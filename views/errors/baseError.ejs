@@ -1,0 +1,271 @@
+<% title = __(`errors.${error}.title`);
+if (title === `errors.${error}.title`) title = `Error ${error}` %>
+
+<%- include("../partials/header", { title: title }) %>
+</div>
+
+<div class="flex w-full justify-center text-center overflow-x-auto -mt-6">
+    <div class="p-2 sm:p-4 mx-auto rounded-lg shadow-lg w-72 sm:w-96 border-4 border-l-[6px] border-b-[6px] border-gray-600 dark:border-gray-300">
+        <div id="display" class="flex flex-row border-2 border-gray-600 dark:border-gray-300 rounded p-0.5 sm:p-1 mb-2 sm:mb-4 h-12 sm:h-16 text-gray-600 dark:text-gray-300">
+        </div>
+        <div class="grid grid-cols-4 gap-2 sm:gap-4 py-1 sm:py-2">
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">7</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">8</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">9</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50">/</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">4</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">5</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">6</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">*</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50">1</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">2</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">3</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50">-</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">0</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">.</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none">C</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50">+</button>
+            <button class="button font-bold text-lg border-2 border-l-4 border-b-4 border-gray-600 dark:border-gray-300 text-gray-600 dark:text-gray-300 px-1 sm:px-2 py-1 sm:py-1.5 rounded-lg shadow-lg focus:outline-none col-span-4">=</button>
+        </div>
+    </div>
+
+</div>
+<div class="w-full text-center mt-4 mb-6">
+    <% errorText = __(`errors.${error}.desc`);
+    if (errorText !== `errors.${error}.desc`) { %>
+        <p class="text-lg sm:text-xl mx-4"><%= errorText %></p>
+    <% } %>
+</div>
+
+<style>
+  .S8D {
+    display: inline-block;
+    position: relative;
+    width: 2.1rem;
+    height: 2.625rem;
+  }
+  .S8D-segment {
+    position: absolute;
+    width: 16.6666666666%;
+    height: 31%;
+    color: rgba(209, 213, 219, 0.75);
+    background-color: currentColor;
+  }
+  .dark .S8D-segment {
+    color: rgba(75, 85, 99, 0.75);
+  }
+  .S8D-segment::before,
+  .S8D-segment::after {
+    content: "";
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 33.333333%;
+    overflow: hidden;
+    position: absolute;
+    right: 0;
+    border-style: solid;
+    border-width: 2.325px;
+    border-color: transparent;
+  }
+  .S8D-segment::before {
+    top: -33.333333%;
+    border-bottom-color: currentColor;
+  }
+  .S8D-segment::after {
+    bottom: -33.333333%;
+    border-top-color: currentColor;
+  }
+  .S8D-segment.-seg-p::before {
+    overflow: unset;
+  }
+  .S8D-segment.-seg-p::after {
+    overflow: unset;
+  }
+  .S8D[data-code*="a"] .-seg-a,
+  .S8D[data-code*="b"] .-seg-b,
+  .S8D[data-code*="c"] .-seg-c,
+  .S8D[data-code*="d"] .-seg-d,
+  .S8D[data-code*="e"] .-seg-e,
+  .S8D[data-code*="f"] .-seg-f,
+  .S8D[data-code*="g"] .-seg-g,
+  .S8D[data-code*="p"] .-seg-p {
+    color: rgb(75 85 99);
+    z-index: 10;
+  }
+  .dark .S8D[data-code*="a"] .-seg-a,
+  .dark .S8D[data-code*="b"] .-seg-b,
+  .dark .S8D[data-code*="c"] .-seg-c,
+  .dark .S8D[data-code*="d"] .-seg-d,
+  .dark .S8D[data-code*="e"] .-seg-e,
+  .dark .S8D[data-code*="f"] .-seg-f,
+  .dark .S8D[data-code*="g"] .-seg-g,
+  .dark .S8D[data-code*="p"] .-seg-p {
+    color: rgb(209 213 219);
+  }
+  .-seg-a { top: -5%; left: 41.666666666%; transform: rotate(90deg); }
+  .-seg-b { top: 15%; right: 8.333333333%; }
+  .-seg-c { bottom: 15%; right: 8.33333333%; }
+  .-seg-d { bottom: -5%; left: 41.666666666%; transform: rotate(90deg); }
+  .-seg-e { bottom: 15%; left: 8.33333333%; }
+  .-seg-f { top: 15%; left: 8.33333333%; }
+  .-seg-g { top: 35%; left: 41.666666666%; transform: rotate(90deg); }
+  .-seg-p { bottom: 5%; right: -5%; height: 9.31%; background-color: transparent; border: none; transform: none; }
+
+  @media (min-width: 640px) {
+    .S8D {
+        height: 3.5rem;
+    }
+    .S8D-segment::before,
+    .S8D-segment::after {
+        border-width: 3.1px;
+    }
+    .-seg-p { bottom: 0%; height: 10.8%;}
+  }
+</style>
+
+<script>
+const display = document.getElementById('display');
+let currentInput = '';
+let operator = null;
+let previousInput = '';
+const maxDigits = 10;
+
+const S8DNumCode = {
+    '0': 'abcdef',
+    '1': 'bc',
+    '2': 'abdeg',
+    '3': 'abcdg',
+    '4': 'bcfg',
+    '5': 'acdfg',
+    '6': 'acdefg',
+    '7': 'abc',
+    '8': 'abcdefg',
+    '9': 'abcdfg',
+    '-': 'g',
+    'E': 'adefg',
+    'r': "eg",
+    'o': 'cdeg',
+    'I': 'ef',
+    'n': 'ceg',
+    'f': 'aefg'
+};
+
+function createS8D() {
+    let S8D = document.createElement('div');
+    S8D.classList.add('S8D');
+    for (let name of 'abcdefgp') {
+        let segment = document.createElement('div');
+        segment.classList.add('S8D-segment');
+        segment.classList.add(`-seg-${name}`);
+        S8D.appendChild(segment);
+    }
+    S8D.dataset.code = '';
+    return S8D;
+}
+
+function lightS8D(S8D, code) {
+    S8D.dataset.code = code;
+    return S8D;
+}
+
+function lightS8DNum(S8D, num) {
+    let code = S8DNumCode[num] || '';
+    lightS8D(S8D, code);
+}
+
+function updateDisplay(text) {
+    display.innerHTML = '';
+    let value;
+    if (text) value = text;
+    else {
+        value = currentInput || '0';
+        if (value.toString().length > maxDigits || value.toString()?.includes("e")) {
+            value = parseFloat(value).toExponential().replace('e', 'E').replace('+', '');
+            if (value.split("E")[1] === '0') {
+                const maxDecimals = maxDigits - 1;
+                value = (Math.round(parseFloat(value.split("E")[0]) * 10**maxDecimals) / 10**maxDecimals).toString();
+            } else {
+                const maxDecimals = maxDigits - value.split("E")[1].length - 2;
+                value = (Math.round(parseFloat(value.split("E")[0]) * 10**maxDecimals) / 10**maxDecimals).toString() + "E" + value.split("E")[1];
+            }
+        }
+    }
+    value = " ".repeat(Math.max(maxDigits - value.length + value.includes("."), 0)) + value;
+    let prev;
+    for (let char of value) {
+        if (char === ".") {
+            prev.dataset.code = prev.dataset.code + "p";
+        } else {
+            let S8D = createS8D();
+            prev = S8D;
+            lightS8DNum(S8D, char);
+            display.appendChild(S8D);
+        }
+    }
+}
+
+document.querySelectorAll('.button').forEach(button => {
+    button.addEventListener('click', () => {
+        const value = button.textContent;
+        if (value === 'C') {
+            currentInput = '';
+            previousInput = '';
+            operator = null;
+            updateDisplay();
+        } else if (value === '=') {
+            if (!operator && previousInput[0] === "-") operator = "+";
+            if (operator && previousInput !== '') {
+                currentInput = parseFloat(eval(`${previousInput}${operator}${currentInput}`).toString()).toString();
+                if (currentInput === "NaN") currentInput = "Error";
+                if (currentInput === "Infinity") currentInput = "Inf.";
+                operator = null;
+                previousInput = '';
+                updateDisplay();
+            }
+        } else if (['+', '-', '*', '/'].includes(value)) {
+            if (operator !== null && operator !== "-" && value === "-" && currentInput.length < maxDigits) {
+                if (!currentInput.includes("-")) {
+                    currentInput = "-" + currentInput;
+                    updateDisplay();
+                } 
+            } else if (operator !== null && operator !== "-" && currentInput.includes("-")) {
+                currentInput = currentInput.substring(1);
+                updateDisplay();
+                return;
+            }
+            if (currentInput !== '') {
+                if (operator) {
+                    currentInput = parseFloat(eval(`${previousInput}${operator}${currentInput}`).toString()).toString();
+                    if (currentInput === "NaN") currentInput = "Error";
+                    if (currentInput === "Infinity") currentInput = "Inf.";
+                    updateDisplay();
+                }
+                previousInput = currentInput;
+                currentInput = '';
+                operator = value;
+            }
+        } else {
+            if (currentInput === "Error" || currentInput === "Inf.") {
+                currentInput = '';
+                previousInput = '';
+                operator = null;
+            }
+            if (value === ".") {
+                if (!currentInput.includes(".")) {
+                    currentInput = (currentInput + value).replace(/^0+(?!\.)/, '') || '0';
+                    updateDisplay();
+                }
+            } else if (currentInput.length < maxDigits) {
+                currentInput = (currentInput + value).replace(/^0+(?!\.)/, '') || '0';
+                updateDisplay();
+            }
+        }
+    });
+});
+
+updateDisplay("Error <%= error %>");
+</script>
+
+<div>
+<%- include("../partials/footer") %>

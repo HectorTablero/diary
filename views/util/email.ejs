@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Contact Form Submission</title>
+        <style>
+            body {
+                font-family:
+                    Inter var,
+                    ui-sans-serif,
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    Segoe UI,
+                    Roboto,
+                    Helvetica Neue,
+                    Arial,
+                    Noto Sans,
+                    sans-serif,
+                    Apple Color Emoji,
+                    Segoe UI Emoji,
+                    Segoe UI Symbol,
+                    Noto Color Emoji;
+                color: #e5e7eb; /* text-gray-300 */
+                margin: 0;
+                padding: 0;
+            }
+            .page {
+                width: 100%;
+                background-color: #384152;
+            }
+            .container {
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 72px;
+                background-color: #384152;
+            }
+            .header,
+            .content {
+                padding: 16px;
+                background-color: #202938; /* bg-gray-800 */
+                border-radius: 6px;
+            }
+            .content {
+                margin-top: 24px;
+            }
+            .header h1 {
+                font-size: 24px;
+                margin: 0;
+                color: #ffffff; /* text-white */
+            }
+            .header p {
+                margin: 0;
+                color: #9ca3af; /* text-gray-500 */
+            }
+            .content p {
+                margin: 0;
+                color: #e5e7eb; /* text-gray-300 */
+            }
+
+            a {
+                color: inherit !important;
+                text-decoration: none !important;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="page">
+            <div class="container">
+                <div class="header">
+                    <h1><a href="mailto:<%= email %>"><%= name %></a></h1>
+                    <p><a href="mailto:<%= email %>"><%= email %></a></p>
+                </div>
+                <div class="content">
+                    <p><%- message.replaceAll("\n", "<br />") %></p>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

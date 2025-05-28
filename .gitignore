@@ -1,0 +1,4 @@
+.env
+deploy.bat
+node_modules/*
+dist/*
