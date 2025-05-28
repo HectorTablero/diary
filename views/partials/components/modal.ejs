@@ -1,0 +1,81 @@
+<!-- Modal Component -->
+<%
+    const sizeVariants = {
+        sm: 'max-w-md',
+        md: 'max-w-lg',
+        lg: 'max-w-2xl',
+        xl: 'max-w-4xl'
+    };
+    
+    const size = locals.size || 'md';
+    const sizeClasses = sizeVariants[size] || sizeVariants.md;
+%>
+
+<div id="<%= id %>" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <!-- Background overlay -->
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        
+        <!-- Center modal -->
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-full <%= sizeClasses %> sm:p-6">
+            <!-- Modal header -->
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white" id="modal-title">
+                    <%= title %>
+                </h3>
+                <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200" onclick="closeModal('<%= id %>')">
+                    <span class="sr-only">Close</span>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+              <!-- Modal content -->
+            <div class="modal-content">
+                <% if (locals.content) { %>
+                    <%- content %>
+                <% } else { %>
+                    <!-- Content will be inserted here -->
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+    
+    // Close modal when clicking outside
+    document.addEventListener('click', function(event) {
+        if (event.target.classList.contains('bg-opacity-75')) {
+            const modals = document.querySelectorAll('[role="dialog"]');
+            modals.forEach(modal => {
+                if (!modal.classList.contains('hidden')) {
+                    closeModal(modal.id);
+                }
+            });
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const modals = document.querySelectorAll('[role="dialog"]');
+            modals.forEach(modal => {
+                if (!modal.classList.contains('hidden')) {
+                    closeModal(modal.id);
+                }
+            });
+        }
+    });
+</script>

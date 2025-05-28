@@ -1,0 +1,85 @@
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/images/favicon.png" />
+    <title>Servidor Inactivo - QED</title>
+    <style id="scrollbar-style"></style>
+    <script src="/js/theme.js"></script>
+    <style>
+        body {
+            font-family:
+                Inter var,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                Segoe UI,
+                Roboto,
+                Helvetica Neue,
+                Arial,
+                Noto Sans,
+                sans-serif,
+                Apple Color Emoji,
+                Segoe UI Emoji,
+                Segoe UI Symbol,
+                Noto Color Emoji;
+            background-color: rgb(243, 244, 246);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            margin: 0;
+        }
+
+        .dark body {
+            background-color: rgb(55, 65, 81);
+        }
+
+        h1 {
+            color: rgb(30, 58, 138);
+            font-size: 3.75rem;
+            text-align: center;
+            margin: 0;
+        }
+
+        .dark h1 {
+            color: rgb(191, 219, 254);
+        }
+
+        h2 {
+            color: rgb(30, 64, 175);
+            font-size: 2.25rem;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            margin-top: 0;
+        }
+
+        .dark h2 {
+            color: rgb(147, 197, 253);
+        }
+
+        p {
+            color: black;
+            font-size: 1rem;
+            text-align: center;
+            margin: 0;
+        }
+
+        .dark p {
+            color: white;
+        }
+    </style>
+</head>
+
+<h1>Servidor Inactivo</h1>
+<h2>Estamos trabajando en ello...</h2>
+<p>
+    Esta página se refrescará automáticamente cuando el servidor se reinicie. Espere aquí o pruebe
+    de nuevo en unos minutos.
+</p>
+
+<script src="/js/offlineRefresh.js"></script>
+<script>
+    checkConnectivity("/endpoints/health");
+</script>
