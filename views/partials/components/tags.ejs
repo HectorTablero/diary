@@ -1,0 +1,13 @@
+<% try {
+    big = big || false;
+} catch (err) {
+    big = false;
+} %>
+
+<div class="flex flex-wrap sm:justify-end -ml-1 sm:ml-0 sm:-mt-2 min-w-20">
+    <% tags.forEach((tag) => { %>
+        <span class="px-2 py-0.5 mx-1 mt-2 h-min bg-blue-200 <%= big ? 'text-xl' : ''%> text-blue-800 rounded-md dark:bg-blue-800 dark:text-blue-200">
+            <%= __(`tags.${tag}`) %>
+        </span>
+    <% }) %>
+</div>

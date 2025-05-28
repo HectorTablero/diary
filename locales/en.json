@@ -1,0 +1,111 @@
+{
+  "navigation": {
+    "diary": "Diary",
+    "friends": "Friends",
+    "tags": "Tags",
+    "settings": "Settings"
+  },  "diary": {
+    "title": "Diary",
+    "subtitle": "Your personal space for thoughts and memories",
+    "newEntry": "New Entry",
+    "editEntry": "Edit Entry",
+    "addSubEntry": "Add Sub-Entry",
+    "previousDay": "Previous Day",
+    "today": "Today",
+    "nextDay": "Next Day",
+    "loading": "Loading entries...",
+    "noEntries": "No entries for this day",
+    "noEntriesDescription": "Start writing your thoughts for today",
+    "scrollToAdd": "Add Entry",
+    "content": "Content",
+    "contentPlaceholder": "What's on your mind today?",
+    "relevance": "Relevance",
+    "date": "Date",
+    "tags": "Tags",
+    "save": "Save Entry"
+  },
+  "relevance": {
+    "label": "Relevance",
+    "levels": {
+      "1": "Life-Changing",
+      "2": "Significant",
+      "3": "Moderate",
+      "4": "Anecdotal",
+      "5": "Thought"
+    },
+    "descriptions": {
+      "1": "Major life events like getting married, new job, buying a house",
+      "2": "Important personal developments and meaningful experiences",
+      "3": "Notable daily events and moderate achievements",
+      "4": "Routine happenings and small observations",
+      "5": "Casual thoughts and trivial daily anecdotes"
+    }
+  },
+  "friends": {
+    "title": "Friends",
+    "subtitle": "Manage friend profiles to filter and organize your diary entries",
+    "addFriend": "Add Friend",
+    "backToDiary": "Back to Diary",
+    "loading": "Loading friends...",
+    "noFriends": "No friends yet",
+    "createFirstFriend": "Create your first friend profile above!",
+    "name": "Friend Name",
+    "namePlaceholder": "Enter friend name",
+    "tags": "Tags",
+    "tagsDescription": "Select tags to filter entries for this friend",
+    "cancel": "Cancel",
+    "editFriend": "Edit Friend",
+    "save": "Save"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Customize your diary experience",
+    "backToDiary": "Back to Diary",
+    "loading": "Loading settings...",
+    "saving": "Saving changes...",
+    "resetToDefaults": "Reset to Defaults",
+    "saveChanges": "Save Changes",
+    "relevanceDurations": {
+      "title": "Relevance Duration Settings",
+      "description": "Set how many days entries with different relevance levels remain visible",
+      "daysLabel": "Days visible",
+      "howItWorks": "How Relevance Duration Works",
+      "explanation": "Entries are automatically hidden after their relevance duration expires. For example, if you set life-changing relevance to 30 days, those entries will only be visible for 30 days after creation."
+    }
+  },
+  "tags": {
+    "title": "Tag Management",
+    "subtitle": "Create and manage tags for organizing your diary entries",
+    "addTag": "Add Tag",
+    "backToDiary": "Back to Diary",
+    "existingTags": "Your Tags",
+    "searchPlaceholder": "Search tags...",
+    "loading": "Loading tags...",
+    "noTags": "No tags yet",
+    "noTagsDescription": "Create your first tag to start organizing your diary entries.",
+    "name": "Tag Name",
+    "namePlaceholder": "Enter tag name",
+    "color": "Color",
+    "description": "Description (Optional)",
+    "descriptionPlaceholder": "Brief description of this tag",
+    "cancel": "Cancel",
+    "createTag": "Create Tag",
+    "editTag": "Edit Tag",
+    "saveChanges": "Save Changes"
+  },
+  "components": {
+    "button": {
+      "cancel": "Cancel"
+    }
+  },
+  "errors": {
+    "404": {
+      "title": "Page Not Found",
+      "desc": "The page you're looking for doesn't exist."
+    },
+    "500": {
+      "title": "Server Error",
+      "desc": "Something went wrong on our end. Please try again later."
+    }
+  }
+}

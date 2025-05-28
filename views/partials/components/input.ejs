@@ -1,0 +1,59 @@
+<!-- Input Component -->
+<%
+    const type = locals.type || 'text';
+    const baseInputClasses = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200';
+    const inputClasses = locals.className ? `${baseInputClasses} ${locals.className}` : baseInputClasses;
+%>
+
+<div class="space-y-1">
+    <% if (locals.label) { %>
+        <label <% if (locals.id) { %>for="<%= id %>"<% } %> class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <%= label %>
+            <% if (locals.required) { %>
+                <span class="text-red-500">*</span>
+            <% } %>
+        </label>
+    <% } %>
+    
+    <% if (type === 'textarea') { %>
+        <textarea
+            <% if (locals.id) { %>id="<%= id %>"<% } %>
+            <% if (locals.name) { %>name="<%= name %>"<% } %>
+            <% if (locals.placeholder) { %>placeholder="<%= placeholder %>"<% } %>
+            <% if (locals.required) { %>required<% } %>
+            <% if (locals.rows) { %>rows="<%= rows %>"<% } else { %>rows="3"<% } %>
+            class="<%= inputClasses %> resize-none"
+        ><% if (locals.value) { %><%= value %><% } %></textarea>
+    <% } else if (type === 'select') { %>        <select
+            <% if (locals.id) { %>id="<%= id %>"<% } %>
+            <% if (locals.name) { %>name="<%= name %>"<% } %>
+            <% if (locals.required) { %>required<% } %>
+            class="<%= inputClasses %>"
+        >
+            <% if (locals.options) { %>
+                <% locals.options.forEach(option => { %>
+                    <option value="<%= option.value %>" <% if (locals.value === option.value) { %>selected<% } %>>
+                        <%= option.text || option.label %>
+                    </option>
+                <% }) %>
+            <% } %>
+        </select>
+    <% } else { %>
+        <input
+            type="<%= type %>"
+            <% if (locals.id) { %>id="<%= id %>"<% } %>
+            <% if (locals.name) { %>name="<%= name %>"<% } %>
+            <% if (locals.placeholder) { %>placeholder="<%= placeholder %>"<% } %>
+            <% if (locals.value) { %>value="<%= value %>"<% } %>
+            <% if (locals.required) { %>required<% } %>
+            <% if (locals.min) { %>min="<%= min %>"<% } %>
+            <% if (locals.max) { %>max="<%= max %>"<% } %>
+            <% if (locals.step) { %>step="<%= step %>"<% } %>
+            class="<%= inputClasses %>"
+        />
+    <% } %>
+    
+    <% if (locals.helpText) { %>
+        <p class="text-sm text-gray-500 dark:text-gray-400"><%= helpText %></p>
+    <% } %>
+</div>
