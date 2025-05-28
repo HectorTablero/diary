@@ -29,8 +29,8 @@
     "levels": {
       "1": "Life-Changing",
       "2": "Significant",
-      "3": "Moderate",
-      "4": "Anecdotal",
+      "3": "Anecdotal",
+      "4": "Event",
       "5": "Thought"
     },
     "descriptions": {
