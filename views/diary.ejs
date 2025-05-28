@@ -1,0 +1,341 @@
+<%- include('partials/header', { title: __('diary.title') }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <%= __('diary.title') %>
+            </h1>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">
+                <%= __('diary.subtitle') %>
+            </p>
+        </div>        <div class="flex items-center space-x-3">
+            <button 
+                onclick="openAddEntryModal()"
+                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
+            >
+                <%= __('diary.newEntry') %>
+            </button>
+            <div class="text-right">
+                <p class="text-sm font-medium text-gray-900 dark:text-white" id="current-date">
+                    <!-- Current date will be inserted here -->
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Date Navigation -->
+<div class="mb-6">
+    <div class="flex items-center justify-center space-x-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+        <button 
+            id="prev-day-btn"
+            class="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            title="<%= __('diary.previousDay') %>"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
+        
+        <div class="flex items-center space-x-3">
+            <input 
+                type="date" 
+                id="date-selector"
+                class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
+            />
+            <button 
+                id="today-btn"
+                class="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+                <%= __('diary.today') %>
+            </button>
+        </div>
+        
+        <button 
+            id="next-day-btn"
+            class="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            title="<%= __('diary.nextDay') %>"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<!-- Entries Display -->
+<div id="entries-display" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+    <div id="entries-container" class="space-y-3">
+        <!-- Entries will be loaded here -->
+    </div>
+    
+    <!-- Loading State -->
+    <div id="loading" class="hidden">
+        <%- include('partials/components/loading', { text: __('diary.loading') }) %>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden">
+        <%- include('partials/components/empty-state', { 
+            title: __('diary.noEntries'),
+            description: __('diary.noEntriesDescription'),
+            actionText: __('diary.scrollToAdd'),
+            removePadding: true,
+            icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>'
+        }) %>
+    </div>
+</div>
+
+<!-- Add Entry Modal -->
+<div id="add-entry-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center w-full">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        
+        <!-- Center modal -->
+        <div class="relative inline-block bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all max-w-lg w-full mx-auto">
+            <!-- Modal header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white" id="modal-title">
+                    <%= __('diary.newEntry') %>
+                </h3>
+                <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200" onclick="closeModal('add-entry-modal')">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Modal content -->
+            <div class="px-6 py-4">
+                <form id="add-entry-form" class="space-y-6">
+                    <!-- Entry Content -->
+                    <%- include('partials/components/input', { 
+                        type: 'textarea',
+                        id: 'entry-content',
+                        label: __('diary.content'),
+                        placeholder: __('diary.contentPlaceholder'),
+                        required: true,
+                        rows: 4
+                    }) %>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Relevance Selection -->
+                        <%- include('partials/components/input', { 
+                            type: 'select',
+                            id: 'entry-priority',
+                            label: __('relevance.label'),
+                            options: [
+                                { value: '1', label: __('relevance.levels.1') },
+                                { value: '2', label: __('relevance.levels.2') },
+                                { value: '3', label: __('relevance.levels.3') },
+                                { value: '4', label: __('relevance.levels.4') },
+                                { value: '5', label: __('relevance.levels.5') }
+                            ]
+                        }) %>
+                        
+                        <!-- Date Selection -->
+                        <%- include('partials/components/input', { 
+                            type: 'date',
+                            id: 'entry-date',
+                            label: __('diary.date')
+                        }) %>
+                    </div>
+                    
+                    <!-- Tag Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <%= __('diary.tags') %>
+                        </label>
+                        <div id="tag-selection" class="flex flex-wrap gap-2 mb-3 min-h-[2.5rem] p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                            <!-- Available tags will be loaded here -->
+                        </div>
+                        <div id="selected-tags" class="flex flex-wrap gap-2">
+                            <!-- Selected tags will appear here -->
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <%- include('partials/components/button', { 
+                            text: __('components.button.cancel'),
+                            variant: 'outline',
+                            type: 'button',
+                            onclick: 'closeModal("add-entry-modal")'
+                        }) %>
+                        <%- include('partials/components/button', { 
+                            text: __('diary.save'),
+                            variant: 'primary',
+                            type: 'submit'
+                        }) %>
+                    </div>
+                </form>
+            </div>
+        </div>    </div>
+</div>
+
+<!-- Edit Entry Modal -->
+<div id="edit-entry-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center w-full">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        
+        <!-- Center modal -->
+        <div class="relative inline-block bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all max-w-lg w-full mx-auto">
+            <!-- Modal header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white" id="edit-modal-title">
+                    <%= __('diary.editEntry') || 'Edit Entry' %>
+                </h3>
+                <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200" onclick="closeModal('edit-entry-modal')">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Modal content -->
+            <div class="px-6 py-4">
+                <form id="edit-entry-form" class="space-y-6">
+                    <input type="hidden" id="edit-entry-id">
+                    
+                    <!-- Entry Content -->
+                    <%- include('partials/components/input', { 
+                        type: 'textarea',
+                        id: 'edit-entry-content',
+                        label: __('diary.content'),
+                        placeholder: __('diary.contentPlaceholder'),
+                        required: true,
+                        rows: 4
+                    }) %>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Relevance Selection -->
+                        <%- include('partials/components/input', { 
+                            type: 'select',
+                            id: 'edit-entry-priority',
+                            label: __('relevance.label'),
+                            options: [
+                                { value: '1', label: __('relevance.levels.1') },
+                                { value: '2', label: __('relevance.levels.2') },
+                                { value: '3', label: __('relevance.levels.3') },
+                                { value: '4', label: __('relevance.levels.4') },
+                                { value: '5', label: __('relevance.levels.5') }
+                            ]
+                        }) %>
+                        
+                        <!-- Date Selection -->
+                        <%- include('partials/components/input', { 
+                            type: 'date',
+                            id: 'edit-entry-date',
+                            label: __('diary.date')
+                        }) %>
+                    </div>
+                    
+                    <!-- Tag Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <%= __('diary.tags') %>
+                        </label>
+                        <div id="edit-tag-selection" class="flex flex-wrap gap-2 mb-3 min-h-[2.5rem] p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                            <!-- Available tags will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <%- include('partials/components/button', { 
+                            text: __('components.button.cancel'),
+                            variant: 'outline',
+                            type: 'button',
+                            onclick: 'closeModal("edit-entry-modal")'
+                        }) %>
+                        <%- include('partials/components/button', { 
+                            text: __('diary.save'),
+                            variant: 'primary',
+                            type: 'submit'
+                        }) %>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Sub-Entry Modal -->
+<div id="add-sub-entry-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center w-full">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        
+        <!-- Center modal -->
+        <div class="relative inline-block bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all max-w-lg w-full mx-auto">
+            <!-- Modal header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white" id="sub-entry-modal-title">
+                    <%= __('diary.addSubEntry') || 'Add Sub-Entry' %>
+                </h3>
+                <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200" onclick="closeModal('add-sub-entry-modal')">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Modal content -->
+            <div class="px-6 py-4">
+                <form id="add-sub-entry-form" class="space-y-6">
+                    <input type="hidden" id="sub-entry-parent-id">
+                    
+                    <!-- Entry Content -->
+                    <%- include('partials/components/input', { 
+                        type: 'textarea',
+                        id: 'sub-entry-content',
+                        label: __('diary.content'),
+                        placeholder: __('diary.contentPlaceholder'),
+                        required: true,
+                        rows: 4
+                    }) %>
+                    
+                    <!-- Priority Selection -->
+                    <%- include('partials/components/input', { 
+                        type: 'select',
+                        id: 'sub-entry-priority',
+                        label: __('relevance.label'),
+                        options: [
+                            { value: '1', label: __('relevance.levels.1') },
+                            { value: '2', label: __('relevance.levels.2') },
+                            { value: '3', label: __('relevance.levels.3') },
+                            { value: '4', label: __('relevance.levels.4') },
+                            { value: '5', label: __('relevance.levels.5') }
+                        ]
+                    }) %>
+                    
+                    <!-- Tag Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <%= __('diary.tags') %>
+                        </label>
+                        <div id="sub-entry-tag-selection" class="flex flex-wrap gap-2 mb-3 min-h-[2.5rem] p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                            <!-- Available tags will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <%- include('partials/components/button', { 
+                            text: __('components.button.cancel'),
+                            variant: 'outline',
+                            type: 'button',
+                            onclick: 'closeModal("add-sub-entry-modal")'
+                        }) %>
+                        <%- include('partials/components/button', { 
+                            text: __('diary.save'),
+                            variant: 'primary',
+                            type: 'submit'
+                        }) %>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced JavaScript -->
+<script src="/js/diary.js"></script>
+
+<%- include('partials/footer') %>

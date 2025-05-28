@@ -1,0 +1,167 @@
+<%- include('partials/header', { title: __('friends.title') || 'Friends' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <%= __('friends.title') || 'Friends' %>
+            </h1>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">
+                <%= __('friends.subtitle') || 'Manage friend profiles to filter and organize your diary entries' %>
+            </p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <%- include('partials/components/button', { 
+                text: __('friends.addFriend') || 'Add Friend',
+                variant: 'primary',
+                onclick: 'openModal("add-friend-modal")',
+                icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>'
+            }) %>
+            <%- include('partials/components/button', { 
+                text: __('friends.backToDiary') || 'Back to Diary',
+                variant: 'outline',
+                href: '/diary',
+                icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>'
+            }) %>
+        </div>
+    </div>
+</div>
+
+
+<div class="mb-8">
+    <!-- Friends List -->
+    <div class="space-y-4" id="friends-list">
+        <!-- Friends will be loaded here -->
+    </div>
+    
+    <!-- Loading State -->
+    <div id="loading" class="hidden">
+        <%- include('partials/components/loading', { text: __('friends.loading') || 'Loading...' }) %>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden">
+        <%- include('partials/components/empty-state', { 
+            icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />',
+            title: __('friends.noFriends') || 'No friends yet',
+            description: __('friends.createFirstFriend') || 'Create your first friend profile above!'
+        }) %>
+    </div>
+</div>
+
+<!-- Add Friend Modal -->
+<div id="add-friend-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center w-full">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <div class="relative inline-block bg-white dark:bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all max-w-lg w-full mx-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                    <%= __('friends.addFriend') || 'Add New Friend' %>
+                </h3>
+                <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200" onclick="closeModal('add-friend-modal')">
+                    <span class="sr-only">Close</span>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content">
+                <form id="add-friend-modal-form" class="space-y-4">
+                    <%- include('partials/components/input', { 
+                        type: 'text',
+                        id: 'modal-friend-name',
+                        label: __('friends.name') || 'Friend Name',
+                        placeholder: __('friends.namePlaceholder') || 'Enter friend name',
+                        required: true
+                    }) %>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <%= __('friends.tags') || 'Tags' %>
+                        </label>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                            <%= __('friends.tagsDescription') || 'Select tags to filter entries for this friend' %>
+                        </p>
+                        <div id="modal-friend-tag-selection" class="flex flex-wrap gap-2">
+                            <!-- Tags will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-4">
+                        <%- include('partials/components/button', { 
+                            text: __('friends.cancel') || 'Cancel',
+                            variant: 'outline',
+                            onclick: 'closeModal("add-friend-modal")'
+                        }) %>
+                        <%- include('partials/components/button', { 
+                            text: __('friends.addFriend') || 'Add Friend',
+                            variant: 'primary',
+                            type: 'submit'
+                        }) %>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Friend Modal -->
+<div id="edit-friend-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-full max-w-lg sm:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                    <%= __('friends.editFriend') || 'Edit Friend' %>
+                </h3>
+                <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200" onclick="closeModal('edit-friend-modal')">
+                    <span class="sr-only">Close</span>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content">
+                <form id="edit-friend-form" class="space-y-4">
+                    <input type="hidden" id="edit-friend-id">
+                    <%- include('partials/components/input', { 
+                        type: 'text',
+                        id: 'edit-friend-name',
+                        label: __('friends.name') || 'Friend Name',
+                        required: true
+                    }) %>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <%= __('friends.tags') || 'Tags' %>
+                        </label>
+                        <div id="edit-friend-tag-selection" class="flex flex-wrap gap-2">
+                            <!-- Tags will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-4">
+                        <%- include('partials/components/button', { 
+                            text: __('friends.cancel') || 'Cancel',
+                            variant: 'outline',
+                            onclick: 'closeModal("edit-friend-modal")'
+                        }) %>
+                        <%- include('partials/components/button', { 
+                            text: __('friends.save') || 'Save',
+                            variant: 'primary',
+                            type: 'submit'
+                        }) %>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+    </div>
+</div>
+
+<!-- Include friends-specific JavaScript -->
+<script src="/js/friends.js"></script>
+
+<%- include('partials/footer') %>

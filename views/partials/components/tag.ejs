@@ -1,0 +1,46 @@
+<!-- Tag Component -->
+<%
+    const color = locals.color || '#3b82f6';
+    const selected = locals.selected || false;
+    const removable = locals.removable || false;
+    
+    // Convert hex color to tailwind-like classes (simplified)
+    const getTagClasses = (color, selected) => {
+        const baseClasses = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-all duration-200';
+        
+        if (selected) {
+            return `${baseClasses} text-white shadow-md transform scale-105`;
+        } else {
+            return `${baseClasses} text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600`;
+        }
+    };
+    
+    const tagClasses = getTagClasses(color, selected);
+%>
+
+<span 
+    class="<%= tagClasses %>" 
+    style="<% if (selected) { %>background-color: <%= color %>;<% } %>"
+    <% if (locals.onclick) { %>onclick="<%= onclick %>"<% } %>
+    <% if (locals.id) { %>data-tag-id="<%= id %>"<% } %>
+>
+    <% if (locals.icon) { %>
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <%- icon %>
+        </svg>
+    <% } %>
+    
+    <span><%= name %></span>
+    
+    <% if (removable) { %>
+        <button 
+            type="button" 
+            class="ml-2 -mr-1 w-4 h-4 rounded-full hover:bg-black hover:bg-opacity-20 flex items-center justify-center transition-colors duration-200"
+            <% if (locals.onRemove) { %>onclick="<%= onRemove %>"<% } %>
+        >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    <% } %>
+</span>

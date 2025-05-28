@@ -1,0 +1,387 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.custom-br {
+    height: 10px;
+}
+
+#scroll-percentage {
+    position: fixed;
+    right: 5px;
+    transform: translateY(-50%);
+    font-size: 14px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+#scroll-percentage.visible {
+    opacity: 1;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track-color);
+    border-radius: 5px;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb-color);
+    border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover-color);
+}
+#scroll-percentage {
+    color: var(--scrollbar-percentage-color);
+}
+
+.footnote-ref a {
+    @apply text-blue-500 dark:text-blue-300;
+}
+
+.footnote-backref {
+    @apply text-blue-500 dark:text-blue-300;
+    font-family: initial;
+}
+
+.katex-display {
+    margin: 1.3333333em 0 !important;
+}
+
+.katex {
+    /* white-space: normal !important; */
+    display: inline-block;
+    overflow-x: auto;
+    overflow-y: hidden;
+    font-size: 1em !important;
+    margin-bottom: -0.5rem; /* -0.625rem; */
+}
+
+eq .katex {
+    /* Inline latex */
+    scrollbar-width: none;
+}
+
+.katex * {
+    /* margin-bottom: 0.125rem; */
+}
+
+.katex .katex-html .newline {
+    height: 10px;
+}
+
+@media (min-width: 640px) {
+    .katex {
+        font-size: 1.2em !important;
+    }
+}
+
+.spoiler-overlay {
+    @apply absolute left-0 top-0 z-[100] flex h-full w-full cursor-pointer items-center justify-center border-2 border-dashed border-gray-300 bg-white/80 text-xl text-black transition-all duration-500 ease-in-out dark:border-gray-500 dark:bg-gray-800/80 dark:text-white;
+    backdrop-filter: blur(25px);
+}
+
+.spoiler-overlay.hide {
+    @apply border-gray-300/0 bg-white/0 text-black/0 dark:border-gray-500/0 dark:bg-gray-800/0 dark:text-white/0;
+    backdrop-filter: blur(0);
+}
+
+.block-embed-service-youtube,
+.block-embed-service-vimeo,
+.block-embed-service-vine,
+.block-embed-service-prezi {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* LIGHT THEME */
+pre code.hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 1em;
+}
+code.hljs {
+    padding: 3px 5px;
+} /*!
+  Theme: GitHub Dark
+  Description: Dark theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-dark
+  Current colors taken from GitHub"s CSS
+*/
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+    color: #ff7b72;
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+    color: #d2a8ff;
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-variable {
+    color: #79c0ff;
+}
+.hljs-meta .hljs-string,
+.hljs-regexp,
+.hljs-string {
+    color: #a5d6ff;
+}
+.hljs-built_in,
+.hljs-symbol {
+    color: #ffa657;
+}
+.hljs-code,
+.hljs-comment,
+.hljs-formula {
+    color: #8b949e;
+}
+.hljs-name,
+.hljs-quote,
+.hljs-selector-pseudo,
+.hljs-selector-tag {
+    color: #7ee787;
+}
+.hljs-subst {
+    color: #c9d1d9;
+}
+.hljs-section {
+    color: #1f6feb;
+    font-weight: 700;
+}
+.hljs-bullet {
+    color: #f2cc60;
+}
+.hljs-emphasis {
+    color: #c9d1d9;
+    font-style: italic;
+}
+.hljs-strong {
+    color: #c9d1d9;
+    font-weight: 700;
+}
+.hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+}
+.hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+}
+
+/* DARK THEME */
+.dark pre code.hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 1em;
+}
+code.hljs {
+    padding: 3px 5px;
+} /*!
+  Theme: GitHub Dark
+  Description: Dark theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-dark
+  Current colors taken from GitHub"s CSS
+*/
+.dark .hljs-doctag,
+.dark .hljs-keyword,
+.dark .hljs-meta .hljs-keyword,
+.dark .hljs-template-tag,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-variable.language_ {
+    color: #ff7b72;
+}
+.hljs-title,
+.dark .hljs-title.class_,
+.dark .hljs-title.class_.inherited__,
+.dark .hljs-title.function_ {
+    color: #d2a8ff;
+}
+.hljs-attr,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-meta,
+.dark .hljs-number,
+.dark .hljs-operator,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-class,
+.dark .hljs-selector-id,
+.dark .hljs-variable {
+    color: #79c0ff;
+}
+.hljs-meta .hljs-string,
+.dark .hljs-regexp,
+.dark .hljs-string {
+    color: #a5d6ff;
+}
+.hljs-built_in,
+.dark .hljs-symbol {
+    color: #ffa657;
+}
+.hljs-code,
+.dark .hljs-comment,
+.dark .hljs-formula {
+    color: #8b949e;
+}
+.hljs-name,
+.dark .hljs-quote,
+.dark .hljs-selector-pseudo,
+.dark .hljs-selector-tag {
+    color: #7ee787;
+}
+.hljs-subst {
+    color: #c9d1d9;
+}
+.hljs-section {
+    color: #1f6feb;
+    font-weight: 700;
+}
+.hljs-bullet {
+    color: #f2cc60;
+}
+.hljs-emphasis {
+    color: #c9d1d9;
+    font-style: italic;
+}
+.hljs-strong {
+    color: #c9d1d9;
+    font-weight: 700;
+}
+.hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+}
+.hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+}
+
+/* Custom styles for diary entries */
+
+/* Hollow circle entry points with better visual styling */
+.entry-item .w-3.h-3.rounded-full {
+    background: transparent;
+    border-width: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Accordion toggle button styling */
+.toggle-children-btn {
+    background: transparent;
+    border-width: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease-in-out;
+}
+
+/* Ensure the SVG icon is properly centered */
+.toggle-children-btn svg {
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Smooth collapse/expand animation for sub-entries */
+.sub-entries {
+    transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+.sub-entries.collapsed {
+    opacity: 0;
+}
+
+/* Better visual separation for nested entries */
+.entry-item.ml-6 {
+    position: relative;
+}
+
+.entry-item.ml-6::before {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(156, 163, 175, 0.3);
+}
+
+/* Improve hover effects for entry actions */
+.group:hover .opacity-0 {
+    opacity: 1;
+}
+
+/* Better visual feedback for disabled buttons */
+.add-sub-entry-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.add-sub-entry-btn:disabled:hover {
+    color: inherit;
+}
+
+/* Custom color picker styling */
+input[type="color"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: none;
+    border: none;
+    outline: none;
+    cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+    border: none;
+    border-radius: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+input[type="color"]::-moz-color-swatch {
+    border: none;
+    border-radius: 0;
+}
+
+/* Color picker container */
+.color-picker-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.375rem;
+}
+
+.color-picker-container input[type="color"] {
+    transform: scale(1.5);
+    transform-origin: center;
+}

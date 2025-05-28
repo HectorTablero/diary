@@ -1,0 +1,191 @@
+<%- include('partials/header', { title: __('settings.title') || 'Settings' }) %>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <%= __('settings.title') || 'Settings' %>
+            </h1>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">
+                <%= __('settings.subtitle') || 'Customize your diary experience' %>
+            </p>
+        </div>
+        <div>
+            <%- include('partials/components/button', { 
+                text: __('settings.backToDiary') || 'Back to Diary',
+                variant: 'outline',
+                href: '/diary',
+                icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>'
+            }) %>
+        </div>
+    </div>
+</div>
+
+<!-- Priority Duration Settings -->
+<div class="mb-8">
+    <div class="card-content">    <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-2 text-gray-800 dark:text-white">
+            <%= __('settings.relevanceDurations.title') %>
+        </h2>
+        <p class="text-gray-600 dark:text-gray-300 text-sm">
+            <%= __('settings.relevanceDurations.description') %>
+        </p>
+    </div>
+
+    <form id="priority-durations-form" class="space-y-6">
+        <!-- Loading state -->
+        <%- include('partials/components/loading', { 
+            id: 'durations-loading',
+            text: __('settings.loading') || 'Loading settings...'
+        }) %>
+
+        <!-- Form content -->        <div id="durations-form" class="hidden space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <!-- Priority 1 (Life-Changing) -->
+                <div class="rounded-lg p-4 border" style="background-color: #d52a2a10; border-color: #d52a2a;">
+                    <div class="flex items-center mb-3">
+                        <div class="w-3 h-3 rounded-full mr-2" style="background-color: #d52a2a;"></div>
+                        <h3 class="font-medium text-gray-800 dark:text-white text-sm">
+                            <%= __('relevance.levels.1') %>
+                        </h3>
+                    </div>
+                    <%- include('partials/components/input', { 
+                        type: 'number',
+                        id: 'priority-1',
+                        label: __('settings.relevanceDurations.daysLabel'),
+                        min: 1,
+                        max: 365,
+                        required: true,
+                        className: 'focus:ring-[#d52a2a]'
+                    }) %>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <%= __('relevance.descriptions.1') %>
+                    </p>
+                </div>
+
+                <!-- Priority 2 (Significant) -->
+                <div class="rounded-lg p-4 border" style="background-color: #d9682610; border-color: #d96826;">
+                    <div class="flex items-center mb-3">
+                        <div class="w-3 h-3 rounded-full mr-2" style="background-color: #d96826;"></div>
+                        <h3 class="font-medium text-gray-800 dark:text-white text-sm">
+                            <%= __('relevance.levels.2') %>
+                        </h3>
+                    </div>
+                    <%- include('partials/components/input', { 
+                        type: 'number',
+                        id: 'priority-2',
+                        label: __('settings.relevanceDurations.daysLabel'),
+                        min: 1,
+                        max: 365,
+                        required: true,
+                        className: 'focus:ring-[#d96826]'
+                    }) %>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <%= __('relevance.descriptions.2') %>
+                    </p>
+                </div>
+
+                <!-- Priority 3 (Moderate) -->
+                <div class="rounded-lg p-4 border" style="background-color: #c2ac4c10; border-color: #c2ac4c;">
+                    <div class="flex items-center mb-3">
+                        <div class="w-3 h-3 rounded-full mr-2" style="background-color: #c2ac4c;"></div>
+                        <h3 class="font-medium text-gray-800 dark:text-white text-sm">
+                            <%= __('relevance.levels.3') %>
+                        </h3>
+                    </div>
+                    <%- include('partials/components/input', { 
+                        type: 'number',
+                        id: 'priority-3',
+                        label: __('settings.relevanceDurations.daysLabel'),
+                        min: 1,
+                        max: 365,
+                        required: true,
+                        className: 'focus:ring-[#c2ac4c]'
+                    }) %>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <%= __('relevance.descriptions.3') %>
+                    </p>
+                </div>
+
+                <!-- Priority 4 (Minor) -->
+                <div class="rounded-lg p-4 border" style="background-color: #17e8b010; border-color: #17e8b0;">
+                    <div class="flex items-center mb-3">
+                        <div class="w-3 h-3 rounded-full mr-2" style="background-color: #17e8b0;"></div>
+                        <h3 class="font-medium text-gray-800 dark:text-white text-sm">
+                            <%= __('relevance.levels.4') %>
+                        </h3>
+                    </div>
+                    <%- include('partials/components/input', { 
+                        type: 'number',
+                        id: 'priority-4',
+                        label: __('settings.relevanceDurations.daysLabel'),
+                        min: 1,
+                        max: 365,
+                        required: true,
+                        className: 'focus:ring-[#17e8b0]'
+                    }) %>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <%= __('relevance.descriptions.4') %>
+                    </p>
+                </div>
+
+                <!-- Priority 5 (Anecdotal) -->
+                <div class="rounded-lg p-4 border" style="background-color: #18c1e710; border-color: #18c1e7;">
+                    <div class="flex items-center mb-3">
+                        <div class="w-3 h-3 rounded-full mr-2" style="background-color: #18c1e7;"></div>
+                        <h3 class="font-medium text-gray-800 dark:text-white text-sm">
+                            <%= __('relevance.levels.5') %>
+                        </h3>
+                    </div>
+                    <%- include('partials/components/input', { 
+                        type: 'number',
+                        id: 'priority-5',
+                        label: __('settings.relevanceDurations.daysLabel'),
+                        min: 1,
+                        max: 365,
+                        required: true,
+                        className: 'focus:ring-[#18c1e7]'
+                    }) %>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <%= __('relevance.descriptions.5') %>
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>                        <h4 class="font-medium text-blue-800 dark:text-blue-200 mb-1">
+                            <%= __('settings.relevanceDurations.howItWorks') %>
+                        </h4>
+                        <p class="text-sm text-blue-700 dark:text-blue-300">
+                            <%= __('settings.relevanceDurations.explanation') %>
+                        </p>
+                    </div>
+                </div>
+            </div>            <div class="flex justify-end space-x-3">
+                <%- include('partials/components/button', { 
+                    text: __('settings.resetToDefaults') || 'Reset to Defaults',
+                    variant: 'outline',
+                    id: 'reset-durations'
+                }) %>
+                <%- include('partials/components/button', { 
+                    text: __('settings.saveChanges') || 'Save Changes',
+                    variant: 'primary',
+                    type: 'submit'
+                }) %>
+            </div>
+        </div>
+    </form>
+    </div>
+</div>
+
+    </div>
+</div>
+
+<script src="/js/settings.js"></script>
+
+<%- include('partials/footer') %>
