@@ -1259,8 +1259,9 @@ class DiaryApp {
             const actualItems = Math.min(entry.friends.length, maxItems);
             const listHeight = actualItems * itemHeight;
             const maxHeight = Math.min(listHeight + 16, 180); // Add padding and cap at 180px
-            
-            friendsList.style.maxHeight = maxHeight + 'px';
+
+            // friendsList.style.maxHeight = maxHeight + 'px';
+            friendsList.style.maxHeight = '180px';
             friendsList.style.overflowY = entry.friends.length > maxItems ? 'auto' : 'visible';
             
             entry.friends.forEach((friend, index) => {
