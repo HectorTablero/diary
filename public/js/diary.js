@@ -611,7 +611,7 @@ class DiaryApp {
                 </div>
                   <!-- Tags and Friends -->
                 <div class="flex-shrink-0">
-                    <div class="flex flex-col items-end gap-1">
+                    <div class="flex items-end gap-1">
                         ${entry.tags && entry.tags.length > 0 ? `
                             <div class="entry-tags flex flex-wrap gap-1 justify-end">
                                 ${entry.tags.map(tag => `
