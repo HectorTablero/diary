@@ -35,10 +35,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 // POST /api/entries - Create a new diary entry
-router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
-    try {
+router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {    try {
         const userId = new Types.ObjectId((req.user as any).id);
-        const { content, date, priority, tagIds, parentEntryId } = req.body;
+        const { content, date, priority, tagIds, friendIds, parentEntryId } = req.body;
 
         if (!content || content.trim() === '') {
             res.status(400).json({ 
@@ -54,6 +53,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
             date: date ? new Date(date) : undefined,
             priority: priority ? parseInt(priority) : undefined,
             tagIds: tagIds ? tagIds.map((id: string) => new Types.ObjectId(id)) : undefined,
+            friendIds: friendIds ? friendIds.map((id: string) => new Types.ObjectId(id)) : undefined,
             parentEntryId: parentEntryId ? new Types.ObjectId(parentEntryId) : undefined
         };
 
@@ -73,11 +73,10 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 });
 
 // PUT /api/entries/:id - Update an existing diary entry
-router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
-    try {
+router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {    try {
         const userId = new Types.ObjectId((req.user as any).id);
         const entryId = new Types.ObjectId(req.params.id);
-        const { content, date, priority, tagIds } = req.body;
+        const { content, date, priority, tagIds, friendIds } = req.body;
 
         // Find the entry and verify ownership
         const { DiaryEntry } = await import('../models');
@@ -97,6 +96,9 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
         if (priority !== undefined) entry.priority = parseInt(priority);
         if (tagIds !== undefined) {
             entry.tags = tagIds.map((id: string) => new Types.ObjectId(id));
+        }
+        if (friendIds !== undefined) {
+            entry.friends = friendIds.map((id: string) => new Types.ObjectId(id));
         }
 
         await entry.save();

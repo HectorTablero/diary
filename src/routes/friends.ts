@@ -51,8 +51,14 @@ router.get('/:id/entries', requireAuth, async (req: Request, res: Response): Pro
     try {
         const userId = new Types.ObjectId((req.user as any).id);
         const friendId = new Types.ObjectId(req.params.id);
+        const dateParam = req.query.date as string;
         
-        const entries = await DiaryService.getEntriesForFriend(userId, friendId);
+        let targetDate: Date | undefined;
+        if (dateParam) {
+            targetDate = new Date(dateParam);
+        }
+        
+        const entries = await DiaryService.getEntriesForFriend(userId, friendId, targetDate);
         
         res.json({
             success: true,

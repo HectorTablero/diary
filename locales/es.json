@@ -1,2 +1,6 @@
 {
+  "diary": {
+    "noFriendsAvailable": "No hay amigos disponibles",
+    "createFriendsFirst": "Crear amigos primero"
+  }
 }

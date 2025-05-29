@@ -6,6 +6,7 @@ interface DiaryEntryDocument extends Document {
     date: Date;
     priority: number; // 1-5 (1 = highest relevance, 5 = lowest)
     tags: Types.ObjectId[];
+    friends: Types.ObjectId[]; // Associated friends
     parentEntry?: Types.ObjectId; // Null for top-level entries
     createdAt: Date;
     updatedAt: Date;
@@ -32,10 +33,13 @@ const diaryEntrySchema = new Schema({
         min: 1,
         max: 5,
         default: 3 // Moderate relevance
-    },
-    tags: [{ 
+    },    tags: [{ 
         type: Schema.Types.ObjectId, 
         ref: 'Tag' 
+    }],
+    friends: [{ 
+        type: Schema.Types.ObjectId, 
+        ref: 'Friend' 
     }],
     parentEntry: { 
         type: Schema.Types.ObjectId, 
