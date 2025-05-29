@@ -1,6 +1,144 @@
 {
-  "diary": {
+  "navigation": {
+    "diary": "Diario",
+    "friends": "Amigos",
+    "tags": "Etiquetas",
+    "settings": "Configuración"
+  },  "diary": {
+    "title": "Diario",
+    "subtitle": "Tu espacio personal para pensamientos y recuerdos",
+    "newEntry": "Nueva Entrada",
+    "editEntry": "Editar Entrada",
+    "addSubEntry": "Agregar Sub-entrada",
+    "previousDay": "Día Anterior",
+    "today": "Hoy",
+    "nextDay": "Día Siguiente",
+    "loading": "Cargando entradas...",
+    "noEntries": "No hay entradas para este día",
+    "noEntriesDescription": "Comienza a escribir tus pensamientos de hoy",
+    "scrollToAdd": "Agregar Entrada",
+    "content": "Contenido",
+    "contentPlaceholder": "¿Qué tienes en mente hoy?",
+    "relevance": "Relevancia",
+    "date": "Fecha",
+    "tags": "Etiquetas",
+    "save": "Guardar Entrada",
+    "friends": "Amigos",
     "noFriendsAvailable": "No hay amigos disponibles",
-    "createFriendsFirst": "Crear amigos primero"
+    "createFriendsFirst": "Crea amigos primero",    "optional": "Opcional",
+    "searchFriends": "Buscar amigos...",
+    "noTags": "(sin etiquetas)",
+    "tagCount": "{{count}} etiqueta",
+    "tagCountPlural": "{{count}} etiquetas",
+    "messages": {
+      "loadFailed": "Error al cargar datos del diario",
+      "entryAddSuccess": "¡Entrada agregada exitosamente!",
+      "entryAddError": "Error al agregar entrada",
+      "entryAddErrorWithDetails": "Error al agregar entrada: {{error}}",
+      "subEntryAddSuccess": "¡Sub-entrada agregada exitosamente!",
+      "subEntryAddError": "Error al agregar sub-entrada",
+      "subEntryAddErrorWithDetails": "Error al agregar sub-entrada: {{error}}",
+      "entryUpdateSuccess": "¡Entrada actualizada exitosamente!",
+      "entryUpdateError": "Error al actualizar entrada",
+      "entryUpdateErrorWithDetails": "Error al actualizar entrada: {{error}}",
+      "entryDeleteSuccess": "¡Entrada eliminada exitosamente!",
+      "entryDeleteError": "Error al eliminar entrada",
+      "entryDeleteErrorWithDetails": "Error al eliminar entrada: {{error}}",
+      "confirmDelete": "¿Estás seguro de que quieres eliminar esta entrada? Esto también eliminará cualquier sub-entrada.",
+      "maxDepthReached": "Profundidad máxima de sub-entrada alcanzada",
+      "maxDepthReachedShort": "Profundidad máx. alcanzada"
+    },    "contextMenu": {
+      "addSubEntry": "Agregar sub-entrada",
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },    "tooltips": {
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "expandCollapse": "Expandir/Contraer sub-entradas"
+    }
+  },
+  "relevance": {
+    "label": "Relevancia",
+    "levels": {
+      "1": "Cambio de Vida",
+      "2": "Significativo",
+      "3": "Anecdótico",
+      "4": "Evento",
+      "5": "Pensamiento"
+    },
+    "descriptions": {
+      "1": "Eventos importantes de la vida como casarse, nuevo trabajo, comprar una casa",
+      "2": "Desarrollos personales importantes y experiencias significativas",
+      "3": "Eventos diarios notables y logros moderados",
+      "4": "Acontecimientos rutinarios y pequeñas observaciones",
+      "5": "Pensamientos casuales y anécdotas diarias triviales"
+    }
+  },
+  "friends": {
+    "title": "Amigos",
+    "subtitle": "Gestiona perfiles de amigos para filtrar y organizar tus entradas del diario",
+    "addFriend": "Agregar Amigo",
+    "backToDiary": "Volver al Diario",
+    "loading": "Cargando amigos...",
+    "noFriends": "Aún no hay amigos",
+    "createFirstFriend": "¡Crea tu primer perfil de amigo arriba!",
+    "name": "Nombre del Amigo",
+    "namePlaceholder": "Ingresa el nombre del amigo",
+    "tags": "Etiquetas",
+    "tagsDescription": "Selecciona etiquetas para filtrar entradas para este amigo",
+    "cancel": "Cancelar",
+    "editFriend": "Editar Amigo",
+    "save": "Guardar"
+  },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Personaliza tu experiencia del diario",
+    "backToDiary": "Volver al Diario",
+    "loading": "Cargando configuración...",
+    "saving": "Guardando cambios...",
+    "resetToDefaults": "Restablecer a Valores Predeterminados",
+    "saveChanges": "Guardar Cambios",
+    "relevanceDurations": {
+      "title": "Configuración de Duración de Relevancia",
+      "description": "Establece cuántos días las entradas con diferentes niveles de relevancia permanecen visibles",
+      "daysLabel": "Días visibles",
+      "howItWorks": "Cómo Funciona la Duración de Relevancia",
+      "explanation": "Las entradas se ocultan automáticamente después de que expira su duración de relevancia. Por ejemplo, si estableces la relevancia de cambio de vida a 30 días, esas entradas solo serán visibles durante 30 días después de su creación."
+    }
+  },
+  "tags": {
+    "title": "Gestión de Etiquetas",
+    "subtitle": "Crea y gestiona etiquetas para organizar tus entradas del diario",
+    "addTag": "Agregar Etiqueta",
+    "backToDiary": "Volver al Diario",
+    "existingTags": "Tus Etiquetas",
+    "searchPlaceholder": "Buscar etiquetas...",
+    "loading": "Cargando etiquetas...",
+    "noTags": "Aún no hay etiquetas",
+    "noTagsDescription": "Crea tu primera etiqueta para comenzar a organizar tus entradas del diario.",
+    "name": "Nombre de la Etiqueta",
+    "namePlaceholder": "Ingresa el nombre de la etiqueta",
+    "color": "Color",
+    "description": "Descripción (Opcional)",
+    "descriptionPlaceholder": "Breve descripción de esta etiqueta",
+    "cancel": "Cancelar",
+    "createTag": "Crear Etiqueta",
+    "editTag": "Editar Etiqueta",
+    "saveChanges": "Guardar Cambios"
+  },
+  "components": {
+    "button": {
+      "cancel": "Cancelar"
+    }
+  },
+  "errors": {
+    "404": {
+      "title": "Página No Encontrada",
+      "desc": "La página que buscas no existe."
+    },
+    "500": {
+      "title": "Error del Servidor",
+      "desc": "Algo salió mal de nuestro lado. Por favor, inténtalo de nuevo más tarde."
+    }
   }
 }
