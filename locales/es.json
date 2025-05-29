@@ -9,14 +9,14 @@
     "subtitle": "Tu espacio personal para pensamientos y recuerdos",
     "newEntry": "Nueva Entrada",
     "editEntry": "Editar Entrada",
-    "addSubEntry": "Agregar Sub-entrada",
+    "addSubEntry": "Añadir Sub-entrada",
     "previousDay": "Día Anterior",
     "today": "Hoy",
     "nextDay": "Día Siguiente",
     "loading": "Cargando entradas...",
     "noEntries": "No hay entradas para este día",
     "noEntriesDescription": "Comienza a escribir tus pensamientos de hoy",
-    "scrollToAdd": "Agregar Entrada",
+    "scrollToAdd": "Añadir Entrada",
     "content": "Contenido",
     "contentPlaceholder": "¿Qué tienes en mente hoy?",
     "relevance": "Relevancia",
@@ -33,11 +33,11 @@
     "messages": {
       "loadFailed": "Error al cargar datos del diario",
       "entryAddSuccess": "¡Entrada agregada exitosamente!",
-      "entryAddError": "Error al agregar entrada",
-      "entryAddErrorWithDetails": "Error al agregar entrada: {{error}}",
+      "entryAddError": "Error al Añadir entrada",
+      "entryAddErrorWithDetails": "Error al Añadir entrada: {{error}}",
       "subEntryAddSuccess": "¡Sub-entrada agregada exitosamente!",
-      "subEntryAddError": "Error al agregar sub-entrada",
-      "subEntryAddErrorWithDetails": "Error al agregar sub-entrada: {{error}}",
+      "subEntryAddError": "Error al Añadir sub-entrada",
+      "subEntryAddErrorWithDetails": "Error al Añadir sub-entrada: {{error}}",
       "entryUpdateSuccess": "¡Entrada actualizada exitosamente!",
       "entryUpdateError": "Error al actualizar entrada",
       "entryUpdateErrorWithDetails": "Error al actualizar entrada: {{error}}",
@@ -48,7 +48,7 @@
       "maxDepthReached": "Profundidad máxima de sub-entrada alcanzada",
       "maxDepthReachedShort": "Profundidad máx. alcanzada"
     },    "contextMenu": {
-      "addSubEntry": "Agregar sub-entrada",
+      "addSubEntry": "Añadir sub-entrada",
       "edit": "Editar",
       "delete": "Eliminar"
     },    "tooltips": {
@@ -69,7 +69,7 @@
     "descriptions": {
       "1": "Eventos importantes de la vida como casarse, nuevo trabajo, comprar una casa",
       "2": "Desarrollos personales importantes y experiencias significativas",
-      "3": "Eventos diarios notables y logros moderados",
+      "3": "Historias interesantes y eventos memorables",
       "4": "Acontecimientos rutinarios y pequeñas observaciones",
       "5": "Pensamientos casuales y anécdotas diarias triviales"
     }
@@ -77,7 +77,7 @@
   "friends": {
     "title": "Amigos",
     "subtitle": "Gestiona perfiles de amigos para filtrar y organizar tus entradas del diario",
-    "addFriend": "Agregar Amigo",
+    "addFriend": "Añadir Amigo",
     "backToDiary": "Volver al Diario",
     "loading": "Cargando amigos...",
     "noFriends": "Aún no hay amigos",
@@ -109,7 +109,7 @@
   "tags": {
     "title": "Gestión de Etiquetas",
     "subtitle": "Crea y gestiona etiquetas para organizar tus entradas del diario",
-    "addTag": "Agregar Etiqueta",
+    "addTag": "Añadir Etiqueta",
     "backToDiary": "Volver al Diario",
     "existingTags": "Tus Etiquetas",
     "searchPlaceholder": "Buscar etiquetas...",
