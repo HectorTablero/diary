@@ -392,12 +392,27 @@ input[type="color"]::-moz-color-swatch {
         display: none !important;
     }
     
-    .diary-entry {
+    /* Prevent text selection on all entry elements for mobile */
+    .diary-entry,
+    .entry-item,
+    .entry-content,
+    .flex.items-start.gap-4.group {
         position: relative;
         user-select: none;
         -webkit-user-select: none;
         -moz-user-select: none;
         -ms-user-select: none;
+        -webkit-touch-callout: none;
+    }
+    
+    /* Prevent text selection specifically on entry content text */
+    .entry-content {
+        pointer-events: auto;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-touch-callout: none;
     }
     
     .diary-entry.long-press-active {
@@ -408,6 +423,24 @@ input[type="color"]::-moz-color-swatch {
 }
 
 /* Context menu for mobile diary actions */
+.diary-context-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+}
+
+.diary-context-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+}
+
 .diary-context-menu {
     position: fixed;
     background: white;
@@ -417,6 +450,19 @@ input[type="color"]::-moz-color-swatch {
     z-index: 1000;
     min-width: 160px;
     padding: 4px 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.95) translateY(-10px);
+    transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out, transform 0.2s ease-in-out;
+    /* Initially position off-screen to avoid flicker */
+    left: -9999px;
+    top: -9999px;
+}
+
+.diary-context-menu.show {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1) translateY(0);
 }
 
 .dark .diary-context-menu {

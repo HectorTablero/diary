@@ -42,13 +42,29 @@ class DiaryApp {
             if (this.isMobile()) {
                 this.createContextMenu();
             }
-            
-            // Listen for window resize to handle mobile/desktop switching
+              // Listen for window resize to handle mobile/desktop switching
             window.addEventListener('resize', () => {
-                if (this.isMobile() && !this.contextMenu) {
+                const wasMobile = !!this.contextMenu;
+                const isMobileNow = this.isMobile();
+                
+                if (isMobileNow && !this.contextMenu) {
                     this.createContextMenu();
-                } else if (!this.isMobile() && this.contextMenu) {
+                } else if (!isMobileNow && this.contextMenu) {
                     this.removeContextMenu();
+                    // Also hide any open context menu
+                    this.hideContextMenu();
+                    // Clear any ongoing long press
+                    if (this.longPressTimer) {
+                        clearTimeout(this.longPressTimer);
+                        this.longPressTimer = null;
+                    }
+                    if (this.longPressEntry) {
+                        this.longPressEntry = null;
+                    }
+                    // Remove long-press-active class from all entries
+                    document.querySelectorAll('.diary-entry.long-press-active').forEach(el => {
+                        el.classList.remove('long-press-active');
+                    });
                 }
             });
             
@@ -128,11 +144,30 @@ class DiaryApp {
             subEntryTextarea.addEventListener('input', () => {
                 this.autoResizeTextarea(subEntryTextarea);
             });
-        }
-
-        // Hide context menu on window resize (for responsive behavior)
+        }        // Hide context menu on window resize (for responsive behavior)
         window.addEventListener('resize', () => {
             this.hideContextMenu();
+        });
+
+        // Hide context menu on scroll
+        window.addEventListener('scroll', () => {
+            this.hideContextMenu();
+        });
+
+        // Hide context menu on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.hideContextMenu();
+            }
+        });
+
+        // Hide context menu on any click outside (backup for mobile)
+        document.addEventListener('click', (e) => {
+            if (this.contextMenu && 
+                !this.contextMenu.contains(e.target) && 
+                !e.target.closest('.diary-entry')) {
+                this.hideContextMenu();
+            }
         });
     }
 
@@ -284,9 +319,7 @@ class DiaryApp {
         } catch (error) {
             console.error('Error loading friends:', error);
         }
-    }
-
-    async loadEntries() {
+    }    async loadEntries() {
         this.showLoading();
         
         try {
@@ -294,7 +327,8 @@ class DiaryApp {
             const params = new URLSearchParams();
             
             // Add date parameter for filtering entries by current date
-            params.append('date', this.currentDate.toISOString().split('T')[0]);
+            const dateString = this.currentDate.toISOString().split('T')[0];
+            params.append('date', dateString);
             
             if (this.currentFriendId) {
                 url = `/api/friends/${this.currentFriendId}/entries`;
@@ -303,15 +337,27 @@ class DiaryApp {
             url += '?' + params.toString();
 
             const response = await fetch(url);
-            const result = await response.json();            if (result.success) {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();            
+            if (result.success) {
                 // The API now returns properly nested hierarchy, no need to build it
-                this.entries = result.data;
+                this.entries = result.data || [];
+                this.renderEntries();
+            } else {
+                console.error('API returned error:', result.error);
+                this.entries = [];
                 this.renderEntries();
             }
         } catch (error) {
             console.error('Error loading entries:', error);
+            this.entries = [];
+            this.renderEntries();
         } finally {
-            this.hideLoading();        }
+            this.hideLoading();        
+        }
     }
 
     buildEntriesHierarchy(flatEntries) {
@@ -670,43 +716,37 @@ class DiaryApp {
             addSubEntryBtn.addEventListener('click', () => {
                 this.addSubEntry(entry._id);
             });
-        }
-
-        // Add mobile long-press event listeners
-        const entryContent = entryDiv.querySelector('.flex.items-start.gap-4.group');
-        
-        // Touch events for mobile
-        entryContent.addEventListener('touchstart', (e) => {
-            this.handleLongPressStart(entry, entryDiv, e);
-        }, { passive: false });
-
-        entryContent.addEventListener('touchend', (e) => {
-            this.handleLongPressEnd(entryDiv);
-        });
-
-        entryContent.addEventListener('touchmove', (e) => {
-            // Cancel long press if user moves finger
-            this.handleLongPressEnd(entryDiv);
-        });
-
-        // Mouse events for desktop testing (optional)
-        entryContent.addEventListener('mousedown', (e) => {
-            if (this.isMobile()) {
+        }        // Add mobile long-press event listeners only if on mobile
+        if (this.isMobile()) {
+            const entryContent = entryDiv.querySelector('.flex.items-start.gap-4.group');
+            
+            // Touch events for mobile
+            entryContent.addEventListener('touchstart', (e) => {
                 this.handleLongPressStart(entry, entryDiv, e);
-            }
-        });
+            }, { passive: false });
 
-        entryContent.addEventListener('mouseup', (e) => {
-            if (this.isMobile()) {
+            entryContent.addEventListener('touchend', (e) => {
                 this.handleLongPressEnd(entryDiv);
-            }
-        });
+            });
 
-        entryContent.addEventListener('mouseleave', (e) => {
-            if (this.isMobile()) {
+            entryContent.addEventListener('touchmove', (e) => {
+                // Cancel long press if user moves finger
                 this.handleLongPressEnd(entryDiv);
-            }
-        });
+            });
+
+            // Mouse events for desktop testing on mobile devices
+            entryContent.addEventListener('mousedown', (e) => {
+                this.handleLongPressStart(entry, entryDiv, e);
+            });
+
+            entryContent.addEventListener('mouseup', (e) => {
+                this.handleLongPressEnd(entryDiv);
+            });
+
+            entryContent.addEventListener('mouseleave', (e) => {
+                this.handleLongPressEnd(entryDiv);
+            });
+        }
 
         // Add sub-entries if they exist
         if (hasChildren) {
@@ -1129,9 +1169,13 @@ class DiaryApp {
                         break;
                 }
             });
-        });
-
-        // Position the menu
+        });        // Position the menu before making it visible
+        // First, temporarily show it off-screen to get dimensions
+        this.contextMenu.style.left = '-9999px';
+        this.contextMenu.style.top = '-9999px';
+        this.contextMenu.style.visibility = 'hidden';
+        this.contextMenu.style.opacity = '1';
+        
         const rect = this.contextMenu.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
@@ -1147,17 +1191,18 @@ class DiaryApp {
             menuY = viewportHeight - rect.height - 10;
         }
 
+        // Set final position and reset styles
         this.contextMenu.style.left = menuX + 'px';
         this.contextMenu.style.top = menuY + 'px';
+        this.contextMenu.style.visibility = '';
+        this.contextMenu.style.opacity = '';
 
-        // Show menu
+        // Show menu with animation
         this.contextBackdrop.classList.add('show');
         this.contextMenu.classList.add('show');
-    }
-
-    // Hide context menu
+    }    // Hide context menu
     hideContextMenu() {
-        if (this.contextMenu) {
+        if (this.contextMenu && this.contextBackdrop) {
             this.contextMenu.classList.remove('show');
             this.contextBackdrop.classList.remove('show');
         }
