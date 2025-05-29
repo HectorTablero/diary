@@ -71,10 +71,9 @@ class DiaryApp {
             this.setCurrentDate();
             await this.loadEntries();
             
-            this.hideLoading();
-        } catch (error) {
+            this.hideLoading();        } catch (error) {
             console.error('Error initializing diary:', error);
-            showToast('Failed to load diary data', 'error');
+            showToast(t('diary.messages.loadFailed'), 'error');
             this.hideLoading();
         }
     }setupEventListeners() {
@@ -211,11 +210,11 @@ class DiaryApp {
         const currentDateElement = document.getElementById('current-date');
         const today = new Date();
         const isToday = this.isSameDay(this.currentDate, today);
-        
-        if (isToday) {
-            currentDateElement.textContent = 'Today';
-        } else {
-            currentDateElement.textContent = this.currentDate.toLocaleDateString('en-US', { 
+          if (isToday) {
+            currentDateElement.textContent = t('diary.today');        } else {
+            // Get the current locale from the i18n system
+            const currentLocale = window.i18n && window.i18n.locale ? window.i18n.locale : 'en';
+            currentDateElement.textContent = this.currentDate.toLocaleDateString(currentLocale, { 
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
@@ -512,13 +511,12 @@ class DiaryApp {
         this.setupFriendSearch(searchInput, container, 'sub-entry');
     }    renderFriendCheckboxes(container, friends, prefix = '') {
         container.innerHTML = '';
-        
-        if (friends.length === 0) {
+          if (friends.length === 0) {
             container.innerHTML = `
                 <div class="text-center text-gray-500 dark:text-gray-400 py-4">
-                    <p class="text-sm" data-i18n="diary.noFriendsAvailable">No friends available</p>
-                    <a href="/friends" class="text-blue-600 dark:text-blue-400 hover:underline text-xs" data-i18n="diary.createFriendsFirst">
-                        Create friends first →
+                    <p class="text-sm">${t('diary.noFriendsAvailable')}</p>
+                    <a href="/friends" class="text-blue-600 dark:text-blue-400 hover:underline text-xs">
+                        ${t('diary.createFriendsFirst')} →
                     </a>
                 </div>
             `;
@@ -537,12 +535,11 @@ class DiaryApp {
                     id="${checkboxId}" 
                     value="${friend._id}"
                     data-friend-id="${friend._id}"
-                />
-                <label for="${checkboxId}">
+                />                <label for="${checkboxId}">
                     ${this.escapeHtml(friend.name)}
                     ${friend.tags && friend.tags.length > 0 ? 
-                        `<span class="text-xs text-gray-500 dark:text-gray-400 ml-1">(${friend.tags.length} tags)</span>` : 
-                        '<span class="text-xs text-gray-500 dark:text-gray-400 ml-1" data-i18n="diary.noTags">(no tags)</span>'
+                        `<span class="text-xs text-gray-500 dark:text-gray-400 ml-1">(${friend.tags.length === 1 ? t('diary.tagCount', {count: friend.tags.length}) : t('diary.tagCountPlural', {count: friend.tags.length})})</span>` : 
+                        `<span class="text-xs text-gray-500 dark:text-gray-400 ml-1">${t('diary.noTags')}</span>`
                     }
                 </label>
             `;
@@ -636,10 +633,9 @@ class DiaryApp {
         entryDiv.innerHTML = `
             <div class="flex items-start gap-4 group"><!-- Expandable indicator / Bullet Point -->
                 <div class="flex-shrink-0 mt-1">
-                    ${hasChildren ? `
-                        <button class="toggle-children-btn w-4 h-4 rounded-full flex items-center justify-center transition-transform duration-200 border-2" 
+                    ${hasChildren ? `                        <button class="toggle-children-btn w-4 h-4 rounded-full flex items-center justify-center transition-transform duration-200 border-2" 
                                 style="border-color: ${priorityColor};" 
-                                title="Expand/Collapse sub-entries">
+                                title="${t('diary.tooltips.expandCollapse')}">
                             <svg class="w-2.5 h-2.5 transform transition-transform duration-200 mt-[0.5px]" fill="${priorityColor}" stroke="${priorityColor}" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M 5.293 8.306 C 5.683 7.916 6.317 7.916 6.707 8.306 L 10 11.599 L 13.293 8.306 C 13.828 7.753 14.761 7.985 14.974 8.725 C 15.075 9.081 14.973 9.463 14.707 9.72 L 10.707 13.72 C 10.317 14.111 9.683 14.111 9.293 13.72 L 5.293 9.72 C 4.903 9.33 4.903 8.697 5.293 8.306 Z" clip-rule="evenodd"></path>
                             </svg>
@@ -684,18 +680,18 @@ class DiaryApp {
                 <div class="entry-actions flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button class="add-sub-entry-btn text-gray-400 hover:text-blue-600 p-1 ${isAtMaxDepth ? 'opacity-50 cursor-not-allowed' : ''}" 
                             data-parent-id="${entry._id}" 
-                            title="${isAtMaxDepth ? 'Maximum sub-entry depth reached' : 'Add sub-entry'}"
+                            title="${isAtMaxDepth ? t('diary.messages.maxDepthReached') : t('diary.contextMenu.addSubEntry')}"
                             ${isAtMaxDepth ? 'disabled' : ''}>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
                     </button>
-                    <button class="edit-entry-btn text-gray-400 hover:text-blue-600 p-1" data-entry-id="${entry._id}" title="Edit">
+                    <button class="edit-entry-btn text-gray-400 hover:text-blue-600 p-1" data-entry-id="${entry._id}" title="${t('diary.tooltips.edit')}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                         </svg>
                     </button>
-                    <button class="delete-entry-btn text-gray-400 hover:text-red-600 p-1" data-entry-id="${entry._id}" title="Delete">
+                    <button class="delete-entry-btn text-gray-400 hover:text-red-600 p-1" data-entry-id="${entry._id}" title="${t('diary.tooltips.delete')}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
@@ -840,15 +836,14 @@ class DiaryApp {
 
                 // Reload entries
                 await this.loadEntries();
-                
-                // Show success toast
-                showToast('Entry added successfully!', 'success');
+                  // Show success toast
+                showToast(t('diary.messages.entryAddSuccess'), 'success');
             } else {
-                showToast('Error adding entry: ' + result.error, 'error');
+                showToast(t('diary.messages.entryAddErrorWithDetails', { error: result.error }), 'error');
             }
         } catch (error) {
             console.error('Error adding entry:', error);
-            showToast('Error adding entry', 'error');
+            showToast(t('diary.messages.entryAddError'), 'error');
         }
     }async addSubEntry(parentId) {
         // Store the parent ID
@@ -912,15 +907,14 @@ class DiaryApp {
 
                 // Reload entries
                 await this.loadEntries();
-                
-                // Show success toast
-                showToast('Sub-entry added successfully!', 'success');
+                  // Show success toast
+                showToast(t('diary.messages.subEntryAddSuccess'), 'success');
             } else {
-                showToast('Error adding sub-entry: ' + result.error, 'error');
+                showToast(t('diary.messages.subEntryAddErrorWithDetails', { error: result.error }), 'error');
             }
         } catch (error) {
             console.error('Error adding sub-entry:', error);
-            showToast('Error adding sub-entry', 'error');
+            showToast(t('diary.messages.subEntryAddError'), 'error');
         }
     }async editEntry(entryId) {
         const findEntryRecursive = (entries) => {
@@ -1021,20 +1015,17 @@ class DiaryApp {
 
                 // Reload entries
                 await this.loadEntries();
-                
-                // Show success toast
-                showToast('Entry updated successfully!', 'success');
+                  // Show success toast
+                showToast(t('diary.messages.entryUpdateSuccess'), 'success');
             } else {
-                showToast('Error updating entry: ' + result.error, 'error');
+                showToast(t('diary.messages.entryUpdateErrorWithDetails', { error: result.error }), 'error');
             }
         } catch (error) {
             console.error('Error updating entry:', error);
-            showToast('Error updating entry', 'error');
+            showToast(t('diary.messages.entryUpdateError'), 'error');
         }
-    }
-
-    async deleteEntry(entryId) {
-        if (!confirm('Are you sure you want to delete this entry? This will also delete any sub-entries.')) {
+    }    async deleteEntry(entryId) {
+        if (!confirm(t('diary.messages.confirmDelete'))) {
             return;
         }
 
@@ -1044,16 +1035,15 @@ class DiaryApp {
             });
 
             const result = await response.json();
-              if (result.success) {
-                await this.loadEntries();
+              if (result.success) {                await this.loadEntries();
                 // Show success toast
-                showToast('Entry deleted successfully!', 'success');
+                showToast(t('diary.messages.entryDeleteSuccess'), 'success');
             } else {
-                showToast('Error deleting entry: ' + result.error, 'error');
+                showToast(t('diary.messages.entryDeleteErrorWithDetails', { error: result.error }), 'error');
             }
         } catch (error) {
             console.error('Error deleting entry:', error);
-            showToast('Error deleting entry', 'error');
+            showToast(t('diary.messages.entryDeleteError'), 'error');
         }
     }
 
@@ -1126,26 +1116,24 @@ class DiaryApp {
 
         // Check if we've reached the maximum depth for sub-entries
         const currentDepth = this.calculateEntryDepth(entry._id);
-        const isAtMaxDepth = currentDepth >= this.maxSubEntryDepth - 1;
-
-        this.contextMenu.innerHTML = `
+        const isAtMaxDepth = currentDepth >= this.maxSubEntryDepth - 1;        this.contextMenu.innerHTML = `
             <button class="diary-context-menu-item" data-action="add-sub" ${isAtMaxDepth ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
-                ${isAtMaxDepth ? 'Max depth reached' : 'Add sub-entry'}
+                ${isAtMaxDepth ? t('diary.messages.maxDepthReachedShort') : t('diary.contextMenu.addSubEntry')}
             </button>
             <button class="diary-context-menu-item" data-action="edit">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                 </svg>
-                Edit
+                ${t('diary.contextMenu.edit')}
             </button>
             <button class="diary-context-menu-item danger" data-action="delete">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                 </svg>
-                Delete
+                ${t('diary.contextMenu.delete')}
             </button>
         `;
 

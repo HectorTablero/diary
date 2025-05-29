@@ -2,10 +2,7 @@
   "navigation": {
     "diary": "Diary",
     "friends": "Friends",
-    "searchFriends": "Search friends...",
-    "optional": "Optional",
     "tags": "Tags",
-    "noTags": "(no tags)",
     "settings": "Settings"
   },  "diary": {
     "title": "Diary",
@@ -28,7 +25,37 @@
     "save": "Save Entry",
     "friends": "Friends",
     "noFriendsAvailable": "No friends available",
-    "createFriendsFirst": "Create friends first"
+    "createFriendsFirst": "Create friends first",    "optional": "Optional",
+    "searchFriends": "Search friends...",
+    "noTags": "(no tags)",
+    "tagCount": "{{count}} tag",
+    "tagCountPlural": "{{count}} tags",
+    "messages": {
+      "loadFailed": "Failed to load diary data",
+      "entryAddSuccess": "Entry added successfully!",
+      "entryAddError": "Error adding entry",
+      "entryAddErrorWithDetails": "Error adding entry: {{error}}",
+      "subEntryAddSuccess": "Sub-entry added successfully!",
+      "subEntryAddError": "Error adding sub-entry",
+      "subEntryAddErrorWithDetails": "Error adding sub-entry: {{error}}",
+      "entryUpdateSuccess": "Entry updated successfully!",
+      "entryUpdateError": "Error updating entry",
+      "entryUpdateErrorWithDetails": "Error updating entry: {{error}}",
+      "entryDeleteSuccess": "Entry deleted successfully!",
+      "entryDeleteError": "Error deleting entry",
+      "entryDeleteErrorWithDetails": "Error deleting entry: {{error}}",
+      "confirmDelete": "Are you sure you want to delete this entry? This will also delete any sub-entries.",
+      "maxDepthReached": "Maximum sub-entry depth reached",
+      "maxDepthReachedShort": "Max depth reached"
+    },    "contextMenu": {
+      "addSubEntry": "Add sub-entry",
+      "edit": "Edit",
+      "delete": "Delete"
+    },    "tooltips": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "expandCollapse": "Expand/Collapse sub-entries"
+    }
   },
   "relevance": {
     "label": "Relevance",
