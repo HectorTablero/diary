@@ -49,32 +49,17 @@ export class DiaryService {
         const endOfDay = new Date(targetDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        const { priorityDurations } = user.settings;
-        const currentDate = new Date();        // Calculate visibility cutoff dates for each priority
-        const cutoffDates = {
-            1: new Date(currentDate.getTime() - priorityDurations[1] * 24 * 60 * 60 * 1000),
-            2: new Date(currentDate.getTime() - priorityDurations[2] * 24 * 60 * 60 * 1000),
-            3: new Date(currentDate.getTime() - priorityDurations[3] * 24 * 60 * 60 * 1000),
-            4: new Date(currentDate.getTime() - priorityDurations[4] * 24 * 60 * 60 * 1000),
-            5: new Date(currentDate.getTime() - priorityDurations[5] * 24 * 60 * 60 * 1000)
-        };
-
-        // First, get parent entries on the specific date that are still visible
+        // Get all entries for the specific date without cutoff restrictions
         const parentQuery = {
             user: userId,
             parentEntry: null, // Only top-level entries
             date: {
                 $gte: startOfDay,
                 $lte: endOfDay
-            },
-            $or: [
-                { priority: 1, date: { $gte: cutoffDates[1] } },
-                { priority: 2, date: { $gte: cutoffDates[2] } },
-                { priority: 3, date: { $gte: cutoffDates[3] } },
-                { priority: 4, date: { $gte: cutoffDates[4] } },
-                { priority: 5, date: { $gte: cutoffDates[5] } }
-            ]
-        };        const parentEntries = await DiaryEntry.find(parentQuery)
+            }
+        };
+
+        const parentEntries = await DiaryEntry.find(parentQuery)
             .populate('tags')
             .populate('friends')
             .sort({ date: -1 });
@@ -82,8 +67,8 @@ export class DiaryService {
         // Get all parent entry IDs
         const parentEntryIds = parentEntries.map(entry => entry._id as Types.ObjectId);
 
-        // Recursively get all sub-entries for these parent entries at any depth
-        const allSubEntries = await this.getAllSubEntriesRecursively(userId, parentEntryIds, cutoffDates);
+        // Get all sub-entries for these parent entries without cutoff restrictions
+        const allSubEntries = await this.getAllSubEntriesForDate(userId, parentEntryIds);
 
         // Combine all entries and build hierarchy on server side
         const allEntries = [...parentEntries, ...allSubEntries];
@@ -95,25 +80,21 @@ export class DiaryService {
     }
 
     /**
-     * Recursively get all sub-entries at any depth
+     * Get all sub-entries for a specific date without cutoff restrictions
      */
-    private static async getAllSubEntriesRecursively(
+    private static async getAllSubEntriesForDate(
         userId: Types.ObjectId, 
-        parentIds: Types.ObjectId[], 
-        cutoffDates: any
+        parentIds: Types.ObjectId[]
     ): Promise<any[]> {
-        if (parentIds.length === 0) return [];        // Get direct children of the current parent IDs
+        if (parentIds.length === 0) return [];
+
+        // Get direct children of the current parent IDs without cutoff restrictions
         const subEntryQuery = {
             user: userId,
-            parentEntry: { $in: parentIds },
-            $or: [
-                { priority: 1, date: { $gte: cutoffDates[1] } },
-                { priority: 2, date: { $gte: cutoffDates[2] } },
-                { priority: 3, date: { $gte: cutoffDates[3] } },
-                { priority: 4, date: { $gte: cutoffDates[4] } },
-                { priority: 5, date: { $gte: cutoffDates[5] } }
-            ]
-        };        const directSubEntries = await DiaryEntry.find(subEntryQuery)
+            parentEntry: { $in: parentIds }
+        };
+
+        const directSubEntries = await DiaryEntry.find(subEntryQuery)
             .populate('tags')
             .populate('friends')
             .sort({ date: -1 });
@@ -124,7 +105,7 @@ export class DiaryService {
         const subEntryIds = directSubEntries.map(entry => entry._id as Types.ObjectId);
 
         // Recursively get children of these sub-entries
-        const deeperSubEntries = await this.getAllSubEntriesRecursively(userId, subEntryIds, cutoffDates);
+        const deeperSubEntries = await this.getAllSubEntriesForDate(userId, subEntryIds);
 
         return [...directSubEntries, ...deeperSubEntries];
     }    /**
@@ -137,26 +118,10 @@ export class DiaryService {
         let allEntries;
         
         if (targetDate) {
-            // For specific date, get all entries regardless of priority cutoffs
-            const startOfDay = new Date(targetDate);
-            startOfDay.setHours(0, 0, 0, 0);
-            
-            const endOfDay = new Date(targetDate);
-            endOfDay.setHours(23, 59, 59, 999);
-
-            // Get all entries for the date (including sub-entries)
-            const dateQuery = {
-                user: userId,
-                date: {
-                    $gte: startOfDay,
-                    $lte: endOfDay
-                }
-            };
-
-            allEntries = await DiaryEntry.find(dateQuery)
-                .populate('tags')
-                .populate('friends')
-                .sort({ date: -1 });
+            // For specific date, get all entries without priority cutoffs
+            allEntries = await this.getEntriesForDate(userId, targetDate);
+            // Flatten the hierarchy since getEntriesForDate returns nested structure
+            allEntries = this.flattenEntries(allEntries);
         } else {
             // For general view, use visible entries (with priority cutoffs)
             allEntries = await this.getVisibleEntries(userId);
@@ -185,6 +150,22 @@ export class DiaryService {
         return await Promise.all(
             parentEntries.map(parent => this.attachChildEntries(parent, filteredEntries))
         );
+    }
+
+    /**
+     * Flatten nested entries structure to a flat array
+     */
+    private static flattenEntries(entries: any[]): any[] {
+        const flatEntries: any[] = [];
+        
+        for (const entry of entries) {
+            flatEntries.push(entry);
+            if (entry.children && entry.children.length > 0) {
+                flatEntries.push(...this.flattenEntries(entry.children));
+            }
+        }
+        
+        return flatEntries;
     }
 
     /**
