@@ -155,6 +155,29 @@
                         </div>
                     </div>
 
+                    <!-- Friend Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <%= __('diary.friends') || 'Friends' %>
+                            <span class="text-xs text-gray-500 dark:text-gray-400 ml-1">(Optional)</span>
+                        </label>
+                        <div class="friend-selection-container">
+                            <!-- Search input -->
+                            <div class="mb-3">
+                                <input 
+                                    type="text" 
+                                    id="friend-search" 
+                                    placeholder="Search friends..." 
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <!-- Friend checkboxes -->
+                            <div id="friend-selection" class="max-h-32 overflow-y-auto space-y-2 p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                                <!-- Available friends will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="flex justify-end space-x-3 pt-4">
                         <%- include('partials/components/button', { 
                             text: __('components.button.cancel'),
@@ -239,6 +262,29 @@
                         </div>
                     </div>
 
+                    <!-- Friend Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <%= __('diary.friends') || 'Friends' %>
+                            <span class="text-xs text-gray-500 dark:text-gray-400 ml-1">(Optional)</span>
+                        </label>
+                        <div class="friend-selection-container">
+                            <!-- Search input -->
+                            <div class="mb-3">
+                                <input 
+                                    type="text" 
+                                    id="edit-friend-search" 
+                                    placeholder="Search friends..." 
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <!-- Friend checkboxes -->
+                            <div id="edit-friend-selection" class="max-h-32 overflow-y-auto space-y-2 p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                                <!-- Available friends will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="flex justify-end space-x-3 pt-4">
                         <%- include('partials/components/button', { 
                             text: __('components.button.cancel'),
@@ -313,6 +359,29 @@
                         </label>
                         <div id="sub-entry-tag-selection" class="flex flex-wrap gap-2 mb-3 min-h-[2.5rem] p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
                             <!-- Available tags will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Friend Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <%= __('diary.friends') || 'Friends' %>
+                            <span class="text-xs text-gray-500 dark:text-gray-400 ml-1">(<%= __('diary.optional') %>)</span>
+                        </label>
+                        <div class="friend-selection-container">
+                            <!-- Search input -->
+                            <div class="mb-3">
+                                <input 
+                                    type="text" 
+                                    id="sub-entry-friend-search" 
+                                    placeholder="<%= __('diary.searchFriends') %>" 
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <!-- Friend checkboxes -->
+                            <div id="sub-entry-friend-selection" class="max-h-32 overflow-y-auto space-y-2 p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                                <!-- Available friends will be loaded here -->
+                            </div>
                         </div>
                     </div>
 

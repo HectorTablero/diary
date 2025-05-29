@@ -18,7 +18,7 @@ router.get("/google", (req, res, next) => {
                 console.error("Error logging in user:", err);
                 return next(err);
             }
-            return res.redirect("/admin/");
+            return res.redirect("/");
         });
     })(req, res, next);
 });

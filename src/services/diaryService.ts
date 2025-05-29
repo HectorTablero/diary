@@ -30,10 +30,9 @@ export class DiaryService {
                 { priority: 4, date: { $gte: cutoffDates[4] } },
                 { priority: 5, date: { $gte: cutoffDates[5] } }
             ]
-        };
-
-        return await DiaryEntry.find(visibilityQuery)
+        };        return await DiaryEntry.find(visibilityQuery)
             .populate('tags')
+            .populate('friends')
             .sort({ date: -1 });
     }
       /**
@@ -75,10 +74,9 @@ export class DiaryService {
                 { priority: 4, date: { $gte: cutoffDates[4] } },
                 { priority: 5, date: { $gte: cutoffDates[5] } }
             ]
-        };
-
-        const parentEntries = await DiaryEntry.find(parentQuery)
+        };        const parentEntries = await DiaryEntry.find(parentQuery)
             .populate('tags')
+            .populate('friends')
             .sort({ date: -1 });
 
         // Get all parent entry IDs
@@ -115,10 +113,9 @@ export class DiaryService {
                 { priority: 4, date: { $gte: cutoffDates[4] } },
                 { priority: 5, date: { $gte: cutoffDates[5] } }
             ]
-        };
-
-        const directSubEntries = await DiaryEntry.find(subEntryQuery)
+        };        const directSubEntries = await DiaryEntry.find(subEntryQuery)
             .populate('tags')
+            .populate('friends')
             .sort({ date: -1 });
 
         if (directSubEntries.length === 0) return [];
@@ -130,22 +127,45 @@ export class DiaryService {
         const deeperSubEntries = await this.getAllSubEntriesRecursively(userId, subEntryIds, cutoffDates);
 
         return [...directSubEntries, ...deeperSubEntries];
-    }
-
-    /**
+    }    /**
      * Get entries filtered for a specific friend
      */
-    static async getEntriesForFriend(userId: Types.ObjectId, friendId: Types.ObjectId): Promise<any[]> {
+    static async getEntriesForFriend(userId: Types.ObjectId, friendId: Types.ObjectId, targetDate?: Date): Promise<any[]> {
         const friend = await Friend.findOne({ _id: friendId, user: userId }).populate('tags');
         if (!friend) throw new Error('Friend not found');
 
-        // Get all visible entries first
-        const visibleEntries = await this.getVisibleEntries(userId);
+        let allEntries;
+        
+        if (targetDate) {
+            // For specific date, get all entries regardless of priority cutoffs
+            const startOfDay = new Date(targetDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            
+            const endOfDay = new Date(targetDate);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            // Get all entries for the date (including sub-entries)
+            const dateQuery = {
+                user: userId,
+                date: {
+                    $gte: startOfDay,
+                    $lte: endOfDay
+                }
+            };
+
+            allEntries = await DiaryEntry.find(dateQuery)
+                .populate('tags')
+                .populate('friends')
+                .sort({ date: -1 });
+        } else {
+            // For general view, use visible entries (with priority cutoffs)
+            allEntries = await this.getVisibleEntries(userId);
+        }
 
         // Filter entries that share at least one tag with the friend
         const friendTagIds = friend.tags.map((tag: any) => tag._id.toString());
         
-        return visibleEntries.filter(entry => {
+        const filteredEntries = allEntries.filter(entry => {
             // Check if entry shares any tags with friend
             const entryTagIds = entry.tags.map((tag: any) => tag._id.toString());
             const hasSharedTag = entryTagIds.some(tagId => friendTagIds.includes(tagId));
@@ -157,6 +177,14 @@ export class DiaryService {
 
             return hasSharedTag && isNotHidden;
         });
+
+        // Build hierarchy - find parent entries and attach children
+        const parentEntries = filteredEntries.filter(entry => !entry.parentEntry);
+        
+        // Build hierarchy and return only top-level entries with nested children
+        return await Promise.all(
+            parentEntries.map(parent => this.attachChildEntries(parent, filteredEntries))
+        );
     }
 
     /**
@@ -180,9 +208,7 @@ export class DiaryService {
         }
 
         return parentObj;
-    }
-
-    /**
+    }    /**
      * Create a new diary entry
      */
     static async createEntry(data: {
@@ -191,6 +217,7 @@ export class DiaryService {
         date?: Date;
         priority?: number;
         tagIds?: Types.ObjectId[];
+        friendIds?: Types.ObjectId[];
         parentEntryId?: Types.ObjectId;
     }): Promise<any> {
         const entry = new DiaryEntry({
@@ -199,6 +226,7 @@ export class DiaryService {
             date: data.date || new Date(),
             priority: data.priority || 2,
             tags: data.tagIds || [],
+            friends: data.friendIds || [],
             parentEntry: data.parentEntryId || null
         });        return await entry.save();
     }

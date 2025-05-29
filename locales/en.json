@@ -2,7 +2,10 @@
   "navigation": {
     "diary": "Diary",
     "friends": "Friends",
+    "searchFriends": "Search friends...",
+    "optional": "Optional",
     "tags": "Tags",
+    "noTags": "(no tags)",
     "settings": "Settings"
   },  "diary": {
     "title": "Diary",
@@ -22,7 +25,10 @@
     "relevance": "Relevance",
     "date": "Date",
     "tags": "Tags",
-    "save": "Save Entry"
+    "save": "Save Entry",
+    "friends": "Friends",
+    "noFriendsAvailable": "No friends available",
+    "createFriendsFirst": "Create friends first"
   },
   "relevance": {
     "label": "Relevance",
