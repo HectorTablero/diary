@@ -1,0 +1,221 @@
+{
+  "app": {
+    "name": "Diario",
+    "tagline": "Tu espacio personal para pensamientos, personas y recuerdos"
+  },
+  "nav": {
+    "diary": "Entradas",
+    "calendar": "Calendario",
+    "people": "Personas",
+    "search": "Buscar",
+    "tags": "Etiquetas",
+    "settings": "Ajustes"
+  },
+  "auth": {
+    "signInWithGoogle": "Continuar con Google",
+    "signOut": "Cerrar sesión"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "add": "Añadir",
+    "create": "Crear",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "loading": "Cargando…",
+    "today": "Hoy",
+    "future": "Futuro",
+    "retry": "Reintentar",
+    "undo": "Deshacer",
+    "search": "Buscar",
+    "optional": "opcional",
+    "noResults": "Sin resultados",
+    "showMore": "Mostrar más",
+    "saved": "Guardado",
+    "less": "Menos",
+    "more": "Más"
+  },
+  "importance": {
+    "label": "Importancia",
+    "levels": {
+      "1": "Cambio de vida",
+      "2": "Significativo",
+      "3": "Anecdótico",
+      "4": "Evento",
+      "5": "Pensamiento"
+    },
+    "descriptions": {
+      "1": "Grandes eventos vitales como casarse, un nuevo trabajo, mudarse a otro país",
+      "2": "Desarrollos personales importantes y experiencias significativas",
+      "3": "Historias interesantes y momentos memorables",
+      "4": "Acontecimientos rutinarios y pequeñas observaciones",
+      "5": "Pensamientos casuales y anécdotas triviales del día a día"
+    }
+  },
+  "diary": {
+    "title": "Diario",
+    "newEntry": "Nueva entrada",
+    "editEntry": "Editar entrada",
+    "addSubEntry": "Añadir sub-entrada",
+    "previousDay": "Día anterior",
+    "nextDay": "Día siguiente",
+    "noEntries": "No hay entradas para este día",
+    "noEntriesDescription": "Empieza a escribir tus pensamientos de este día",
+    "composerPlaceholder": "¿Qué ha pasado? Usa @persona y #etiqueta…",
+    "willBeSaidTo": "Se marcará como contado a",
+    "date": "Fecha",
+    "deleteConfirmTitle": "¿Eliminar entrada?",
+    "deleteConfirmDescription": "También se eliminarán sus sub-entradas. Esto no se puede deshacer.",
+    "maxDepthReached": "Profundidad máxima de sub-entradas alcanzada",
+    "entrySaved": "Entrada guardada",
+    "entryDeleted": "Entrada eliminada",
+    "createTag": "Crear etiqueta «{{name}}»",
+    "addTags": "Etiquetas",
+    "addPeople": "Personas",
+    "subEntries": "{{count}} sub-entrada",
+    "subEntries_other": "{{count}} sub-entradas"
+  },
+  "people": {
+    "title": "Personas",
+    "addPerson": "Añadir persona",
+    "editPerson": "Editar persona",
+    "deletePerson": "Eliminar persona",
+    "name": "Nombre",
+    "namePlaceholder": "Nombre de la persona",
+    "notes": "Notas",
+    "notesPlaceholder": "Cualquier cosa que valga la pena recordar sobre esta persona…",
+    "tags": "Etiquetas",
+    "tagsDescription": "Las entradas que compartan estas etiquetas serán temas de conversación para esta persona",
+    "noPeople": "Aún no hay personas",
+    "noPeopleDescription": "Añade a las personas con las que hablas y el diario te sugerirá qué contarles.",
+    "talkingPoints": "Temas de conversación",
+    "talkingPointsCount": "{{count}} tema de conversación",
+    "talkingPointsCount_other": "{{count}} temas de conversación",
+    "memories": "Recuerdos",
+    "history": "Historial",
+    "markSaid": "Marcar como contado",
+    "markedSaid": "Marcado como contado",
+    "unmarkSaid": "Aún no contado",
+    "hideForPerson": "No sugerir nunca para {{name}}",
+    "alreadyTold": "Ya contado",
+    "noTalkingPoints": "Nada nuevo que contar",
+    "noTalkingPointsDescription": "Las entradas nuevas que mencionen a {{name}} o compartan sus etiquetas aparecerán aquí.",
+    "noMemories": "Aún no hay recuerdos compartidos",
+    "noMemoriesDescription": "Las entradas importantes que mencionen a {{name}} reaparecerán aquí después de {{months}} meses.",
+    "noHistory": "Ninguna entrada menciona a {{name}} todavía",
+    "matchMention": "Le menciona",
+    "matchTag": "Etiqueta compartida",
+    "matchBroadcast": "Compartido con todos",
+    "deleteConfirmTitle": "¿Eliminar a {{name}}?",
+    "deleteConfirmDescription": "Las entradas se conservarán, pero se eliminará toda mención, marca de contado y marca de oculto de esta persona.",
+    "personSaved": "Persona guardada",
+    "personDeleted": "Persona eliminada",
+    "duplicate_name": "Ya existe una persona con ese nombre",
+    "checkupReminders": "Recordatorios de seguimiento",
+    "checkupRemindersDescription": "Recibe una alerta en el perfil de esta persona cuando haya pasado tiempo desde la última vez que hablasteis.",
+    "checkupEvery": "Cada",
+    "checkupDueTitle": "Toca hacer seguimiento a {{name}}",
+    "checkupDueDescription": "Ha pasado tiempo desde que marcaste algo como contado a esta persona.",
+    "markCheckupDone": "Marcar como hecho",
+    "checkupMarkedDone": "Seguimiento marcado como hecho",
+    "disableCheckups": "Desactivar seguimientos",
+    "checkupsDisabled": "Seguimientos desactivados para esta persona"
+  },
+  "tags": {
+    "title": "Etiquetas",
+    "addTag": "Añadir etiqueta",
+    "editTag": "Editar etiqueta",
+    "deleteTag": "Eliminar etiqueta",
+    "name": "Nombre",
+    "namePlaceholder": "Nombre de la etiqueta",
+    "color": "Color",
+    "noTags": "Aún no hay etiquetas",
+    "noTagsDescription": "Las etiquetas conectan entradas con personas. Crea algunas para empezar.",
+    "usage": "{{entries}} entradas · {{people}} personas",
+    "deleteConfirmTitle": "¿Eliminar la etiqueta «{{name}}»?",
+    "deleteConfirmDescription": "Se quitará de todas las entradas y personas que la usen.",
+    "tagSaved": "Etiqueta guardada",
+    "tagDeleted": "Etiqueta eliminada",
+    "duplicate_name": "Ya existe una etiqueta con ese nombre"
+  },
+  "calendar": {
+    "title": "Calendario",
+    "onThisDay": "Tal día como hoy",
+    "entriesCount": "{{count}} entrada",
+    "entriesCount_other": "{{count}} entradas"
+  },
+  "search": {
+    "title": "Buscar",
+    "placeholder": "Busca en tus entradas…",
+    "filters": "Filtros",
+    "byTags": "Etiquetas",
+    "byPeople": "Personas",
+    "byImportance": "Importancia",
+    "from": "Desde",
+    "to": "Hasta",
+    "results": "{{count}} resultado",
+    "results_other": "{{count}} resultados",
+    "noResults": "No se han encontrado entradas",
+    "noResultsDescription": "Prueba con otras palabras o menos filtros.",
+    "clearFilters": "Limpiar filtros"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "appearance": "Apariencia",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeAuto": "Sistema",
+    "language": "Idioma",
+    "decay": {
+      "title": "Caducidad de los temas de conversación",
+      "description": "Cuánto tiempo siguen siendo relevantes las entradas de cada importancia como temas de conversación. El valor es una semivida en días: pasados esos días la entrada tiene la mitad de su puntuación inicial, y desaparece cuando cae por debajo del umbral.",
+      "halfLifeDays": "Semivida (días)"
+    },
+    "memories": {
+      "title": "Recuerdos",
+      "description": "Las entradas que mencionan directamente a una persona vuelven como recuerdos compartidos cuando son lo bastante antiguas.",
+      "threshold": "Importancia mínima",
+      "thresholdDescription": "Solo las entradas con esta importancia o mayor se convierten en recuerdos",
+      "minAge": "Aparecen después de",
+      "days": "días"
+    },
+    "broadcast": {
+      "title": "Compartir con todos",
+      "description": "Algunas entradas pueden sugerirse como temas de conversación para todas las personas, no solo para quienes mencionan o comparten una etiqueta.",
+      "lifeChanging": "Eventos de cambio de vida",
+      "lifeChangingDescription": "Sugiere cada entrada de \"Cambio de vida\" a todo el mundo, sin importar la coincidencia.",
+      "tags": "Etiquetas compartidas",
+      "tagsDescription": "Las entradas con estas etiquetas se sugieren a todo el mundo sin importar la coincidencia."
+    },
+    "checkups": {
+      "title": "Recordatorios de seguimiento",
+      "description": "Intervalo de seguimiento por defecto que heredan las personas nuevas. Cada persona puede anularlo o desactivarlo desde su perfil.",
+      "enable": "Enviar recordatorios de seguimiento por defecto"
+    },
+    "account": "Cuenta",
+    "resetDefaults": "Restablecer valores",
+    "settingsSaved": "Ajustes guardados"
+  },
+  "errors": {
+    "unauthorized": "Necesitas iniciar sesión",
+    "not_found": "No encontrado",
+    "unknown": "Algo ha salido mal",
+    "offline": "Parece que no tienes conexión",
+    "validation": "Algunos campos no son válidos"
+  },
+  "entry": {
+    "max_depth": "Profundidad máxima de sub-entradas alcanzada",
+    "not_found": "Entrada no encontrada"
+  },
+  "person": {
+    "not_found": "Persona no encontrada",
+    "duplicate_name": "Ya existe una persona con ese nombre"
+  },
+  "tag": {
+    "not_found": "Etiqueta no encontrada",
+    "duplicate_name": "Ya existe una etiqueta con ese nombre"
+  }
+}

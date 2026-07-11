@@ -1,0 +1,101 @@
+import type { MatchType } from './constants';
+
+export interface TagDto {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface TagWithStats extends TagDto {
+  entryCount: number;
+  personCount: number;
+}
+
+export interface PersonRefDto {
+  id: string;
+  name: string;
+}
+
+export interface PersonDto {
+  id: string;
+  name: string;
+  tags: TagDto[];
+  notes: string;
+  /** Days between checkup reminders for this person. `null` disables checkups. */
+  checkupIntervalDays: number | null;
+  /** Last time an interaction was recorded or the checkup was manually marked done. */
+  lastCheckupAt: string;
+  createdAt: string;
+}
+
+export interface PersonListItem extends PersonDto {
+  talkingPointCount: number;
+}
+
+export interface SaidMark {
+  personId: string;
+  /** When this entry was marked as said to this person. */
+  at: string;
+}
+
+export interface EntryDto {
+  id: string;
+  content: string;
+  dateKey: string;
+  importance: number;
+  tags: TagDto[];
+  people: PersonRefDto[];
+  /** People this entry has been marked as said to, with the date it happened. */
+  saidTo: SaidMark[];
+  /** Person ids this entry is hidden for (never a talking point). */
+  hiddenFor: string[];
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EntryNode extends EntryDto {
+  children: EntryNode[];
+}
+
+export interface ScoredEntry extends EntryDto {
+  score: number;
+  matchType: MatchType;
+}
+
+export interface TalkingPointsResponse {
+  active: ScoredEntry[];
+  said: EntryDto[];
+}
+
+export interface CalendarDay {
+  date: string;
+  count: number;
+  /** Lowest importance number present that day (1 = highest importance). */
+  maxImportance: number;
+}
+
+export interface SearchResponse {
+  results: EntryDto[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface SettingsDto {
+  halfLifeDays: Record<'1' | '2' | '3' | '4' | '5', number>;
+  epsilon: number;
+  talkingPointsLimit: number;
+  memoryImportanceThreshold: number;
+  memoryMinAgeDays: number;
+  /** Suggest importance-1 ("life-changing") entries to everyone, not just matching people. */
+  broadcastLifeChangingEvents: boolean;
+  /** Tags whose entries are suggested to everyone regardless of match. */
+  broadcastTagIds: string[];
+  /** Default `checkupIntervalDays` inherited by newly created people. `null` = off by default. */
+  defaultCheckupIntervalDays: number | null;
+}
+
+export interface ApiError {
+  error: string;
+}

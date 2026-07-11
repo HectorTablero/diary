@@ -1,0 +1,221 @@
+{
+  "app": {
+    "name": "Diary",
+    "tagline": "Your personal space for thoughts, people and memories"
+  },
+  "nav": {
+    "diary": "Entries",
+    "calendar": "Calendar",
+    "people": "People",
+    "search": "Search",
+    "tags": "Tags",
+    "settings": "Settings"
+  },
+  "auth": {
+    "signInWithGoogle": "Continue with Google",
+    "signOut": "Sign out"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "create": "Create",
+    "close": "Close",
+    "confirm": "Confirm",
+    "loading": "Loading…",
+    "today": "Today",
+    "future": "Future",
+    "retry": "Retry",
+    "undo": "Undo",
+    "search": "Search",
+    "optional": "optional",
+    "noResults": "No results",
+    "showMore": "Show more",
+    "saved": "Saved",
+    "less": "Less",
+    "more": "More"
+  },
+  "importance": {
+    "label": "Importance",
+    "levels": {
+      "1": "Life-changing",
+      "2": "Significant",
+      "3": "Anecdotal",
+      "4": "Event",
+      "5": "Thought"
+    },
+    "descriptions": {
+      "1": "Major life events like getting married, a new job, moving abroad",
+      "2": "Important personal developments and meaningful experiences",
+      "3": "Interesting stories and memorable moments",
+      "4": "Routine happenings and small observations",
+      "5": "Casual thoughts and trivial daily anecdotes"
+    }
+  },
+  "diary": {
+    "title": "Diary",
+    "newEntry": "New entry",
+    "editEntry": "Edit entry",
+    "addSubEntry": "Add sub-entry",
+    "previousDay": "Previous day",
+    "nextDay": "Next day",
+    "noEntries": "No entries for this day",
+    "noEntriesDescription": "Start writing your thoughts for this day",
+    "composerPlaceholder": "What happened? Use @person and #tag…",
+    "willBeSaidTo": "Will be marked as said to",
+    "date": "Date",
+    "deleteConfirmTitle": "Delete entry?",
+    "deleteConfirmDescription": "This will also delete its sub-entries. This cannot be undone.",
+    "maxDepthReached": "Maximum sub-entry depth reached",
+    "entrySaved": "Entry saved",
+    "entryDeleted": "Entry deleted",
+    "createTag": "Create tag \"{{name}}\"",
+    "addTags": "Tags",
+    "addPeople": "People",
+    "subEntries": "{{count}} sub-entry",
+    "subEntries_other": "{{count}} sub-entries"
+  },
+  "people": {
+    "title": "People",
+    "addPerson": "Add person",
+    "editPerson": "Edit person",
+    "deletePerson": "Delete person",
+    "name": "Name",
+    "namePlaceholder": "Person's name",
+    "notes": "Notes",
+    "notesPlaceholder": "Anything worth remembering about them…",
+    "tags": "Tags",
+    "tagsDescription": "Entries sharing these tags become talking points for this person",
+    "noPeople": "No people yet",
+    "noPeopleDescription": "Add the people you talk to and the diary will suggest what to tell them.",
+    "talkingPoints": "Talking points",
+    "talkingPointsCount": "{{count}} talking point",
+    "talkingPointsCount_other": "{{count}} talking points",
+    "memories": "Memories",
+    "history": "History",
+    "markSaid": "Mark as said",
+    "markedSaid": "Marked as said",
+    "unmarkSaid": "Not said yet",
+    "hideForPerson": "Never suggest for {{name}}",
+    "alreadyTold": "Already told",
+    "noTalkingPoints": "Nothing new to tell",
+    "noTalkingPointsDescription": "New entries that mention {{name}} or share their tags will appear here.",
+    "noMemories": "No shared memories yet",
+    "noMemoriesDescription": "Important entries that mention {{name}} will resurface here after {{months}} months.",
+    "noHistory": "No entries mention {{name}} yet",
+    "matchMention": "Mentions them",
+    "matchTag": "Shared tag",
+    "matchBroadcast": "Shared with everyone",
+    "deleteConfirmTitle": "Delete {{name}}?",
+    "deleteConfirmDescription": "Entries will be kept, but every mention, said-mark and hidden-mark of this person will be removed.",
+    "personSaved": "Person saved",
+    "personDeleted": "Person deleted",
+    "duplicate_name": "A person with that name already exists",
+    "checkupReminders": "Checkup reminders",
+    "checkupRemindersDescription": "Get an alert on this person's profile when it's been a while since you last talked.",
+    "checkupEvery": "Every",
+    "checkupDueTitle": "Time to check up on {{name}}",
+    "checkupDueDescription": "It's been a while since you last marked something as said to them.",
+    "markCheckupDone": "Mark as done",
+    "checkupMarkedDone": "Checkup marked as done",
+    "disableCheckups": "Disable checkups",
+    "checkupsDisabled": "Checkups disabled for this person"
+  },
+  "tags": {
+    "title": "Tags",
+    "addTag": "Add tag",
+    "editTag": "Edit tag",
+    "deleteTag": "Delete tag",
+    "name": "Name",
+    "namePlaceholder": "Tag name",
+    "color": "Color",
+    "noTags": "No tags yet",
+    "noTagsDescription": "Tags connect entries to people. Create a few to get started.",
+    "usage": "{{entries}} entries · {{people}} people",
+    "deleteConfirmTitle": "Delete tag \"{{name}}\"?",
+    "deleteConfirmDescription": "It will be removed from all entries and people that use it.",
+    "tagSaved": "Tag saved",
+    "tagDeleted": "Tag deleted",
+    "duplicate_name": "A tag with that name already exists"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "onThisDay": "On this day",
+    "entriesCount": "{{count}} entry",
+    "entriesCount_other": "{{count}} entries"
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search your entries…",
+    "filters": "Filters",
+    "byTags": "Tags",
+    "byPeople": "People",
+    "byImportance": "Importance",
+    "from": "From",
+    "to": "To",
+    "results": "{{count}} result",
+    "results_other": "{{count}} results",
+    "noResults": "No entries found",
+    "noResultsDescription": "Try different words or fewer filters.",
+    "clearFilters": "Clear filters"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeAuto": "System",
+    "language": "Language",
+    "decay": {
+      "title": "Talking point decay",
+      "description": "How long entries of each importance stay relevant as talking points. The value is a half-life in days: after that many days an entry has half its initial score, and it disappears once the score falls below the cutoff.",
+      "halfLifeDays": "Half-life (days)"
+    },
+    "memories": {
+      "title": "Memories",
+      "description": "Entries that directly mention a person come back as shared memories once they are old enough.",
+      "threshold": "Minimum importance",
+      "thresholdDescription": "Only entries at this importance or higher become memories",
+      "minAge": "Appear after",
+      "days": "days"
+    },
+    "broadcast": {
+      "title": "Broadcast to everyone",
+      "description": "Some entries can be suggested as talking points for every person, not just those they mention or share a tag with.",
+      "lifeChanging": "Life-changing events",
+      "lifeChangingDescription": "Suggest every \"Life-changing\" entry to everyone, regardless of match.",
+      "tags": "Broadcast tags",
+      "tagsDescription": "Entries with these tags are suggested to everyone regardless of match."
+    },
+    "checkups": {
+      "title": "Checkup reminders",
+      "description": "Default checkup interval inherited by newly created people. Each person can override or disable it from their profile.",
+      "enable": "Send checkup reminders by default"
+    },
+    "account": "Account",
+    "resetDefaults": "Reset to defaults",
+    "settingsSaved": "Settings saved"
+  },
+  "errors": {
+    "unauthorized": "You need to sign in",
+    "not_found": "Not found",
+    "unknown": "Something went wrong",
+    "offline": "You appear to be offline",
+    "validation": "Some fields are invalid"
+  },
+  "entry": {
+    "max_depth": "Maximum sub-entry depth reached",
+    "not_found": "Entry not found"
+  },
+  "person": {
+    "not_found": "Person not found",
+    "duplicate_name": "A person with that name already exists"
+  },
+  "tag": {
+    "not_found": "Tag not found",
+    "duplicate_name": "A tag with that name already exists"
+  }
+}

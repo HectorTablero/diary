@@ -1,3 +1,7 @@
 **/node_modules/
-**/dist
+**/dist/
+**/dev-dist/
+.env
+.git
+.github
 deploy.bat
