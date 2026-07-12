@@ -94,6 +94,8 @@ export interface SettingsDto {
   broadcastLifeChangingEvents: boolean;
   /** Tags whose entries are suggested to everyone regardless of match. */
   broadcastTagIds: string[];
+  /** Force AI dictation suggestions to be written in English, regardless of the transcript language. */
+  forceEnglishAIEvents: boolean;
   /** Default `checkupIntervalDays` inherited by newly created people. `null` = off by default. */
   defaultCheckupIntervalDays: number | null;
   /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text

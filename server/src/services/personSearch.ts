@@ -21,6 +21,22 @@ export const normalize = (s: string) =>
 
 const tokenize = (s: string): string[] => normalize(s).split(/[^a-z0-9]+/).filter(Boolean);
 
+function phoneticizeToken(token: string): string {
+  return token
+    .replace(/ph/g, 'f')
+    .replace(/[bv]/g, 'b')
+    .replace(/[ckq]/g, 'k')
+    .replace(/[dt]/g, 't')
+    .replace(/[gj]/g, 'g')
+    .replace(/[szx]/g, 's')
+    .replace(/y/g, 'i')
+    .replace(/w/g, 'u')
+    .replace(/h/g, '')
+    .replace(/(.)\1+/g, '$1');
+}
+
+const phoneticizeTokens = (s: string): string[] => tokenize(s).map(phoneticizeToken).filter(Boolean);
+
 /** Classic edit-distance DP, O(len(a) * len(b)). Inputs here are short tokens, not full text. */
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
@@ -53,10 +69,14 @@ function tokenScore(queryToken: string, targetToken: string): number {
 }
 
 /** Best per-query-token match averaged across the query, against a whole text field. */
-function fieldScore(query: string, field: string): number {
+function fieldScore(
+  query: string,
+  field: string,
+  transformToken: (token: string) => string = (token) => token,
+): number {
   if (!field) return 0;
-  const queryTokens = tokenize(query);
-  const fieldTokens = tokenize(field);
+  const queryTokens = tokenize(query).map(transformToken);
+  const fieldTokens = tokenize(field).map(transformToken);
   if (!queryTokens.length || !fieldTokens.length) return 0;
   let total = 0;
   for (const qt of queryTokens) {
@@ -75,12 +95,34 @@ export function scorePerson(query: string, person: SearchablePerson): number {
   return 1.0 * nameScore + 0.6 * tagsScore + 0.4 * notesScore;
 }
 
-export function searchPeople(query: string, people: SearchablePerson[]): ScoredPerson[] {
+function scorePersonPhonetic(query: string, person: SearchablePerson): number {
+  const nameScore = fieldScore(query, person.name, phoneticizeToken);
+  const tagsScore = fieldScore(query, person.tagNames.join(' '), phoneticizeToken);
+  const notesScore = fieldScore(query, person.notes, phoneticizeToken);
+  return 1.0 * nameScore + 0.6 * tagsScore + 0.4 * notesScore;
+}
+
+function searchPeopleDirect(query: string, people: SearchablePerson[]): ScoredPerson[] {
   return people
     .map((p) => ({ ...p, score: scorePerson(query, p) }))
     .filter((p) => p.score > 0.15)
     .sort((a, b) => b.score - a.score)
     .slice(0, 15);
+}
+
+function searchPeoplePhonetic(query: string, people: SearchablePerson[]): ScoredPerson[] {
+  return people
+    .map((p) => ({ ...p, score: scorePersonPhonetic(query, p) }))
+    .filter((p) => p.score > 0.15)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 15);
+}
+
+export function searchPeople(query: string, people: SearchablePerson[]): ScoredPerson[] {
+  const directMatches = searchPeopleDirect(query, people);
+  if (directMatches.length) return directMatches;
+
+  return searchPeoplePhonetic(query, people);
 }
 
 function csvField(value: string): string {
@@ -89,12 +131,19 @@ function csvField(value: string): string {
 
 /** RFC-4180-ish CSV the model reads back as a tool result. */
 export function searchPeopleCsv(query: string, people: SearchablePerson[]): string {
-  const header = 'id,name,tags,notes,score';
-  const results = searchPeople(query, people);
+  console.log(`searchPeopleCsv(${JSON.stringify(query)}, ${people.length} people)`);
+  const header = 'name,id,tags,notes,score';
+  const directMatches = searchPeopleDirect(query, people);
+  const results = directMatches.length ? directMatches : searchPeoplePhonetic(query, people);
   if (!results.length) return `${header}\n# no matches`;
   const rows = results.map((p) => {
     const notes = p.notes.replace(/\r?\n+/g, ' ').slice(0, 200);
-    return [p.id, p.name, p.tagNames.join('|'), notes, p.score.toFixed(2)].map(csvField).join(',');
+    return [p.name, p.id, p.tagNames.join('|'), notes, p.score.toFixed(2)].map(csvField).join(',');
   });
-  return [header, ...rows].join('\n');
+  const csv = [header, ...rows].join('\n');
+  if (directMatches.length) console.log(csv);
+  if (directMatches.length) return csv;
+  const prefix =
+    'No direct matches were found. The transcript may be imperfect. These are the similar sounding names; if one is even close, prefer it over skipping the person.\n\n';
+  return prefix + csv;
 }

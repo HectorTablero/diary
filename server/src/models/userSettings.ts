@@ -29,6 +29,7 @@ const userSettingsSchema = new Schema(
     },
     groqApiKey: { type: String, default: DEFAULT_SETTINGS.groqApiKey },
     openRouterApiKey: { type: String, default: DEFAULT_SETTINGS.openRouterApiKey },
+    forceEnglishAIEvents: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

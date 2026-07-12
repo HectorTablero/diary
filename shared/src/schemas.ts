@@ -91,6 +91,7 @@ export const settingsSchema = z.object({
   memoryMinAgeDays: z.number().int().min(0).max(3650),
   broadcastLifeChangingEvents: z.boolean(),
   broadcastTagIds: z.array(objectIdSchema).max(50),
+  forceEnglishAIEvents: z.boolean().optional(),
   defaultCheckupIntervalDays: checkupIntervalDaysSchema,
   // Both optional and never defaulted: a queued PUT /settings outbox payload from an older
   // client (that predates these fields) must not wipe the stored keys on replay. An

@@ -26,6 +26,7 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     memoryMinAgeDays: doc.memoryMinAgeDays,
     broadcastLifeChangingEvents: doc.broadcastLifeChangingEvents,
     broadcastTagIds: (doc.broadcastTagIds as Types.ObjectId[]).map((id) => id.toString()),
+    forceEnglishAIEvents: doc.forceEnglishAIEvents,
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
     groqApiKey: doc.groqApiKey ?? '',
     openRouterApiKey: doc.openRouterApiKey ?? '',
