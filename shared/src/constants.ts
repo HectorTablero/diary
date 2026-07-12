@@ -45,6 +45,7 @@ export const DEFAULT_SETTINGS = {
 
 export const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
 export const GROQ_WHISPER_MODEL = 'whisper-large-v3-turbo';
+export const GROQ_WHISPER_FALLBACK_MODEL = 'whisper-large-v3';
 /** Single point of change if this model id ever moves or is renamed on Groq. */
 export const GROQ_CHAT_MODEL = 'openai/gpt-oss-120b';
 export const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
