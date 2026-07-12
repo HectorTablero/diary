@@ -8,6 +8,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 // The API port lives in the repo-root .env (shared with the server).
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 const apiPort = process.env.PORT ?? '3000';
+// Expose the (public) Google client id to the bundle for native sign-in.
+process.env.VITE_GOOGLE_CLIENT_ID ??= process.env.GOOGLE_CLIENT_ID;
 
 export default defineConfig({
   plugins: [
@@ -36,22 +38,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Data lives in the local Dexie store now; the SW only precaches the app shell.
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [
-          {
-            // Cache API reads for offline viewing — never auth endpoints.
-            urlPattern: ({ url, sameOrigin }) =>
-              sameOrigin && url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth/'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 3,
-              expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 3600 },
-              cacheableResponse: { statuses: [200] },
-            },
-          },
-        ],
       },
     }),
   ],

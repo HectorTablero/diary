@@ -1,10 +1,40 @@
+import { SocialLogin } from '@capgo/capacitor-social-login';
 import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router';
 import { FullScreenSpinner, Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
-import { signIn, useSession } from '@/lib/authClient';
+import { kick } from '@/db/sync';
+import { authClient, signIn, useSession } from '@/lib/authClient';
+import { isNative } from '@/lib/native';
+
+let socialLoginReady = false;
+
+/**
+ * Native sign-in: Google blocks its OAuth pages inside webviews, so the app
+ * uses the platform's native Google Sign-In and hands the resulting idToken
+ * to Better Auth, which creates the session (returned as a bearer token).
+ */
+async function nativeGoogleSignIn(): Promise<void> {
+  if (!socialLoginReady) {
+    await SocialLogin.initialize({
+      google: { webClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID as string },
+    });
+    socialLoginReady = true;
+  }
+  const { result } = await SocialLogin.login({
+    provider: 'google',
+    options: { scopes: ['email', 'profile'] },
+  });
+  if (!('idToken' in result) || !result.idToken) throw new Error('Google sign-in returned no idToken');
+  const { error } = await authClient.signIn.social({
+    provider: 'google',
+    idToken: { token: result.idToken, accessToken: result.accessToken?.token },
+  });
+  if (error) throw new Error(error.message ?? 'sign-in failed');
+  kick();
+}
 
 function GoogleIcon() {
   return (
@@ -40,7 +70,13 @@ export default function LoginPage() {
   const handleSignIn = async () => {
     setSigningIn(true);
     try {
-      await signIn.social({ provider: 'google', callbackURL: '/diary' });
+      if (isNative) {
+        await nativeGoogleSignIn();
+        // useSession refreshes after signIn and the <Navigate> above redirects.
+        setSigningIn(false);
+      } else {
+        await signIn.social({ provider: 'google', callbackURL: '/diary' });
+      }
     } catch {
       setSigningIn(false);
     }

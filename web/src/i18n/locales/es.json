@@ -15,6 +15,13 @@
     "signInWithGoogle": "Continuar con Google",
     "signOut": "Cerrar sesión"
   },
+  "sync": {
+    "offline": "Sin conexión",
+    "offlinePending_one": "Sin conexión — {{count}} cambio por sincronizar",
+    "offlinePending_many": "Sin conexión — {{count}} cambios por sincronizar",
+    "offlinePending_other": "Sin conexión — {{count}} cambios por sincronizar",
+    "sessionExpired": "Tu sesión ha caducado."
+  },
   "common": {
     "cancel": "Cancelar",
     "save": "Guardar",

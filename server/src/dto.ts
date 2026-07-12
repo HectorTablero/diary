@@ -1,4 +1,4 @@
-import type { EntryDto, EntryNode, PersonDto, PersonRefDto, SaidMark, TagDto } from '@diary/shared';
+import type { EntryDto, PersonDto, PersonRefDto, SaidMark, TagDto } from '@diary/shared';
 import { Types } from 'mongoose';
 import type { PopulateOptions } from 'mongoose';
 
@@ -84,27 +84,6 @@ export const entryToDto = (entry: LeanEntry): EntryDto => ({
   createdAt: entry.createdAt.toISOString(),
   updatedAt: entry.updatedAt.toISOString(),
 });
-
-/** Assemble a flat list of entries into parent/children trees, oldest first per level. */
-export function buildEntryTree(entries: LeanEntry[]): EntryNode[] {
-  const nodes = new Map<string, EntryNode>();
-  for (const entry of entries) {
-    nodes.set(entry._id.toString(), { ...entryToDto(entry), children: [] });
-  }
-  const roots: EntryNode[] = [];
-  for (const node of nodes.values()) {
-    const parent = node.parentId ? nodes.get(node.parentId) : undefined;
-    if (parent) parent.children.push(node);
-    else roots.push(node);
-  }
-  const byCreation = (a: EntryNode, b: EntryNode) => a.createdAt.localeCompare(b.createdAt);
-  const sortTree = (list: EntryNode[]) => {
-    list.sort(byCreation);
-    list.forEach((n) => sortTree(n.children));
-  };
-  sortTree(roots);
-  return roots;
-}
 
 export const ENTRY_POPULATE: PopulateOptions[] = [
   { path: 'tags', select: 'name color' },

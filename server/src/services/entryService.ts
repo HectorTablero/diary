@@ -1,11 +1,12 @@
 import type { EntryCreateInput, EntryUpdateInput } from '@diary/shared';
-import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { buildEntryTree, MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
 import { Types } from 'mongoose';
 import { badRequest, notFound } from '../errors';
+import { recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
-import { buildEntryTree, ENTRY_POPULATE, entryToDto, type LeanEntry } from '../dto';
+import { ENTRY_POPULATE, entryToDto, type LeanEntry } from '../dto';
 
 const toObjectIds = (ids: string[]) => ids.map((id) => new Types.ObjectId(id));
 
@@ -37,13 +38,17 @@ async function assertDepthAllowed(userId: string, parentId: string) {
 
 export async function getDayEntries(userId: string, dateKey: string) {
   const entries = await Entry.find({ userId, dateKey }).populate(ENTRY_POPULATE).lean();
-  return buildEntryTree(entries as unknown as LeanEntry[]);
+  return buildEntryTree((entries as unknown as LeanEntry[]).map(entryToDto));
 }
 
-/** Bump the checkup clock: marking something as said counts as a real interaction. */
+/** Bump the checkup clock: marking something as said counts as a real interaction.
+    Only moves forward — a replayed offline mutation must not rewind it. */
 async function bumpLastCheckup(userId: string, personIds: Types.ObjectId[], at: Date) {
   if (!personIds.length) return;
-  await Person.updateMany({ userId, _id: { $in: personIds } }, { lastCheckupAt: at });
+  await Person.updateMany(
+    { userId, _id: { $in: personIds }, lastCheckupAt: { $lt: at } },
+    { lastCheckupAt: at },
+  );
 }
 
 export async function createEntry(userId: string, input: EntryCreateInput) {
@@ -52,18 +57,29 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
   const people = await ownedPersonIds(userId, input.people);
   // Auto-said: a direct mention means the person heard it, unless the client says otherwise.
   const saidToIds = input.saidTo === undefined ? people : await ownedPersonIds(userId, input.saidTo);
-  const now = new Date();
+  // Offline creates replay with their original timestamp so ordering within a day survives.
+  const now = input.createdAt ? new Date(input.createdAt) : new Date();
 
-  const entry = await Entry.create({
-    userId,
-    content: input.content,
-    dateKey: input.dateKey,
-    importance: input.importance,
-    tags: await ownedTagIds(userId, input.tags),
-    people,
-    saidTo: saidToIds.map((person) => ({ person, at: now })),
-    parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
-  });
+  // timestamps off for this save: mongoose would otherwise force updatedAt = createdAt on new
+  // docs, hiding replayed offline creates from other clients' sync cursors.
+  const [entry] = await Entry.create(
+    [
+      {
+        _id: input.id ? new Types.ObjectId(input.id) : new Types.ObjectId(),
+        createdAt: now,
+        updatedAt: new Date(),
+        userId,
+        content: input.content,
+        dateKey: input.dateKey,
+        importance: input.importance,
+        tags: await ownedTagIds(userId, input.tags),
+        people,
+        saidTo: saidToIds.map((person) => ({ person, at: now })),
+        parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
+      },
+    ],
+    { timestamps: false },
+  );
   await bumpLastCheckup(userId, saidToIds, now);
   const populated = await entry.populate(ENTRY_POPULATE);
   return entryToDto(populated.toObject() as unknown as LeanEntry);
@@ -112,6 +128,7 @@ export async function deleteEntry(userId: string, entryId: string) {
     toDelete.push(...frontier);
   }
   await Entry.deleteMany({ userId, _id: { $in: toDelete } });
+  await recordDeletions(userId, 'entry', toDelete);
   return toDelete.length;
 }
 

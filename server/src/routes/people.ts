@@ -5,6 +5,7 @@ import { Types } from 'mongoose';
 import { conflict, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator, queryValidator } from '../middleware/validate';
+import { recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { personToDto, type LeanPerson } from '../dto';
@@ -54,14 +55,25 @@ export const peopleRouter = new Hono<AppEnv>()
         input.checkupIntervalDays !== undefined
           ? input.checkupIntervalDays
           : (await getSettings(userId)).defaultCheckupIntervalDays;
-      const person = await Person.create({
-        userId,
-        name: input.name,
-        tags: await ownedTagIds(userId, input.tags),
-        notes: input.notes,
-        checkupIntervalDays,
-        lastCheckupAt: new Date(),
-      });
+      const createdAt = input.createdAt ? new Date(input.createdAt) : new Date();
+      // timestamps off: keep updatedAt at server time (not createdAt) so replayed offline
+      // creates still hit other clients' sync cursors.
+      const [person] = await Person.create(
+        [
+          {
+            _id: input.id ? new Types.ObjectId(input.id) : new Types.ObjectId(),
+            createdAt,
+            updatedAt: new Date(),
+            userId,
+            name: input.name,
+            tags: await ownedTagIds(userId, input.tags),
+            notes: input.notes,
+            checkupIntervalDays,
+            lastCheckupAt: createdAt,
+          },
+        ],
+        { timestamps: false },
+      );
       const populated = await person.populate(PERSON_POPULATE);
       return c.json(personToDto(populated.toObject() as unknown as LeanPerson), 201);
     } catch (err) {
@@ -100,10 +112,13 @@ export const peopleRouter = new Hono<AppEnv>()
     const person = await Person.findOneAndDelete({ _id: id, userId }).lean();
     if (!person) throw notFound('person.not_found');
     const personId = new Types.ObjectId(id);
+    // Scoped filter: only entries that actually reference the person get their updatedAt bumped
+    // (sync pulls rely on updatedAt, so an unscoped updateMany would re-send every entry).
     await Entry.updateMany(
-      { userId },
+      { userId, $or: [{ people: personId }, { 'saidTo.person': personId }, { hiddenFor: personId }] },
       { $pull: { people: personId, saidTo: { person: personId }, hiddenFor: personId } },
     );
+    await recordDeletions(userId, 'person', [personId]);
     return c.json({ ok: true });
   })
   .put('/:id/checkup', async (c) => {

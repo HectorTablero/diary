@@ -1,9 +1,11 @@
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Auth } from './auth';
+import { config } from './config';
 import { handleError } from './errors';
 import { requireAuth, type AppEnv } from './middleware/session';
 import { calendarRouter, onThisDayRouter } from './routes/calendar';
@@ -11,6 +13,7 @@ import { entriesRouter } from './routes/entries';
 import { peopleRouter } from './routes/people';
 import { searchRouter } from './routes/search';
 import { settingsRouter } from './routes/settings';
+import { syncRouter } from './routes/sync';
 import { tagsRouter } from './routes/tags';
 
 // serveStatic resolves relative to process.cwd(); compute the path to web/dist
@@ -22,6 +25,17 @@ export const buildApp = (auth: Auth) => {
   const app = new Hono<AppEnv>();
   app.use(logger());
   app.onError(handleError);
+
+  // The Capacitor app calls the API cross-origin from the native webview.
+  app.use(
+    '/api/*',
+    cors({
+      origin: [config.betterAuthUrl, 'https://localhost', 'capacitor://localhost'],
+      allowHeaders: ['Content-Type', 'Authorization'],
+      exposeHeaders: ['set-auth-token'],
+      credentials: true,
+    }),
+  );
 
   app.get('/api/health', (c) => c.json({ ok: true }));
   app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
@@ -35,6 +49,7 @@ export const buildApp = (auth: Auth) => {
   api.route('/calendar', calendarRouter);
   api.route('/on-this-day', onThisDayRouter);
   api.route('/search', searchRouter);
+  api.route('/sync', syncRouter);
   app.route('/api', api);
 
   // Unknown API paths must 404 as JSON, never fall through to the SPA.

@@ -33,11 +33,19 @@ npm workspaces monorepo:
 
 | Workspace | Stack |
 |---|---|
-| `web/` | React 19 + Vite 7 + TypeScript, Tailwind v4, shadcn/ui, TanStack Query, react-router 7, i18next, PWA (vite-plugin-pwa) |
+| `web/` | React 19 + Vite 7 + TypeScript, Tailwind v4, shadcn/ui, TanStack Query, react-router 7, i18next, Dexie (IndexedDB), PWA (vite-plugin-pwa), Capacitor (Android) |
 | `server/` | Hono on Node, Mongoose 8 (MongoDB), Better Auth (Google OAuth) |
-| `shared/` | zod schemas, DTO types and constants shared by both |
+| `shared/` | zod schemas, DTO types, constants and the talking-points scoring, shared by both |
 
 In production the server serves the built SPA (single origin, single container).
+
+## Offline / sync
+
+The app is **local-first**: every page reads from an IndexedDB mirror (`web/src/db`), so
+reading *and writing* work fully offline on both the website and the Android app.
+Mutations apply locally and queue in an outbox that replays against the REST API when
+online; `GET /api/sync?since=` then pulls everything that changed (deletes propagate via
+tombstones). Conflicts resolve last-write-wins — fine for a single-user app.
 
 ## Setup
 
@@ -48,12 +56,6 @@ In production the server serves the built SPA (single origin, single container).
 3. `npm ci`
 4. `npm run dev` → http://localhost:5173 (API on the port from `.env`, proxied).
 
-Optional demo data (after signing in once):
-
-```sh
-npm run seed -- --email you@example.com
-```
-
 ## Production
 
 ```sh
@@ -63,10 +65,34 @@ docker build -t diary . && docker run --env-file .env -p 3000:3000 diary
 
 Set `BETTER_AUTH_URL` to the public origin in production.
 
+## Android app (Capacitor)
+
+The Android app in `web/android/` bundles the same SPA and talks to the production API
+(`web/.env.app` → `VITE_API_BASE`). Sign-in uses the platform's **native Google
+Sign-In** (Google blocks OAuth pages inside webviews); the resulting idToken is handed
+to Better Auth, which returns a **bearer token** stored in Capacitor Preferences.
+
+One-time Google Cloud Console setup: create an **Android** OAuth client with package
+`es.tablerus.diary` and the SHA-1 of the debug and release keystores
+(`keytool -list -v -keystore <ks>`). The existing web client id keeps being the one
+referenced in code.
+
+```sh
+npm run build:app   # web build (app mode) + cap sync android
+npm run app:open    # open in Android Studio
+# or from web/android: .\gradlew assembleDebug / assembleRelease
+```
+
+Release builds are signed with `web/android/app/diary-release.keystore` via the
+untracked `web/android/app/keystore.properties` (both gitignored — **back the keystore
+up**; losing it means new installs can't update in place). The signed APK lands in
+`web/android/app/build/outputs/apk/release/app-release.apk` — sideload it directly.
+
 ## Scripts
 
 - `npm run dev` — API (tsx watch) + web (Vite) concurrently
 - `npm run build` / `npm start` — production build / run
+- `npm run build:app` / `npm run app:open` — Android app build / open in Android Studio
 - `npm run typecheck` — all workspaces
-- `npm run seed -- --email <email>` — idempotent demo data
-- `npx tsx src/scripts/smokeTest.ts` (from `server/`) — service-layer smoke tests against local MongoDB
+- `npx tsx src/scripts/syncSmoke.ts` (from `server/`) — sync-foundation smoke tests against local MongoDB
+- `npx tsx scripts/dbSmoke.ts` (from `web/`) — local-first data layer smoke tests (Node + fake-indexeddb)

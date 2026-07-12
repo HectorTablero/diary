@@ -99,3 +99,21 @@ export interface SettingsDto {
 export interface ApiError {
   error: string;
 }
+
+export type SyncCollection = 'entry' | 'person' | 'tag';
+
+export interface SyncDeletion {
+  coll: SyncCollection;
+  docId: string;
+  deletedAt: string;
+}
+
+export interface SyncResponse {
+  /** Cursor for the next pull (captured server-side before the queries ran). */
+  serverTime: string;
+  entries: EntryDto[];
+  people: PersonDto[];
+  tags: TagDto[];
+  settings: SettingsDto;
+  deletions: SyncDeletion[];
+}
