@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { isNative } from '@/lib/native';
 import { cn } from '@/lib/utils';
 
 const csv = (values: string[]) => values.filter(Boolean).join(',');
@@ -93,7 +94,7 @@ export default function SearchPage() {
           onChange={(e) => setInput(e.target.value)}
           placeholder={t('search.placeholder')}
           className="pl-9"
-          autoFocus
+          autoFocus={!isNative}
         />
       </div>
 

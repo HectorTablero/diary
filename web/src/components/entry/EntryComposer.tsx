@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/common/Spinner';
 import { ApiError } from '@/lib/apiClient';
+import { isNative } from '@/lib/native';
 
 interface EntryComposerProps {
   dateKey: string;
@@ -111,8 +112,20 @@ export function EntryComposer({
       prev.includes(personId) ? prev.filter((id) => id !== personId) : [...prev, personId],
     );
 
+  // On the phone the keyboard + bottom tab bar would cover the composer;
+  // scroll the page to the bottom once the textarea grabs focus (dialogs
+  // manage their own scrolling, so skip when inside one).
+  const scrollClearOfTabBar = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (!isNative) return;
+    const target = e.target as HTMLElement;
+    if (target.tagName !== 'TEXTAREA' || target.closest('[role="dialog"]')) return;
+    setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+    }, 300); // let the keyboard resize settle first
+  };
+
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2.5" onFocus={scrollClearOfTabBar}>
       <TokenTextarea
         value={content}
         onChange={setContent}

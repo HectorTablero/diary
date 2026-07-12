@@ -8,7 +8,7 @@ import { FullScreenSpinner } from '@/components/common/Spinner';
 import { kick } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
-import { hapticTap } from '@/lib/haptics';
+import { isNative } from '@/lib/native';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
 import { cn } from '@/lib/utils';
 
@@ -76,13 +76,18 @@ function TabBar() {
   const { t } = useTranslation();
   const items = [...MAIN_NAV, ...SECONDARY_NAV];
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
+    <nav
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80',
+        // The app always uses the tab bar, even in landscape widths.
+        !isNative && 'md:hidden',
+      )}
+    >
       <div className="flex items-stretch justify-around pb-[var(--inset-bottom)]">
         {items.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            onClick={hapticTap}
             className={({ isActive }) =>
               cn(
                 'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative',
@@ -129,7 +134,14 @@ function SyncStatusOverlay() {
   }
   if (status.offline) {
     return (
-      <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 md:bottom-4">
+      <div
+        className={cn(
+          // Sit above the tab bar; the bar's height grows by the gesture-nav
+          // safe-area inset, so that inset must be part of the offset.
+          'pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 bottom-[calc(5.5rem+var(--inset-bottom))]',
+          !isNative && 'md:bottom-4',
+        )}
+      >
         <span className="flex items-center gap-1.5 rounded-full border bg-background/95 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
           <CloudOff className="size-3.5" />
           {status.pending > 0
@@ -169,8 +181,8 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-dvh">
-      <Sidebar />
-      <main className="min-w-0 flex-1 pt-[var(--inset-top)] pb-20 md:pb-0">
+      {!isNative && <Sidebar />}
+      <main className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-20', !isNative && 'md:pb-0')}>
         <SyncStatusOverlay />
         <Outlet />
       </main>

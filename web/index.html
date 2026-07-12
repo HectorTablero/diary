@@ -19,6 +19,67 @@
     </script>
   </head>
   <body>
+    <!-- Native boot splash: hover-state logo morphs into the real logo, then
+         fades once React is up. Colors are per-theme via the variables below. -->
+    <style>
+      :root {
+        --boot-splash-bg: #fafafa;
+        --boot-splash-logo: rgb(0, 114, 255);
+      }
+      html.dark {
+        --boot-splash-bg: #18181b;
+        --boot-splash-logo: rgb(0, 114, 255);
+      }
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: var(--boot-splash-bg);
+        transition: opacity 0.25s ease;
+      }
+      #boot-splash path {
+        fill: none;
+        stroke: var(--boot-splash-logo);
+        stroke-width: 50px;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: d 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+      }
+      #boot-splash.morph .bs-h { d: path('M 200 250 L 100 250'); }
+      #boot-splash.morph .bs-c { d: path('M 175 100 L 400 250 L 175 400'); }
+      #boot-splash.morph .bs-v { d: path('M 100 100 L 100 400'); }
+      #boot-splash.fade { opacity: 0; pointer-events: none; }
+    </style>
+    <div id="boot-splash" aria-hidden="true">
+      <svg viewBox="0 0 500 500" width="120" height="120">
+        <path class="bs-h" d="M 375 250 L 50 250" />
+        <path class="bs-c" d="M 300 125 L 375 250 L 300 375" />
+        <path class="bs-v" d="M 450 100 L 450 400" />
+      </svg>
+    </div>
+    <script>
+      (function () {
+        var el = document.getElementById('boot-splash');
+        var isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+        if (!isNative) { el.remove(); return; }
+        el.style.display = 'flex';
+        var start = Date.now();
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { el.classList.add('morph'); });
+        });
+        // Called from main.tsx once React has rendered; waits out the morph first.
+        window.__bootSplashHide = function () {
+          var wait = Math.max(0, 800 - (Date.now() - start));
+          setTimeout(function () {
+            el.classList.add('fade');
+            setTimeout(function () { el.remove(); }, 300);
+          }, wait);
+        };
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
