@@ -52,6 +52,38 @@ export function segmentContent(
   return segments;
 }
 
+/**
+ * Rewrite every @/# mention of `oldName` inside `content` to `newName`, using the
+ * same longest-name-first matching rule as segmentContent (so an overlapping
+ * longer name, e.g. "Ana María" vs "Ana", isn't clobbered).
+ */
+export function renameMentions(
+  content: string,
+  marker: '@' | '#',
+  names: string[],
+  oldName: string,
+  newName: string,
+): string {
+  const sorted = [...names].sort((a, b) => b.length - a.length);
+  let result = '';
+  let i = 0;
+  while (i < content.length) {
+    const ch = content[i];
+    if (ch === marker) {
+      const rest = content.slice(i + 1);
+      const match = sorted.find((n) => fuzzyEquals(rest.slice(0, n.length), n));
+      if (match) {
+        result += fuzzyEquals(match, oldName) ? marker + newName : content.slice(i, i + 1 + match.length);
+        i += 1 + match.length;
+        continue;
+      }
+    }
+    result += ch;
+    i++;
+  }
+  return result;
+}
+
 export interface ActiveToken {
   type: '@' | '#';
   query: string;

@@ -87,6 +87,13 @@
   },
   "people": {
     "title": "Personas",
+    "count": "{{count}} persona",
+    "count_other": "{{count}} personas",
+    "sortBy": "Ordenar por",
+    "sortName": "Nombre",
+    "sortTalkingPoints": "Más temas pendientes",
+    "sortLastContact": "Más tiempo sin contacto",
+    "filterByTag": "Etiquetas",
     "addPerson": "Añadir persona",
     "editPerson": "Editar persona",
     "deletePerson": "Eliminar persona",
@@ -136,6 +143,8 @@
   },
   "tags": {
     "title": "Etiquetas",
+    "count": "{{count}} etiqueta",
+    "count_other": "{{count}} etiquetas",
     "addTag": "Añadir etiqueta",
     "editTag": "Editar etiqueta",
     "deleteTag": "Eliminar etiqueta",

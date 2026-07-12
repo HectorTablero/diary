@@ -1,16 +1,24 @@
 import { App as CapApp } from '@capacitor/app';
+import { Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import AppLayout from './components/layout/AppLayout';
+import { FullScreenSpinner } from './components/common/Spinner';
 import { todayKey } from './lib/dates';
 import { isNative } from './lib/native';
-import CalendarPage from './pages/CalendarPage';
-import DiaryDayPage from './pages/DiaryDayPage';
 import LoginPage from './pages/LoginPage';
-import PeopleListPage from './pages/PeopleListPage';
-import PersonProfilePage from './pages/PersonProfilePage';
-import SearchPage from './pages/SearchPage';
-import SettingsPage from './pages/SettingsPage';
-import TagsPage from './pages/TagsPage';
+import {
+  CalendarPage,
+  DiaryDayPage,
+  PeopleListPage,
+  PersonProfilePage,
+  SearchPage,
+  SettingsPage,
+  TagsPage,
+} from './pages/lazyPages';
+
+function withSuspense(element: React.ReactNode) {
+  return <Suspense fallback={<FullScreenSpinner />}>{element}</Suspense>;
+}
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -20,13 +28,13 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/diary" replace /> },
       { path: 'diary', element: <Navigate to={`/diary/${todayKey()}`} replace /> },
-      { path: 'diary/:date', element: <DiaryDayPage /> },
-      { path: 'calendar', element: <CalendarPage /> },
-      { path: 'people', element: <PeopleListPage /> },
-      { path: 'people/:id', element: <PersonProfilePage /> },
-      { path: 'search', element: <SearchPage /> },
-      { path: 'tags', element: <TagsPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      { path: 'diary/:date', element: withSuspense(<DiaryDayPage />) },
+      { path: 'calendar', element: withSuspense(<CalendarPage />) },
+      { path: 'people', element: withSuspense(<PeopleListPage />) },
+      { path: 'people/:id', element: withSuspense(<PersonProfilePage />) },
+      { path: 'search', element: withSuspense(<SearchPage />) },
+      { path: 'tags', element: withSuspense(<TagsPage />) },
+      { path: 'settings', element: withSuspense(<SettingsPage />) },
       { path: '*', element: <Navigate to="/diary" replace /> },
     ],
   },

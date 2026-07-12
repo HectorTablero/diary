@@ -14,7 +14,7 @@ import type {
 } from '@diary/shared';
 import { DEFAULT_TAG_COLORS, newObjectId } from '@diary/shared';
 import { ApiError } from '@/lib/apiClient';
-import { fuzzyEquals } from '@/lib/tokens';
+import { fuzzyEquals, renameMentions } from '@/lib/tokens';
 import { db, type LocalEntry, type OutboxOp } from './db';
 import { getDayEntries, getPerson, getSettings } from './repo';
 import { kick } from './sync';
@@ -201,18 +201,42 @@ export async function createPerson(input: PersonCreateInput): Promise<PersonDto>
   return getPerson(id);
 }
 
+/** Rewrite every entry's literal @OldName text to @NewName after a person rename
+    (the structured peopleIds link is already correct — only the mention text is stale). */
+async function renamePersonMentions(personId: string, oldName: string, newName: string): Promise<void> {
+  const entries = await db.entries.where('peopleIds').equals(personId).toArray();
+  if (!entries.length) return;
+  const nameById = new Map((await db.people.toArray()).map((p) => [p.id, p.name]));
+  nameById.set(personId, oldName);
+  const now = nowIso();
+  for (const entry of entries) {
+    const names = entry.peopleIds
+      .map((id) => nameById.get(id))
+      .filter((n): n is string => n !== undefined);
+    const content = renameMentions(entry.content, '@', names, oldName, newName);
+    if (content === entry.content) continue;
+    await db.entries.update(entry.id, { content, updatedAt: now });
+    await enqueue('PATCH', `/entries/${entry.id}`, { content });
+  }
+}
+
 export async function updatePerson(personId: string, input: PersonUpdateInput): Promise<PersonDto> {
   if (input.name !== undefined) await assertUniquePersonName(input.name, personId);
+  let oldName: string | undefined;
   const count = await db.people
     .where('id')
     .equals(personId)
     .modify((p) => {
+      oldName = p.name;
       if (input.name !== undefined) p.name = input.name;
       if (input.notes !== undefined) p.notes = input.notes;
       if (input.tags !== undefined) p.tagIds = input.tags;
       if (input.checkupIntervalDays !== undefined) p.checkupIntervalDays = input.checkupIntervalDays;
     });
   if (!count) throw new ApiError(404, 'person.not_found');
+  if (input.name !== undefined && oldName !== undefined && !fuzzyEquals(input.name, oldName)) {
+    await renamePersonMentions(personId, oldName, input.name);
+  }
   await enqueue('PATCH', `/people/${personId}`, input);
   return getPerson(personId);
 }
@@ -275,16 +299,40 @@ export async function createTag(input: TagCreateInput): Promise<TagDto> {
   return tag;
 }
 
+/** Rewrite every entry's literal #oldtag text to #newtag after a tag rename
+    (the structured tagIds link is already correct — only the mention text is stale). */
+async function renameTagMentions(tagId: string, oldName: string, newName: string): Promise<void> {
+  const entries = await db.entries.where('tagIds').equals(tagId).toArray();
+  if (!entries.length) return;
+  const nameById = new Map((await db.tags.toArray()).map((t) => [t.id, t.name]));
+  nameById.set(tagId, oldName);
+  const now = nowIso();
+  for (const entry of entries) {
+    const names = entry.tagIds
+      .map((id) => nameById.get(id))
+      .filter((n): n is string => n !== undefined);
+    const content = renameMentions(entry.content, '#', names, oldName, newName);
+    if (content === entry.content) continue;
+    await db.entries.update(entry.id, { content, updatedAt: now });
+    await enqueue('PATCH', `/entries/${entry.id}`, { content });
+  }
+}
+
 export async function updateTag(tagId: string, input: TagUpdateInput): Promise<TagDto> {
   if (input.name !== undefined) await assertUniqueTagName(input.name, tagId);
+  let oldName: string | undefined;
   const count = await db.tags
     .where('id')
     .equals(tagId)
     .modify((t) => {
+      oldName = t.name;
       if (input.name !== undefined) t.name = input.name;
       if (input.color !== undefined) t.color = input.color;
     });
   if (!count) throw new ApiError(404, 'tag.not_found');
+  if (input.name !== undefined && oldName !== undefined && !fuzzyEquals(input.name, oldName)) {
+    await renameTagMentions(tagId, oldName, input.name);
+  }
   await enqueue('PATCH', `/tags/${tagId}`, input);
   return (await db.tags.get(tagId))!;
 }

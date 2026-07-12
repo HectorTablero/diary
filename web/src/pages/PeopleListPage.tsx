@@ -1,36 +1,78 @@
-import type { PersonDto } from '@diary/shared';
-import { BellRing, MessageCircle, Pencil, Plus, Search, Users } from 'lucide-react';
+import type { PersonDto, PersonListItem } from '@diary/shared';
+import { BellRing, Hash, MessageCircle, Pencil, Plus, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { usePeople } from '@/api/hooks';
+import { usePeople, useTags } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { TagChip } from '@/components/entry/chips';
+import { EntityPicker } from '@/components/entry/EntityPicker';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { PersonForm } from '@/components/person/PersonForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fuzzyIncludes } from '@/lib/tokens';
+
+type SortOption = 'name' | 'talkingPoints' | 'lastContact';
+
+function sortPeople(people: PersonListItem[], sort: SortOption): PersonListItem[] {
+  const sorted = [...people];
+  switch (sort) {
+    case 'talkingPoints':
+      return sorted.sort(
+        (a, b) => b.talkingPointCount - a.talkingPointCount || a.name.localeCompare(b.name),
+      );
+    case 'lastContact':
+      return sorted.sort(
+        (a, b) =>
+          Date.parse(a.lastCheckupAt) - Date.parse(b.lastCheckupAt) || a.name.localeCompare(b.name),
+      );
+    case 'name':
+    default:
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+  }
+}
 
 export default function PeopleListPage() {
   const { t } = useTranslation();
   const { data: people, isLoading } = usePeople();
+  const { data: tags } = useTags();
   const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortOption>('name');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<PersonDto | null>(null);
 
-  const filtered = useMemo(
-    () => (people ?? []).filter((p) => !query || fuzzyIncludes(p.name, query)),
-    [people, query],
-  );
+  const filtered = useMemo(() => {
+    const matching = (people ?? []).filter(
+      (p) =>
+        (!query || fuzzyIncludes(p.name, query)) &&
+        (tagFilter.length === 0 || p.tags.some((tag) => tagFilter.includes(tag.id))),
+    );
+    return sortPeople(matching, sort);
+  }, [people, query, sort, tagFilter]);
+
+  const toggleTagFilter = (id: string) =>
+    setTagFilter((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
 
   return (
     <PageContainer>
       <PageHeader
-        title={t('people.title')}
+        title={
+          <span className="flex items-center gap-2">
+            {t('people.title')}
+            {people && people.length > 0 && (
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground">
+                <span className="sr-only">{t('people.count', { count: people.length })}</span>
+                <span className="px-2">{people.length}</span>
+              </span>
+            )}
+          </span>
+        }
         actions={
           <Button size="sm" className="gap-1.5" onClick={() => setAdding(true)}>
             <Plus className="size-4" />
@@ -40,14 +82,54 @@ export default function PeopleListPage() {
       />
 
       {people && people.length > 0 && (
-        <div className="relative mb-4">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('common.search')}
-            className="pl-9"
-          />
+        <div className="mb-4 flex flex-col gap-2">
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('common.search')}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+              <SelectTrigger size="sm" className="w-fit">
+                <span className="text-muted-foreground">{t('people.sortBy')}:</span>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">{t('people.sortName')}</SelectItem>
+                <SelectItem value="talkingPoints">{t('people.sortTalkingPoints')}</SelectItem>
+                <SelectItem value="lastContact">{t('people.sortLastContact')}</SelectItem>
+              </SelectContent>
+            </Select>
+            {tags && tags.length > 0 && (
+              <EntityPicker
+                trigger={
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                    <Hash className="size-3.5" />
+                    {t('people.filterByTag')}
+                    {tagFilter.length > 0 && <span className="text-primary">({tagFilter.length})</span>}
+                  </Button>
+                }
+                items={tags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
+                selectedIds={tagFilter}
+                onToggle={toggleTagFilter}
+                placeholder={t('tags.namePlaceholder')}
+              />
+            )}
+          </div>
+          {tagFilter.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {tagFilter.map((id) => {
+                const tag = tags?.find((tg) => tg.id === id);
+                return tag ? (
+                  <TagChip key={id} tag={tag} onRemove={() => toggleTagFilter(id)} />
+                ) : null;
+              })}
+            </div>
+          )}
         </div>
       )}
 

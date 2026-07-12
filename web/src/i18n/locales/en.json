@@ -86,6 +86,13 @@
   },
   "people": {
     "title": "People",
+    "count": "{{count}} person",
+    "count_other": "{{count}} people",
+    "sortBy": "Sort by",
+    "sortName": "Name",
+    "sortTalkingPoints": "Most talking points",
+    "sortLastContact": "Longest without contact",
+    "filterByTag": "Tags",
     "addPerson": "Add person",
     "editPerson": "Edit person",
     "deletePerson": "Delete person",
@@ -135,6 +142,8 @@
   },
   "tags": {
     "title": "Tags",
+    "count": "{{count}} tag",
+    "count_other": "{{count}} tags",
     "addTag": "Add tag",
     "editTag": "Edit tag",
     "deleteTag": "Delete tag",
