@@ -2,8 +2,10 @@ import type { EntryDto, PersonDto, SaidMark, TagDto } from '@diary/shared';
 import Dexie, { type EntityTable } from 'dexie';
 
 /* Local-first store: the source of truth the UI reads from. Entries and people
-   are stored normalized (ids only) and joined with tags/people at read time,
-   so a rename never leaves stale copies inside other documents. */
+   are stored normalized (ids only) and joined with tags/people at read time, so
+   structured links never go stale on rename. The literal @Name/#Tag text inside
+   entry.content is a separate, denormalized copy (typed by the composer) that
+   mutations.ts's rename helpers must rewrite explicitly when a name changes. */
 
 export interface LocalEntry {
   id: string;

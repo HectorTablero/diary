@@ -121,7 +121,20 @@ export default function TagsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title={t('tags.title')}
+        title={
+          <span className="flex items-baseline gap-2">
+            {t('tags.title')}
+            {tags && tags.length > 0 && (
+              // <span className="text-sm font-normal text-muted-foreground">
+              //   {t('tags.count', { count: tags.length })}
+              // </span>
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground">
+                <span className="sr-only">{t('tags.count', { count: tags.length })}</span>
+                <span className="px-2">{tags.length}</span>
+              </span>
+            )}
+          </span>
+        }
         actions={
           <Button
             size="sm"

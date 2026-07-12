@@ -8,9 +8,11 @@ import { FullScreenSpinner } from '@/components/common/Spinner';
 import { kick } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
+import { cancelIdle, onIdle } from '@/lib/idle';
 import { isNative } from '@/lib/native';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
 import { cn } from '@/lib/utils';
+import { pageLoaders } from '@/pages/lazyPages';
 
 interface NavItem {
   to: string;
@@ -169,6 +171,19 @@ export default function AppLayout() {
     }
   }, [session]);
 
+  // Warm the route chunk cache once the shell is up and idle, so navigating
+  // between tabs doesn't pay a network round-trip. Skipped on metered
+  // connections (Save-Data) since it's a pure UX nicety, not a requirement.
+  useEffect(() => {
+    if (!session?.user) return;
+    const saveData = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData;
+    if (saveData) return;
+    const handle = onIdle(() => {
+      for (const load of Object.values(pageLoaders)) void load();
+    });
+    return () => cancelIdle(handle);
+  }, [session]);
+
   if (!session) {
     // With a cached user, stay usable while the session check is pending or the
     // network is down (local-first). A definitive "signed out" still redirects.
@@ -182,7 +197,7 @@ export default function AppLayout() {
   return (
     <div className="flex min-h-dvh">
       {!isNative && <Sidebar />}
-      <main className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-20', !isNative && 'md:pb-0')}>
+      <main className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]', !isNative && 'md:pb-0')}>
         <SyncStatusOverlay />
         <Outlet />
       </main>
