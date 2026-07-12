@@ -99,10 +99,12 @@ export interface SettingsDto {
   /** Default `checkupIntervalDays` inherited by newly created people. `null` = off by default. */
   defaultCheckupIntervalDays: number | null;
   /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text
-      fallback when no OpenRouter key is set). Empty = feature disabled. */
+      fallback when no OpenRouter/Cerebras key is set). Empty = feature disabled. */
   groqApiKey: string;
   /** User's own OpenRouter API key; when set, used for text/tool-calling instead of Groq. */
   openRouterApiKey: string;
+    /** User's own Cerebras API key; when set, used for text/tool-calling instead of Groq. */
+    cerebrasApiKey: string;
 }
 
 // --- AI voice assistant ---

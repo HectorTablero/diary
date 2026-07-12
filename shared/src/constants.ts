@@ -35,11 +35,14 @@ export const DEFAULT_SETTINGS = {
   /** Default checkup interval inherited by new people. `null` = checkups off by default. */
   defaultCheckupIntervalDays: null as number | null,
   /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text
-      fallback when no OpenRouter key is set). Empty = feature disabled. */
+      fallback when no OpenRouter/Cerebras key is set). Empty = feature disabled. */
   groqApiKey: '',
   /** User's own OpenRouter API key. When set, it's used for text/tool-calling instead of Groq
       (transcription still always goes through Groq — OpenRouter has no speech-to-text). */
   openRouterApiKey: '',
+  /** User's own Cerebras API key. When set, it's used for text/tool-calling instead of Groq
+    (transcription still always goes through Groq — Cerebras has no speech-to-text). */
+  cerebrasApiKey: '',
 };
 
 // --- AI voice assistant ---
@@ -52,6 +55,10 @@ export const GROQ_CHAT_MODEL = 'openai/gpt-oss-120b';
 export const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
 /** Single point of change if this model id ever moves or is renamed on OpenRouter. */
 export const OPENROUTER_CHAT_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+export const CEREBRAS_API_BASE = 'https://api.cerebras.ai/v1';
+/** Single point of change if this model id ever moves or is renamed on Cerebras. */
+export const CEREBRAS_CHAT_MODEL = 'gemma-4-31b';
+// export const CEREBRAS_CHAT_MODEL = 'gpt-oss-120b';
 export const AI_MAX_TOOL_ITERATIONS = 8;
 export const AI_MAX_SUBMIT_REMINDERS = 2;
 export const AI_MAX_TRANSCRIPT_LENGTH = 20_000;

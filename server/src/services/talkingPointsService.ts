@@ -30,6 +30,7 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
     groqApiKey: doc.groqApiKey ?? '',
     openRouterApiKey: doc.openRouterApiKey ?? '',
+    cerebrasApiKey: doc.cerebrasApiKey ?? '',
   };
 }
 

@@ -92,6 +92,7 @@ export default function SettingsPage() {
           : null,
         groqApiKey: draft.groqApiKey,
         openRouterApiKey: draft.openRouterApiKey,
+        cerebrasApiKey: draft.cerebrasApiKey,
       },
       {
         onSuccess: (data) => {
@@ -381,6 +382,29 @@ export default function SettingsPage() {
                   checked={draft.forceEnglishAIEvents}
                   onCheckedChange={(checked) => setDraft({ ...draft, forceEnglishAIEvents: checked })}
                 />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="cerebras-api-key">{t('settings.ai.cerebrasApiKey')}</Label>
+                <Input
+                  id="cerebras-api-key"
+                  type="password"
+                  autoComplete="off"
+                  value={draft.cerebrasApiKey}
+                  onChange={(e) => setDraft({ ...draft, cerebrasApiKey: e.target.value })}
+                  placeholder={t('settings.ai.cerebrasApiKeyPlaceholder')}
+                  className="max-w-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.ai.cerebrasApiKeyHint')}{' '}
+                  <a
+                    href="https://cloud.cerebras.ai/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    cloud.cerebras.ai
+                  </a>
+                </p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="openrouter-api-key">{t('settings.ai.openRouterApiKey')}</Label>

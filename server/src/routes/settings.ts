@@ -18,7 +18,7 @@ export const settingsRouter = new Hono<AppEnv>()
   })
   .put('/', jsonValidator(settingsSchema), async (c) => {
     const userId = c.get('userId');
-    const { groqApiKey, openRouterApiKey, ...input } = c.req.valid('json');
+    const { groqApiKey, openRouterApiKey, cerebrasApiKey, ...input } = c.req.valid('json');
     await UserSettings.findOneAndUpdate(
       { userId },
       {
@@ -29,6 +29,7 @@ export const settingsRouter = new Hono<AppEnv>()
           broadcastTagIds: await ownedTagIds(userId, input.broadcastTagIds),
           ...(groqApiKey !== undefined ? { groqApiKey } : {}),
           ...(openRouterApiKey !== undefined ? { openRouterApiKey } : {}),
+          ...(cerebrasApiKey !== undefined ? { cerebrasApiKey } : {}),
         },
         $setOnInsert: { userId },
       },
