@@ -115,6 +115,9 @@
     "matchMention": "Mentions them",
     "matchTag": "Shared tag",
     "matchBroadcast": "Shared with everyone",
+    "hiddenSubEntries": "+{{count}} hidden sub-entry",
+    "hiddenSubEntries_other": "+{{count}} hidden sub-entries",
+    "hideSubEntries": "Hide sub-entries",
     "deleteConfirmTitle": "Delete {{name}}?",
     "deleteConfirmDescription": "Entries will be kept, but every mention, said-mark and hidden-mark of this person will be removed.",
     "personSaved": "Person saved",
@@ -202,6 +205,16 @@
       "description": "Default checkup interval inherited by newly created people. Each person can override or disable it from their profile.",
       "enable": "Send checkup reminders by default"
     },
+    "ai": {
+      "title": "AI assistant",
+      "description": "Record a voice note and let AI turn it into diary entry suggestions you can review before saving. Groq is required for transcription; adding an OpenRouter key too switches the suggestion step to a stronger free model instead of Groq's.",
+      "apiKey": "Groq API key",
+      "apiKeyPlaceholder": "gsk_…",
+      "apiKeyHint": "Required for voice transcription. Free to get, used only to call Groq directly from this device. Get one at",
+      "openRouterApiKey": "OpenRouter API key (optional)",
+      "openRouterApiKeyPlaceholder": "sk-or-…",
+      "openRouterApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call OpenRouter directly from this device. Get one at"
+    },
     "account": "Account",
     "resetDefaults": "Reset to defaults",
     "settingsSaved": "Settings saved"
@@ -224,5 +237,29 @@
   "tag": {
     "not_found": "Tag not found",
     "duplicate_name": "A tag with that name already exists"
+  },
+  "ai": {
+    "record": "Record a voice note",
+    "stopRecording": "Stop recording",
+    "cancelRecording": "Cancel recording",
+    "transcribing": "Transcribing…",
+    "thinking": "Finding entries…",
+    "reviewTitle": "Review suggestions",
+    "reviewDescription": "Edit or remove anything before adding these to your diary.",
+    "acceptAll": "Add {{count}} entry",
+    "acceptAll_other": "Add {{count}} entries",
+    "discard": "Discard",
+    "deletePoint": "Remove",
+    "empty": "Nothing to suggest from that recording",
+    "entriesCreated": "{{count}} entry added",
+    "entriesCreated_other": "{{count}} entries added",
+    "mic_denied": "Microphone access was denied",
+    "mic_unavailable": "Microphone is not available",
+    "invalid_key": "Your Groq API key looks invalid",
+    "rate_limited": "Groq rate limit reached, try again shortly",
+    "upstream_error": "Groq couldn't process that",
+    "timeout": "Groq took too long to respond",
+    "no_key": "Add a Groq API key in settings first",
+    "no_submission": "Couldn't get a result from the assistant"
   }
 }

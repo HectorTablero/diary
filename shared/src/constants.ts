@@ -33,7 +33,28 @@ export const DEFAULT_SETTINGS = {
   broadcastTagIds: [] as string[],
   /** Default checkup interval inherited by new people. `null` = checkups off by default. */
   defaultCheckupIntervalDays: null as number | null,
+  /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text
+      fallback when no OpenRouter key is set). Empty = feature disabled. */
+  groqApiKey: '',
+  /** User's own OpenRouter API key. When set, it's used for text/tool-calling instead of Groq
+      (transcription still always goes through Groq — OpenRouter has no speech-to-text). */
+  openRouterApiKey: '',
 };
+
+// --- AI voice assistant ---
+
+export const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
+export const GROQ_WHISPER_MODEL = 'whisper-large-v3-turbo';
+/** Single point of change if this model id ever moves or is renamed on Groq. */
+export const GROQ_CHAT_MODEL = 'openai/gpt-oss-120b';
+export const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
+/** Single point of change if this model id ever moves or is renamed on OpenRouter. */
+export const OPENROUTER_CHAT_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+export const AI_MAX_TOOL_ITERATIONS = 8;
+export const AI_MAX_SUBMIT_REMINDERS = 2;
+export const AI_MAX_TRANSCRIPT_LENGTH = 20_000;
+export const AI_MAX_SUGGESTION_NODES = 40;
+export const AI_MAX_RECORDING_MS = 5 * 60_000;
 
 /** Palette cycled through when creating tags without an explicit color. */
 export const DEFAULT_TAG_COLORS = [

@@ -83,7 +83,7 @@ export default function DiaryDayPage() {
       )}
 
       <div className="mt-8 rounded-xl border bg-card p-3 shadow-xs">
-        <EntryComposer dateKey={dateKey} />
+        <EntryComposer key={dateKey} dateKey={dateKey} />
       </div>
     </PageContainer>
   );

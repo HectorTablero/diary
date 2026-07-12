@@ -27,6 +27,8 @@ const userSettingsSchema = new Schema(
       type: Number,
       default: DEFAULT_SETTINGS.defaultCheckupIntervalDays,
     },
+    groqApiKey: { type: String, default: DEFAULT_SETTINGS.groqApiKey },
+    openRouterApiKey: { type: String, default: DEFAULT_SETTINGS.openRouterApiKey },
   },
   { timestamps: true },
 );

@@ -1,5 +1,5 @@
 import type { PersonDto } from '@diary/shared';
-import { MessageCircle, Pencil, Plus, Search, Users } from 'lucide-react';
+import { BellRing, MessageCircle, Pencil, Plus, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -81,6 +81,12 @@ export default function PeopleListPage() {
                     </div>
                   )}
                 </div>
+                {person.checkupIntervalDays != null && (
+                  <span className="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
+                    <BellRing className="size-3" />
+                    {t('people.checkupEvery')} {person.checkupIntervalDays} {t('settings.memories.days')}
+                  </span>
+                )}
                 {person.talkingPointCount > 0 && (
                   <Badge variant="secondary" className="gap-1">
                     <MessageCircle className="size-3" />
