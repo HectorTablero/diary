@@ -1,0 +1,7 @@
+<svg viewBox="-10 0 490 500" xmlns="http://www.w3.org/2000/svg">
+    <g style="transform-box: fill-box; transform-origin: 50% 50%;" transform="matrix(1, 0, 0, 1, 0, 0)"> <!-- matrix(1, 0, 0, 1, 0, 0) matrix(0, -1, 1, 0, 0, 0) -->
+    <path style="fill: none; stroke-linecap: round; stroke: rgb(0, 114, 255); stroke-width: 50px;" d="M 100 100 L 100 400"/>
+    <path style="fill: none; stroke-linecap: round; stroke: rgb(0, 114, 255); stroke-linejoin: round; stroke-width: 50px;" d="M 175 100 L 400 250 L 175 400"/>
+    <path style="fill: none; stroke-linecap: round; stroke: rgb(0, 114, 255); stroke-linejoin: round; stroke-width: 50px;" d="M 200 250 L 100 250"/>
+    </g>
+</svg>

@@ -55,4 +55,18 @@ export default defineConfig({
       '/api': { target: `http://localhost:${apiPort}`, changeOrigin: false, ws: true },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Heavy libraries that are used across the app but not needed for first paint
+          'db-vendor': ['dexie', 'fake-indexeddb'],
+          'date-vendor': ['date-fns'],
+          'ui-vendor': ['radix-ui', 'lucide-react'],
+          'auth-vendor': ['better-auth', '@capgo/capacitor-social-login'],
+          'capacitor': ['@capacitor/core', '@capacitor/app', '@capacitor/haptics', '@capacitor/keyboard', '@capacitor/preferences', '@capacitor/splash-screen', '@capacitor/status-bar'],
+        },
+      },
+    },
+  }
 });

@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Diary</title>
     <script>
-      // Apply the saved theme before first paint to avoid a flash.
       (function () {
         try {
           var theme = localStorage.getItem('theme') || 'auto';
@@ -19,8 +18,6 @@
     </script>
   </head>
   <body>
-    <!-- Native boot splash: hover-state logo morphs into the real logo, then
-         fades once React is up. Colors are per-theme via the variables below. -->
     <style>
       :root {
         --boot-splash-bg: #fafafa;
@@ -53,26 +50,39 @@
       #boot-splash.morph .bs-v { d: path('M 100 100 L 100 400'); }
       #boot-splash.fade { opacity: 0; pointer-events: none; }
     </style>
-    <div id="boot-splash" aria-hidden="true">
+
+    <div id="boot-splash" aria-hidden="true" style="display: flex;">
       <svg viewBox="0 0 500 500" width="120" height="120">
         <path class="bs-h" d="M 375 250 L 50 250" />
         <path class="bs-c" d="M 300 125 L 375 250 L 300 375" />
         <path class="bs-v" d="M 450 100 L 450 400" />
       </svg>
     </div>
+
     <script>
       (function () {
         var el = document.getElementById('boot-splash');
         var isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
         if (!isNative) { el.remove(); return; }
+
         el.style.display = 'flex';
         var start = Date.now();
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () { el.classList.add('morph'); });
-        });
-        // Called from main.tsx once React has rendered; waits out the morph first.
+
+        // 350 ms base-state wait before starting the morph
+        setTimeout(function () {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              el.classList.add('morph');
+            });
+          });
+        }, 350);
+
+        // Called from main.tsx once React has rendered
         window.__bootSplashHide = function () {
-          var wait = Math.max(0, 800 - (Date.now() - start));
+          var now = Date.now();
+          // 350 ms delay + 600 ms morph + 200 ms after = 1150 ms from start
+          var fadeStart = start + 1150;
+          var wait = Math.max(0, fadeStart - now);
           setTimeout(function () {
             el.classList.add('fade');
             setTimeout(function () { el.remove(); }, 300);
@@ -80,6 +90,7 @@
         };
       })();
     </script>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
