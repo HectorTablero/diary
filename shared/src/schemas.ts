@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  AI_MAX_TRANSCRIPT_LENGTH,
   DATE_KEY_REGEX,
   HEX_COLOR_REGEX,
   MAX_CONTENT_LENGTH,
@@ -91,6 +92,19 @@ export const settingsSchema = z.object({
   broadcastLifeChangingEvents: z.boolean(),
   broadcastTagIds: z.array(objectIdSchema).max(50),
   defaultCheckupIntervalDays: checkupIntervalDaysSchema,
+  // Both optional and never defaulted: a queued PUT /settings outbox payload from an older
+  // client (that predates these fields) must not wipe the stored keys on replay. An
+  // explicit "" still clears one.
+  groqApiKey: z.string().trim().max(200).optional(),
+  openRouterApiKey: z.string().trim().max(200).optional(),
+});
+
+// --- AI voice assistant ---
+
+export const aiSuggestionsRequestSchema = z.object({
+  transcript: z.string().trim().min(1).max(AI_MAX_TRANSCRIPT_LENGTH),
+  dateKey: dateKeySchema,
+  language: z.string().max(10).default('es'),
 });
 
 // --- Query params (validated as strings from the URL) ---
@@ -135,3 +149,4 @@ export type TagCreateInput = z.infer<typeof tagCreateSchema>;
 export type TagUpdateInput = z.infer<typeof tagUpdateSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
 export type SearchQueryInput = z.infer<typeof searchQuerySchema>;
+export type AiSuggestionsRequestInput = z.infer<typeof aiSuggestionsRequestSchema>;

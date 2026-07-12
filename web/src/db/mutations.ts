@@ -83,6 +83,17 @@ export async function createEntry(input: EntryCreateInput): Promise<EntryDto> {
   return entryDto(id, input.dateKey);
 }
 
+/** Moving a parent's date must carry every descendant along with it. */
+async function cascadeDateKey(rootId: string, dateKey: string, at: string): Promise<void> {
+  let frontier = [rootId];
+  while (frontier.length) {
+    const children = await db.entries.where('parentId').anyOf(frontier).toArray();
+    if (!children.length) break;
+    await db.entries.bulkPut(children.map((c) => ({ ...c, dateKey, updatedAt: at })));
+    frontier = children.map((c) => c.id);
+  }
+}
+
 export async function updateEntry(entryId: string, input: EntryUpdateInput): Promise<EntryDto> {
   const entry = await db.entries.get(entryId);
   if (!entry) throw new ApiError(404, 'entry.not_found');
@@ -111,6 +122,9 @@ export async function updateEntry(entryId: string, input: EntryUpdateInput): Pro
     updatedAt: now,
   };
   await db.entries.put(updated);
+  if (input.dateKey !== undefined && input.dateKey !== entry.dateKey) {
+    await cascadeDateKey(entryId, input.dateKey, now);
+  }
   await bumpLastCheckup(newlySaid, now);
   await enqueue('PATCH', `/entries/${entryId}`, input);
   return entryDto(entryId, updated.dateKey);
@@ -294,7 +308,10 @@ export async function deleteTag(tagId: string): Promise<void> {
 // --- Settings ---
 
 export async function saveSettings(input: SettingsInput): Promise<SettingsDto> {
-  const settings: SettingsDto = { ...input };
+  // Merge over the current settings (not just DEFAULT_SETTINGS) so fields the caller
+  // didn't touch — like an optional groqApiKey — survive instead of being blanked.
+  const current = await getSettings();
+  const settings: SettingsDto = { ...current, ...input };
   await db.meta.put({ key: 'settings', value: settings });
   await enqueue('PUT', '/settings', input);
   return settings;

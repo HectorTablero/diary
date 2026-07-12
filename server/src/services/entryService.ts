@@ -85,10 +85,23 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
   return entryToDto(populated.toObject() as unknown as LeanEntry);
 }
 
+/** Moving a parent's date must carry every descendant along with it. */
+async function cascadeDateKey(userId: string, rootId: string, dateKey: string) {
+  let frontier = [new Types.ObjectId(rootId)];
+  while (frontier.length) {
+    const children = await Entry.find({ userId, parentId: { $in: frontier } }, '_id').lean();
+    if (!children.length) break;
+    const ids = children.map((c) => c._id);
+    await Entry.updateMany({ userId, _id: { $in: ids } }, { dateKey, updatedAt: new Date() });
+    frontier = ids;
+  }
+}
+
 export async function updateEntry(userId: string, entryId: string, input: EntryUpdateInput) {
   const entry = await Entry.findOne({ _id: entryId, userId });
   if (!entry) throw notFound('entry.not_found');
 
+  const originalDateKey = entry.dateKey;
   if (input.content !== undefined) entry.content = input.content;
   if (input.dateKey !== undefined) entry.dateKey = input.dateKey;
   if (input.importance !== undefined) entry.importance = input.importance;
@@ -110,6 +123,9 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
   if (input.hiddenFor !== undefined) entry.hiddenFor = await ownedPersonIds(userId, input.hiddenFor);
 
   await entry.save();
+  if (input.dateKey !== undefined && input.dateKey !== originalDateKey) {
+    await cascadeDateKey(userId, entryId, input.dateKey);
+  }
   if (newlySaid.length) await bumpLastCheckup(userId, newlySaid, new Date());
   const populated = await entry.populate(ENTRY_POPULATE);
   return entryToDto(populated.toObject() as unknown as LeanEntry);

@@ -1,5 +1,10 @@
-import type { ScoredEntry, SettingsDto, TalkingPointsResponse } from '@diary/shared';
-import { memoryCutoffDateKey, scoreCutoffDateKey, scoreEntry } from '@diary/shared';
+import type { ClusterCandidate, SettingsDto, TalkingPointsResponse } from '@diary/shared';
+import {
+  buildTalkingPointForest,
+  countMatchingClusters,
+  memoryCutoffDateKey,
+  scoreCutoffDateKey,
+} from '@diary/shared';
 import { Types } from 'mongoose';
 import { notFound } from '../errors';
 import { Entry } from '../models/entry';
@@ -22,68 +27,8 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     broadcastLifeChangingEvents: doc.broadcastLifeChangingEvents,
     broadcastTagIds: (doc.broadcastTagIds as Types.ObjectId[]).map((id) => id.toString()),
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
-  };
-}
-
-interface PersonWithTags {
-  _id: Types.ObjectId;
-  name: string;
-  tags: Types.ObjectId[];
-}
-
-/** True if an entry is broadcast to everyone regardless of per-person match. */
-function isBroadcast(
-  entry: { importance: number; tags: { _id: Types.ObjectId }[] },
-  settings: SettingsDto,
-  broadcastTagIds: Set<string>,
-): boolean {
-  if (settings.broadcastLifeChangingEvents && entry.importance === 1) return true;
-  return entry.tags.some((t) => broadcastTagIds.has(t._id.toString()));
-}
-
-function scoreCandidates(
-  entries: LeanEntry[],
-  person: PersonWithTags,
-  settings: SettingsDto,
-  now: number,
-): ScoredEntry[] {
-  const personId = person._id.toString();
-  const personTagIds = new Set(person.tags.map((t) => t.toString()));
-  const broadcastTagIds = new Set(settings.broadcastTagIds);
-
-  const scored: ScoredEntry[] = [];
-  for (const entry of entries) {
-    const mentions = entry.people.some((p) => p._id.toString() === personId);
-    const sharesTag = entry.tags.some((t) => personTagIds.has(t._id.toString()));
-    if (!mentions && !sharesTag && !isBroadcast(entry, settings, broadcastTagIds)) continue;
-    const matchType = mentions ? 'mention' : sharesTag ? 'tag' : 'broadcast';
-    const score = scoreEntry(entry, matchType, settings, now);
-    if (score < settings.epsilon) continue;
-    scored.push({ ...entryToDto(entry), score, matchType });
-  }
-  scored.sort((a, b) => b.score - a.score || b.dateKey.localeCompare(a.dateKey));
-  return scored;
-}
-
-/** Candidate query for one person: mentions, shared tag, or a broadcast entry - not hidden, not said, recent enough. */
-function candidateQuery(
-  userId: string,
-  personId: Types.ObjectId,
-  tagIds: Types.ObjectId[],
-  cutoff: string,
-  settings: SettingsDto,
-) {
-  const or: Record<string, unknown>[] = [{ people: personId }, { tags: { $in: tagIds } }];
-  if (settings.broadcastLifeChangingEvents) or.push({ importance: 1 });
-  if (settings.broadcastTagIds.length) {
-    or.push({ tags: { $in: settings.broadcastTagIds.map((id) => new Types.ObjectId(id)) } });
-  }
-  return {
-    userId,
-    dateKey: { $gte: cutoff },
-    $or: or,
-    hiddenFor: { $ne: personId },
-    'saidTo.person': { $ne: personId },
+    groqApiKey: doc.groqApiKey ?? '',
+    openRouterApiKey: doc.openRouterApiKey ?? '',
   };
 }
 
@@ -97,11 +42,13 @@ export async function getTalkingPoints(
   const settings = await getSettings(userId);
   const now = Date.now();
   const cutoff = scoreCutoffDateKey(settings, now);
+  const personTagIds = new Set(person.tags.map((t) => t.toString()));
+  const broadcastTagIds = new Set(settings.broadcastTagIds);
 
+  // Full date-range fetch (not just matching candidates): a matching sub-entry
+  // needs its non-matching ancestors/siblings available as context too.
   const [candidates, said] = await Promise.all([
-    Entry.find(candidateQuery(userId, person._id, person.tags, cutoff, settings))
-      .populate(ENTRY_POPULATE)
-      .lean(),
+    Entry.find({ userId, dateKey: { $gte: cutoff } }).populate(ENTRY_POPULATE).lean(),
     Entry.find({ userId, 'saidTo.person': person._id })
       .sort({ dateKey: -1, createdAt: -1 })
       .limit(50)
@@ -109,10 +56,12 @@ export async function getTalkingPoints(
       .lean(),
   ]);
 
-  const active = scoreCandidates(
-    candidates as unknown as LeanEntry[],
-    person as unknown as PersonWithTags,
+  const active = buildTalkingPointForest(
+    (candidates as unknown as LeanEntry[]).map(entryToDto),
+    personId,
+    personTagIds,
     settings,
+    broadcastTagIds,
     now,
   ).slice(0, settings.talkingPointsLimit);
 
@@ -122,7 +71,9 @@ export async function getTalkingPoints(
   };
 }
 
-/** Batch talking-point counts for the people list: one entry scan, per-person scoring in memory. */
+/** Batch talking-point counts for the people list: one entry scan, per-person scoring in memory.
+    A matching parent and its matching sub-entries count as one talking point, so this counts
+    distinct root clusters (same grouping as `getTalkingPoints`) rather than raw matched entries. */
 export async function countTalkingPoints(userId: string): Promise<Map<string, number>> {
   const people = await Person.find({ userId }, 'name tags').lean();
   const counts = new Map<string, number>();
@@ -134,8 +85,10 @@ export async function countTalkingPoints(userId: string): Promise<Map<string, nu
 
   const entries = (await Entry.find(
     { userId, dateKey: { $gte: cutoff } },
-    'dateKey importance tags people saidTo hiddenFor',
+    'dateKey importance tags people saidTo hiddenFor parentId',
   ).lean()) as unknown as {
+    _id: Types.ObjectId;
+    parentId: Types.ObjectId | null;
     dateKey: string;
     importance: number;
     tags: Types.ObjectId[];
@@ -144,25 +97,30 @@ export async function countTalkingPoints(userId: string): Promise<Map<string, nu
     hiddenFor: Types.ObjectId[];
   }[];
 
+  const candidates: ClusterCandidate[] = entries.map((e) => ({
+    id: e._id.toString(),
+    parentId: e.parentId ? e.parentId.toString() : null,
+    dateKey: e.dateKey,
+    importance: e.importance,
+    tagIds: e.tags.map((id) => id.toString()),
+    peopleIds: e.people.map((id) => id.toString()),
+    saidToIds: e.saidTo.map((s) => s.person.toString()),
+    hiddenForIds: e.hiddenFor.map((id) => id.toString()),
+  }));
+
   const broadcastTagIds = new Set(settings.broadcastTagIds);
 
   for (const person of people) {
     const personId = person._id.toString();
     const personTagIds = new Set(person.tags.map((t: Types.ObjectId) => t.toString()));
-    let count = 0;
-    for (const entry of entries) {
-      if (entry.saidTo.some((s) => s.person.toString() === personId)) continue;
-      if (entry.hiddenFor.some((id) => id.toString() === personId)) continue;
-      const mentions = entry.people.some((id) => id.toString() === personId);
-      const sharesTag = entry.tags.some((id) => personTagIds.has(id.toString()));
-      const broadcast =
-        (settings.broadcastLifeChangingEvents && entry.importance === 1) ||
-        entry.tags.some((id) => broadcastTagIds.has(id.toString()));
-      if (!mentions && !sharesTag && !broadcast) continue;
-      const matchType = mentions ? 'mention' : sharesTag ? 'tag' : 'broadcast';
-      const score = scoreEntry(entry, matchType, settings, now);
-      if (score >= settings.epsilon) count++;
-    }
+    const count = countMatchingClusters(
+      candidates,
+      personId,
+      personTagIds,
+      settings,
+      broadcastTagIds,
+      now,
+    );
     counts.set(personId, Math.min(count, settings.talkingPointsLimit));
   }
   return counts;

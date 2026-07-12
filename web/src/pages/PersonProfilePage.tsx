@@ -1,17 +1,13 @@
-import type { ScoredEntry } from '@diary/shared';
 import {
   AtSign,
   BellOff,
   BellRing,
   Check,
   ChevronDown,
-  EyeOff,
-  Megaphone,
   MessageCircle,
   MoreHorizontal,
   Pencil,
   Sparkles,
-  Tag as TagIcon,
   Trash2,
   Undo2,
 } from 'lucide-react';
@@ -25,7 +21,6 @@ import {
   useMemories,
   usePerson,
   usePersonHistory,
-  useSetHidden,
   useSetSaid,
   useSettings,
   useTalkingPoints,
@@ -38,7 +33,7 @@ import { TagChip } from '@/components/entry/chips';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
 import { PersonForm } from '@/components/person/PersonForm';
-import { Badge } from '@/components/ui/badge';
+import { TalkingPointItem } from '@/components/person/TalkingPointItem';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -55,7 +50,6 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
   const { t } = useTranslation();
   const { data, isLoading } = useTalkingPoints(personId);
   const setSaid = useSetSaid();
-  const setHidden = useSetHidden();
 
   if (isLoading) {
     return (
@@ -66,87 +60,12 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
     );
   }
 
-  const markSaid = (entry: ScoredEntry) => {
-    setSaid.mutate(
-      { entryId: entry.id, personId, said: true },
-      {
-        onSuccess: () =>
-          toast(t('people.markedSaid'), {
-            action: {
-              label: t('common.undo'),
-              onClick: () => setSaid.mutate({ entryId: entry.id, personId, said: false }),
-            },
-          }),
-        onError: () => toast.error(t('errors.unknown')),
-      },
-    );
-  };
-
-  const hide = (entry: ScoredEntry) => {
-    setHidden.mutate(
-      { entryId: entry.id, personId, hidden: true },
-      {
-        onSuccess: () =>
-          toast(t('people.hideForPerson', { name: personName }), {
-            action: {
-              label: t('common.undo'),
-              onClick: () => setHidden.mutate({ entryId: entry.id, personId, hidden: false }),
-            },
-          }),
-        onError: () => toast.error(t('errors.unknown')),
-      },
-    );
-  };
-
   return (
     <div className="flex flex-col gap-4">
       {data && data.active.length > 0 ? (
         <ul className="flex flex-col gap-2">
-          {data.active.map((entry) => (
-            <li key={entry.id} className="rounded-xl border bg-card p-3 shadow-xs">
-              <EntryRow entry={entry} showChips={false}>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Badge variant="outline" className="hidden gap-1 text-[11px] text-muted-foreground sm:inline-flex">
-                    {entry.matchType === 'mention' ? (
-                      <AtSign className="size-3" />
-                    ) : entry.matchType === 'tag' ? (
-                      <TagIcon className="size-3" />
-                    ) : (
-                      <Megaphone className="size-3" />
-                    )}
-                    {t(
-                      entry.matchType === 'mention'
-                        ? 'people.matchMention'
-                        : entry.matchType === 'tag'
-                          ? 'people.matchTag'
-                          : 'people.matchBroadcast',
-                    )}
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-xs"
-                    onClick={() => markSaid(entry)}
-                  >
-                    <Check className="size-3.5" />
-                    {t('people.markSaid')}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => hide(entry)}>
-                        <EyeOff className="size-3.5" />
-                        {t('people.hideForPerson', { name: personName })}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </EntryRow>
-            </li>
+          {data.active.map((node) => (
+            <TalkingPointItem key={node.id} node={node} personId={personId} personName={personName} />
           ))}
         </ul>
       ) : (

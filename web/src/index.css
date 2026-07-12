@@ -12,13 +12,26 @@
   --inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
 }
 
+/* Add the safe-area inset on top of sonner's own offset (--offset-top/-bottom,
+   24px by default) instead of replacing it — replacing it flattened the gap to
+   0 on desktop, where there's no inset, pinning toasts to the screen edge. */
 [data-sonner-toaster][data-y-position="top"] {
-  top: var(--inset-top, 0px) !important;
+  top: calc(var(--offset-top, 24px) + var(--inset-top, 0px)) !important;
 }
 
-/* Also respect bottom safe area when toasts are positioned at bottom */
 [data-sonner-toaster][data-y-position="bottom"] {
-  bottom: var(--inset-bottom, 0px) !important;
+  bottom: calc(var(--offset-bottom, 24px) + var(--inset-bottom, 0px)) !important;
+}
+
+/* Sonner switches to its own smaller mobile offset below 600px. */
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-y-position="top"] {
+    top: calc(var(--mobile-offset-top, 16px) + var(--inset-top, 0px)) !important;
+  }
+
+  [data-sonner-toaster][data-y-position="bottom"] {
+    bottom: calc(var(--mobile-offset-bottom, 16px) + var(--inset-bottom, 0px)) !important;
+  }
 }
 
 @theme inline {

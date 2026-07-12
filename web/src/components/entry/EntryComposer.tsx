@@ -3,7 +3,8 @@ import { AtSign, CalendarIcon, Hash, Send } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { useCreateEntry, useCreateTag, usePeople, useTags, useUpdateEntry } from '@/api/hooks';
+import { useCreateEntry, useCreateTag, usePeople, useSettings, useTags, useUpdateEntry } from '@/api/hooks';
+import { VoiceEntryButton } from '@/components/ai/VoiceEntryButton';
 import { PersonChip, TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { ImportancePicker } from '@/components/entry/ImportanceDot';
@@ -11,6 +12,7 @@ import { TokenTextarea } from '@/components/entry/TokenTextarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/common/Spinner';
+import { useSyncStatus } from '@/db/useSyncStatus';
 import { ApiError } from '@/lib/apiClient';
 import { isNative } from '@/lib/native';
 
@@ -35,6 +37,8 @@ export function EntryComposer({
   const { t } = useTranslation();
   const { data: allTags = [] } = useTags();
   const { data: allPeople = [] } = usePeople();
+  const { data: settings } = useSettings();
+  const { offline } = useSyncStatus();
   const createTag = useCreateTag();
   const createEntry = useCreateEntry();
   const updateEntry = useUpdateEntry();
@@ -48,6 +52,7 @@ export function EntryComposer({
 
   const isEditing = entry !== null;
   const pending = createEntry.isPending || updateEntry.isPending;
+  const showMic = !isEditing && parentId === null && !!settings?.groqApiKey?.trim() && !offline;
 
   const addPerson = (person: PersonRefDto) => {
     setPeople((prev) => (prev.some((p) => p.id === person.id) ? prev : [...prev, person]));
@@ -169,44 +174,49 @@ export function EntryComposer({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="@container flex flex-wrap items-center gap-2">
         <ImportancePicker value={importance} onChange={setImportance} />
-        <div className="mx-1 h-5 w-px bg-border" />
-        <EntityPicker
-          trigger={
-            <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-muted-foreground">
-              <Hash className="size-3.5" />
-              {t('diary.addTags')}
-            </Button>
-          }
-          items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
-          selectedIds={tags.map((tag) => tag.id)}
-          onToggle={(id) => {
-            const tag = allTags.find((tg) => tg.id === id);
-            if (!tag) return;
-            if (tags.some((tg) => tg.id === id)) setTags((p) => p.filter((tg) => tg.id !== id));
-            else addTag(tag);
-          }}
-          onCreate={(name) => void handleCreateTag(name)}
-          placeholder={t('tags.namePlaceholder')}
-        />
-        <EntityPicker
-          trigger={
-            <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-muted-foreground">
-              <AtSign className="size-3.5" />
-              {t('diary.addPeople')}
-            </Button>
-          }
-          items={allPeople.map((p) => ({ id: p.id, label: p.name }))}
-          selectedIds={people.map((p) => p.id)}
-          onToggle={(id) => {
-            const person = allPeople.find((p) => p.id === id);
-            if (!person) return;
-            if (people.some((p) => p.id === id)) removePerson(id);
-            else addPerson(person);
-          }}
-          placeholder={t('people.namePlaceholder')}
-        />
+        {/* Grouped so they wrap to the next line together instead of splitting apart.
+            The separator only makes sense when the group shares the line with the
+            importance picker, so it's hidden once the container is too narrow for that. */}
+        <div className="flex items-center gap-1">
+          <div className="hidden h-5 w-px shrink-0 bg-border @md:block" />
+          <EntityPicker
+            trigger={
+              <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-muted-foreground">
+                <Hash className="size-3.5" />
+                {t('diary.addTags')}
+              </Button>
+            }
+            items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
+            selectedIds={tags.map((tag) => tag.id)}
+            onToggle={(id) => {
+              const tag = allTags.find((tg) => tg.id === id);
+              if (!tag) return;
+              if (tags.some((tg) => tg.id === id)) setTags((p) => p.filter((tg) => tg.id !== id));
+              else addTag(tag);
+            }}
+            onCreate={(name) => void handleCreateTag(name)}
+            placeholder={t('tags.namePlaceholder')}
+          />
+          <EntityPicker
+            trigger={
+              <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-muted-foreground">
+                <AtSign className="size-3.5" />
+                {t('diary.addPeople')}
+              </Button>
+            }
+            items={allPeople.map((p) => ({ id: p.id, label: p.name }))}
+            selectedIds={people.map((p) => p.id)}
+            onToggle={(id) => {
+              const person = allPeople.find((p) => p.id === id);
+              if (!person) return;
+              if (people.some((p) => p.id === id)) removePerson(id);
+              else addPerson(person);
+            }}
+            placeholder={t('people.namePlaceholder')}
+          />
+        </div>
         {showDateInput && (
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <CalendarIcon className="size-3.5" />
@@ -218,15 +228,18 @@ export function EntryComposer({
             />
           </label>
         )}
-        <Button
-          size="sm"
-          className="ml-auto h-8 gap-1.5"
-          onClick={submit}
-          disabled={!content.trim() || pending}
-        >
-          {pending ? <Spinner className="size-3.5" /> : <Send className="size-3.5" />}
-          {t('common.save')}
-        </Button>
+        <div className="ml-auto flex items-center gap-1">
+          {showMic && <VoiceEntryButton dateKey={date} />}
+          <Button
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={submit}
+            disabled={!content.trim() || pending}
+          >
+            {pending ? <Spinner className="size-3.5" /> : <Send className="size-3.5" />}
+            {t('common.save')}
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,6 @@ import type {
   EntryNode,
   PersonDto,
   PersonListItem,
-  ScoredEntry,
   SearchResponse,
   SettingsDto,
   TagDto,
@@ -13,11 +12,11 @@ import type {
 } from '@diary/shared';
 import {
   buildEntryTree,
+  buildTalkingPointForest,
+  countMatchingClusters,
   DEFAULT_SETTINGS,
-  matchTypeFor,
   memoryCutoffDateKey,
   scoreCutoffDateKey,
-  scoreEntry,
 } from '@diary/shared';
 import { ApiError } from '@/lib/apiClient';
 import { fuzzyIncludes } from '@/lib/tokens';
@@ -75,7 +74,10 @@ const byDateDesc = (a: LocalEntry, b: LocalEntry) =>
   b.dateKey.localeCompare(a.dateKey) || b.createdAt.localeCompare(a.createdAt);
 
 export async function getSettings(): Promise<SettingsDto> {
-  return (await getMeta<SettingsDto>('settings')) ?? DEFAULT_SETTINGS;
+  const stored = await getMeta<SettingsDto>('settings');
+  // Spread over the defaults so metas saved before a field existed (e.g. groqApiKey) still
+  // come back with a complete SettingsDto instead of `undefined`.
+  return { ...DEFAULT_SETTINGS, ...stored };
 }
 
 // --- Diary day ---
@@ -173,20 +175,33 @@ export async function getPeople(): Promise<PersonListItem[]> {
   ]);
   const now = Date.now();
   const cutoff = scoreCutoffDateKey(settings, now);
-  const recent = entries.filter((e) => e.dateKey >= cutoff);
+  // A matching parent and its matching sub-entries count as one talking point,
+  // so the badge counts distinct root clusters rather than raw matched entries.
+  const recent = entries
+    .filter((e) => e.dateKey >= cutoff)
+    .map((e) => ({
+      id: e.id,
+      parentId: e.parentId,
+      dateKey: e.dateKey,
+      importance: e.importance,
+      tagIds: e.tagIds,
+      peopleIds: e.peopleIds,
+      saidToIds: e.saidTo.map((s) => s.personId),
+      hiddenForIds: e.hiddenFor,
+    }));
   const broadcastTagIds = new Set(settings.broadcastTagIds);
 
   return people
     .map((person) => {
       const personTagIds = new Set(person.tagIds);
-      let count = 0;
-      for (const entry of recent) {
-        if (entry.saidTo.some((s) => s.personId === person.id)) continue;
-        if (entry.hiddenFor.includes(person.id)) continue;
-        const matchType = matchTypeFor(entry, person.id, personTagIds, settings, broadcastTagIds);
-        if (!matchType) continue;
-        if (scoreEntry(entry, matchType, settings, now) >= settings.epsilon) count++;
-      }
+      const count = countMatchingClusters(
+        recent,
+        person.id,
+        personTagIds,
+        settings,
+        broadcastTagIds,
+        now,
+      );
       return {
         ...personToDto(person, maps.tags),
         talkingPointCount: Math.min(count, settings.talkingPointsLimit),
@@ -218,18 +233,19 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
   const personTagIds = new Set(person.tagIds);
   const broadcastTagIds = new Set(settings.broadcastTagIds);
 
-  const active: ScoredEntry[] = [];
-  for (const entry of entries) {
-    if (entry.dateKey < cutoff) continue;
-    if (entry.saidTo.some((s) => s.personId === personId)) continue;
-    if (entry.hiddenFor.includes(personId)) continue;
-    const matchType = matchTypeFor(entry, personId, personTagIds, settings, broadcastTagIds);
-    if (!matchType) continue;
-    const score = scoreEntry(entry, matchType, settings, now);
-    if (score < settings.epsilon) continue;
-    active.push({ ...entryToDto(entry, maps), score, matchType });
-  }
-  active.sort((a, b) => b.score - a.score || b.dateKey.localeCompare(a.dateKey));
+  // Full date-range set (not just matching candidates): a matching sub-entry
+  // needs its non-matching ancestors/siblings available as context too.
+  const withinCutoff = entries
+    .filter((e) => e.dateKey >= cutoff)
+    .map((e) => entryToDto(e, maps));
+  const active = buildTalkingPointForest(
+    withinCutoff,
+    personId,
+    personTagIds,
+    settings,
+    broadcastTagIds,
+    now,
+  ).slice(0, settings.talkingPointsLimit);
 
   const said = entries
     .filter((e) => e.saidTo.some((s) => s.personId === personId))
@@ -237,7 +253,7 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
     .slice(0, 50)
     .map((e) => entryToDto(e, maps));
 
-  return { active: active.slice(0, settings.talkingPointsLimit), said };
+  return { active, said };
 }
 
 export async function getMemories(personId: string): Promise<EntryDto[]> {

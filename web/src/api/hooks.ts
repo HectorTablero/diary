@@ -1,4 +1,6 @@
 import type {
+  AiSuggestionsRequest,
+  AiSuggestionsResponse,
   EntryCreateInput,
   EntryUpdateInput,
   PersonCreateInput,
@@ -10,6 +12,7 @@ import type {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as mutations from '@/db/mutations';
 import * as repo from '@/db/repo';
+import { apiPost } from '@/lib/apiClient';
 import { hapticWarning } from '@/lib/haptics';
 
 /* All reads and writes go through the local Dexie store (see src/db); the sync
@@ -229,5 +232,16 @@ export function useSaveSettings() {
       qc.setQueryData(['settings'], data);
       qc.invalidateQueries({ queryKey: ['people'] });
     },
+  });
+}
+
+// --- AI voice assistant ---
+
+/** The one hook that talks to the network directly instead of the local Dexie store:
+    suggestions are generated live from the transcript, there's nothing local to read. */
+export function useAiSuggestions() {
+  return useMutation({
+    mutationFn: (input: AiSuggestionsRequest) =>
+      apiPost<AiSuggestionsResponse>('/ai/suggestions', input),
   });
 }

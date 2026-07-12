@@ -15,6 +15,7 @@ import {
   removeLiveClient,
 } from './services/liveSync';
 import { requireAuth, type AppEnv } from './middleware/session';
+import { aiRouter } from './routes/ai';
 import { calendarRouter, onThisDayRouter } from './routes/calendar';
 import { entriesRouter } from './routes/entries';
 import { peopleRouter } from './routes/people';
@@ -81,6 +82,7 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   api.route('/on-this-day', onThisDayRouter);
   api.route('/search', searchRouter);
   api.route('/sync', syncRouter);
+  api.route('/ai', aiRouter);
   app.route('/api', api);
 
   // Unknown API paths must 404 as JSON, never fall through to the SPA.

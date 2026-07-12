@@ -133,7 +133,7 @@ export function EntryItem({ entry, depth = 0 }: { entry: EntryNode; depth?: numb
             <EntryComposer
               dateKey={entry.dateKey}
               entry={entry}
-              showDateInput
+              showDateInput={entry.parentId === null}
               autoFocus
               onDone={() => setEditing(false)}
             />

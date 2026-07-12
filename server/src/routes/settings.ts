@@ -18,11 +18,18 @@ export const settingsRouter = new Hono<AppEnv>()
   })
   .put('/', jsonValidator(settingsSchema), async (c) => {
     const userId = c.get('userId');
-    const input = c.req.valid('json');
+    const { groqApiKey, openRouterApiKey, ...input } = c.req.valid('json');
     await UserSettings.findOneAndUpdate(
       { userId },
       {
-        $set: { ...input, broadcastTagIds: await ownedTagIds(userId, input.broadcastTagIds) },
+        // Both keys are optional in the schema so replayed offline payloads from older
+        // clients (which never had the fields) can't wipe out the stored keys.
+        $set: {
+          ...input,
+          broadcastTagIds: await ownedTagIds(userId, input.broadcastTagIds),
+          ...(groqApiKey !== undefined ? { groqApiKey } : {}),
+          ...(openRouterApiKey !== undefined ? { openRouterApiKey } : {}),
+        },
         $setOnInsert: { userId },
       },
       { upsert: true },

@@ -58,13 +58,15 @@ export interface EntryNode extends EntryDto {
   children: EntryNode[];
 }
 
-export interface ScoredEntry extends EntryDto {
+export interface TalkingPointNode extends EntryDto {
+  /** Non-null only when this specific node matches the person on its own merits. */
+  matchType: MatchType | null;
   score: number;
-  matchType: MatchType;
+  children: TalkingPointNode[];
 }
 
 export interface TalkingPointsResponse {
-  active: ScoredEntry[];
+  active: TalkingPointNode[];
   said: EntryDto[];
 }
 
@@ -94,6 +96,36 @@ export interface SettingsDto {
   broadcastTagIds: string[];
   /** Default `checkupIntervalDays` inherited by newly created people. `null` = off by default. */
   defaultCheckupIntervalDays: number | null;
+  /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text
+      fallback when no OpenRouter key is set). Empty = feature disabled. */
+  groqApiKey: string;
+  /** User's own OpenRouter API key; when set, used for text/tool-calling instead of Groq. */
+  openRouterApiKey: string;
+}
+
+// --- AI voice assistant ---
+
+export interface SuggestedEntryNode {
+  /** May contain @Name tokens for linked people. */
+  content: string;
+  /** 1 (highest) .. 5 (lowest). */
+  importance: number;
+  /** Existing tag ids only. */
+  tags: string[];
+  /** Existing person ids only. */
+  people: string[];
+  /** Sub-details, up to MAX_SUB_ENTRY_DEPTH deep. */
+  children: SuggestedEntryNode[];
+}
+
+export interface AiSuggestionsRequest {
+  transcript: string;
+  dateKey: string;
+  language: string;
+}
+
+export interface AiSuggestionsResponse {
+  entries: SuggestedEntryNode[];
 }
 
 export interface ApiError {

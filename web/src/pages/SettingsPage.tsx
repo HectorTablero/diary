@@ -89,6 +89,8 @@ export default function SettingsPage() {
         defaultCheckupIntervalDays: checkupsEnabled
           ? Math.min(3650, Math.max(1, Math.round(checkupIntervalDays) || 1))
           : null,
+        groqApiKey: draft.groqApiKey,
+        openRouterApiKey: draft.openRouterApiKey,
       },
       {
         onSuccess: (data) => {
@@ -335,6 +337,61 @@ export default function SettingsPage() {
                   <span className="text-xs text-muted-foreground">{t('settings.memories.days')}</span>
                 </div>
               )}
+            </div>
+          )}
+        </Section>
+
+        <Section title={t('settings.ai.title')} description={t('settings.ai.description')}>
+          {isLoading || !draft ? (
+            <Skeleton className="h-32" />
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="groq-api-key">{t('settings.ai.apiKey')}</Label>
+                <Input
+                  id="groq-api-key"
+                  type="password"
+                  autoComplete="off"
+                  value={draft.groqApiKey}
+                  onChange={(e) => setDraft({ ...draft, groqApiKey: e.target.value })}
+                  placeholder={t('settings.ai.apiKeyPlaceholder')}
+                  className="max-w-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.ai.apiKeyHint')}{' '}
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    console.groq.com
+                  </a>
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="openrouter-api-key">{t('settings.ai.openRouterApiKey')}</Label>
+                <Input
+                  id="openrouter-api-key"
+                  type="password"
+                  autoComplete="off"
+                  value={draft.openRouterApiKey}
+                  onChange={(e) => setDraft({ ...draft, openRouterApiKey: e.target.value })}
+                  placeholder={t('settings.ai.openRouterApiKeyPlaceholder')}
+                  className="max-w-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.ai.openRouterApiKeyHint')}{' '}
+                  <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    openrouter.ai/keys
+                  </a>
+                </p>
+              </div>
             </div>
           )}
         </Section>

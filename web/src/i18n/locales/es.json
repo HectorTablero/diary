@@ -116,6 +116,9 @@
     "matchMention": "Le menciona",
     "matchTag": "Etiqueta compartida",
     "matchBroadcast": "Compartido con todos",
+    "hiddenSubEntries": "+{{count}} sub-entrada oculta",
+    "hiddenSubEntries_other": "+{{count}} sub-entradas ocultas",
+    "hideSubEntries": "Ocultar sub-entradas",
     "deleteConfirmTitle": "¿Eliminar a {{name}}?",
     "deleteConfirmDescription": "Las entradas se conservarán, pero se eliminará toda mención, marca de contado y marca de oculto de esta persona.",
     "personSaved": "Persona guardada",
@@ -203,6 +206,16 @@
       "description": "Intervalo de seguimiento por defecto que heredan las personas nuevas. Cada persona puede anularlo o desactivarlo desde su perfil.",
       "enable": "Enviar recordatorios de seguimiento por defecto"
     },
+    "ai": {
+      "title": "Asistente de IA",
+      "description": "Graba una nota de voz y deja que la IA la convierta en sugerencias de entradas que puedes revisar antes de guardarlas. Groq es necesario para la transcripción; si además añades una clave de OpenRouter, el paso de sugerencias usará un modelo gratuito más potente en lugar del de Groq.",
+      "apiKey": "Clave de API de Groq",
+      "apiKeyPlaceholder": "gsk_…",
+      "apiKeyHint": "Necesaria para la transcripción de voz. Gratis de obtener, se usa solo para llamar a Groq directamente desde este dispositivo. Consíguela en",
+      "openRouterApiKey": "Clave de API de OpenRouter (opcional)",
+      "openRouterApiKeyPlaceholder": "sk-or-…",
+      "openRouterApiKeyHint": "Si la añades, se usa en lugar de Groq para convertir las transcripciones en sugerencias de entradas. Gratis de obtener, se usa solo para llamar a OpenRouter directamente desde este dispositivo. Consíguela en"
+    },
     "account": "Cuenta",
     "resetDefaults": "Restablecer valores",
     "settingsSaved": "Ajustes guardados"
@@ -225,5 +238,29 @@
   "tag": {
     "not_found": "Etiqueta no encontrada",
     "duplicate_name": "Ya existe una etiqueta con ese nombre"
+  },
+  "ai": {
+    "record": "Grabar una nota de voz",
+    "stopRecording": "Detener grabación",
+    "cancelRecording": "Cancelar grabación",
+    "transcribing": "Transcribiendo…",
+    "thinking": "Buscando entradas…",
+    "reviewTitle": "Revisar sugerencias",
+    "reviewDescription": "Edita o elimina lo que quieras antes de añadir esto a tu diario.",
+    "acceptAll": "Añadir {{count}} entrada",
+    "acceptAll_other": "Añadir {{count}} entradas",
+    "discard": "Descartar",
+    "deletePoint": "Quitar",
+    "empty": "No hay nada que sugerir a partir de esa grabación",
+    "entriesCreated": "{{count}} entrada añadida",
+    "entriesCreated_other": "{{count}} entradas añadidas",
+    "mic_denied": "Se ha denegado el acceso al micrófono",
+    "mic_unavailable": "El micrófono no está disponible",
+    "invalid_key": "Tu clave de API de Groq no parece válida",
+    "rate_limited": "Se ha alcanzado el límite de Groq, inténtalo de nuevo en un momento",
+    "upstream_error": "Groq no ha podido procesar eso",
+    "timeout": "Groq ha tardado demasiado en responder",
+    "no_key": "Añade una clave de API de Groq en los ajustes primero",
+    "no_submission": "No se ha podido obtener un resultado del asistente"
   }
 }
