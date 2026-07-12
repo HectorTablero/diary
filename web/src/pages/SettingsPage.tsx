@@ -86,6 +86,7 @@ export default function SettingsPage() {
         memoryMinAgeDays: Number(draft.memoryMinAgeDays) || DEFAULT_SETTINGS.memoryMinAgeDays,
         broadcastLifeChangingEvents: draft.broadcastLifeChangingEvents,
         broadcastTagIds: draft.broadcastTagIds,
+        forceEnglishAIEvents: draft.forceEnglishAIEvents,
         defaultCheckupIntervalDays: checkupsEnabled
           ? Math.min(3650, Math.max(1, Math.round(checkupIntervalDays) || 1))
           : null,
@@ -115,6 +116,7 @@ export default function SettingsPage() {
       memoryMinAgeDays: DEFAULT_SETTINGS.memoryMinAgeDays,
       broadcastLifeChangingEvents: DEFAULT_SETTINGS.broadcastLifeChangingEvents,
       broadcastTagIds: [...DEFAULT_SETTINGS.broadcastTagIds],
+      forceEnglishAIEvents: DEFAULT_SETTINGS.forceEnglishAIEvents,
     });
     setCheckupsEnabled(DEFAULT_SETTINGS.defaultCheckupIntervalDays != null);
     setCheckupIntervalDays(DEFAULT_SETTINGS.defaultCheckupIntervalDays ?? 30);
@@ -368,6 +370,17 @@ export default function SettingsPage() {
                     console.groq.com
                   </a>
                 </p>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="force-english-ai-events">{t('settings.ai.forceEnglishAIEvents')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.ai.forceEnglishAIEventsDescription')}</p>
+                </div>
+                <Switch
+                  id="force-english-ai-events"
+                  checked={draft.forceEnglishAIEvents}
+                  onCheckedChange={(checked) => setDraft({ ...draft, forceEnglishAIEvents: checked })}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="openrouter-api-key">{t('settings.ai.openRouterApiKey')}</Label>

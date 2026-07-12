@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS = {
   memoryMinAgeDays: 180,
   broadcastLifeChangingEvents: false,
   broadcastTagIds: [] as string[],
+  forceEnglishAIEvents: false,
   /** Default checkup interval inherited by new people. `null` = checkups off by default. */
   defaultCheckupIntervalDays: null as number | null,
   /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text

@@ -22,6 +22,12 @@ describe('searchPeople', () => {
     expect(results.map((r) => r.id)).toEqual(['a']);
   });
 
+  it('falls back to phonetic similarity when direct fuzzy matching fails', () => {
+    const people = [person({ id: 'a', name: 'Ibón' })];
+    const results = searchPeople('Yvonne', people);
+    expect(results.map((r) => r.id)).toEqual(['a']);
+  });
+
   it('weighs name matches above tag matches above note matches', () => {
     const people = [
       person({ id: 'name-match', name: 'Climbing' }),
@@ -43,7 +49,7 @@ describe('searchPeople', () => {
 describe('searchPeopleCsv', () => {
   it('emits a header-only "no matches" row when nothing scores', () => {
     const csv = searchPeopleCsv('nobody', [person({ id: 'a', name: 'Alice' })]);
-    expect(csv).toBe('id,name,tags,notes,score\n# no matches');
+    expect(csv).toBe('name,id,tags,notes,score\n# no matches');
   });
 
   it('quotes fields containing commas or quotes', () => {
@@ -53,5 +59,12 @@ describe('searchPeopleCsv', () => {
     const csv = searchPeopleCsv('Anne', people);
     const [, row] = csv.split('\n');
     expect(row).toContain('"Anne, ""Annie"""');
+  });
+
+  it('prefaces phonetic fallback results with a note', () => {
+    const csv = searchPeopleCsv('Yvonne', [person({ id: 'a', name: 'Ibón' })]);
+    expect(csv.startsWith('No direct matches were found.')).toBe(true);
+    expect(csv).toContain('\n\nname,id,tags,notes,score\n');
+    expect(csv).toContain('\nIbón,a,,,' + '0.72');
   });
 });

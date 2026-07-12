@@ -150,13 +150,15 @@ function sanitizeNodes(nodes: SuggestedEntryNode[], depth: number, ctx: Sanitize
 
 // --- System prompt ---
 
-function buildSystemPrompt(tags: TagRef[], dateKey: string, language: string): string {
+function buildSystemPrompt(tags: TagRef[], dateKey: string, language: string, forceEnglishAIEvents: boolean): string {
   const today = new Date().toISOString().slice(0, 10);
   const tagLines = tags.length ? tags.map((t) => `${t.id}: ${t.name}`).join('\n') : '(no tags exist yet)';
   return `You extract diary bullet points from a voice transcript recorded by the user.
 
 The entries you submit are always filed under the date ${dateKey} (today is ${today}) — use any relative dates mentioned in the transcript ("yesterday", "last week") only to understand context, never to change where the entry is filed.
-Write every "content" field in the same language as the transcript (app language hint: "${language}").
+${forceEnglishAIEvents
+  ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").`
+  : `Write every "content" field in the same language as the transcript (app language hint: "${language}").`}
 
 Split the transcript into concise, first-person diary bullet points. Use "children" for sub-details that belong under a parent point, nested up to ${MAX_SUB_ENTRY_DEPTH} levels deep. Never invent facts that are not in the transcript.
 
@@ -166,6 +168,12 @@ Existing tags (id: name) — you may ONLY reference these ids/names, never inven
 ${tagLines}
 
 People convention: before writing about a specific named person, call query_people with their name. If a confident match is found, put their id in the entry's "people" array and write "@ExactName" in the content using the EXACT name query_people returned. If no confident match is found, write their name as plain text without "@".
+
+Be aggressive about tool calls: if the transcript contains anything that could be a person name, treat it as a candidate and call query_people before deciding. This includes capitalized tokens, unusual proper-name-looking words, and any name-like phrase that could plausibly refer to someone in the user's profile.
+
+Do not rely on the model's memory of known people; use the tool to verify the match before deciding whether to tag the person or leave the name as plain text. If the first query_people lookup is weak or misses, try likely variants, nicknames, and near-homophones instead of skipping the lookup.
+
+Remember that the transcription itself may be wrong. If a name looks plausible but not exact, assume the transcript may have mangled it and try similar-sounding variants too, because the spoken name may have been transcribed imperfectly.
 
 Tags convention: a tag can be linked EITHER by putting its id in the "tags" array (when its name doesn't fit naturally into the sentence) OR by writing "#TagName" inline in the content using the EXACT name from the list above (when it reads naturally). Both are combined into one set, so use whichever fits the sentence — never invent a name that isn't in the list. Examples:
 - { content: "Did A with @B", tags: ["<id of groupC>"] } — groupC is linked via the tags array because "#groupC" wouldn't read naturally in the sentence.
@@ -217,6 +225,7 @@ export async function generateSuggestions(
 ): Promise<SuggestedEntryNode[]> {
   const settings = await getSettings(userId);
   const provider = pickProvider(settings);
+  const aiLanguage = settings.forceEnglishAIEvents ? 'en' : language;
 
   const [tagDocs, personDocs] = await Promise.all([
     Tag.find({ userId }, 'name').lean(),
@@ -238,7 +247,7 @@ export async function generateSuggestions(
   const ownedPersonIds = new Set(searchablePeople.map((p) => p.id));
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(tags, dateKey, language) },
+    { role: 'system', content: buildSystemPrompt(tags, dateKey, aiLanguage, settings.forceEnglishAIEvents) },
     { role: 'user', content: transcript },
   ];
 

@@ -212,6 +212,8 @@
       "apiKey": "Clave de API de Groq",
       "apiKeyPlaceholder": "gsk_…",
       "apiKeyHint": "Necesaria para la transcripción de voz. Gratis de obtener, se usa solo para llamar a Groq directamente desde este dispositivo. Consíguela en",
+      "forceEnglishAIEvents": "Forzar que la dictación de IA salga en inglés",
+      "forceEnglishAIEventsDescription": "Cuando está activado, las entradas creadas por dictado de voz se escriben en inglés aunque hables otro idioma.",
       "openRouterApiKey": "Clave de API de OpenRouter (opcional)",
       "openRouterApiKeyPlaceholder": "sk-or-…",
       "openRouterApiKeyHint": "Si la añades, se usa en lugar de Groq para convertir las transcripciones en sugerencias de entradas. Gratis de obtener, se usa solo para llamar a OpenRouter directamente desde este dispositivo. Consíguela en"
