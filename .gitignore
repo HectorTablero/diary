@@ -4,3 +4,4 @@ node_modules/
 dist/
 dev-dist/
 *.ps1
+codebase.md

@@ -8,7 +8,8 @@ const config: CapacitorConfig = {
     SplashScreen: {
       // The native splash is a plain themed background; the animated logo
       // lives in the web boot overlay (index.html), which takes over instantly.
-      launchShowDuration: 300,
+      launchShowDuration: 200,
+      // launchShowDuration: 0,
       launchAutoHide: true,
       backgroundColor: '#18181b',
     },
