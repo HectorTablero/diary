@@ -98,6 +98,7 @@ export const settingsSchema = z.object({
   // explicit "" still clears one.
   groqApiKey: z.string().trim().max(200).optional(),
   openRouterApiKey: z.string().trim().max(200).optional(),
+  cerebrasApiKey: z.string().trim().max(200).optional(),
 });
 
 // --- AI voice assistant ---

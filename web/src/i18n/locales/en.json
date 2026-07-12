@@ -207,7 +207,7 @@
     },
     "ai": {
       "title": "AI assistant",
-      "description": "Record a voice note and let AI turn it into diary entry suggestions you can review before saving. Groq is required for transcription; adding an OpenRouter key too switches the suggestion step to a stronger free model instead of Groq's.",
+      "description": "Record a voice note and let AI turn it into diary entry suggestions you can review before saving. Groq is required for transcription; adding an OpenRouter or Cerebras key switches the suggestion step to a stronger model instead of Groq's.",
       "apiKey": "Groq API key",
       "apiKeyPlaceholder": "gsk_…",
       "apiKeyHint": "Required for voice transcription. Free to get, used only to call Groq directly from this device. Get one at",
@@ -215,7 +215,10 @@
       "forceEnglishAIEventsDescription": "When enabled, entries created from voice dictation are written in English even if you speak another language.",
       "openRouterApiKey": "OpenRouter API key (optional)",
       "openRouterApiKeyPlaceholder": "sk-or-…",
-      "openRouterApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call OpenRouter directly from this device. Get one at"
+      "openRouterApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call OpenRouter directly from this device. Get one at",
+      "cerebrasApiKey": "Cerebras API key (optional)",
+      "cerebrasApiKeyPlaceholder": "csk-…",
+      "cerebrasApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call Cerebras directly from this device. Get one at"
     },
     "account": "Account",
     "resetDefaults": "Reset to defaults",
@@ -257,10 +260,10 @@
     "entriesCreated_other": "{{count}} entries added",
     "mic_denied": "Microphone access was denied",
     "mic_unavailable": "Microphone is not available",
-    "invalid_key": "Your Groq API key looks invalid",
-    "rate_limited": "Groq rate limit reached, try again shortly",
-    "upstream_error": "Groq couldn't process that",
-    "timeout": "Groq took too long to respond",
+    "invalid_key": "Your LLM API key looks invalid",
+    "rate_limited": "LLM rate limit reached, try again shortly",
+    "upstream_error": "The LLM couldn't process that",
+    "timeout": "The LLM took too long to respond",
     "no_key": "Add a Groq API key in settings first",
     "no_submission": "Couldn't get a result from the assistant"
   }

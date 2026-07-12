@@ -3,6 +3,8 @@ import {
   AI_MAX_SUBMIT_REMINDERS,
   AI_MAX_SUGGESTION_NODES,
   AI_MAX_TOOL_ITERATIONS,
+  CEREBRAS_API_BASE,
+  CEREBRAS_CHAT_MODEL,
   GROQ_API_BASE,
   GROQ_CHAT_MODEL,
   MAX_CONTENT_LENGTH,
@@ -155,6 +157,8 @@ function buildSystemPrompt(tags: TagRef[], dateKey: string, language: string, fo
   const tagLines = tags.length ? tags.map((t) => `${t.id}: ${t.name}`).join('\n') : '(no tags exist yet)';
   return `You extract diary bullet points from a voice transcript recorded by the user.
 
+Take your time and prioritize correctness over speed. Reason carefully about the transcript before using tools or submitting the final result.
+
 The entries you submit are always filed under the date ${dateKey} (today is ${today}) — use any relative dates mentioned in the transcript ("yesterday", "last week") only to understand context, never to change where the entry is filed.
 ${forceEnglishAIEvents
   ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").`
@@ -169,9 +173,11 @@ ${tagLines}
 
 People convention: before writing about a specific named person, call query_people with their name. If a confident match is found, put their id in the entry's "people" array and write "@ExactName" in the content using the EXACT name query_people returned. If no confident match is found, write their name as plain text without "@".
 
+If the transcript is ambiguous, prefer a conservative interpretation and verify uncertain names, nicknames, or spelling variants with query_people before deciding.
+
 Be aggressive about tool calls: if the transcript contains anything that could be a person name, treat it as a candidate and call query_people before deciding. This includes capitalized tokens, unusual proper-name-looking words, and any name-like phrase that could plausibly refer to someone in the user's profile.
 
-Do not rely on the model's memory of known people; use the tool to verify the match before deciding whether to tag the person or leave the name as plain text. If the first query_people lookup is weak or misses, try likely variants, nicknames, and near-homophones instead of skipping the lookup.
+Do not rely on the model's memory of known people; use the tool to verify the match before deciding whether to tag the person or leave the name as plain text. Remember that the transcription may be slightly inaccurate, especially for names, so if a name looks plausible but not exact, assume the transcript may have mangled it and try similar-sounding variants too. For example: if the transcript contains "Ivonne" or "Yvonne" instead of "Ibón", which is the most likely correct spelling in my context.
 
 Remember that the transcription itself may be wrong. If a name looks plausible but not exact, assume the transcript may have mangled it and try similar-sounding variants too, because the spoken name may have been transcribed imperfectly.
 
@@ -198,10 +204,22 @@ interface Provider {
   headers?: Record<string, string>;
 }
 
-/** OpenRouter (if the user set a key) is preferred for text/tool-calling; Groq is always
-    required for client-side transcription but also works as the text fallback so the
-    assistant still functions with just a Groq key. */
-function pickProvider(settings: { groqApiKey: string; openRouterApiKey: string }): Provider {
+/** Cerebras and OpenRouter are used for text/tool-calling; Groq is always required for
+    client-side transcription but also works as the text fallback so the assistant still
+    functions with just a Groq key. */
+function pickProvider(settings: {
+  groqApiKey: string;
+  openRouterApiKey: string;
+  cerebrasApiKey: string;
+}): Provider {
+  const cerebrasKey = settings.cerebrasApiKey.trim();
+  if (cerebrasKey) {
+    return {
+      baseUrl: CEREBRAS_API_BASE,
+      apiKey: cerebrasKey,
+      model: CEREBRAS_CHAT_MODEL,
+    };
+  }
   const openRouterKey = settings.openRouterApiKey.trim();
   if (openRouterKey) {
     return {
