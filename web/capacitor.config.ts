@@ -6,7 +6,9 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     SplashScreen: {
-      launchShowDuration: 800,
+      // The native splash is a plain themed background; the animated logo
+      // lives in the web boot overlay (index.html), which takes over instantly.
+      launchShowDuration: 300,
       launchAutoHide: true,
       backgroundColor: '#18181b',
     },

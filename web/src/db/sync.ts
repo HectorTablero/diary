@@ -1,5 +1,5 @@
 import type { SyncResponse } from '@diary/shared';
-import { api, ApiError, apiGet } from '@/lib/apiClient';
+import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
 import { db, entryFromDto, getMeta, personFromDto, setMeta, type OutboxOp } from './db';
 
 /* Sync engine: replays the outbox against the REST API in order (push), then
@@ -44,6 +44,14 @@ export function onSyncApplied(cb: () => void): () => void {
   return () => dataListeners.delete(cb);
 }
 
+const reconnectListeners = new Set<() => void>();
+
+/** Fires when the server becomes reachable again after a failed sync. */
+export function onReconnected(cb: () => void): () => void {
+  reconnectListeners.add(cb);
+  return () => reconnectListeners.delete(cb);
+}
+
 async function refreshPending() {
   setStatus({ pending: await db.outbox.count() });
 }
@@ -80,13 +88,17 @@ async function pushOutbox(): Promise<boolean> {
       if (!(err instanceof ApiError)) throw err;
       if (err.status === 0) {
         setStatus({ offline: true });
+        networkFailure = true;
         return false;
       }
       if (err.status === 401) {
         setStatus({ needsAuth: true });
         return false;
       }
-      if (err.status >= 500) return false; // server hiccup: retry next sync
+      if (err.status >= 500) {
+        networkFailure = true;
+        return false; // server hiccup: retry once it answers again
+      }
       if (err.status === 409 && op.method === 'POST') {
         await removeLocalDoc(op);
         await db.outbox.delete(op.seq!);
@@ -112,6 +124,86 @@ async function removeLocalDoc(op: OutboxOp) {
   else if (op.path.startsWith('/tags')) await db.tags.delete(id);
 }
 
+/* Live channel: a WebSocket per open client. The server nudges the user's
+   other devices after every mutation, so edits appear everywhere within
+   moments while the diary is open on several devices. */
+
+let liveSocket: WebSocket | null = null;
+let liveConnecting = false;
+
+function ensureLiveChannel(): void {
+  if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return;
+  if (!navigator.onLine || liveConnecting) return;
+  if (liveSocket && liveSocket.readyState <= WebSocket.OPEN) return; // connecting or open
+  liveConnecting = true;
+  void (async () => {
+    try {
+      // The session token must never appear in a URL (URLs land in access
+      // logs); redeem a single-use short-lived ticket over normal auth instead.
+      const { ticket } = await apiGet<{ ticket: string }>('/sync/ws-ticket');
+      const base = API_BASE || window.location.origin;
+      const params = new URLSearchParams({ ticket, client: CLIENT_ID });
+      const socket = new WebSocket(`${base.replace(/^http/, 'ws')}/api/sync/ws?${params}`);
+      socket.onmessage = (event) => {
+        if (event.data === 'changed') kick();
+      };
+      socket.onclose = () => {
+        if (liveSocket === socket) liveSocket = null;
+        // Gentle retry; kick()/interval also re-open it on their own triggers.
+        setTimeout(ensureLiveChannel, 10_000);
+      };
+      socket.onerror = () => socket.close();
+      liveSocket = socket;
+    } catch {
+      liveSocket = null; // not signed in yet or offline; later triggers retry
+    } finally {
+      liveConnecting = false;
+    }
+  })();
+}
+
+/** Used on sign-out so a dead session doesn't keep a socket around. */
+export function closeLiveChannel(): void {
+  liveSocket?.close();
+  liveSocket = null;
+}
+
+/* Reconnect probe: after a sync fails on network grounds, ping /api/health
+   every few seconds (navigator.onLine can't see an unreachable server). The
+   moment it answers, announce it and sync. */
+
+const PROBE_INTERVAL_MS = 10_000;
+let probeTimer: ReturnType<typeof setInterval> | null = null;
+
+function stopReconnectProbe() {
+  if (probeTimer !== null) {
+    clearInterval(probeTimer);
+    probeTimer = null;
+  }
+}
+
+function startReconnectProbe() {
+  if (probeTimer !== null) return;
+  probeTimer = setInterval(async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5_000);
+      const res = await fetch(`${API_BASE}/api/health`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) return;
+    } catch {
+      return; // still unreachable
+    }
+    stopReconnectProbe();
+    setStatus({ offline: false });
+    reconnectListeners.forEach((cb) => cb());
+    kick();
+  }, PROBE_INTERVAL_MS);
+}
+
 async function pull(): Promise<void> {
   const since = await getMeta<string>('syncCursor');
   const res = await apiGet<SyncResponse>(
@@ -135,33 +227,44 @@ async function pull(): Promise<void> {
     await setMeta('syncCursor', new Date(Date.parse(res.serverTime) - 10_000).toISOString());
   });
   setStatus({ needsAuth: false, lastSyncAt: new Date().toISOString() });
+  stopReconnectProbe(); // reached the server through some other trigger
   dataListeners.forEach((cb) => cb());
 }
 
 let running: Promise<void> | null = null;
 let rerun = false;
+let networkFailure = false;
 
 async function run(): Promise<void> {
   await refreshPending();
   if (!navigator.onLine) {
     setStatus({ offline: true });
+    startReconnectProbe();
     return;
   }
   setStatus({ syncing: true, offline: false });
+  networkFailure = false;
   try {
     const drained = await pushOutbox();
     if (drained) await pull();
   } catch (err) {
     if (err instanceof ApiError) {
-      if (err.status === 0) setStatus({ offline: true });
-      else if (err.status === 401) setStatus({ needsAuth: true });
-      else console.warn('sync failed', err.code);
+      if (err.status === 0) {
+        setStatus({ offline: true });
+        networkFailure = true;
+      } else if (err.status === 401) {
+        setStatus({ needsAuth: true });
+      } else {
+        if (err.status >= 500) networkFailure = true;
+        console.warn('sync failed', err.code);
+      }
     } else {
       console.warn('sync failed', err);
     }
   } finally {
     await refreshPending();
     setStatus({ syncing: false });
+    if (networkFailure) startReconnectProbe();
   }
 }
 
@@ -171,6 +274,7 @@ export function kick(): void {
 }
 
 export function syncNow(): Promise<void> {
+  ensureLiveChannel();
   if (running) {
     rerun = true; // something changed mid-sync: go again right after
     return running;

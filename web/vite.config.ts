@@ -51,7 +51,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': { target: `http://localhost:${apiPort}`, changeOrigin: false },
+      // ws: true lets the live-sync WebSocket flow through the dev proxy too.
+      '/api': { target: `http://localhost:${apiPort}`, changeOrigin: false, ws: true },
     },
   },
 });

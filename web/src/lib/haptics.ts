@@ -12,3 +12,25 @@ export const hapticTap = (): void => {
 export const hapticWarning = (): void => {
   if (isNative) void Haptics.notification({ type: NotificationType.Warning });
 };
+
+/** Anything a finger can meaningfully press. `data-haptic` opts custom elements in. */
+const INTERACTIVE =
+  'button, a[href], select, label[for], input[type="checkbox"], input[type="radio"], input[type="date"], ' +
+  '[role="button"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], ' +
+  '[role="option"], [role="checkbox"], [role="switch"], [role="radio"], [role="slider"], [data-haptic]';
+
+/**
+ * Global subtle haptics: one light tick whenever an interactive element is
+ * pressed, instead of hand-wiring every button. Native only; no-op on the web.
+ */
+export function initGlobalHaptics(): void {
+  if (!isNative) return;
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      const target = event.target as Element | null;
+      if (target?.closest(INTERACTIVE)) hapticTap();
+    },
+    { capture: true, passive: true },
+  );
+}

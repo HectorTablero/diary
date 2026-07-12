@@ -8,6 +8,11 @@ const memory = new Map<string, string>();
   setItem: (k: string, v: string) => void memory.set(k, v),
   removeItem: (k: string) => void memory.delete(k),
 };
+// The i18n module (pulled in by the sync engine for toasts) touches the DOM at import.
+(globalThis as Record<string, unknown>).document ??= {
+  documentElement: { lang: '' },
+  addEventListener: () => {},
+};
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = '') => {

@@ -8,6 +8,7 @@ import { Deletion } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
+import { issueWsTicket } from '../services/liveSync';
 import { getSettings } from '../services/talkingPointsService';
 import {
   ENTRY_POPULATE,
@@ -27,11 +28,12 @@ interface LeanDeletion {
   deletedAt: Date;
 }
 
-/** Pull endpoint for the local-first clients: everything changed since the cursor. */
-export const syncRouter = new Hono<AppEnv>().get(
-  '/',
-  queryValidator(syncQuerySchema),
-  async (c) => {
+export const syncRouter = new Hono<AppEnv>()
+  // Single-use ticket for the live-sync WebSocket (see services/liveSync).
+  // GET on purpose: the mutation-broadcast middleware only fires on non-GET.
+  .get('/ws-ticket', (c) => c.json({ ticket: issueWsTicket(c.get('userId')) }))
+  /** Pull endpoint for the local-first clients: everything changed since the cursor. */
+  .get('/', queryValidator(syncQuerySchema), async (c) => {
     const userId = c.get('userId');
     const { since } = c.req.valid('query');
     // Captured before the queries run: anything written mid-request is re-sent next pull.
@@ -61,5 +63,4 @@ export const syncRouter = new Hono<AppEnv>().get(
       })),
     };
     return c.json(response);
-  },
-);
+  });

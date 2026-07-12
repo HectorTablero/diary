@@ -3,6 +3,7 @@ import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router';
+import { toast } from 'sonner';
 import { FullScreenSpinner, Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
 import { kick } from '@/db/sync';
@@ -23,9 +24,11 @@ async function nativeGoogleSignIn(): Promise<void> {
     });
     socialLoginReady = true;
   }
+  // No `scopes`: identity (email/name/picture) already comes in the idToken, and
+  // requesting scopes would require the plugin's MainActivity modification.
   const { result } = await SocialLogin.login({
     provider: 'google',
-    options: { scopes: ['email', 'profile'] },
+    options: {},
   });
   if (!('idToken' in result) || !result.idToken) throw new Error('Google sign-in returned no idToken');
   const { error } = await authClient.signIn.social({
@@ -33,6 +36,10 @@ async function nativeGoogleSignIn(): Promise<void> {
     idToken: { token: result.idToken, accessToken: result.accessToken?.token },
   });
   if (error) throw new Error(error.message ?? 'sign-in failed');
+  // Better Auth only auto-refreshes useSession for a fixed list of paths that
+  // doesn't include /sign-in/social (the web flow reloads the page instead, so
+  // it never notices). Nudge the session store manually.
+  authClient.$store.notify('$sessionSignal');
   kick();
 }
 
@@ -77,7 +84,8 @@ export default function LoginPage() {
       } else {
         await signIn.social({ provider: 'google', callbackURL: '/diary' });
       }
-    } catch {
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('errors.unknown'));
       setSigningIn(false);
     }
   };

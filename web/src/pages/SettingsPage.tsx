@@ -24,6 +24,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { clearLocalData } from '@/db/db';
+import { closeLiveChannel } from '@/db/sync';
 import { signOut, useSession } from '@/lib/authClient';
 import { setAuthToken } from '@/lib/authToken';
 import { cacheUser } from '@/lib/sessionCache';
@@ -120,6 +121,7 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     await signOut();
     // Local data belongs to the signed-in account: wipe it all.
+    closeLiveChannel();
     await clearLocalData();
     setAuthToken(null);
     cacheUser(null);

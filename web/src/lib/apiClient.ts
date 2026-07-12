@@ -5,6 +5,9 @@ import { getAuthToken } from './authToken';
 export const API_BASE: string =
   (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_API_BASE ?? '';
 
+/** Identifies this client session so live-sync can skip echoing our own changes back. */
+export const CLIENT_ID: string = crypto.randomUUID();
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -17,7 +20,10 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Client-Id': CLIENT_ID,
+  };
   const token = getAuthToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 

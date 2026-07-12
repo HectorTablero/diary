@@ -19,7 +19,8 @@
     "offline": "Offline",
     "offlinePending_one": "Offline — {{count}} change to sync",
     "offlinePending_other": "Offline — {{count}} changes to sync",
-    "sessionExpired": "Your session has expired."
+    "sessionExpired": "Your session has expired.",
+    "reconnected": "Connection restored — syncing…"
   },
   "common": {
     "cancel": "Cancel",

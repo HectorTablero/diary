@@ -10,7 +10,7 @@ import type {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as mutations from '@/db/mutations';
 import * as repo from '@/db/repo';
-import { hapticTap, hapticWarning } from '@/lib/haptics';
+import { hapticWarning } from '@/lib/haptics';
 
 /* All reads and writes go through the local Dexie store (see src/db); the sync
    engine reconciles with the server in the background. Query keys are kept from
@@ -96,7 +96,6 @@ export function useMarkCheckup() {
   return useMutation({
     mutationFn: (id: string) => mutations.markCheckup(id),
     onSuccess: (data) => {
-      hapticTap();
       qc.setQueryData(['people', data.id], data);
       qc.invalidateQueries({ queryKey: ['people'] });
     },
@@ -144,10 +143,7 @@ export function useCreateEntry() {
   const invalidate = useInvalidateEntryData();
   return useMutation({
     mutationFn: (input: EntryCreateInput) => mutations.createEntry(input),
-    onSuccess: () => {
-      hapticTap();
-      invalidate();
-    },
+    onSuccess: invalidate,
   });
 }
 
@@ -176,10 +172,7 @@ export function useSetSaid() {
   return useMutation({
     mutationFn: ({ entryId, personId, said }: { entryId: string; personId: string; said: boolean }) =>
       mutations.setSaid(entryId, personId, said),
-    onSuccess: () => {
-      hapticTap();
-      invalidate();
-    },
+    onSuccess: invalidate,
   });
 }
 

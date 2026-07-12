@@ -20,7 +20,8 @@
     "offlinePending_one": "Sin conexión — {{count}} cambio por sincronizar",
     "offlinePending_many": "Sin conexión — {{count}} cambios por sincronizar",
     "offlinePending_other": "Sin conexión — {{count}} cambios por sincronizar",
-    "sessionExpired": "Tu sesión ha caducado."
+    "sessionExpired": "Tu sesión ha caducado.",
+    "reconnected": "Conexión restablecida — sincronizando…"
   },
   "common": {
     "cancel": "Cancelar",
