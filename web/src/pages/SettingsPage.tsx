@@ -23,7 +23,10 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { clearLocalData } from '@/db/db';
 import { signOut, useSession } from '@/lib/authClient';
+import { setAuthToken } from '@/lib/authToken';
+import { cacheUser } from '@/lib/sessionCache';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -116,6 +119,10 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     await signOut();
+    // Local data belongs to the signed-in account: wipe it all.
+    await clearLocalData();
+    setAuthToken(null);
+    cacheUser(null);
     navigate('/login');
   };
 

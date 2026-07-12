@@ -9,12 +9,16 @@ import {
 
 export const objectIdSchema = z.string().regex(OBJECT_ID_REGEX, 'invalid id');
 export const dateKeySchema = z.string().regex(DATE_KEY_REGEX, 'expected YYYY-MM-DD');
+export const isoDateTimeSchema = z.iso.datetime();
 export const importanceSchema = z.number().int().min(1).max(5);
 export const checkupIntervalDaysSchema = z.number().int().min(1).max(3650).nullable();
 
 // --- Entries ---
 
 export const entryCreateSchema = z.object({
+  /** Client-generated id + timestamp let offline creates sync later with stable identity and order. */
+  id: objectIdSchema.optional(),
+  createdAt: isoDateTimeSchema.optional(),
   content: z.string().trim().min(1).max(MAX_CONTENT_LENGTH),
   dateKey: dateKeySchema,
   importance: importanceSchema.default(3),
@@ -38,6 +42,8 @@ export const entryUpdateSchema = z.object({
 // --- People ---
 
 export const personCreateSchema = z.object({
+  id: objectIdSchema.optional(),
+  createdAt: isoDateTimeSchema.optional(),
   name: z.string().trim().min(1).max(100),
   tags: z.array(objectIdSchema).max(50).default([]),
   notes: z.string().max(MAX_NOTES_LENGTH).default(''),
@@ -55,6 +61,8 @@ export const personUpdateSchema = z.object({
 // --- Tags ---
 
 export const tagCreateSchema = z.object({
+  id: objectIdSchema.optional(),
+  createdAt: isoDateTimeSchema.optional(),
   name: z.string().trim().min(1).max(50),
   color: z.string().regex(HEX_COLOR_REGEX, 'expected #RRGGBB').optional(),
 });
@@ -112,6 +120,11 @@ export const searchQuerySchema = z.object({
 export const pageQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const syncQuerySchema = z.object({
+  /** Pull only changes after this instant; omit for a full dump (first sync). */
+  since: isoDateTimeSchema.optional(),
 });
 
 export type EntryCreateInput = z.infer<typeof entryCreateSchema>;

@@ -5,6 +5,13 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Safe-area insets: env() works on iOS/web; Capacitor injects
+   --safe-area-inset-* on Android (edge-to-edge). Take whichever is set. */
+:root {
+  --inset-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+}
+
 @theme inline {
 
     --font-heading: var(--font-sans);

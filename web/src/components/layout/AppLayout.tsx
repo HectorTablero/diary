@@ -1,10 +1,15 @@
-import { BookOpen, CalendarDays, Search, Settings, Tag, Users } from 'lucide-react';
+import { BookOpen, CalendarDays, CloudOff, Search, Settings, Tag, Users } from 'lucide-react';
 import { AnimatedLogo } from '@/components/icons/AnimatedLogo';
 import type { LucideIcon } from 'lucide-react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, NavLink, Outlet } from 'react-router';
+import { Link, Navigate, NavLink, Outlet } from 'react-router';
 import { FullScreenSpinner } from '@/components/common/Spinner';
+import { kick } from '@/db/sync';
+import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
+import { hapticTap } from '@/lib/haptics';
+import { cacheUser, getCachedUser } from '@/lib/sessionCache';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -72,11 +77,12 @@ function TabBar() {
   const items = [...MAIN_NAV, ...SECONDARY_NAV];
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
-      <div className="flex items-stretch justify-around pb-[env(safe-area-inset-bottom)]">
+      <div className="flex items-stretch justify-around pb-[var(--inset-bottom)]">
         {items.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={hapticTap}
             className={({ isActive }) =>
               cn(
                 'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative',
@@ -106,16 +112,66 @@ function TabBar() {
   );
 }
 
-export default function AppLayout() {
-  const { data: session, isPending } = useSession();
+/** Session-expired banner + offline/pending pill fed by the sync engine. */
+function SyncStatusOverlay() {
+  const status = useSyncStatus();
+  const { t } = useTranslation();
 
-  if (isPending) return <FullScreenSpinner />;
-  if (!session) return <Navigate to="/login" replace />;
+  if (status.needsAuth) {
+    return (
+      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
+        {t('sync.sessionExpired')}
+        <Link to="/login" className="font-medium underline underline-offset-2">
+          {t('auth.signInWithGoogle')}
+        </Link>
+      </div>
+    );
+  }
+  if (status.offline) {
+    return (
+      <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 md:bottom-4">
+        <span className="flex items-center gap-1.5 rounded-full border bg-background/95 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
+          <CloudOff className="size-3.5" />
+          {status.pending > 0
+            ? t('sync.offlinePending', { count: status.pending })
+            : t('sync.offline')}
+        </span>
+      </div>
+    );
+  }
+  return null;
+}
+
+export default function AppLayout() {
+  const { data: session, isPending, error } = useSession();
+  const cached = getCachedUser();
+
+  useEffect(() => {
+    if (session?.user) {
+      cacheUser({
+        name: session.user.name,
+        email: session.user.email,
+        image: session.user.image,
+      });
+      kick();
+    }
+  }, [session]);
+
+  if (!session) {
+    // With a cached user, stay usable while the session check is pending or the
+    // network is down (local-first). A definitive "signed out" still redirects.
+    const offlineUsable = !!cached && (isPending || !!error);
+    if (!offlineUsable) {
+      if (isPending) return <FullScreenSpinner />;
+      return <Navigate to="/login" replace />;
+    }
+  }
 
   return (
     <div className="flex min-h-dvh">
       <Sidebar />
-      <main className="min-w-0 flex-1 pb-20 md:pb-0">
+      <main className="min-w-0 flex-1 pt-[var(--inset-top)] pb-20 md:pb-0">
+        <SyncStatusOverlay />
         <Outlet />
       </main>
       <TabBar />

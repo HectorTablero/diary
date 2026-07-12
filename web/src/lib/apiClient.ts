@@ -1,3 +1,10 @@
+import { getAuthToken } from './authToken';
+
+/** Empty for web builds (same-origin); the Capacitor build points at the prod server.
+    Optional-chained so the module also loads outside Vite (node-based tests). */
+export const API_BASE: string =
+  (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_API_BASE ?? '';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -10,11 +17,15 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE}/api${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: { ...headers, ...init?.headers },
     });
   } catch {
     throw new ApiError(0, 'errors.offline');
@@ -26,9 +37,6 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       if (body.error) code = body.error;
     } catch {
       // non-JSON error body
-    }
-    if (res.status === 401 && !window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
     }
     throw new ApiError(res.status, code);
   }

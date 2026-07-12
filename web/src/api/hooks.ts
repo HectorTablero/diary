@@ -1,38 +1,33 @@
 import type {
-  CalendarDay,
   EntryCreateInput,
-  EntryDto,
-  EntryNode,
   EntryUpdateInput,
   PersonCreateInput,
-  PersonDto,
-  PersonListItem,
   PersonUpdateInput,
-  SearchResponse,
-  SettingsDto,
   SettingsInput,
   TagCreateInput,
-  TagDto,
   TagUpdateInput,
-  TagWithStats,
-  TalkingPointsResponse,
 } from '@diary/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/apiClient';
+import * as mutations from '@/db/mutations';
+import * as repo from '@/db/repo';
+import { hapticTap, hapticWarning } from '@/lib/haptics';
+
+/* All reads and writes go through the local Dexie store (see src/db); the sync
+   engine reconciles with the server in the background. Query keys are kept from
+   the server-first era so components didn't have to change. */
 
 // --- Tags ---
 
 export const useTags = () =>
   useQuery({
     queryKey: ['tags'],
-    queryFn: () => apiGet<{ tags: TagWithStats[] }>('/tags').then((r) => r.tags),
-    staleTime: 5 * 60_000,
+    queryFn: () => repo.getTags(),
   });
 
 export function useCreateTag() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: TagCreateInput) => apiPost<TagDto>('/tags', input),
+    mutationFn: (input: TagCreateInput) => mutations.createTag(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tags'] }),
   });
 }
@@ -41,7 +36,7 @@ export function useUpdateTag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: TagUpdateInput }) =>
-      apiPatch<TagDto>(`/tags/${id}`, input),
+      mutations.updateTag(id, input),
     onSuccess: () => qc.invalidateQueries(),
   });
 }
@@ -49,7 +44,7 @@ export function useUpdateTag() {
 export function useDeleteTag() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiDelete<{ ok: boolean }>(`/tags/${id}`),
+    mutationFn: (id: string) => mutations.deleteTag(id),
     onSuccess: () => qc.invalidateQueries(),
   });
 }
@@ -59,20 +54,19 @@ export function useDeleteTag() {
 export const usePeople = () =>
   useQuery({
     queryKey: ['people'],
-    queryFn: () => apiGet<{ people: PersonListItem[] }>('/people').then((r) => r.people),
-    staleTime: 5 * 60_000,
+    queryFn: () => repo.getPeople(),
   });
 
 export const usePerson = (id: string) =>
   useQuery({
     queryKey: ['people', id],
-    queryFn: () => apiGet<PersonDto>(`/people/${id}`),
+    queryFn: () => repo.getPerson(id),
   });
 
 export function useCreatePerson() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: PersonCreateInput) => apiPost<PersonDto>('/people', input),
+    mutationFn: (input: PersonCreateInput) => mutations.createPerson(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['people'] }),
   });
 }
@@ -81,7 +75,7 @@ export function useUpdatePerson() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: PersonUpdateInput }) =>
-      apiPatch<PersonDto>(`/people/${id}`, input),
+      mutations.updatePerson(id, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['people'] }),
   });
 }
@@ -89,16 +83,20 @@ export function useUpdatePerson() {
 export function useDeletePerson() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiDelete<{ ok: boolean }>(`/people/${id}`),
-    onSuccess: () => qc.invalidateQueries(),
+    mutationFn: (id: string) => mutations.deletePerson(id),
+    onSuccess: () => {
+      hapticWarning();
+      qc.invalidateQueries();
+    },
   });
 }
 
 export function useMarkCheckup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiPut<PersonDto>(`/people/${id}/checkup`),
+    mutationFn: (id: string) => mutations.markCheckup(id),
     onSuccess: (data) => {
+      hapticTap();
       qc.setQueryData(['people', data.id], data);
       qc.invalidateQueries({ queryKey: ['people'] });
     },
@@ -108,23 +106,19 @@ export function useMarkCheckup() {
 export const useTalkingPoints = (personId: string) =>
   useQuery({
     queryKey: ['people', personId, 'talking-points'],
-    queryFn: () => apiGet<TalkingPointsResponse>(`/people/${personId}/talking-points`),
+    queryFn: () => repo.getTalkingPoints(personId),
   });
 
 export const useMemories = (personId: string) =>
   useQuery({
     queryKey: ['people', personId, 'memories'],
-    queryFn: () =>
-      apiGet<{ memories: EntryDto[] }>(`/people/${personId}/memories`).then((r) => r.memories),
+    queryFn: () => repo.getMemories(personId),
   });
 
 export const usePersonHistory = (personId: string, page: number) =>
   useQuery({
     queryKey: ['people', personId, 'history', page],
-    queryFn: () =>
-      apiGet<{ results: EntryDto[]; total: number; page: number; limit: number }>(
-        `/people/${personId}/history?page=${page}&limit=50`,
-      ),
+    queryFn: () => repo.getHistory(personId, page, 50),
   });
 
 // --- Entries ---
@@ -132,7 +126,7 @@ export const usePersonHistory = (personId: string, page: number) =>
 export const useDayEntries = (dateKey: string) =>
   useQuery({
     queryKey: ['entries', 'day', dateKey],
-    queryFn: () => apiGet<{ entries: EntryNode[] }>(`/entries?date=${dateKey}`).then((r) => r.entries),
+    queryFn: () => repo.getDayEntries(dateKey),
   });
 
 function useInvalidateEntryData() {
@@ -149,8 +143,11 @@ function useInvalidateEntryData() {
 export function useCreateEntry() {
   const invalidate = useInvalidateEntryData();
   return useMutation({
-    mutationFn: (input: EntryCreateInput) => apiPost<EntryDto>('/entries', input),
-    onSuccess: invalidate,
+    mutationFn: (input: EntryCreateInput) => mutations.createEntry(input),
+    onSuccess: () => {
+      hapticTap();
+      invalidate();
+    },
   });
 }
 
@@ -158,7 +155,7 @@ export function useUpdateEntry() {
   const invalidate = useInvalidateEntryData();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: EntryUpdateInput }) =>
-      apiPatch<EntryDto>(`/entries/${id}`, input),
+      mutations.updateEntry(id, input),
     onSuccess: invalidate,
   });
 }
@@ -166,8 +163,11 @@ export function useUpdateEntry() {
 export function useDeleteEntry() {
   const invalidate = useInvalidateEntryData();
   return useMutation({
-    mutationFn: (id: string) => apiDelete<{ deleted: number }>(`/entries/${id}`),
-    onSuccess: invalidate,
+    mutationFn: (id: string) => mutations.deleteEntry(id),
+    onSuccess: () => {
+      hapticWarning();
+      invalidate();
+    },
   });
 }
 
@@ -175,10 +175,11 @@ export function useSetSaid() {
   const invalidate = useInvalidateEntryData();
   return useMutation({
     mutationFn: ({ entryId, personId, said }: { entryId: string; personId: string; said: boolean }) =>
-      said
-        ? apiPut<{ ok: boolean }>(`/entries/${entryId}/said/${personId}`)
-        : apiDelete<{ ok: boolean }>(`/entries/${entryId}/said/${personId}`),
-    onSuccess: invalidate,
+      mutations.setSaid(entryId, personId, said),
+    onSuccess: () => {
+      hapticTap();
+      invalidate();
+    },
   });
 }
 
@@ -193,10 +194,7 @@ export function useSetHidden() {
       entryId: string;
       personId: string;
       hidden: boolean;
-    }) =>
-      hidden
-        ? apiPut<{ ok: boolean }>(`/entries/${entryId}/hidden/${personId}`)
-        : apiDelete<{ ok: boolean }>(`/entries/${entryId}/hidden/${personId}`),
+    }) => mutations.setHidden(entryId, personId, hidden),
     onSuccess: invalidate,
   });
 }
@@ -206,21 +204,19 @@ export function useSetHidden() {
 export const useCalendarMonth = (year: number, month: number) =>
   useQuery({
     queryKey: ['calendar', year, month],
-    queryFn: () =>
-      apiGet<{ days: CalendarDay[] }>(`/calendar?year=${year}&month=${month}`).then((r) => r.days),
+    queryFn: () => repo.getCalendarMonth(year, month),
   });
 
 export const useOnThisDay = (dateKey: string) =>
   useQuery({
     queryKey: ['on-this-day', dateKey],
-    queryFn: () =>
-      apiGet<{ entries: EntryDto[] }>(`/on-this-day?date=${dateKey}`).then((r) => r.entries),
+    queryFn: () => repo.getOnThisDay(dateKey),
   });
 
 export const useSearch = (params: URLSearchParams, enabled: boolean) =>
   useQuery({
     queryKey: ['search', params.toString()],
-    queryFn: () => apiGet<SearchResponse>(`/search?${params.toString()}`),
+    queryFn: () => repo.search(params),
     enabled,
   });
 
@@ -229,14 +225,13 @@ export const useSearch = (params: URLSearchParams, enabled: boolean) =>
 export const useSettings = () =>
   useQuery({
     queryKey: ['settings'],
-    queryFn: () => apiGet<SettingsDto>('/settings'),
-    staleTime: 5 * 60_000,
+    queryFn: () => repo.getSettings(),
   });
 
 export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: SettingsInput) => apiPut<SettingsDto>('/settings', input),
+    mutationFn: (input: SettingsInput) => mutations.saveSettings(input),
     onSuccess: (data) => {
       qc.setQueryData(['settings'], data);
       qc.invalidateQueries({ queryKey: ['people'] });

@@ -52,3 +52,13 @@ export const DEFAULT_TAG_COLORS = [
 export const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 export const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 export const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+
+/** ObjectId-shaped id (timestamp prefix + random) generated client-side for offline creates. */
+export function newObjectId(): string {
+  const time = Math.floor(Date.now() / 1000)
+    .toString(16)
+    .padStart(8, '0');
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return time + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}

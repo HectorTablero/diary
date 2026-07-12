@@ -15,6 +15,12 @@
     "signInWithGoogle": "Continue with Google",
     "signOut": "Sign out"
   },
+  "sync": {
+    "offline": "Offline",
+    "offlinePending_one": "Offline — {{count}} change to sync",
+    "offlinePending_other": "Offline — {{count}} changes to sync",
+    "sessionExpired": "Your session has expired."
+  },
   "common": {
     "cancel": "Cancel",
     "save": "Save",

@@ -1,13 +1,11 @@
 import type { ScoredEntry, SettingsDto, TalkingPointsResponse } from '@diary/shared';
-import { importanceWeight, MATCH_STRENGTH } from '@diary/shared';
+import { memoryCutoffDateKey, scoreCutoffDateKey, scoreEntry } from '@diary/shared';
 import { Types } from 'mongoose';
 import { notFound } from '../errors';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { UserSettings } from '../models/userSettings';
 import { ENTRY_POPULATE, entryToDto, type LeanEntry } from '../dto';
-
-const DAY_MS = 86_400_000;
 
 export async function getSettings(userId: string): Promise<SettingsDto> {
   const doc = await UserSettings.findOneAndUpdate(
@@ -25,40 +23,6 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     broadcastTagIds: (doc.broadcastTagIds as Types.ObjectId[]).map((id) => id.toString()),
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
   };
-}
-
-const ageInDays = (dateKey: string, now: number) =>
-  Math.max(0, (now - Date.parse(dateKey)) / DAY_MS);
-
-const halfLifeFor = (settings: SettingsDto, importance: number) =>
-  settings.halfLifeDays[String(importance) as keyof SettingsDto['halfLifeDays']] ?? 14;
-
-/** score = importanceWeight · matchStrength · 2^(-age / halfLife) */
-export function scoreEntry(
-  entry: { dateKey: string; importance: number },
-  matchType: keyof typeof MATCH_STRENGTH,
-  settings: SettingsDto,
-  now: number,
-) {
-  const decay = Math.exp(
-    (-ageInDays(entry.dateKey, now) * Math.LN2) / halfLifeFor(settings, entry.importance),
-  );
-  return importanceWeight(entry.importance) * MATCH_STRENGTH[matchType] * decay;
-}
-
-/**
- * Oldest dateKey that could still score >= epsilon for ANY importance level.
- * Bounds candidate queries so old entries are never scanned.
- */
-export function scoreCutoffDateKey(settings: SettingsDto, now: number): string {
-  let maxAge = 0;
-  for (let i = 1; i <= 5; i++) {
-    const best = importanceWeight(i) * MATCH_STRENGTH.mention;
-    if (best <= settings.epsilon) continue;
-    const age = (halfLifeFor(settings, i) * Math.log2(best / settings.epsilon));
-    maxAge = Math.max(maxAge, age);
-  }
-  return new Date(now - Math.ceil(maxAge) * DAY_MS).toISOString().slice(0, 10);
 }
 
 interface PersonWithTags {
@@ -209,9 +173,7 @@ export async function getMemories(userId: string, personId: string) {
   if (!person) throw notFound('person.not_found');
 
   const settings = await getSettings(userId);
-  const cutoff = new Date(Date.now() - settings.memoryMinAgeDays * DAY_MS)
-    .toISOString()
-    .slice(0, 10);
+  const cutoff = memoryCutoffDateKey(settings, Date.now());
 
   const entries = await Entry.find({
     userId,
