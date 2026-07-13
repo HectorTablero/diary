@@ -259,7 +259,7 @@ export default function AppLayout() {
     return () => cancelIdle(handle);
   }, [session]);
 
-  if (!session) {
+  if (!session?.user) {
     // With a cached user, stay usable while the session check is pending or the
     // network is down (local-first). A definitive "signed out" still redirects.
     const offlineUsable = !!cached && (isPending || !!error);
