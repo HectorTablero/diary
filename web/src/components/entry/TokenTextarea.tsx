@@ -105,7 +105,7 @@ export function TokenTextarea({
           const alias = fuzzyIncludes(p.name, token.query) ? undefined : matchedAlias(p);
           return {
             key: p.id,
-            label: alias ? `${p.name} (${alias})` : p.name,
+            label: alias ? `${p.name} (aka. ${alias})` : p.name,
             icon: 'person' as const,
             apply: () => {
               onSelectPerson(p);

@@ -13,7 +13,6 @@ import {
 } from '@/api/hooks';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
-import { WeChatIcon } from '@/components/icons/WeChatIcon';
 import { Spinner } from '@/components/common/Spinner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -306,8 +305,7 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="person-wechat" className="gap-1.5">
-          <WeChatIcon className="size-3.5 text-muted-foreground" />
+        <Label htmlFor="person-wechat">
           {t('people.wechat')}{' '}
           <span className="font-normal text-muted-foreground">({t('common.optional')})</span>
         </Label>
