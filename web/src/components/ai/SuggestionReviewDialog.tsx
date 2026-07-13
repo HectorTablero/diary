@@ -11,6 +11,7 @@ import { EntityPicker } from '@/components/entry/EntityPicker';
 import { ImportancePicker } from '@/components/entry/ImportanceDot';
 import { TokenTextarea } from '@/components/entry/TokenTextarea';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,8 @@ interface DraftNode {
   importance: number;
   tags: TagDto[];
   people: PersonRefDto[];
+  /** Person ids this entry will be marked as said to; defaults to all linked people. */
+  saidTo: string[];
   children: DraftNode[];
 }
 
@@ -37,14 +40,18 @@ function buildDraft(
   tagsById: Map<string, TagDto>,
   peopleById: Map<string, PersonRefDto>,
 ): DraftNode[] {
-  return nodes.map((node) => ({
-    id: newObjectId(),
-    content: node.content,
-    importance: node.importance,
-    tags: node.tags.flatMap((id) => tagsById.get(id) ?? []),
-    people: node.people.flatMap((id) => peopleById.get(id) ?? []),
-    children: buildDraft(node.children, tagsById, peopleById),
-  }));
+  return nodes.map((node) => {
+    const people = node.people.flatMap((id) => peopleById.get(id) ?? []);
+    return {
+      id: newObjectId(),
+      content: node.content,
+      importance: node.importance,
+      tags: node.tags.flatMap((id) => tagsById.get(id) ?? []),
+      people,
+      saidTo: people.map((p) => p.id),
+      children: buildDraft(node.children, tagsById, peopleById),
+    };
+  });
 }
 
 function countNodes(nodes: DraftNode[]): number {
@@ -67,6 +74,27 @@ function SuggestionNodeEditor({
   onRemove: (id: string) => void;
 }) {
   const { t } = useTranslation();
+
+  // Adding a person auto-marks the entry as said to them, mirroring the main composer.
+  const addPerson = (person: PersonRefDto) => {
+    if (node.people.some((p) => p.id === person.id)) return;
+    onChange(node.id, {
+      people: [...node.people, person],
+      saidTo: node.saidTo.includes(person.id) ? node.saidTo : [...node.saidTo, person.id],
+    });
+  };
+
+  const removePerson = (id: string) =>
+    onChange(node.id, {
+      people: node.people.filter((p) => p.id !== id),
+      saidTo: node.saidTo.filter((pid) => pid !== id),
+    });
+
+  const toggleSaid = (id: string) =>
+    onChange(node.id, {
+      saidTo: node.saidTo.includes(id) ? node.saidTo.filter((pid) => pid !== id) : [...node.saidTo, id],
+    });
+
   return (
     <div className={cn('flex flex-col gap-2', depth > 0 && 'ml-4 border-l border-border/70 pl-3')}>
       <div className="flex items-start gap-2">
@@ -78,11 +106,7 @@ function SuggestionNodeEditor({
             tags={allTags}
             linkedPeople={node.people}
             linkedTags={node.tags}
-            onSelectPerson={(person) =>
-              onChange(node.id, {
-                people: node.people.some((p) => p.id === person.id) ? node.people : [...node.people, person],
-              })
-            }
+            onSelectPerson={addPerson}
             onSelectTag={(tag) =>
               onChange(node.id, {
                 tags: node.tags.some((tg) => tg.id === tag.id) ? node.tags : [...node.tags, tag],
@@ -101,12 +125,24 @@ function SuggestionNodeEditor({
                 />
               ))}
               {node.people.map((person) => (
-                <PersonChip
-                  key={person.id}
-                  person={person}
-                  onRemove={() => onChange(node.id, { people: node.people.filter((p) => p.id !== person.id) })}
-                />
+                <PersonChip key={person.id} person={person} onRemove={() => removePerson(person.id)} />
               ))}
+            </div>
+          )}
+          {node.people.length > 0 && (
+            <div className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3 py-2">
+              <span className="text-xs font-medium text-muted-foreground">{t('diary.willBeSaidTo')}</span>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {node.people.map((person) => (
+                  <label key={person.id} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                    <Checkbox
+                      checked={node.saidTo.includes(person.id)}
+                      onCheckedChange={() => toggleSaid(person.id)}
+                    />
+                    {person.name}
+                  </label>
+                ))}
+              </div>
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">
@@ -144,13 +180,12 @@ function SuggestionNodeEditor({
               items={allPeople.map((p) => ({ id: p.id, label: p.name }))}
               selectedIds={node.people.map((p) => p.id)}
               onToggle={(id) => {
+                if (node.people.some((p) => p.id === id)) {
+                  removePerson(id);
+                  return;
+                }
                 const person = allPeople.find((p) => p.id === id);
-                if (!person) return;
-                onChange(node.id, {
-                  people: node.people.some((p) => p.id === id)
-                    ? node.people.filter((p) => p.id !== id)
-                    : [...node.people, person],
-                });
+                if (person) addPerson(person);
               }}
               placeholder={t('people.namePlaceholder')}
             />
@@ -235,6 +270,7 @@ export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }:
             importance: node.importance,
             tags: node.tags.map((tag) => tag.id),
             people: node.people.map((p) => p.id),
+            saidTo: node.saidTo,
             parentId,
           };
           await createEntry.mutateAsync(payload);
