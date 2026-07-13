@@ -23,6 +23,15 @@
     "sessionExpired": "Tu sesión ha caducado.",
     "reconnected": "Conexión restablecida — sincronizando…"
   },
+  "notifications": {
+    "dailyReminderTitle": "No olvides tu diario",
+    "dailyReminderBody": "Todavía no has añadido nada hoy."
+  },
+  "update": {
+    "available": "Actualización disponible: v{{version}}",
+    "view": "Ver versión",
+    "dismiss": "Descartar"
+  },
   "common": {
     "cancel": "Cancelar",
     "save": "Guardar",
@@ -138,8 +147,10 @@
     "checkupDueDescription": "Ha pasado tiempo desde que marcaste algo como contado a esta persona.",
     "markCheckupDone": "Marcar como hecho",
     "checkupMarkedDone": "Seguimiento marcado como hecho",
-    "disableCheckups": "Desactivar seguimientos",
-    "checkupsDisabled": "Seguimientos desactivados para esta persona"
+    "disableCheckups": "Desactivar checkups",
+    "checkupsDisabled": "Checkups desactivados para esta persona",
+    "checkupsPending": "{{count}} checkup pendiente",
+    "checkupsPending_other": "{{count}} checkups pendientes"
   },
   "tags": {
     "title": "Etiquetas",

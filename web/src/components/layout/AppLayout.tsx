@@ -1,16 +1,19 @@
-import { BookOpen, CalendarDays, CloudOff, Search, Settings, Tag, Users } from 'lucide-react';
+import { BellRing, BookOpen, CalendarDays, CloudOff, Search, Settings, Tag, Users } from 'lucide-react';
 import { AnimatedLogo } from '@/components/icons/AnimatedLogo';
 import type { LucideIcon } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, NavLink, Outlet } from 'react-router';
+import { usePeople } from '@/api/hooks';
 import { FullScreenSpinner } from '@/components/common/Spinner';
 import { kick } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
+import { isCheckupDue } from '@/lib/checkup';
 import { cancelIdle, onIdle } from '@/lib/idle';
 import { isNative } from '@/lib/native';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
+import { checkForUpdate, dismissUpdate, type UpdateInfo } from '@/lib/updateCheck';
 import { cn } from '@/lib/utils';
 import { pageLoaders } from '@/pages/lazyPages';
 
@@ -18,6 +21,13 @@ interface NavItem {
   to: string;
   icon: LucideIcon;
   labelKey: string;
+}
+
+/** Pending-checkups count for the People nav badge; reactive since `usePeople` is
+    invalidated on every mutation and every applied sync. */
+function usePendingCheckupsCount(): number {
+  const { data: people } = usePeople();
+  return useMemo(() => (people ?? []).filter(isCheckupDue).length, [people]);
 }
 
 const MAIN_NAV: NavItem[] = [
@@ -32,7 +42,7 @@ const SECONDARY_NAV: NavItem[] = [
   { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
-function SidebarLink({ item }: { item: NavItem }) {
+function SidebarLink({ item, badge = 0 }: { item: NavItem; badge?: number }) {
   const { t } = useTranslation();
   return (
     <NavLink
@@ -47,12 +57,19 @@ function SidebarLink({ item }: { item: NavItem }) {
       }
     >
       <item.icon className="size-4.5 shrink-0" />
-      {t(item.labelKey)}
+      <span className="flex-1">{t(item.labelKey)}</span>
+      {badge > 0 && (
+        <span className="flex h-5 items-center gap-0.5 rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white">
+          <span className="sr-only">{t('people.checkupsPending', { count: badge })}</span>
+          <BellRing aria-hidden className="size-3" />
+          <span aria-hidden>{badge}</span>
+        </span>
+      )}
     </NavLink>
   );
 }
 
-function Sidebar() {
+function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
   const { t } = useTranslation();
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r bg-sidebar px-3 py-5 md:flex">
@@ -62,7 +79,11 @@ function Sidebar() {
       </NavLink>
       <nav className="flex flex-1 flex-col gap-1">
         {MAIN_NAV.map((item) => (
-          <SidebarLink key={item.to} item={item} />
+          <SidebarLink
+            key={item.to}
+            item={item}
+            badge={item.to === '/people' ? pendingCheckups : 0}
+          />
         ))}
         <div className="mt-auto flex flex-col gap-1">
           {SECONDARY_NAV.map((item) => (
@@ -74,7 +95,7 @@ function Sidebar() {
   );
 }
 
-function TabBar() {
+function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
   const { t } = useTranslation();
   const items = [...MAIN_NAV, ...SECONDARY_NAV];
   return (
@@ -86,36 +107,89 @@ function TabBar() {
       )}
     >
       <div className="flex items-stretch justify-around pb-[var(--inset-bottom)]">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              cn(
-                'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative',
-                isActive ? 'text-primary' : 'text-muted-foreground',
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span
-                  className={cn(
-                    'flex items-center justify-center rounded-full p-1 transition-colors'
+        {items.map((item) => {
+          const badge = item.to === '/people' ? pendingCheckups : 0;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative',
+                  isActive ? 'text-primary' : 'text-muted-foreground',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={cn('relative flex items-center justify-center rounded-full p-1 transition-colors')}
+                  >
+                    <item.icon className={cn('size-5 transition-transform', isActive && 'scale-110')} />
+                    {badge > 0 && (
+                      <span
+                        className={cn(
+                          'absolute rounded-full bg-destructive text-white',
+                          // '-top-0.75 right-0 flex h-3.5 min-w-3.5 items-center justify-center px-0.5 text-[9px] leading-none font-bold'
+                          badge <= 9
+                            ? '-top-0.75 right-0 flex h-3.5 min-w-3.5 items-center justify-center px-0.5 text-[9px] leading-none font-bold'
+                            : 'top-0 right-0.5 size-2.5',
+                        )}
+                      >
+                        <span className="sr-only">{t('people.checkupsPending', { count: badge })}</span>
+                        {/* <span aria-hidden className="px-0.5">{badge}</span> */}
+                        {badge <= 9 && <span aria-hidden>{badge}</span>}
+                      </span>
+                    )}
+                  </span>
+                  <span className="truncate">{t(item.labelKey)}</span>
+                  {isActive && (
+                    <span className="absolute -top-0.5 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-primary" />
                   )}
-                >
-                  <item.icon className={cn('size-5 transition-transform', isActive && 'scale-110')} />
-                </span>
-                <span className="truncate">{t(item.labelKey)}</span>
-                {isActive && (
-                  <span className="absolute -top-0.5 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-primary" />
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </div>
     </nav>
+  );
+}
+
+/** Notifies once a newer build than the running one is published on GitHub. */
+function UpdateBanner() {
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!isNative) return;
+    void checkForUpdate().then(setUpdate);
+  }, []);
+
+  if (!update) return null;
+
+  return (
+    <div className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
+      {t('update.available', { version: update.versionName })}
+      <a
+        href={update.releaseUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="font-medium underline underline-offset-2"
+      >
+        {t('update.view')}
+      </a>
+      <button
+        type="button"
+        className="text-muted-foreground underline-offset-2 hover:underline"
+        onClick={() => {
+          void dismissUpdate(update.versionCode);
+          setUpdate(null);
+        }}
+      >
+        {t('update.dismiss')}
+      </button>
+    </div>
   );
 }
 
@@ -159,6 +233,7 @@ function SyncStatusOverlay() {
 export default function AppLayout() {
   const { data: session, isPending, error } = useSession();
   const cached = getCachedUser();
+  const pendingCheckups = usePendingCheckupsCount();
 
   useEffect(() => {
     if (session?.user) {
@@ -196,12 +271,13 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-dvh">
-      {!isNative && <Sidebar />}
+      {!isNative && <Sidebar pendingCheckups={pendingCheckups} />}
       <main className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]', !isNative && 'md:pb-0')}>
+        <UpdateBanner />
         <SyncStatusOverlay />
         <Outlet />
       </main>
-      <TabBar />
+      <TabBar pendingCheckups={pendingCheckups} />
     </div>
   );
 }

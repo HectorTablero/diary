@@ -10,6 +10,7 @@ import { initSync, onReconnected, onSyncApplied } from './db/sync';
 import { initAuthToken } from './lib/authToken';
 import { initGlobalHaptics } from './lib/haptics';
 import { isNative } from './lib/native';
+import { initLocalNotifications, refreshNotifications } from './lib/notifications';
 import i18n from './i18n';
 import './index.css';
 
@@ -29,8 +30,12 @@ const queryClient = new QueryClient({
 
 initSync();
 initGlobalHaptics();
+initLocalNotifications();
 // Server changes just landed in the local store: refresh everything on screen.
 onSyncApplied(() => queryClient.invalidateQueries());
+// Remote-origin changes (another device) can affect who's due for a checkup
+// or whether today already has an entry, so re-arm reminders too.
+onSyncApplied(() => refreshNotifications());
 onReconnected(() => toast.success(i18n.t('sync.reconnected')));
 
 async function bootstrap() {

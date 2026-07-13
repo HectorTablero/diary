@@ -14,6 +14,7 @@ import type {
 } from '@diary/shared';
 import { DEFAULT_TAG_COLORS, newObjectId } from '@diary/shared';
 import { ApiError } from '@/lib/apiClient';
+import { refreshNotifications } from '@/lib/notifications';
 import { fuzzyEquals, renameMentions } from '@/lib/tokens';
 import { db, type LocalEntry, type OutboxOp } from './db';
 import { getDayEntries, getPerson, getSettings } from './repo';
@@ -26,6 +27,7 @@ import { kick } from './sync';
 async function enqueue(method: OutboxOp['method'], path: string, body?: unknown): Promise<void> {
   await db.outbox.add({ method, path, body });
   kick();
+  refreshNotifications();
 }
 
 const nowIso = () => new Date().toISOString();

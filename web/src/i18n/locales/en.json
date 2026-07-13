@@ -22,6 +22,15 @@
     "sessionExpired": "Your session has expired.",
     "reconnected": "Connection restored — syncing…"
   },
+  "update": {
+    "available": "Update available: v{{version}}",
+    "view": "View release",
+    "dismiss": "Dismiss"
+  },
+  "notifications": {
+    "dailyReminderTitle": "Don't forget your diary",
+    "dailyReminderBody": "You haven't added anything today."
+  },
   "common": {
     "cancel": "Cancel",
     "save": "Save",
@@ -138,7 +147,9 @@
     "markCheckupDone": "Mark as done",
     "checkupMarkedDone": "Checkup marked as done",
     "disableCheckups": "Disable checkups",
-    "checkupsDisabled": "Checkups disabled for this person"
+    "checkupsDisabled": "Checkups disabled for this person",
+    "checkupsPending": "{{count}} checkup pending",
+    "checkupsPending_other": "{{count}} checkups pending"
   },
   "tags": {
     "title": "Tags",

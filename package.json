@@ -10,12 +10,13 @@
     "web"
   ],
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev": "npm run generate:logos -- --silent && concurrently -n api,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
-    "build": "npm run build -w web && npm run build -w server",
+    "generate:logos": "tsx web/scripts/generateLogos.ts",
+    "build": "npm run generate:logos && npm run build -w web && npm run build -w server",
     "generate:assets": "tsx web/scripts/generateAssets.ts",
-    "build:app": "npm run generate:assets && npm run build:app -w web",
+    "build:app": "npm run generate:logos && npm run generate:assets && npm run build:app -w web",
     "app:open": "npm run app:open -w web",
     "start": "node server/dist/index.js",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web"
