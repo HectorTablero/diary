@@ -25,7 +25,10 @@
   },
   "notifications": {
     "dailyReminderTitle": "No olvides tu diario",
-    "dailyReminderBody": "Todavía no has añadido nada hoy."
+    "dailyReminderBody": "Todavía no has añadido nada hoy.",
+    "birthdayTitle": "🎂 Es el cumpleaños de {{name}}",
+    "birthdayTitleWithAge": "🎂 {{name}} cumple {{age}} hoy",
+    "birthdayBody": "Felicita a {{name}}."
   },
   "update": {
     "available": "Actualización disponible: v{{version}}",
@@ -52,7 +55,9 @@
     "showMore": "Mostrar más",
     "saved": "Guardado",
     "less": "Menos",
-    "more": "Más"
+    "more": "Más",
+    "back": "Volver",
+    "remove": "Quitar"
   },
   "importance": {
     "label": "Importancia",
@@ -150,7 +155,31 @@
     "disableCheckups": "Desactivar checkups",
     "checkupsDisabled": "Checkups desactivados para esta persona",
     "checkupsPending": "{{count}} checkup pendiente",
-    "checkupsPending_other": "{{count}} checkups pendientes"
+    "checkupsPending_other": "{{count}} checkups pendientes",
+    "call": "Llamar",
+    "email": "Correo",
+    "phone": "Teléfono",
+    "phoneInternationalHint": "Incluye el prefijo del país, p. ej. +34 600 123 456.",
+    "phoneIncomplete": "No está en formato internacional — añade el prefijo del país para poder llamar y usar WhatsApp.",
+    "wechat": "WeChat",
+    "wechatPlaceholder": "ID de WeChat",
+    "wechatOpen": "Abrir en WeChat",
+    "wechatShowQr": "Mostrar código QR",
+    "wechatQrTitle": "Escanea con WeChat",
+    "wechatQrDescription": "Escanéalo desde el móvil para abrir el chat en WeChat.",
+    "aliases": "Otros nombres",
+    "aliasesDescription": "Apodos por los que también responde. Se usan en las menciones @ y en el dictado por voz.",
+    "aliasPlaceholder": "Apodo",
+    "alsoKnownAs": "alias",
+    "birthday": "Cumpleaños",
+    "birthdayKnowYear": "Sé el año",
+    "birthdayToday": "¡hoy!",
+    "birthdayInDays": "en {{count}} día",
+    "birthdayInDays_other": "en {{count}} días",
+    "ageYears": "{{count}} año",
+    "ageYears_other": "{{count}} años",
+    "company": "Empresa",
+    "jobTitle": "Puesto"
   },
   "tags": {
     "title": "Etiquetas",
@@ -287,5 +316,36 @@
     "timeout": "El LLM ha tardado demasiado en responder",
     "no_key": "Añade una clave de API de Groq en los ajustes primero",
     "no_submission": "No se ha podido obtener un resultado del asistente"
+  },
+  "import": {
+    "title": "Importar de contactos",
+    "nativeOnly": "Los contactos solo se pueden importar desde la app de Android.",
+    "noPermission": "Sin acceso a tus contactos",
+    "noPermissionDescription": "Concede el permiso de contactos en los ajustes del sistema para importar personas de tu agenda.",
+    "noContacts": "No se han encontrado contactos",
+    "selectAll": "Seleccionar todo",
+    "selectNone": "Quitar selección",
+    "selectedCount": "{{count}} seleccionados",
+    "alreadyImported": "Ya importado",
+    "continue": "Revisar {{count}} contacto",
+    "continue_other": "Revisar {{count}} contactos",
+    "reviewTitle": "Resolver conflictos",
+    "summaryNew": "Se añadirá {{count}} contacto como persona nueva.",
+    "summaryNew_other": "Se añadirán {{count}} contactos como personas nuevas.",
+    "summaryConflicts": "{{count}} necesita tu atención antes de importar.",
+    "summaryConflicts_other": "{{count}} necesitan tu atención antes de importar.",
+    "conflictImported": "Ya importado como «{{name}}».",
+    "conflictDuplicate": "«{{name}}» ya existe. Dos personas no pueden llamarse igual.",
+    "conflictContainment": "Se parece a «{{name}}» — podrían ser la misma persona.",
+    "conflictPhone": "Mismo número de teléfono que «{{name}}».",
+    "mergeInto": "Fusionar con {{name}}",
+    "keepBoth": "Mantener ambos",
+    "rename": "Renombrar",
+    "skip": "Omitir",
+    "resolveFirst": "Resuelve {{count}} conflicto para continuar.",
+    "resolveFirst_other": "Resuelve {{count}} conflictos para continuar.",
+    "confirm": "Importar {{count}} contacto",
+    "confirm_other": "Importar {{count}} contactos",
+    "done": "{{created}} añadidos, {{merged}} fusionados."
   }
 }

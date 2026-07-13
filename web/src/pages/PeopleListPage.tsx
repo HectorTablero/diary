@@ -1,5 +1,5 @@
 import type { PersonDto, PersonListItem } from '@diary/shared';
-import { BellRing, Hash, MessageCircle, Pencil, Plus, Search, Users } from 'lucide-react';
+import { BellRing, ContactRound, Hash, MessageCircle, Pencil, Plus, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isCheckupDue } from '@/lib/checkup';
+import { canImportContacts } from '@/lib/contacts';
 import { fuzzyIncludes } from '@/lib/tokens';
 
 type SortOption = 'name' | 'talkingPoints' | 'lastContact';
@@ -246,11 +247,33 @@ export default function PeopleListPage() {
           title={t('people.noPeople')}
           description={t('people.noPeopleDescription')}
         >
-          <Button size="sm" className="mt-2 gap-1.5" onClick={() => setAdding(true)}>
-            <Plus className="size-4" />
-            {t('people.addPerson')}
-          </Button>
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
+            <Button size="sm" className="gap-1.5" onClick={() => setAdding(true)}>
+              <Plus className="size-4" />
+              {t('people.addPerson')}
+            </Button>
+            {canImportContacts() && (
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link to="/people/import">
+                  <ContactRound className="size-4" />
+                  {t('import.title')}
+                </Link>
+              </Button>
+            )}
+          </div>
         </EmptyState>
+      )}
+
+      {/* Contacts are only readable inside the Android app, so this stays hidden on the web. */}
+      {canImportContacts() && filtered.length > 0 && (
+        <div className="mt-6 flex justify-center border-t pt-6">
+          <Button asChild variant="outline" size="sm" className="gap-1.5">
+            <Link to="/people/import">
+              <ContactRound className="size-4" />
+              {t('import.title')}
+            </Link>
+          </Button>
+        </div>
       )}
 
       <Dialog open={adding} onOpenChange={setAdding}>

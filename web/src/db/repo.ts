@@ -62,6 +62,16 @@ function personToDto(person: LocalPerson, tags: Map<string, TagDto>): PersonDto 
   return {
     id: person.id,
     name: person.name,
+    // `?? ` guards rows written before the v2 upgrade ran (and any that a mid-flight sync
+    // re-put while the upgrade was pending).
+    aliases: person.aliases ?? [],
+    phone: person.phone ?? null,
+    email: person.email ?? null,
+    wechatId: person.wechatId ?? null,
+    birthday: person.birthday ?? null,
+    company: person.company ?? null,
+    jobTitle: person.jobTitle ?? null,
+    contactId: person.contactId ?? null,
     tags: person.tagIds.flatMap((id) => tags.get(id) ?? []),
     notes: person.notes,
     checkupIntervalDays: person.checkupIntervalDays,

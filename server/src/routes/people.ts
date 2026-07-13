@@ -66,6 +66,14 @@ export const peopleRouter = new Hono<AppEnv>()
             updatedAt: new Date(),
             userId,
             name: input.name,
+            aliases: input.aliases,
+            phone: input.phone,
+            email: input.email,
+            wechatId: input.wechatId,
+            birthday: input.birthday,
+            company: input.company,
+            jobTitle: input.jobTitle,
+            contactId: input.contactId,
             tags: await ownedTagIds(userId, input.tags),
             notes: input.notes,
             checkupIntervalDays,
@@ -93,7 +101,17 @@ export const peopleRouter = new Hono<AppEnv>()
     const person = await Person.findOne({ _id: oid(c.req.param('id')), userId });
     if (!person) throw notFound('person.not_found');
     const input = c.req.valid('json');
+    // Only keys the client actually sent are applied, so a PATCH replayed from an older client
+    // (which knows nothing of these fields) can't blank them.
     if (input.name !== undefined) person.name = input.name;
+    if (input.aliases !== undefined) person.aliases = input.aliases;
+    if (input.phone !== undefined) person.phone = input.phone;
+    if (input.email !== undefined) person.email = input.email;
+    if (input.wechatId !== undefined) person.wechatId = input.wechatId;
+    if (input.birthday !== undefined) person.birthday = input.birthday;
+    if (input.company !== undefined) person.company = input.company;
+    if (input.jobTitle !== undefined) person.jobTitle = input.jobTitle;
+    if (input.contactId !== undefined) person.contactId = input.contactId;
     if (input.notes !== undefined) person.notes = input.notes;
     if (input.tags !== undefined) person.tags = await ownedTagIds(userId, input.tags);
     if (input.checkupIntervalDays !== undefined) person.checkupIntervalDays = input.checkupIntervalDays;

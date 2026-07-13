@@ -36,4 +36,25 @@
     <!-- Without this, Android's audio subsystem refuses to hand the mic to the WebView even
          after RECORD_AUDIO is granted — getUserMedia() fails with NotReadableError. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Read-only: the contact importer never writes back to the address book. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Package visibility (Android 11+ / targetSdk 36): without this the WebView can't resolve
+         the wa.me and weixin:// hand-offs, and the chat buttons silently do nothing. -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <package android:name="com.tencent.mm" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+    </queries>
 </manifest>

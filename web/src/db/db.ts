@@ -24,6 +24,14 @@ export interface LocalEntry {
 export interface LocalPerson {
   id: string;
   name: string;
+  aliases: string[];
+  phone: string | null;
+  email: string | null;
+  wechatId: string | null;
+  birthday: string | null;
+  company: string | null;
+  jobTitle: string | null;
+  contactId: string | null;
   tagIds: string[];
   notes: string;
   checkupIntervalDays: number | null;
@@ -60,6 +68,33 @@ db.version(1).stores({
   meta: 'key',
 });
 
+/* v2 adds contact metadata. The upgrade backfills defaults because a cursor-based pull() only
+   re-sends people the server considers changed — untouched rows would otherwise keep `undefined`
+   for every new field and quietly break `person.aliases.map(...)` style reads. */
+db.version(2)
+  .stores({
+    entries: 'id, dateKey, parentId, *tagIds, *peopleIds',
+    people: 'id, name, *aliases, contactId',
+    tags: 'id, name',
+    outbox: '++seq',
+    meta: 'key',
+  })
+  .upgrade((tx) =>
+    tx
+      .table<LocalPerson>('people')
+      .toCollection()
+      .modify((person) => {
+        person.aliases ??= [];
+        person.phone ??= null;
+        person.email ??= null;
+        person.wechatId ??= null;
+        person.birthday ??= null;
+        person.company ??= null;
+        person.jobTitle ??= null;
+        person.contactId ??= null;
+      }),
+  );
+
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
   content: dto.content,
@@ -77,6 +112,14 @@ export const entryFromDto = (dto: EntryDto): LocalEntry => ({
 export const personFromDto = (dto: PersonDto): LocalPerson => ({
   id: dto.id,
   name: dto.name,
+  aliases: dto.aliases,
+  phone: dto.phone,
+  email: dto.email,
+  wechatId: dto.wechatId,
+  birthday: dto.birthday,
+  company: dto.company,
+  jobTitle: dto.jobTitle,
+  contactId: dto.contactId,
   tagIds: dto.tags.map((t) => t.id),
   notes: dto.notes,
   checkupIntervalDays: dto.checkupIntervalDays,

@@ -193,6 +193,7 @@ You MUST finish by calling submit_entries exactly once, even if the list is empt
 interface LeanPersonForSearch {
   _id: Types.ObjectId;
   name: string;
+  aliases?: string[];
   tags?: { name: string }[];
   notes?: string;
 }
@@ -247,7 +248,7 @@ export async function generateSuggestions(
 
   const [tagDocs, personDocs] = await Promise.all([
     Tag.find({ userId }, 'name').lean(),
-    Person.find({ userId }, 'name notes').populate({ path: 'tags', select: 'name' }).lean(),
+    Person.find({ userId }, 'name aliases notes').populate({ path: 'tags', select: 'name' }).lean(),
   ]);
 
   const tags: TagRef[] = (tagDocs as unknown as { _id: Types.ObjectId; name: string }[]).map((t) => ({
@@ -259,6 +260,7 @@ export async function generateSuggestions(
   const searchablePeople: SearchablePerson[] = (personDocs as unknown as LeanPersonForSearch[]).map((p) => ({
     id: p._id.toString(),
     name: p.name,
+    aliases: p.aliases ?? [],
     tagNames: (p.tags ?? []).map((t) => t.name),
     notes: p.notes ?? '',
   }));

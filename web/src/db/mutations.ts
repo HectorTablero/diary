@@ -12,11 +12,12 @@ import type {
   TagDto,
   TagUpdateInput,
 } from '@diary/shared';
-import { DEFAULT_TAG_COLORS, newObjectId } from '@diary/shared';
+import { DEFAULT_TAG_COLORS, MAX_ALIASES, newObjectId } from '@diary/shared';
 import { ApiError } from '@/lib/apiClient';
+import type { ContactCandidate, Resolution } from '@/lib/conflicts';
 import { refreshNotifications } from '@/lib/notifications';
 import { fuzzyEquals, renameMentions } from '@/lib/tokens';
-import { db, type LocalEntry, type OutboxOp } from './db';
+import { db, type LocalEntry, type LocalPerson, type OutboxOp } from './db';
 import { getDayEntries, getPerson, getSettings } from './repo';
 import { kick } from './sync';
 
@@ -26,6 +27,16 @@ import { kick } from './sync';
 
 async function enqueue(method: OutboxOp['method'], path: string, body?: unknown): Promise<void> {
   await db.outbox.add({ method, path, body });
+  kick();
+  refreshNotifications();
+}
+
+/** Queue many ops at once, kicking sync and rescheduling notifications a single time.
+    Importing 200 contacts through `enqueue` would otherwise run 200 full notification
+    reconciles, each of which re-reads every person. */
+async function enqueueBatch(ops: OutboxOp[]): Promise<void> {
+  if (!ops.length) return;
+  await db.outbox.bulkAdd(ops);
   kick();
   refreshNotifications();
 }
@@ -174,9 +185,13 @@ export async function setHidden(entryId: string, personId: string, hidden: boole
 
 // --- People ---
 
+/** A name must not collide with another person's name *or* one of their aliases — otherwise
+    `@Name` would be ambiguous, and the server's unique index would reject the create anyway. */
 async function assertUniquePersonName(name: string, exceptId?: string): Promise<void> {
   const clash = (await db.people.toArray()).find(
-    (p) => p.id !== exceptId && fuzzyEquals(p.name, name),
+    (p) =>
+      p.id !== exceptId &&
+      (fuzzyEquals(p.name, name) || (p.aliases ?? []).some((alias) => fuzzyEquals(alias, name))),
   );
   if (clash) throw new ApiError(409, 'person.duplicate_name');
 }
@@ -193,6 +208,14 @@ export async function createPerson(input: PersonCreateInput): Promise<PersonDto>
   await db.people.add({
     id,
     name: input.name,
+    aliases: input.aliases ?? [],
+    phone: input.phone ?? null,
+    email: input.email ?? null,
+    wechatId: input.wechatId ?? null,
+    birthday: input.birthday ?? null,
+    company: input.company ?? null,
+    jobTitle: input.jobTitle ?? null,
+    contactId: input.contactId ?? null,
     tagIds: input.tags,
     notes: input.notes,
     checkupIntervalDays,
@@ -231,6 +254,14 @@ export async function updatePerson(personId: string, input: PersonUpdateInput): 
     .modify((p) => {
       oldName = p.name;
       if (input.name !== undefined) p.name = input.name;
+      if (input.aliases !== undefined) p.aliases = input.aliases;
+      if (input.phone !== undefined) p.phone = input.phone;
+      if (input.email !== undefined) p.email = input.email;
+      if (input.wechatId !== undefined) p.wechatId = input.wechatId;
+      if (input.birthday !== undefined) p.birthday = input.birthday;
+      if (input.company !== undefined) p.company = input.company;
+      if (input.jobTitle !== undefined) p.jobTitle = input.jobTitle;
+      if (input.contactId !== undefined) p.contactId = input.contactId;
       if (input.notes !== undefined) p.notes = input.notes;
       if (input.tags !== undefined) p.tagIds = input.tags;
       if (input.checkupIntervalDays !== undefined) p.checkupIntervalDays = input.checkupIntervalDays;
@@ -259,6 +290,128 @@ export async function deletePerson(personId: string): Promise<void> {
       e.saidTo = e.saidTo.filter((s) => s.personId !== personId);
     });
   await enqueue('DELETE', `/people/${personId}`);
+}
+
+/** Fields a merge may fill in, plus the aliases it may learn. */
+function mergePatch(target: LocalPerson, candidate: ContactCandidate): PersonUpdateInput | null {
+  const patch: PersonUpdateInput = {};
+  // Only ever fill blanks — an import must never overwrite something the user typed themselves.
+  if (!target.phone && candidate.phone) patch.phone = candidate.phone;
+  if (!target.email && candidate.email) patch.email = candidate.email;
+  if (!target.birthday && candidate.birthday) patch.birthday = candidate.birthday;
+  if (!target.company && candidate.company) patch.company = candidate.company;
+  if (!target.jobTitle && candidate.jobTitle) patch.jobTitle = candidate.jobTitle;
+  if (!target.contactId && candidate.contactId) patch.contactId = candidate.contactId;
+
+  // The contact's own name becomes an alias when it differs from the person's — merging the
+  // contact "Mum" into "Carmen" is what teaches the app that @Mum means Carmen.
+  const existing = target.aliases ?? [];
+  const merged = [...existing];
+  for (const alias of [candidate.name, ...candidate.aliases]) {
+    if (fuzzyEquals(alias, target.name)) continue;
+    if (merged.some((known) => fuzzyEquals(known, alias))) continue;
+    merged.push(alias);
+  }
+  if (merged.length !== existing.length) patch.aliases = merged.slice(0, MAX_ALIASES);
+
+  return Object.keys(patch).length ? patch : null;
+}
+
+export interface ImportItem {
+  /** The candidate as resolved in the review step — `name` may have been edited there. */
+  candidate: ContactCandidate;
+  resolution: Resolution;
+}
+
+/**
+ * Apply a fully-resolved import plan. Conflicts must already be settled: this queues one
+ * `POST /people` per created person, and a 409 from the server would make sync.ts delete the
+ * local row as a phantom (see sync.ts:102). The review step is what guarantees that can't happen.
+ *
+ * Creates go in as one bulk write plus one outbox op each — per-person ops keep `dirtyIds()` and
+ * `removeLocalDoc()` working unchanged, and the UI is local-first so nobody waits on the queue.
+ */
+export async function importPeople(items: ImportItem[]): Promise<{ created: number; merged: number }> {
+  // Read settings and people once. Looping over createPerson() would re-read every person on
+  // every single call (assertUniquePersonName does a full table scan) — O(n²) on a 500-contact
+  // address book.
+  const [settings, existing] = await Promise.all([getSettings(), db.people.toArray()]);
+  const byId = new Map(existing.map((person) => [person.id, person]));
+  const now = nowIso();
+
+  const creates: LocalPerson[] = [];
+  const updates: LocalPerson[] = [];
+  const ops: OutboxOp[] = [];
+
+  for (const { candidate, resolution } of items) {
+    if (resolution.action === 'skip') continue;
+
+    if (resolution.action === 'merge') {
+      const target = byId.get(resolution.personId);
+      if (!target) continue; // deleted underneath us; nothing sensible to merge into
+      const patch = mergePatch(target, candidate);
+      if (!patch) continue; // the person already knows everything this contact could tell us
+      updates.push({
+        ...target,
+        aliases: patch.aliases ?? target.aliases,
+        phone: patch.phone ?? target.phone,
+        email: patch.email ?? target.email,
+        birthday: patch.birthday ?? target.birthday,
+        company: patch.company ?? target.company,
+        jobTitle: patch.jobTitle ?? target.jobTitle,
+        contactId: patch.contactId ?? target.contactId,
+      });
+      ops.push({ method: 'PATCH', path: `/people/${target.id}`, body: patch });
+      continue;
+    }
+
+    const id = newObjectId();
+    const person: LocalPerson = {
+      id,
+      name: candidate.name,
+      aliases: candidate.aliases,
+      phone: candidate.phone,
+      email: candidate.email,
+      wechatId: null,
+      birthday: candidate.birthday,
+      company: candidate.company,
+      jobTitle: candidate.jobTitle,
+      contactId: candidate.contactId,
+      tagIds: [],
+      notes: '',
+      checkupIntervalDays: settings.defaultCheckupIntervalDays,
+      lastCheckupAt: now,
+      createdAt: now,
+    };
+    creates.push(person);
+    ops.push({
+      method: 'POST',
+      path: '/people',
+      body: {
+        id,
+        createdAt: now,
+        name: person.name,
+        aliases: person.aliases,
+        phone: person.phone,
+        email: person.email,
+        birthday: person.birthday,
+        company: person.company,
+        jobTitle: person.jobTitle,
+        contactId: person.contactId,
+        tags: [],
+        notes: '',
+        checkupIntervalDays: person.checkupIntervalDays,
+      },
+    });
+  }
+
+  await db.transaction('rw', db.people, async () => {
+    if (creates.length) await db.people.bulkAdd(creates);
+    if (updates.length) await db.people.bulkPut(updates);
+  });
+  await enqueueBatch(ops);
+
+  return { created: creates.length, merged: updates.length };
 }
 
 export async function markCheckup(personId: string): Promise<PersonDto> {

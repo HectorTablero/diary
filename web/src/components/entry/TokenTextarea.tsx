@@ -12,10 +12,14 @@ interface Suggestion {
   apply: () => void;
 }
 
+/** Autocomplete can be *found* by an alias, but the token inserted is always the canonical
+    name — so segmentContent/renameMentions keep working off `name` alone. */
+export type MentionablePerson = PersonRefDto & { aliases?: string[] };
+
 interface TokenTextareaProps {
   value: string;
   onChange: (value: string) => void;
-  people: PersonRefDto[];
+  people: MentionablePerson[];
   tags: TagDto[];
   linkedPeople: PersonRefDto[];
   linkedTags: TagDto[];
@@ -88,18 +92,27 @@ export function TokenTextarea({
   const suggestions = useMemo<Suggestion[]>(() => {
     if (!token) return [];
     if (token.type === '@') {
+      const matchedAlias = (person: MentionablePerson) =>
+        person.aliases?.find((alias) => fuzzyIncludes(alias, token.query));
       return people
-        .filter((p) => !token.query || fuzzyIncludes(p.name, token.query))
+        .filter(
+          (p) =>
+            !token.query || fuzzyIncludes(p.name, token.query) || matchedAlias(p) !== undefined,
+        )
         .slice(0, 6)
-        .map((p) => ({
-          key: p.id,
-          label: p.name,
-          icon: 'person' as const,
-          apply: () => {
-            onSelectPerson(p);
-            insertToken(`@${p.name}`);
-          },
-        }));
+        .map((p) => {
+          // Show the nickname that matched, so picking "Carmen" after typing "@Mum" isn't a surprise.
+          const alias = fuzzyIncludes(p.name, token.query) ? undefined : matchedAlias(p);
+          return {
+            key: p.id,
+            label: alias ? `${p.name} (${alias})` : p.name,
+            icon: 'person' as const,
+            apply: () => {
+              onSelectPerson(p);
+              insertToken(`@${p.name}`);
+            },
+          };
+        });
     }
     const matches: Suggestion[] = tags
       .filter((tag) => !token.query || fuzzyIncludes(tag.name, token.query))

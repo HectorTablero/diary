@@ -7,6 +7,14 @@ export const MAX_SUB_ENTRY_DEPTH = 3;
 export const MAX_CONTENT_LENGTH = 2000;
 export const MAX_NOTES_LENGTH = 5000;
 
+/** Extra names a person can answer to (nicknames, surname variants, imported display names). */
+export const MAX_ALIASES = 10;
+export const MAX_ALIAS_LENGTH = 100;
+export const MAX_PHONE_LENGTH = 40;
+export const MAX_EMAIL_LENGTH = 200;
+export const MAX_ORGANIZATION_LENGTH = 100;
+export const MAX_WECHAT_ID_LENGTH = 60;
+
 /** Weight applied per importance level in the talking-points score: 1 → 1.0 … 5 → 0.2 */
 export const importanceWeight = (importance: number): number => (6 - importance) / 5;
 
@@ -100,6 +108,13 @@ export const DEFAULT_TAG_COLORS = [
 export const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 export const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 export const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+
+/** `YYYY-MM-DD`, or vCard-style `--MM-DD` when the year is unknown — phone contacts very
+    often store a birthday without one, so the year can never be required. */
+export const BIRTHDAY_REGEX = /^(?:\d{4}|--)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
+
+/** Full international number. Only a number in this shape can open a WhatsApp chat. */
+export const E164_REGEX = /^\+[1-9]\d{6,14}$/;
 
 /** ObjectId-shaped id (timestamp prefix + random) generated client-side for offline creates. */
 export function newObjectId(): string {
