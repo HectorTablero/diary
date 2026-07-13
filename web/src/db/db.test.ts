@@ -14,9 +14,9 @@ const V1_SCHEMA = {
   meta: 'key',
 };
 
-describe('people store v2 upgrade', () => {
-  it('backfills contact metadata onto people written by v1', async () => {
-    // An existing install: v1 schema, a person with none of the new fields.
+describe('people store upgrade', () => {
+  it('backfills contact metadata and events, and heals legacy birthdays, from v1', async () => {
+    // An existing install: v1 schema, a person with none of the fields added since.
     const v1 = new Dexie('diary');
     v1.version(1).stores(V1_SCHEMA);
     await v1.open();
@@ -26,6 +26,18 @@ describe('people store v2 upgrade', () => {
       tagIds: [],
       notes: 'met at the climbing gym',
       checkupIntervalDays: 30,
+      lastCheckupAt: '2026-01-01T00:00:00.000Z',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    // A row carrying the legacy triple-dash birthday an early build wrote; the v3 upgrade is
+    // supposed to rewrite it to the canonical `--10-10`.
+    await v1.table('people').add({
+      id: 'p2',
+      name: 'Carmen',
+      birthday: '---10-10',
+      tagIds: [],
+      notes: '',
+      checkupIntervalDays: null,
       lastCheckupAt: '2026-01-01T00:00:00.000Z',
       createdAt: '2026-01-01T00:00:00.000Z',
     });
@@ -45,6 +57,7 @@ describe('people store v2 upgrade', () => {
       company: null,
       jobTitle: null,
       contactId: null,
+      events: [], // v3
     });
     // ...without disturbing anything that was already there.
     expect(person).toMatchObject({
@@ -52,6 +65,11 @@ describe('people store v2 upgrade', () => {
       notes: 'met at the climbing gym',
       checkupIntervalDays: 30,
     });
+
+    // v3 also settles the legacy birthday format, so the read-side shim can eventually go.
+    const carmen = await db.people.get('p2');
+    expect(carmen?.birthday).toBe('--10-10');
+    expect(carmen?.events).toEqual([]);
 
     // The new alias index must be queryable, or @mention lookups silently return nothing.
     await db.people.update('p1', { aliases: ['Ire'] });

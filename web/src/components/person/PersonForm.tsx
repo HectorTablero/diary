@@ -143,7 +143,7 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
   const [tags, setTags] = useState<TagDto[]>(person?.tags ?? []);
   const [aliases, setAliases] = useState<string[]>(person?.aliases ?? []);
   const [phone, setPhone] = useState(person?.phone ?? '');
-  const [phoneError, setPhoneError] = useState(false);
+  const [phoneFocused, setPhoneFocused] = useState(false);
   const [email, setEmail] = useState(person?.email ?? '');
   const [wechatId, setWechatId] = useState(person?.wechatId ?? '');
   const [company, setCompany] = useState(person?.company ?? '');
@@ -172,6 +172,14 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
 
   const pending = createPerson.isPending || updatePerson.isPending;
 
+  /* A number here must be fully international — anything less can't open a WhatsApp chat, and we
+     refuse to guess a country code. Derived, not set on submit: an imported local number is
+     already invalid the moment the dialog opens, and staying silent until Save hides that.
+     Suppressed while the field has focus, so it doesn't shout at every keystroke of a number
+     that simply isn't finished yet. */
+  const phoneInvalid = phone.trim() !== '' && toE164(phone) === null;
+  const showPhoneError = phoneInvalid && !phoneFocused;
+
   const toggleTag = (id: string) => {
     const tag = allTags.find((tg) => tg.id === id);
     if (!tag) return;
@@ -183,27 +191,24 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
   const submit = async () => {
     if (!name.trim() || pending) return;
 
-    // A number typed here must be fully international — anything less can't open a WhatsApp chat,
-    // and we refuse to guess a country code. (Imported numbers bypass this and get flagged on the
-    // profile instead, which routes the user back here to fix them.)
-    const trimmedPhone = phone.trim();
-    const e164 = toE164(trimmedPhone);
-    if (trimmedPhone && !e164) {
-      setPhoneError(true);
+    if (phoneInvalid) {
+      setPhoneFocused(false); // surface the error even if they hit Enter without leaving the field
       return;
     }
-    setPhoneError(false);
 
     const input = {
       name: name.trim(),
       aliases,
-      phone: e164,
+      phone: toE164(phone),
       email: email.trim() || null,
       wechatId: wechatId.trim() || null,
       birthday: buildBirthday(birthdayDay, birthdayMonth, birthdayYear),
       company: company.trim() || null,
       jobTitle: jobTitle.trim() || null,
       contactId: person?.contactId ?? null,
+      // Events are managed on the profile's Events tab; carry them through untouched so saving
+      // the person's details can't wipe them.
+      events: person?.events ?? [],
       notes,
       tags: tags.map((tag) => tag.id),
       checkupIntervalDays: checkupEnabled
@@ -277,15 +282,16 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
           inputMode="tel"
           value={phone}
           placeholder={t('people.phonePlaceholder')}
-          aria-invalid={phoneError}
-          onChange={(e) => {
-            setPhone(e.target.value);
-            if (phoneError) setPhoneError(false);
+          aria-invalid={showPhoneError}
+          onChange={(e) => setPhone(e.target.value)}
+          onFocus={() => setPhoneFocused(true)}
+          onBlur={() => {
+            setPhoneFocused(false);
+            if (phone.trim()) setPhone(normalizePhone(phone));
           }}
-          onBlur={() => phone.trim() && setPhone(normalizePhone(phone))}
         />
-        <p className={'text-xs ' + (phoneError ? 'text-destructive' : 'text-muted-foreground')}>
-          {t('people.phoneInternationalHint')}
+        <p className={'text-xs ' + (showPhoneError ? 'text-destructive' : 'text-muted-foreground')}>
+          {showPhoneError ? t('people.phoneIncomplete') : t('people.phoneInternationalHint')}
         </p>
       </div>
 

@@ -16,9 +16,27 @@ export interface PersonRefDto {
   name: string;
 }
 
+/** Something that happened *to* a person — a trip, an exam, a move — worth asking them about after. */
+export interface PersonEventDto {
+  /** Client-generated, so an event created offline keeps its identity when it syncs. */
+  id: string;
+  title: string;
+  /** YYYY-MM-DD. */
+  startDate: string;
+  /** YYYY-MM-DD, or `null` for a single-day event. */
+  endDate: string | null;
+  notes: string;
+  /** When the follow-up ("did you ask them?") was marked done. `null` = still pending. */
+  askedAt: string | null;
+  createdAt: string;
+}
+
 export interface PersonDto {
   id: string;
   name: string;
+  /** Embedded rather than a collection of their own: /sync already ships whole PersonDtos, so
+      these replicate for free. See the note in web/src/db/sync.ts. */
+  events: PersonEventDto[];
   /** Other names this person answers to (nicknames, surname variants). Widens @mention
       autocomplete and the AI's person search without touching the canonical `name`. */
   aliases: string[];

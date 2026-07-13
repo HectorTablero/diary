@@ -3,6 +3,7 @@ import { Briefcase, Cake, Copy, Mail, MessageCircle, Phone, QrCode, TriangleAler
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { HintTooltip } from '@/components/common/HintTooltip';
 import { WeChatIcon } from '@/components/icons/WeChatIcon';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,7 +13,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ageOn, daysUntilBirthday, formatBirthday } from '@/lib/birthday';
 import { qrcodeLoader } from '@/lib/preloaders';
 import {
@@ -197,21 +197,20 @@ export function ContactInfo({ person, onEdit }: { person: PersonDto; onEdit: () 
           )}
           {person.wechatId && <WeChatAction wechatId={person.wechatId} />}
 
+          {/* Native gets no tooltip, but nothing is lost: tapping it opens the editor, where the
+              phone field spells out the same "needs a country code" hint. */}
           {phoneNeedsFixing && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1.5 text-amber-600 dark:text-amber-400"
-                  onClick={onEdit}
-                >
-                  <TriangleAlert className="size-3.5" />
-                  {person.phone}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t('people.phoneIncomplete')}</TooltipContent>
-            </Tooltip>
+            <HintTooltip content={t('people.phoneIncomplete')}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-amber-600 dark:text-amber-400"
+                onClick={onEdit}
+              >
+                <TriangleAlert className="size-3.5" />
+                {person.phone}
+              </Button>
+            </HintTooltip>
           )}
         </div>
       )}

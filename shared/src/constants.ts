@@ -15,6 +15,13 @@ export const MAX_EMAIL_LENGTH = 200;
 export const MAX_ORGANIZATION_LENGTH = 100;
 export const MAX_WECHAT_ID_LENGTH = 60;
 
+export const MAX_EVENTS = 50;
+export const MAX_EVENT_TITLE_LENGTH = 120;
+
+/** How long a finished event stays worth asking about: this many times its own length.
+    A weekend trip goes stale in a fortnight; a two-month secondment stays live for a year. */
+export const EVENT_REMEMBER_MULTIPLIER = 7;
+
 /** Weight applied per importance level in the talking-points score: 1 → 1.0 … 5 → 0.2 */
 export const importanceWeight = (importance: number): number => (6 - importance) / 5;
 

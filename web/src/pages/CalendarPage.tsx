@@ -8,8 +8,8 @@ import { useCalendarMonth, useOnThisDay, usePeople } from '@/api/hooks';
 import { importanceDotClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
+import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ageOn, birthdaysOn } from '@/lib/birthday';
 import { dateFnsLocale, parseDateKey, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
@@ -186,10 +186,12 @@ export default function CalendarPage() {
 
           if (!celebrating) return <div key={i}>{dayCell}</div>;
 
+          /* No tooltip on the phone (a touch can't open one) — but nothing is lost: tapping the
+             day opens the diary page, which lists that day's birthdays in full. */
           return (
-            <Tooltip key={i}>
-              <TooltipTrigger asChild>{dayCell}</TooltipTrigger>
-              <TooltipContent>
+            <HintTooltip
+              key={i}
+              content={
                 <ul>
                   {celebrating.map((person) => {
                     // Age on that day, not today — hovering a past or future birthday should
@@ -204,8 +206,10 @@ export default function CalendarPage() {
                     );
                   })}
                 </ul>
-              </TooltipContent>
-            </Tooltip>
+              }
+            >
+              {dayCell}
+            </HintTooltip>
           );
         })}
       </div>

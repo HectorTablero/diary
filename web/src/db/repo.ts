@@ -72,6 +72,7 @@ function personToDto(person: LocalPerson, tags: Map<string, TagDto>): PersonDto 
     company: person.company ?? null,
     jobTitle: person.jobTitle ?? null,
     contactId: person.contactId ?? null,
+    events: person.events ?? [],
     tags: person.tagIds.flatMap((id) => tags.get(id) ?? []),
     notes: person.notes,
     checkupIntervalDays: person.checkupIntervalDays,

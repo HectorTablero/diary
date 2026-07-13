@@ -56,15 +56,19 @@ export function TagChip({
   tag,
   onRemove,
   onClick,
+  className,
 }: {
   tag: TagDto;
   onRemove?: () => void;
   onClick?: () => void;
+  /** Callers use this to de-emphasise a chip — e.g. tags that don't match an active filter. */
+  className?: string;
 }) {
   return (
     <ChipShell
       onRemove={onRemove}
       onClick={onClick}
+      className={className}
       style={{ backgroundColor: tag.color, color: contrastColor(tag.color) }}
     >
       #{tag.name}

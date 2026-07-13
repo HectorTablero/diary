@@ -1,10 +1,23 @@
 import type { PersonDto, PersonListItem } from '@diary/shared';
-import { BellRing, ContactRound, Hash, MessageCircle, Pencil, Plus, Search, Users } from 'lucide-react';
+import { ongoingEvents, pendingEventFollowUps } from '@diary/shared';
+import {
+  BellRing,
+  CalendarClock,
+  ContactRound,
+  Hash,
+  MessageCircle,
+  MessageCircleQuestion,
+  Pencil,
+  Plus,
+  Search,
+  Users,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { usePeople, useTags } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
+import { HintTooltip } from '@/components/common/HintTooltip';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
@@ -17,9 +30,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { isCheckupDue } from '@/lib/checkup';
 import { canImportContacts } from '@/lib/contacts';
+import { todayKey } from '@/lib/dates';
+import { isNative } from '@/lib/native';
+import { visibleTags } from '@/lib/tags';
 import { fuzzyIncludes } from '@/lib/tokens';
+import { cn } from '@/lib/utils';
 
 type SortOption = 'name' | 'talkingPoints' | 'lastContact';
+
+const pendingEventCount = (person: PersonListItem, today: string): number =>
+  pendingEventFollowUps(person.events, today).length;
+
+/**
+ * Tier people by what their events demand of you: something you owe them an answer about, then
+ * something happening to them right now, then everyone else.
+ *
+ * One pass, so each tier keeps the order `sortPeople` gave it — the chosen sort never changes
+ * meaning, it just applies within each tier. And because the checkup grouping downstream is only
+ * a filter, this ordering survives into both of its groups too.
+ */
+function eventsFirst(people: PersonListItem[], today: string): PersonListItem[] {
+  const pending: PersonListItem[] = [];
+  const ongoing: PersonListItem[] = [];
+  const rest: PersonListItem[] = [];
+
+  for (const person of people) {
+    if (pendingEventCount(person, today) > 0) pending.push(person);
+    else if (ongoingEvents(person.events, today).length > 0) ongoing.push(person);
+    else rest.push(person);
+  }
+
+  return [...pending, ...ongoing, ...rest];
+}
 
 function sortPeople(people: PersonListItem[], sort: SortOption): PersonListItem[] {
   const sorted = [...people];
@@ -42,17 +84,27 @@ function sortPeople(people: PersonListItem[], sort: SortOption): PersonListItem[
 function PersonRow({
   person,
   onEdit,
+  today,
+  tagFilter,
   matchedAliases,
   checkupPending = false,
 }: {
   person: PersonListItem;
   onEdit: (person: PersonListItem) => void;
+  today: string;
+  /** Tag ids currently being filtered on; anything else on the row is faded back. */
+  tagFilter: string[];
   /** Nicknames that matched the current search — shown so a hit on "Mum" explains why
       Carmen is in the results. */
   matchedAliases?: string[];
   checkupPending?: boolean;
 }) {
   const { t } = useTranslation();
+  const ongoing = ongoingEvents(person.events, today);
+  const pending = pendingEventCount(person, today);
+  // Under a tag filter the matching tags claim the visible slots, so a person can't be shown
+  // without the tag that put them there. See lib/tags.ts.
+  const { shown: shownTags, hidden: hiddenTagCount } = visibleTags(person.tags, tagFilter);
   return (
     <li>
       <Link
@@ -63,24 +115,71 @@ function PersonRow({
           {person.name.slice(0, 2)}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{person.name}</p>
-          {matchedAliases && matchedAliases.length > 0 && (
-            <p className="truncate text-xs text-muted-foreground">
-              {t('people.alsoKnownAs')}{' '}
-              <span className="font-medium text-foreground">{matchedAliases.join(', ')}</span>
-            </p>
+          {/* flex-wrap so the matched nickname sits beside the name when it fits, and only drops
+              to its own line — still above the tags — when it doesn't. */}
+          <div className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="max-w-full truncate font-medium">{person.name}</span>
+            {matchedAliases && matchedAliases.length > 0 && (
+              <span className="max-w-full truncate text-xs text-muted-foreground">
+                {t('people.alsoKnownAs')}{' '}
+                <span className="font-medium text-foreground">{matchedAliases.join(', ')}</span>
+              </span>
+            )}
+          </div>
+          {ongoing.length > 0 && (
+            /* A bare "3 ongoing events" says nothing useful. On the web the names are a hover
+               away; on the phone there's no hover to be had, so list them inline instead — the
+               count alone would be information the user could never reach. */
+            <HintTooltip
+              content={
+                <ul>
+                  {ongoing.map((event) => (
+                    <li key={event.id}>{event.title}</li>
+                  ))}
+                </ul>
+              }
+            >
+              <p
+                className={cn(
+                  'mt-0.5 flex w-fit max-w-full items-center gap-1 text-xs text-muted-foreground',
+                  ongoing.length > 1 && !isNative && 'underline decoration-dotted underline-offset-2',
+                )}
+              >
+                <CalendarClock className="size-3 shrink-0" />
+                <span className="truncate">
+                  {ongoing.length === 1 || isNative
+                    ? ongoing.map((event) => event.title).join(' · ')
+                    : t('people.eventsOngoing', { count: ongoing.length })}
+                </span>
+              </p>
+            </HintTooltip>
           )}
           {person.tags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
-              {person.tags.slice(0, 4).map((tag) => (
-                <TagChip key={tag.id} tag={tag} />
+              {shownTags.map((tag) => (
+                <TagChip
+                  key={tag.id}
+                  tag={tag}
+                  // Fade the tags that aren't what you filtered on, so the ones that are jump out.
+                  className={
+                    tagFilter.length > 0 && !tagFilter.includes(tag.id) ? 'opacity-30' : undefined
+                  }
+                />
               ))}
-              {person.tags.length > 4 && (
-                <span className="text-xs text-muted-foreground">+{person.tags.length - 4}</span>
+              {hiddenTagCount > 0 && (
+                <span className="text-xs text-muted-foreground">+{hiddenTagCount}</span>
               )}
             </div>
           )}
         </div>
+        {/* Same destructive tint the row already uses for an overdue checkup — an unanswered
+            "how did it go?" is the same kind of debt. */}
+        {pending > 0 && (
+          <Badge variant="outline" className="shrink-0 gap-1 border-destructive/40 text-destructive">
+            <MessageCircleQuestion className="size-3" />
+            {pending}
+          </Badge>
+        )}
         {person.checkupIntervalDays != null && (
           <span className={"hidden shrink-0 items-center gap-1 text-xs sm:flex" + (checkupPending ? ' text-destructive' : ' text-muted-foreground')}>
             <BellRing className="size-3" />
@@ -114,6 +213,8 @@ export default function PeopleListPage() {
   const { t } = useTranslation();
   const { data: people, isLoading } = usePeople();
   const { data: tags } = useTags();
+  // The event follow-up maths is date-key based, so it needs today's *local* key.
+  const today = todayKey();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortOption>('name');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
@@ -138,8 +239,8 @@ export default function PeopleListPage() {
         (!query || fuzzyIncludes(p.name, query) || aliasMatches.has(p.id)) &&
         (tagFilter.length === 0 || p.tags.some((tag) => tagFilter.includes(tag.id))),
     );
-    return sortPeople(matching, sort);
-  }, [people, query, sort, tagFilter, aliasMatches]);
+    return eventsFirst(sortPeople(matching, sort), today);
+  }, [people, query, sort, tagFilter, aliasMatches, today]);
 
   // Pending checkups always float to the top, as their own category; the chosen
   // sort still applies within each group since it's just a filter over `filtered`.
@@ -246,6 +347,8 @@ export default function PeopleListPage() {
                     key={person.id}
                     person={person}
                     onEdit={setEditing}
+                    today={today}
+                    tagFilter={tagFilter}
                     matchedAliases={aliasMatches.get(person.id)}
                     checkupPending
                   />
@@ -259,6 +362,8 @@ export default function PeopleListPage() {
                     key={person.id}
                     person={person}
                     onEdit={setEditing}
+                    today={today}
+                    tagFilter={tagFilter}
                     matchedAliases={aliasMatches.get(person.id)}
                   />
                 ))}
@@ -272,6 +377,8 @@ export default function PeopleListPage() {
                 key={person.id}
                 person={person}
                 onEdit={setEditing}
+                today={today}
+                tagFilter={tagFilter}
                 matchedAliases={aliasMatches.get(person.id)}
               />
             ))}

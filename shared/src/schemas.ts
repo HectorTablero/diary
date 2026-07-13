@@ -8,6 +8,8 @@ import {
   MAX_ALIASES,
   MAX_CONTENT_LENGTH,
   MAX_EMAIL_LENGTH,
+  MAX_EVENT_TITLE_LENGTH,
+  MAX_EVENTS,
   MAX_NOTES_LENGTH,
   MAX_ORGANIZATION_LENGTH,
   MAX_PHONE_LENGTH,
@@ -66,6 +68,25 @@ export const birthdaySchema = z
   .nullable();
 export const organizationSchema = z.string().trim().max(MAX_ORGANIZATION_LENGTH).nullable();
 
+export const personEventSchema = z
+  .object({
+    id: objectIdSchema,
+    title: z.string().trim().min(1).max(MAX_EVENT_TITLE_LENGTH),
+    startDate: dateKeySchema,
+    /** `null` means a single-day event — the follow-up math treats it as ending on startDate. */
+    endDate: dateKeySchema.nullable().default(null),
+    notes: z.string().max(MAX_NOTES_LENGTH).default(''),
+    askedAt: isoDateTimeSchema.nullable().default(null),
+    createdAt: isoDateTimeSchema,
+  })
+  // Date keys are ISO, so a plain string compare is a correct date compare.
+  .refine((event) => event.endDate === null || event.endDate >= event.startDate, {
+    message: 'endDate must not precede startDate',
+    path: ['endDate'],
+  });
+
+export const eventsSchema = z.array(personEventSchema).max(MAX_EVENTS);
+
 export const personCreateSchema = z.object({
   id: objectIdSchema.optional(),
   createdAt: isoDateTimeSchema.optional(),
@@ -78,6 +99,7 @@ export const personCreateSchema = z.object({
   company: organizationSchema.default(null),
   jobTitle: organizationSchema.default(null),
   contactId: z.string().trim().max(200).nullable().default(null),
+  events: eventsSchema.default([]),
   tags: z.array(objectIdSchema).max(50).default([]),
   notes: z.string().max(MAX_NOTES_LENGTH).default(''),
   /** When omitted, the server copies the account's default checkup interval. */
@@ -96,6 +118,7 @@ export const personUpdateSchema = z.object({
   company: organizationSchema.optional(),
   jobTitle: organizationSchema.optional(),
   contactId: z.string().trim().max(200).nullable().optional(),
+  events: eventsSchema.optional(),
   tags: z.array(objectIdSchema).max(50).optional(),
   notes: z.string().max(MAX_NOTES_LENGTH).optional(),
   checkupIntervalDays: checkupIntervalDaysSchema.optional(),
@@ -189,6 +212,7 @@ export type EntryCreateInput = z.infer<typeof entryCreateSchema>;
 export type EntryUpdateInput = z.infer<typeof entryUpdateSchema>;
 export type PersonCreateInput = z.infer<typeof personCreateSchema>;
 export type PersonUpdateInput = z.infer<typeof personUpdateSchema>;
+export type PersonEventInput = z.infer<typeof personEventSchema>;
 export type TagCreateInput = z.infer<typeof tagCreateSchema>;
 export type TagUpdateInput = z.infer<typeof tagUpdateSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;

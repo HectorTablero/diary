@@ -20,6 +20,7 @@ const person = (overrides: Partial<PersonDto>): PersonDto => ({
   company: null,
   jobTitle: null,
   contactId: null,
+  events: [],
   tags: [],
   notes: '',
   checkupIntervalDays: null,

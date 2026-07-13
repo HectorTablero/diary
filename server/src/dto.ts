@@ -1,4 +1,4 @@
-import type { EntryDto, PersonDto, PersonRefDto, SaidMark, TagDto } from '@diary/shared';
+import type { EntryDto, PersonDto, PersonEventDto, PersonRefDto, SaidMark, TagDto } from '@diary/shared';
 import { Types } from 'mongoose';
 import type { PopulateOptions } from 'mongoose';
 
@@ -16,6 +16,26 @@ export interface LeanTag {
   color: string;
 }
 
+export interface LeanPersonEvent {
+  id: string;
+  title: string;
+  startDate: string;
+  endDate?: string | null;
+  notes?: string;
+  askedAt?: Date | null;
+  createdAt: Date;
+}
+
+const personEventToDto = (event: LeanPersonEvent): PersonEventDto => ({
+  id: event.id,
+  title: event.title,
+  startDate: event.startDate,
+  endDate: event.endDate ?? null,
+  notes: event.notes ?? '',
+  askedAt: event.askedAt ? event.askedAt.toISOString() : null,
+  createdAt: event.createdAt.toISOString(),
+});
+
 export interface LeanPerson {
   _id: Types.ObjectId;
   name: string;
@@ -29,6 +49,7 @@ export interface LeanPerson {
   company?: string | null;
   jobTitle?: string | null;
   contactId?: string | null;
+  events?: LeanPersonEvent[];
   tags: LeanTag[];
   notes?: string;
   checkupIntervalDays?: number | null;
@@ -77,6 +98,7 @@ export const personToDto = (person: LeanPerson): PersonDto => ({
   company: person.company ?? null,
   jobTitle: person.jobTitle ?? null,
   contactId: person.contactId ?? null,
+  events: (person.events ?? []).map(personEventToDto),
   tags: person.tags.map(tagToDto),
   notes: person.notes ?? '',
   checkupIntervalDays: person.checkupIntervalDays ?? null,

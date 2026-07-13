@@ -1,12 +1,32 @@
 import {
   MAX_ALIAS_LENGTH,
   MAX_EMAIL_LENGTH,
+  MAX_EVENT_TITLE_LENGTH,
   MAX_NOTES_LENGTH,
   MAX_ORGANIZATION_LENGTH,
   MAX_PHONE_LENGTH,
   MAX_WECHAT_ID_LENGTH,
 } from '@diary/shared';
 import { model, Schema } from 'mongoose';
+
+/* Embedded rather than its own collection: /sync already ships whole people, so events replicate
+   with no extra machinery. `_id: false` with an explicit string `id` because the id is generated
+   on the client — an event created offline must keep the identity it was born with. */
+const personEventSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    title: { type: String, required: true, trim: true, maxlength: MAX_EVENT_TITLE_LENGTH },
+    /** YYYY-MM-DD. Stored as a string, like Entry.dateKey — it's a calendar day, not an instant. */
+    startDate: { type: String, required: true },
+    /** `null` for a single-day event. */
+    endDate: { type: String, default: null },
+    notes: { type: String, default: '', maxlength: MAX_NOTES_LENGTH },
+    /** When the "did you ask them?" follow-up was cleared. `null` = still pending. */
+    askedAt: { type: Date, default: null },
+    createdAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
 
 const personSchema = new Schema(
   {
@@ -25,6 +45,8 @@ const personSchema = new Schema(
     jobTitle: { type: String, default: null, maxlength: MAX_ORGANIZATION_LENGTH },
     /** Source device contact, so a re-import updates this person instead of duplicating them. */
     contactId: { type: String, default: null },
+    /** Things that happened to them, each with a decaying "ask how it went" follow-up. */
+    events: { type: [personEventSchema], default: [] },
     tags: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
     notes: { type: String, default: '', maxlength: MAX_NOTES_LENGTH },
     /** `null` disables checkup reminders for this person. */

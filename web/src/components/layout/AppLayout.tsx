@@ -306,7 +306,7 @@ export default function AppLayout() {
     <div className="flex min-h-dvh">
       {!isNative && <Sidebar pendingCheckups={pendingCheckups} />}
       <main className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]', !isNative && 'md:pb-0')}>
-        <UpdateBanner />
+        {/* <UpdateBanner /> */}
         <SyncStatusOverlay />
         <Outlet />
       </main>

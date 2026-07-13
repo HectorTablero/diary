@@ -269,3 +269,36 @@
   --color-importance-4: #4c9e63;
   --color-importance-5: #8ea6bd;
 }
+
+/* Minimal themed scrollbar (desktop) */
+@media (pointer: fine) {
+  * {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s ease;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--foreground);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
