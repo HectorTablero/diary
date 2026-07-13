@@ -72,7 +72,7 @@ export default function LoginPage() {
   const [signingIn, setSigningIn] = useState(false);
 
   if (isPending) return <FullScreenSpinner />;
-  if (session) return <Navigate to="/diary" replace />;
+  if (session?.user) return <Navigate to="/diary" replace />;
 
   const handleSignIn = async () => {
     setSigningIn(true);

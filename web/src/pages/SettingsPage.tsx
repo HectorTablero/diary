@@ -447,12 +447,12 @@ export default function SettingsPage() {
         <Section title={t('settings.account')}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              {session?.user.image && (
+              {session?.user?.image && (
                 <img src={session.user.image} alt="" className="size-9 rounded-full" referrerPolicy="no-referrer" />
               )}
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{session?.user.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{session?.user.email}</p>
+                <p className="truncate text-sm font-medium">{session?.user?.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{session?.user?.email}</p>
               </div>
             </div>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void handleSignOut()}>
