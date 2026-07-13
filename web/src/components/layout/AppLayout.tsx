@@ -199,13 +199,13 @@ function UpdateBanner() {
   if (!update) return null;
 
   return (
-    <div className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
+    <div className="sticky top-0 z-50 flex items-center justify-center gap-4 border-b border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
       {t('update.available', { version: update.versionName })}
       <a
         href={update.releaseUrl}
         target="_blank"
         rel="noreferrer"
-        className="font-medium underline underline-offset-2"
+        className="font-medium underline underline-offset-2 min-w-max"
       >
         {t('update.view')}
       </a>

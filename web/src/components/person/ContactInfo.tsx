@@ -1,16 +1,9 @@
 import type { PersonDto } from '@diary/shared';
-import {
-  Briefcase,
-  Cake,
-  Mail,
-  MessageCircle,
-  MessageSquare,
-  Phone,
-  QrCode,
-  TriangleAlert,
-} from 'lucide-react';
+import { Briefcase, Cake, Copy, Mail, MessageCircle, Phone, QrCode, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { WeChatIcon } from '@/components/icons/WeChatIcon';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -21,9 +14,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ageOn, daysUntilBirthday, formatBirthday } from '@/lib/birthday';
-import { isNative } from '@/lib/native';
 import { qrcodeLoader } from '@/lib/preloaders';
-import { isIncompletePhone, mailtoLink, telLink, wechatLink, whatsappLink } from '@/lib/phone';
+import {
+  isIncompletePhone,
+  mailtoLink,
+  telLink,
+  WECHAT_APP_URL,
+  whatsappLink,
+} from '@/lib/phone';
 
 /* Contact actions in the profile header. Shown on web as well as native — wa.me, mailto: and tel:
    all resolve fine in a desktop browser; only the contact *import* is Android-only.
@@ -44,8 +42,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-/** The deep link is useless in a desktop browser without the WeChat client, so offer the QR too:
-    scanning it from the phone opens the same chat. */
+/** Carries the WeChat ID over to the phone: scan it, and you have the ID to paste into search. */
 function WeChatQrDialog({
   wechatId,
   open,
@@ -57,16 +54,22 @@ function WeChatQrDialog({
 }) {
   const { t } = useTranslation();
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    // The QR encoder is shared with the idle preloader, so opening the dialog
-    // only has to wait for the cached chunk if it already warmed.
+    setFailed(false);
+    // Encodes the ID itself, not a link: there is no URL that opens a WeChat chat (see phone.ts).
+    // Encoding one is exactly what made the old QR scan through to a blank page.
     void qrcodeLoader()
-      .then((qrcode) => qrcode.toDataURL(wechatLink(wechatId), { margin: 2, width: 320 }))
+      .then((qrcode) => qrcode.toDataURL(wechatId, { margin: 2, width: 320 }))
       .then((url) => !cancelled && setDataUrl(url))
-      .catch(() => !cancelled && setDataUrl(null));
+      .catch((err) => {
+        // Surfaced, not swallowed — a silent catch here would just leave a skeleton spinning.
+        console.error('wechat: QR generation failed', err);
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -79,7 +82,9 @@ function WeChatQrDialog({
           <DialogTitle>{t('people.wechatQrTitle')}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center gap-3">
-          {dataUrl ? (
+          {failed ? (
+            <p className="py-6 text-center text-sm text-destructive">{t('errors.unknown')}</p>
+          ) : dataUrl ? (
             <img
               src={dataUrl}
               alt={t('people.wechatQrTitle')}
@@ -100,35 +105,51 @@ function WeChatQrDialog({
   );
 }
 
+/**
+ * WeChat can't be deep-linked to a specific chat (see phone.ts), so "open WeChat" means: put the
+ * ID on the clipboard and launch the app, ready to paste into its search box.
+ */
 function WeChatAction({ wechatId }: { wechatId: string }) {
   const { t } = useTranslation();
   const [qrOpen, setQrOpen] = useState(false);
 
-  // On the phone the deep link just works, so don't make the user pick.
-  if (isNative) {
-    return (
-      <LinkButton href={wechatLink(wechatId)}>
-        <MessageSquare className="size-3.5" />
-        {t('people.wechat')}
-      </LinkButton>
-    );
-  }
+  const copyId = async (): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(wechatId);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const openWeChat = async () => {
+    const copied = await copyId();
+    toast.info(copied ? t('people.wechatCopiedHint') : t('people.wechatSearchHint', { id: wechatId }));
+    window.location.href = WECHAT_APP_URL;
+  };
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 gap-1.5">
-            <MessageSquare className="size-3.5" />
+            <WeChatIcon className="size-3.5" />
             {t('people.wechat')}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuItem asChild>
-            <a href={wechatLink(wechatId)} target="_blank" rel="noreferrer">
-              <MessageSquare className="size-3.5" /> {t('people.wechatOpen')}
-            </a>
+          <DropdownMenuItem onClick={() => void openWeChat()}>
+            <WeChatIcon className="size-3.5" /> {t('people.wechatOpen')}
           </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              void copyId().then((copied) => copied && toast.success(t('people.wechatCopied')))
+            }
+          >
+            <Copy className="size-3.5" /> {t('people.wechatCopyId')}
+          </DropdownMenuItem>
+          {/* Mainly a desktop affordance — scan it to get the ID onto the phone — but harmless
+              on native, so it isn't gated. */}
           <DropdownMenuItem onClick={() => setQrOpen(true)}>
             <QrCode className="size-3.5" /> {t('people.wechatShowQr')}
           </DropdownMenuItem>
@@ -159,7 +180,7 @@ export function ContactInfo({ person, onEdit }: { person: PersonDto; onEdit: () 
           {whatsapp && (
             <LinkButton href={whatsapp}>
               <MessageCircle className="size-3.5" />
-              WhatsApp
+              {t('people.whatsapp')}
             </LinkButton>
           )}
           {person.phone && (
