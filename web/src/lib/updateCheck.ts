@@ -11,15 +11,14 @@ export interface UpdateInfo {
   releaseUrl: string;
 }
 
-interface GithubAsset {
-  name: string;
-  browser_download_url: string;
-}
-
 interface GithubRelease {
   html_url: string;
-  assets: GithubAsset[];
+  name: string;
 }
+
+/** Matches the "Latest build (<code> / <name>)" release name set by the android-release
+    workflow, e.g. "Latest build (42 / 2.2.0+a64bc46)". */
+const RELEASE_NAME_PATTERN = /\((\d+)\s*\/\s*([^)]+)\)/;
 
 function readVersionCode(value: unknown): number | null {
   if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value;
@@ -40,24 +39,20 @@ async function getCurrentVersionCode(): Promise<number | null> {
   return getWebVersionCode();
 }
 
-/** Compares the running build against the CI-published "latest" GitHub release. */
+/** Compares the running build against the CI-published "latest" GitHub release.
+    Reads the version straight off the release's `name` field rather than fetching the
+    `version.json` asset: that asset's `browser_download_url` 302-redirects to a different
+    host, and browsers don't reliably treat that redirect as CORS-safe. */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   const releaseRes = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
   if (!releaseRes.ok) return null;
   const release = (await releaseRes.json()) as GithubRelease;
 
-  const versionAsset = release.assets.find((a) => a.name === 'version.json');
-  if (!versionAsset) return null;
-
-  const versionRes = await fetch(versionAsset.browser_download_url);
-  if (!versionRes.ok) return null;
-  const versionData = (await versionRes.json()) as Partial<{
-    versionCode: unknown;
-    versionName: unknown;
-  }>;
-  const versionCode = readVersionCode(versionData.versionCode);
-  const versionName = typeof versionData.versionName === 'string' ? versionData.versionName : null;
-  if (versionCode === null || versionName === null) return null;
+  const match = RELEASE_NAME_PATTERN.exec(release.name);
+  if (!match) return null;
+  const versionCode = readVersionCode(match[1]);
+  const versionName = match[2].trim();
+  if (versionCode === null) return null;
 
   const currentVersionCode = await getCurrentVersionCode();
   if (currentVersionCode === null || versionCode <= currentVersionCode) return null;
