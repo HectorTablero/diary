@@ -55,6 +55,15 @@ type NotifiedCheckups = Record<string, string>;
 
 type LocalPeople = LocalPerson[];
 
+/** Picks one of a set of lighthearted body templates and fills in the given placeholders.
+    Interpolated by hand rather than via i18next's returnObjects + options, since that path's
+    interpolation-on-arrays behavior isn't guaranteed across i18next versions. */
+function pickTemplate(key: string, vars: Record<string, string> = {}): string {
+  const templates = i18n.t(key, { returnObjects: true }) as string[];
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(`{{${k}}}`, v), template);
+}
+
 /**
  * One notification per person whose checkup is due.
  *
@@ -72,7 +81,8 @@ async function collectCheckupNotifications(people: LocalPeople): Promise<LocalNo
 
   for (const person of people) {
     if (person.checkupIntervalDays == null) continue;
-    const dueAt = Date.parse(person.lastCheckupAt) + person.checkupIntervalDays * CHECKUP_DAY_MS;
+    const lastCheckupAt = Date.parse(person.lastCheckupAt);
+    const dueAt = lastCheckupAt + person.checkupIntervalDays * CHECKUP_DAY_MS;
 
     let at: Date | null = null;
     if (dueAt > now) {
@@ -85,10 +95,11 @@ async function collectCheckupNotifications(people: LocalPeople): Promise<LocalNo
     }
 
     if (!at) continue;
+    const days = Math.round((at.getTime() - lastCheckupAt) / CHECKUP_DAY_MS);
     scheduled.push({
       id: checkupNotificationId(person.id),
       title: i18n.t('people.checkupDueTitle', { name: person.name }),
-      body: i18n.t('people.checkupDueDescription'),
+      body: pickTemplate('people.checkupBodies', { name: person.name, days: String(days) }),
       schedule: { at },
       extra: { kind: 'checkup', personId: person.id },
     });
@@ -136,7 +147,7 @@ async function collectBirthdayNotifications(people: LocalPeople): Promise<LocalN
         age === null
           ? i18n.t('notifications.birthdayTitle', { name: person.name })
           : i18n.t('notifications.birthdayTitleWithAge', { name: person.name, age }),
-      body: i18n.t('notifications.birthdayBody', { name: person.name }),
+      body: pickTemplate('notifications.birthdayBodies', { name: person.name }),
       schedule: { at },
       extra: { kind: 'birthday', personId: person.id },
     });
@@ -164,7 +175,7 @@ async function collectDailyReminder(): Promise<LocalNotificationSchema[]> {
     {
       id: DAILY_REMINDER_ID,
       title: i18n.t('notifications.dailyReminderTitle'),
-      body: i18n.t('notifications.dailyReminderBody'),
+      body: pickTemplate('notifications.dailyReminderBodies'),
       schedule: { at: candidate },
       extra: { kind: 'daily' },
     },

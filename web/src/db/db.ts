@@ -95,6 +95,24 @@ db.version(2)
       }),
   );
 
+/* ┌─ DROP THE LEGACY BIRTHDAY SHIM AT THE NEXT UPVERSION ────────────────────────────────────┐
+   │ An early build stored year-less birthdays as `---10-10` (three dashes) instead of        │
+   │ `--10-10`. Those rows still exist here and on the server, so `normalizeBirthday` is       │
+   │ currently applied on every read (parseBirthday) and every write (the Zod birthdaySchema). │
+   │                                                                                          │
+   │ Whoever adds db.version(3) — for whatever reason — should fold this migration in:         │
+   │                                                                                          │
+   │   db.version(3).stores({ ...same as v2 }).upgrade((tx) =>                                 │
+   │     tx.table<LocalPerson>('people').toCollection().modify((person) => {                   │
+   │       if (person.birthday) person.birthday = normalizeBirthday(person.birthday);          │
+   │     }),                                                                                   │
+   │   );                                                                                      │
+   │                                                                                          │
+   │ then delete LEGACY_YEARLESS_BIRTHDAY_REGEX + normalizeBirthday from shared/constants.ts   │
+   │ and their two call sites. Server-side rows heal on their own: any PATCH that touches a    │
+   │ birthday rewrites it to the canonical form.                                               │
+   └──────────────────────────────────────────────────────────────────────────────────────────┘ */
+
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
   content: dto.content,

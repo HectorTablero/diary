@@ -1,15 +1,16 @@
 import { DATE_KEY_REGEX } from '@diary/shared';
 import { addDays } from 'date-fns';
-import { ChevronLeft, ChevronRight, NotebookPen } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate, useParams } from 'react-router';
-import { useDayEntries } from '@/api/hooks';
+import { Cake, ChevronLeft, ChevronRight, NotebookPen } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { useDayEntries, usePeople } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { EntryComposer } from '@/components/entry/EntryComposer';
 import { EntryItem } from '@/components/entry/EntryItem';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ageOn, birthdaysOn } from '@/lib/birthday';
 import { formatDateKey, parseDateKey, toDateKey, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -21,12 +22,14 @@ export default function DiaryDayPage() {
   const valid = !!date && DATE_KEY_REGEX.test(date) && !isNaN(parseDateKey(date).getTime());
   const dateKey = valid ? date! : todayKey();
   const { data: entries, isLoading } = useDayEntries(dateKey);
+  const { data: people = [] } = usePeople();
 
   if (!valid) return <Navigate to={`/diary/${todayKey()}`} replace />;
 
   const goTo = (key: string) => navigate(`/diary/${key}`);
   const shift = (days: number) => goTo(toDateKey(addDays(parseDateKey(dateKey), days)));
   const isToday = dateKey === todayKey();
+  const celebrating = birthdaysOn(people, dateKey);
 
   return (
     <PageContainer>
@@ -80,6 +83,39 @@ export default function DiaryDayPage() {
           title={t('diary.noEntries')}
           description={t('diary.noEntriesDescription')}
         />
+      )}
+
+      {celebrating.length > 0 && (
+        <section className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-pink-500/30 bg-pink-500/[0.06] px-3 py-2 text-sm">
+          <Cake className="size-4 shrink-0 text-pink-500 dark:text-pink-400" />
+          {celebrating.map((person, index) => {
+            // Age on the day being viewed, not today — browsing back to a past birthday should
+            // show how old they turned then.
+            const age = ageOn(person.birthday, parseDateKey(dateKey));
+            return (
+              <span key={person.id}>
+                {index > 0 && <span className="mr-1.5 text-muted-foreground">·</span>}
+                {/* Trans, not t(): the sentence wraps the name differently per language
+                    ("@Ana's birthday" vs "Cumpleaños de @Ana"), so the link has to be placed by
+                    the translation rather than concatenated around it. */}
+                <Trans
+                  i18nKey={age === null ? 'diary.birthdayLine' : 'diary.birthdayLineWithAge'}
+                  values={{ name: person.name, age }}
+                  components={{
+                    // Same colour and weight segmentContent gives an @mention inside entry text,
+                    // so a birthday reads like any other mention of that person.
+                    mention: (
+                      <Link
+                        to={`/people/${person.id}`}
+                        className="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                      />
+                    ),
+                  }}
+                />
+              </span>
+            );
+          })}
+        </section>
       )}
 
       <div className="mt-8 rounded-xl border bg-card p-3 shadow-xs">

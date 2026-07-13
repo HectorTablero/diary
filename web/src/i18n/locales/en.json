@@ -29,10 +29,29 @@
   },
   "notifications": {
     "dailyReminderTitle": "Don't forget your diary",
-    "dailyReminderBody": "You haven't added anything today.",
+    "dailyReminderBodies": [
+      "You haven't added anything today.",
+      "Today is still blank. Rude, considering everything that happened.",
+      "Your diary is gathering dust. One sentence fixes that.",
+      "Somewhere, a future you is hoping you wrote this down.",
+      "Today happened. Technically. Prove it.",
+      "A totally empty page is looking at you right now.",
+      "Quick reminder: today doesn't write itself.",
+      "Five minutes from now, you could have a diary entry instead of this notification.",
+      "Your streak is counting on you. No pressure.",
+      "Nothing's in today's entry yet. Even 'nothing happened' counts."
+    ],
     "birthdayTitle": "🎂 It's {{name}}'s birthday",
     "birthdayTitleWithAge": "🎂 {{name}} turns {{age}} today",
-    "birthdayBody": "Send {{name}} your best wishes."
+    "birthdayBodies": [
+      "Send {{name}} your best wishes.",
+      "{{name}} only turns this age once. Probably a good moment to say hi.",
+      "Cake, candles, {{name}} — today has all three. Join in.",
+      "One message from you could make {{name}}'s whole day.",
+      "{{name}} is expecting confetti emojis at minimum.",
+      "It's {{name}}'s big day. Don't be the friend who forgot.",
+      "Drop {{name}} a happy birthday before someone else beats you to it."
+    ]
   },
   "common": {
     "cancel": "Cancel",
@@ -96,7 +115,10 @@
     "addTags": "Tags",
     "addPeople": "People",
     "subEntries": "{{count}} sub-entry",
-    "subEntries_other": "{{count}} sub-entries"
+    "subEntries_other": "{{count}} sub-entries",
+    "birthdays": "Birthdays",
+    "birthdayLine": "<mention>@{{name}}</mention>'s birthday",
+    "birthdayLineWithAge": "<mention>@{{name}}</mention>'s birthday ({{age}})"
   },
   "people": {
     "title": "People",
@@ -149,6 +171,20 @@
     "checkupEvery": "Every",
     "checkupDueTitle": "Time to check up on {{name}}",
     "checkupDueDescription": "It's been a while since you last marked something as said to them.",
+    "checkupBodies": [
+      "It's been {{days}} days since you last talked to {{name}}. They might be starting to think you don't love them anymore.",
+      "{{name}} hasn't heard from you in {{days}} days. Time to prove you're not a ghost.",
+      "Plot twist: {{name}} still exists, and it's been {{days}} days since you checked in.",
+      "Breaking news: {{name}} is still waiting for you to say hi. It's been {{days}} days.",
+      "Your friendship with {{name}} isn't extinct yet, but it's been {{days}} days. Go water it.",
+      "{{name}} called. Just kidding, they didn't, because it's been {{days}} days since you reached out first.",
+      "Gentle nudge: {{name}} is a real person who exists outside your notifications. {{days}} days and counting.",
+      "It's been {{days}} days. {{name}} is starting to suspect they've been replaced by a Tamagotchi you forgot to feed.",
+      "Friendly reminder: {{name}} misses you, or at least you should assume so after {{days}} days of silence.",
+      "{{days}} days of radio silence with {{name}}. Send a meme, a hello, anything.",
+      "Achievement unlocked: {{days}} days without talking to {{name}}. Please don't go for the next tier.",
+      "{{name}} is patiently waiting. It's been {{days}} days — maybe say something before it becomes a milestone."
+    ],
     "markCheckupDone": "Mark as done",
     "checkupMarkedDone": "Checkup marked as done",
     "disableCheckups": "Disable checkups",
@@ -171,14 +207,17 @@
     "aliasPlaceholder": "Nickname",
     "alsoKnownAs": "aka",
     "birthday": "Birthday",
-    "birthdayKnowYear": "I know the year",
     "birthdayToday": "today!",
     "birthdayInDays": "in {{count}} day",
     "birthdayInDays_other": "in {{count}} days",
     "ageYears": "{{count}} year old",
     "ageYears_other": "{{count}} years old",
     "company": "Company",
-    "jobTitle": "Job title"
+    "jobTitle": "Job title",
+    "birthdayDay": "Day",
+    "birthdayMonth": "Month",
+    "birthdayYear": "Year",
+    "birthdayYearOptional": "The year is optional — leave it blank if you don't know it."
   },
   "tags": {
     "title": "Tags",
@@ -203,7 +242,9 @@
     "title": "Calendar",
     "onThisDay": "On this day",
     "entriesCount": "{{count}} entry",
-    "entriesCount_other": "{{count}} entries"
+    "entriesCount_other": "{{count}} entries",
+    "birthdayOf": "{{name}}'s birthday",
+    "birthdayOfWithAge": "{{name}} turns {{age}}"
   },
   "search": {
     "title": "Search",
@@ -345,6 +386,8 @@
     "resolveFirst_other": "Resolve {{count}} conflicts to continue.",
     "confirm": "Import {{count}} contact",
     "confirm_other": "Import {{count}} contacts",
-    "done": "{{created}} added, {{merged}} merged."
+    "done": "{{created}} added, {{merged}} merged.",
+    "loading": "Reading your contacts…",
+    "failed": "Couldn't read your contacts"
   }
 }

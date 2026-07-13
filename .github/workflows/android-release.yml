@@ -68,6 +68,7 @@ jobs:
       - name: Build web assets + sync Capacitor
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_APP_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: npm run build:app
 
       - name: Build signed release APK

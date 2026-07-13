@@ -36,8 +36,14 @@
     <!-- Without this, Android's audio subsystem refuses to hand the mic to the WebView even
          after RECORD_AUDIO is granted — getUserMedia() fails with NotReadableError. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- Read-only: the contact importer never writes back to the address book. -->
+    <!-- The importer only ever reads. WRITE_CONTACTS is declared purely because the contacts
+         plugin bundles both into a single "contacts" permission alias, and Capacitor treats an
+         alias as granted only when *every* permission in it is granted (Bridge.java: "multiple
+         permissions with the same alias must all be true, otherwise all false"). Without this,
+         getPermissionState("contacts") never reaches GRANTED, so getContacts() rejects with
+         "Permission is required to access contacts." no matter what the user taps. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
 
     <!-- Package visibility (Android 11+ / targetSdk 36): without this the WebView can't resolve
          the wa.me and weixin:// hand-offs, and the chat buttons silently do nothing. -->

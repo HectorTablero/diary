@@ -110,8 +110,26 @@ export const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 export const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
 /** `YYYY-MM-DD`, or vCard-style `--MM-DD` when the year is unknown — phone contacts very
-    often store a birthday without one, so the year can never be required. */
-export const BIRTHDAY_REGEX = /^(?:\d{4}|--)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
+    often store a birthday without one, so the year can never be required.
+    Note the alternation covers the trailing dash: it's `YYYY-` or `--`, then `MM-DD`. */
+export const BIRTHDAY_REGEX = /^(?:\d{4}-|--)(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
+
+/* --- LEGACY birthday format: droppable at the next Dexie upversion ---------------------------
+   An early build appended the month separator after the `--` year placeholder, writing a
+   year-less birthday as `---10-10` (three dashes) instead of `--10-10`. Those rows are already
+   in Mongo and in people's local Dexie, so both are still *read* and normalized on write.
+
+   To remove: bump db.version(3) in web/src/db/db.ts with an .upgrade() that rewrites
+   `people.birthday` through normalizeBirthday, run it long enough for clients to migrate, then
+   delete LEGACY_YEARLESS_BIRTHDAY_REGEX + normalizeBirthday and their call sites (the Zod
+   birthdaySchema and parseBirthday). See the marker comment in web/src/db/db.ts. */
+
+export const LEGACY_YEARLESS_BIRTHDAY_REGEX =
+  /^---(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
+
+/** Accepts either format, always returns the canonical one. */
+export const normalizeBirthday = (value: string): string =>
+  LEGACY_YEARLESS_BIRTHDAY_REGEX.test(value) ? value.slice(1) : value;
 
 /** Full international number. Only a number in this shape can open a WhatsApp chat. */
 export const E164_REGEX = /^\+[1-9]\d{6,14}$/;

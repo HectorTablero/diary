@@ -19,7 +19,8 @@
     "build:app": "npm run generate:logos && npm run generate:assets && npm run build:app -w web",
     "app:open": "npm run app:open -w web",
     "start": "node server/dist/index.js",
-    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web"
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web",
+    "test": "npm test -w shared && npm test -w server && npm test -w web"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

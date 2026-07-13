@@ -14,7 +14,7 @@ import { cancelIdle, onIdle } from '@/lib/idle';
 import { isNative } from '@/lib/native';
 import { preloadLoaders } from '@/lib/preloaders';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
-import { checkForUpdate, dismissUpdate, type UpdateInfo } from '@/lib/updateCheck';
+import { checkForUpdate, dismissUpdate, refreshWebApp, type UpdateInfo } from '@/lib/updateCheck';
 import { cn } from '@/lib/utils';
 import { pageLoaders } from '@/pages/lazyPages';
 
@@ -163,8 +163,37 @@ function UpdateBanner() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!isNative) return;
-    void checkForUpdate().then(setUpdate);
+    let cancelled = false;
+
+    const run = async () => {
+      const updateInfo = await checkForUpdate();
+      if (cancelled || !updateInfo) return;
+
+      if (!isNative) {
+        if (!navigator.onLine) return;
+        const refreshed = await refreshWebApp();
+        if (refreshed) return;
+      }
+
+      setUpdate(updateInfo);
+    };
+
+    void run();
+
+    if (isNative) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const handleOnline = () => {
+      void run();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   if (!update) return null;

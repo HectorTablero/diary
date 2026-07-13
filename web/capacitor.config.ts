@@ -4,6 +4,12 @@ const config: CapacitorConfig = {
   appId: 'es.tablerus.diary',
   appName: 'Diary',
   webDir: 'dist',
+  // Capacitor's native bridge otherwise logs every plugin call (id, method, args) at
+  // verbose level in debug builds — e.g. LocalNotifications.getPending() on every
+  // refreshNotifications() reconcile. Silence it globally rather than per-call.
+  android: {
+    loggingBehavior: 'none',
+  },
   plugins: {
     SplashScreen: {
       // The native splash is a plain themed background; the animated logo

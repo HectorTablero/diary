@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ArrowLeft,
   Ban,
   Check,
@@ -8,16 +7,17 @@ import {
   Pencil,
   Search,
   ShieldAlert,
+  TriangleAlert,
   UserPlus,
 } from 'lucide-react';
 import type { TFunction } from 'i18next';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePeople } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
-import { FullScreenSpinner, Spinner } from '@/components/common/Spinner';
+import { Spinner } from '@/components/common/Spinner';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,8 @@ import { fuzzyIncludes } from '@/lib/tokens';
       import that "worked" would quietly lose people on the next pull. */
 
 type Step = 'select' | 'review';
-type Permission = 'pending' | 'granted' | 'denied';
+/** `failed` is distinct from `denied`: the plugin threw, rather than the user saying no. */
+type LoadState = 'loading' | 'ready' | 'denied' | 'failed';
 
 /** Description of what a conflict actually is, in the user's words. */
 function conflictLabel(match: ConflictMatch, t: TFunction): string {
@@ -141,7 +142,7 @@ function ConflictRow({
         ) : hard ? (
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
         ) : (
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
         )}
         <div className="min-w-0 flex-1">
           {renaming ? (
@@ -226,8 +227,9 @@ export default function ImportContactsPage() {
   const navigate = useNavigate();
   const { data: people = [] } = usePeople();
 
-  const [permission, setPermission] = useState<Permission>('pending');
-  const [contacts, setContacts] = useState<ContactCandidate[] | null>(null);
+  const [state, setState] = useState<LoadState>('loading');
+  const [error, setError] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<ContactCandidate[]>([]);
   const [step, setStep] = useState<Step>('select');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -236,22 +238,40 @@ export default function ImportContactsPage() {
   const [resolutions, setResolutions] = useState<Record<string, Resolution>>({});
   const [importing, setImporting] = useState(false);
 
-  useEffect(() => {
+  /* Every step here can fail (permission rejected, plugin not implemented, address book
+     unreadable). Each one must land on a *terminal* state — an earlier version let a rejected
+     promise escape, which left the spinner up forever with nothing in the logs. */
+  const load = useCallback(async () => {
+    setState('loading');
+    setError(null);
+
     if (!canImportContacts()) {
-      setPermission('denied');
+      setState('denied');
       return;
     }
-    void (async () => {
+    try {
       const granted = (await checkContactsPermission()) || (await requestContactsPermission());
-      setPermission(granted ? 'granted' : 'denied');
-      if (granted) setContacts(await readContacts());
-    })();
+      if (!granted) {
+        setState('denied');
+        return;
+      }
+      setContacts(await readContacts());
+      setState('ready');
+    } catch (err) {
+      console.error('contacts: import failed', err);
+      setError(err instanceof Error ? err.message : String(err));
+      setState('failed');
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   /** Contacts as they'd be imported — i.e. with any review-step rename applied. */
   const candidates = useMemo<ContactCandidate[]>(
     () =>
-      (contacts ?? []).map((contact) =>
+      contacts.map((contact) =>
         renames[contact.contactId]
           ? { ...contact, name: renames[contact.contactId] }
           : contact,
@@ -312,28 +332,52 @@ export default function ImportContactsPage() {
     }
   };
 
-  if (permission === 'pending') return <FullScreenSpinner />;
+  const backButton = (
+    <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void navigate('/people')}>
+      <ArrowLeft className="size-4" />
+      {t('common.back')}
+    </Button>
+  );
 
-  if (permission === 'denied') {
+  // Reading a large address book takes a moment; keep the page chrome so it never looks hung,
+  // and stay inside PageContainer so the loading view can't grow past the viewport.
+  if (state === 'loading') {
     return (
       <PageContainer>
-        <PageHeader title={t('import.title')} />
-        <EmptyState
-          icon={ContactRound}
-          title={t('import.noPermission')}
-          description={
-            canImportContacts() ? t('import.noPermissionDescription') : t('import.nativeOnly')
-          }
-        >
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => void navigate('/people')}>
-            {t('common.back')}
-          </Button>
-        </EmptyState>
+        <PageHeader title={t('import.title')} actions={backButton} />
+        <div className="flex flex-col items-center justify-center gap-3 py-20">
+          <Spinner className="size-7" />
+          <p className="text-sm text-muted-foreground">{t('import.loading')}</p>
+        </div>
       </PageContainer>
     );
   }
 
-  if (!contacts) return <FullScreenSpinner />;
+  if (state === 'denied' || state === 'failed') {
+    const failed = state === 'failed';
+    return (
+      <PageContainer>
+        <PageHeader title={t('import.title')} actions={backButton} />
+        <EmptyState
+          icon={failed ? TriangleAlert : ContactRound}
+          title={failed ? t('import.failed') : t('import.noPermission')}
+          description={
+            failed
+              ? (error ?? t('errors.unknown'))
+              : canImportContacts()
+                ? t('import.noPermissionDescription')
+                : t('import.nativeOnly')
+          }
+        >
+          {canImportContacts() && (
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>
+              {t('common.retry')}
+            </Button>
+          )}
+        </EmptyState>
+      </PageContainer>
+    );
+  }
 
   if (step === 'review') {
     return (
@@ -397,15 +441,7 @@ export default function ImportContactsPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title={t('import.title')}
-        actions={
-          <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void navigate('/people')}>
-            <ArrowLeft className="size-4" />
-            {t('common.back')}
-          </Button>
-        }
-      />
+      <PageHeader title={t('import.title')} actions={backButton} />
 
       {contacts.length === 0 ? (
         <EmptyState icon={ContactRound} title={t('import.noContacts')} />

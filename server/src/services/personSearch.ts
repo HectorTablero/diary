@@ -144,7 +144,6 @@ function csvField(value: string): string {
 
 /** RFC-4180-ish CSV the model reads back as a tool result. */
 export function searchPeopleCsv(query: string, people: SearchablePerson[]): string {
-  console.log(`searchPeopleCsv(${JSON.stringify(query)}, ${people.length} people)`);
   const header = 'name,aliases,id,tags,notes,score';
   const directMatches = searchPeopleDirect(query, people);
   const results = directMatches.length ? directMatches : searchPeoplePhonetic(query, people);
@@ -156,7 +155,6 @@ export function searchPeopleCsv(query: string, people: SearchablePerson[]): stri
       .join(',');
   });
   const csv = [header, ...rows].join('\n');
-  if (directMatches.length) console.log(csv);
   if (directMatches.length) return csv;
   const prefix =
     'No direct matches were found. The transcript may be imperfect. These are the similar sounding names; if one is even close, prefer it over skipping the person.\n\n';

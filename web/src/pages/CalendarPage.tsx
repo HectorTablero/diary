@@ -1,14 +1,17 @@
+import type { PersonListItem } from '@diary/shared';
 import { addMonths, endOfMonth, format, getDay, startOfMonth } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Cake, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
-import { useCalendarMonth, useOnThisDay } from '@/api/hooks';
+import { useCalendarMonth, useOnThisDay, usePeople } from '@/api/hooks';
 import { importanceDotClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
 import { Button } from '@/components/ui/button';
-import { dateFnsLocale, todayKey } from '@/lib/dates';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ageOn, birthdaysOn } from '@/lib/birthday';
+import { dateFnsLocale, parseDateKey, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
 function useIsDark(): boolean {
@@ -64,6 +67,7 @@ export default function CalendarPage() {
   const month = cursor.getMonth() + 1;
   const { data: days } = useCalendarMonth(year, month);
   const { data: onThisDay } = useOnThisDay(todayKey());
+  const { data: people } = usePeople();
 
   const byDate = useMemo(() => new Map((days ?? []).map((d) => [d.date, d])), [days]);
   const locale = dateFnsLocale(i18n.language);
@@ -86,6 +90,19 @@ export default function CalendarPage() {
       format(new Date(2024, 0, 1 + i), 'EEEEEE', { locale }),
     );
   }, [locale]);
+
+  // Anniversaries for the visible month only — birthdaysOn ignores the stored year, so a
+  // birthday recorded as `--07-13` lands on 13 July of whichever year is on screen.
+  const birthdaysByDate = useMemo(() => {
+    const map = new Map<string, PersonListItem[]>();
+    if (!people?.length) return map;
+    for (const dateKey of cells) {
+      if (!dateKey) continue;
+      const celebrating = birthdaysOn(people, dateKey);
+      if (celebrating.length) map.set(dateKey, celebrating);
+    }
+    return map;
+  }, [people, cells]);
 
   return (
     <PageContainer>
@@ -130,14 +147,16 @@ export default function CalendarPage() {
       </div>
 
       <div className="grid grid-cols-7 gap-0.5">
-        {cells.map((dateKey, i) =>
-          dateKey ? (
+        {cells.map((dateKey, i) => {
+          if (!dateKey) return <div key={i} className="h-10" />;
+
+          const celebrating = birthdaysByDate.get(dateKey);
+          const dayCell = (
             <button
-              key={i}
               type="button"
               onClick={() => navigate(`/diary/${dateKey}`)}
               className={cn(
-                'relative flex h-10 items-center justify-center rounded-lg border text-[13px] transition-colors',
+                'relative flex h-10 w-full items-center justify-center rounded-lg border text-[13px] transition-colors',
                 dateKey === today
                   ? 'border-foreground/80 bg-foreground/[0.04] font-semibold text-foreground'
                   : 'border-transparent text-muted-foreground hover:border-border',
@@ -159,11 +178,36 @@ export default function CalendarPage() {
                   )}
                 />
               )}
+              {celebrating && (
+                <Cake className="absolute top-[3px] left-[3px] size-3.5 text-pink-500 dark:text-pink-400" />
+              )}
             </button>
-          ) : (
-            <div key={i} className="h-10" />
-          ),
-        )}
+          );
+
+          if (!celebrating) return <div key={i}>{dayCell}</div>;
+
+          return (
+            <Tooltip key={i}>
+              <TooltipTrigger asChild>{dayCell}</TooltipTrigger>
+              <TooltipContent>
+                <ul>
+                  {celebrating.map((person) => {
+                    // Age on that day, not today — hovering a past or future birthday should
+                    // show how old they were/will be then.
+                    const age = ageOn(person.birthday, parseDateKey(dateKey));
+                    return (
+                      <li key={person.id}>
+                        {age === null
+                          ? t('calendar.birthdayOf', { name: person.name })
+                          : t('calendar.birthdayOfWithAge', { name: person.name, age })}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
       </div>
 
       <div className="mt-4 flex flex-col items-center gap-2 border-t pt-3">
@@ -192,6 +236,12 @@ export default function CalendarPage() {
               <span className="text-[10px] text-muted-foreground">{t(`importance.levels.${level}`)}</span>
             </div>
           ))}
+          {birthdaysByDate.size > 0 && (
+            <div className="flex items-center gap-1">
+              <Cake className="size-3 text-pink-500 dark:text-pink-400" />
+              <span className="text-[10px] text-muted-foreground">{t('diary.birthdays')}</span>
+            </div>
+          )}
         </div>
       </div>
 
