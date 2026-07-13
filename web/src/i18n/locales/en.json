@@ -29,7 +29,10 @@
   },
   "notifications": {
     "dailyReminderTitle": "Don't forget your diary",
-    "dailyReminderBody": "You haven't added anything today."
+    "dailyReminderBody": "You haven't added anything today.",
+    "birthdayTitle": "🎂 It's {{name}}'s birthday",
+    "birthdayTitleWithAge": "🎂 {{name}} turns {{age}} today",
+    "birthdayBody": "Send {{name}} your best wishes."
   },
   "common": {
     "cancel": "Cancel",
@@ -51,7 +54,9 @@
     "showMore": "Show more",
     "saved": "Saved",
     "less": "Less",
-    "more": "More"
+    "more": "More",
+    "back": "Back",
+    "remove": "Remove"
   },
   "importance": {
     "label": "Importance",
@@ -149,7 +154,31 @@
     "disableCheckups": "Disable checkups",
     "checkupsDisabled": "Checkups disabled for this person",
     "checkupsPending": "{{count}} checkup pending",
-    "checkupsPending_other": "{{count}} checkups pending"
+    "checkupsPending_other": "{{count}} checkups pending",
+    "call": "Call",
+    "email": "Email",
+    "phone": "Phone",
+    "phoneInternationalHint": "Include the country code, e.g. +34 600 123 456.",
+    "phoneIncomplete": "Not in international format — add the country code so WhatsApp and calls work.",
+    "wechat": "WeChat",
+    "wechatPlaceholder": "WeChat ID",
+    "wechatOpen": "Open in WeChat",
+    "wechatShowQr": "Show QR code",
+    "wechatQrTitle": "Scan with WeChat",
+    "wechatQrDescription": "Scan this from your phone to open the chat in WeChat.",
+    "aliases": "Other names",
+    "aliasesDescription": "Nicknames this person also answers to. Used by @mentions and voice dictation.",
+    "aliasPlaceholder": "Nickname",
+    "alsoKnownAs": "aka",
+    "birthday": "Birthday",
+    "birthdayKnowYear": "I know the year",
+    "birthdayToday": "today!",
+    "birthdayInDays": "in {{count}} day",
+    "birthdayInDays_other": "in {{count}} days",
+    "ageYears": "{{count}} year old",
+    "ageYears_other": "{{count}} years old",
+    "company": "Company",
+    "jobTitle": "Job title"
   },
   "tags": {
     "title": "Tags",
@@ -286,5 +315,36 @@
     "timeout": "The LLM took too long to respond",
     "no_key": "Add a Groq API key in settings first",
     "no_submission": "Couldn't get a result from the assistant"
+  },
+  "import": {
+    "title": "Import from contacts",
+    "nativeOnly": "Contacts can only be imported from the Android app.",
+    "noPermission": "No access to your contacts",
+    "noPermissionDescription": "Grant the contacts permission in system settings to import people from your address book.",
+    "noContacts": "No contacts found",
+    "selectAll": "Select all",
+    "selectNone": "Clear selection",
+    "selectedCount": "{{count}} selected",
+    "alreadyImported": "Already imported",
+    "continue": "Review {{count}} contact",
+    "continue_other": "Review {{count}} contacts",
+    "reviewTitle": "Resolve conflicts",
+    "summaryNew": "{{count}} contact will be added as a new person.",
+    "summaryNew_other": "{{count}} contacts will be added as new people.",
+    "summaryConflicts": "{{count}} needs your attention before importing.",
+    "summaryConflicts_other": "{{count}} need your attention before importing.",
+    "conflictImported": "Already imported as “{{name}}”.",
+    "conflictDuplicate": "“{{name}}” already exists. Two people can’t share a name.",
+    "conflictContainment": "Looks similar to “{{name}}” — they might be the same person.",
+    "conflictPhone": "Same phone number as “{{name}}”.",
+    "mergeInto": "Merge into {{name}}",
+    "keepBoth": "Keep both",
+    "rename": "Rename",
+    "skip": "Skip",
+    "resolveFirst": "Resolve {{count}} conflict to continue.",
+    "resolveFirst_other": "Resolve {{count}} conflicts to continue.",
+    "confirm": "Import {{count}} contact",
+    "confirm_other": "Import {{count}} contacts",
+    "done": "{{created}} added, {{merged}} merged."
   }
 }

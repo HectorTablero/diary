@@ -3,7 +3,8 @@ export interface TokenSegment {
   kind: 'text' | 'person' | 'tag';
 }
 
-const normalize = (s: string) =>
+/** NFD, strip diacritics, lowercase. Mirrors `normalize` in server/src/services/personSearch.ts. */
+export const normalize = (s: string) =>
   s
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')

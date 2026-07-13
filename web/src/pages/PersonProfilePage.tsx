@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { FullScreenSpinner } from '@/components/common/Spinner';
 import { TagChip } from '@/components/entry/chips';
 import { PageContainer } from '@/components/layout/PageHeader';
+import { ContactInfo } from '@/components/person/ContactInfo';
 import { EntryRow } from '@/components/person/EntryRow';
 import { PersonForm } from '@/components/person/PersonForm';
 import { TalkingPointItem } from '@/components/person/TalkingPointItem';
@@ -232,6 +233,7 @@ export default function PersonProfilePage() {
           {person.notes && (
             <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">{person.notes}</p>
           )}
+          <ContactInfo person={person} onEdit={() => setEditing(true)} />
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

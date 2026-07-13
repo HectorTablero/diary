@@ -4,6 +4,8 @@
 export interface SearchablePerson {
   id: string;
   name: string;
+  /** Nicknames the person also answers to — dictating "Ire" should still find "Irene". */
+  aliases: string[];
   tagNames: string[];
   notes: string;
 }
@@ -87,20 +89,31 @@ function fieldScore(
   return total / queryTokens.length;
 }
 
-/** Name outweighs tags outweighs notes, but all three contribute. */
-export function scorePerson(query: string, person: SearchablePerson): number {
-  const nameScore = fieldScore(query, person.name);
-  const tagsScore = fieldScore(query, person.tagNames.join(' '));
-  const notesScore = fieldScore(query, person.notes);
-  return 1.0 * nameScore + 0.6 * tagsScore + 0.4 * notesScore;
+/**
+ * Name outweighs tags outweighs notes, but all three contribute. An alias competes with the
+ * canonical name rather than adding to it (best-of, slightly discounted), so a person doesn't
+ * outrank everyone else just for carrying many nicknames.
+ */
+function score(
+  query: string,
+  person: SearchablePerson,
+  transformToken?: (token: string) => string,
+): number {
+  const nameScore = fieldScore(query, person.name, transformToken);
+  const aliasScore = person.aliases.reduce(
+    (best, alias) => Math.max(best, fieldScore(query, alias, transformToken)),
+    0,
+  );
+  const tagsScore = fieldScore(query, person.tagNames.join(' '), transformToken);
+  const notesScore = fieldScore(query, person.notes, transformToken);
+  return 1.0 * Math.max(nameScore, 0.9 * aliasScore) + 0.6 * tagsScore + 0.4 * notesScore;
 }
 
-function scorePersonPhonetic(query: string, person: SearchablePerson): number {
-  const nameScore = fieldScore(query, person.name, phoneticizeToken);
-  const tagsScore = fieldScore(query, person.tagNames.join(' '), phoneticizeToken);
-  const notesScore = fieldScore(query, person.notes, phoneticizeToken);
-  return 1.0 * nameScore + 0.6 * tagsScore + 0.4 * notesScore;
-}
+export const scorePerson = (query: string, person: SearchablePerson): number =>
+  score(query, person);
+
+const scorePersonPhonetic = (query: string, person: SearchablePerson): number =>
+  score(query, person, phoneticizeToken);
 
 function searchPeopleDirect(query: string, people: SearchablePerson[]): ScoredPerson[] {
   return people
@@ -132,13 +145,15 @@ function csvField(value: string): string {
 /** RFC-4180-ish CSV the model reads back as a tool result. */
 export function searchPeopleCsv(query: string, people: SearchablePerson[]): string {
   console.log(`searchPeopleCsv(${JSON.stringify(query)}, ${people.length} people)`);
-  const header = 'name,id,tags,notes,score';
+  const header = 'name,aliases,id,tags,notes,score';
   const directMatches = searchPeopleDirect(query, people);
   const results = directMatches.length ? directMatches : searchPeoplePhonetic(query, people);
   if (!results.length) return `${header}\n# no matches`;
   const rows = results.map((p) => {
     const notes = p.notes.replace(/\r?\n+/g, ' ').slice(0, 200);
-    return [p.name, p.id, p.tagNames.join('|'), notes, p.score.toFixed(2)].map(csvField).join(',');
+    return [p.name, p.aliases.join('|'), p.id, p.tagNames.join('|'), notes, p.score.toFixed(2)]
+      .map(csvField)
+      .join(',');
   });
   const csv = [header, ...rows].join('\n');
   if (directMatches.length) console.log(csv);

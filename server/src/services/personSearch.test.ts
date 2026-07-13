@@ -4,6 +4,7 @@ import { searchPeople, searchPeopleCsv, type SearchablePerson } from './personSe
 const person = (overrides: Partial<SearchablePerson>): SearchablePerson => ({
   id: '1',
   name: '',
+  aliases: [],
   tagNames: [],
   notes: '',
   ...overrides,
@@ -44,12 +45,40 @@ describe('searchPeople', () => {
     const people = [person({ id: 'a', name: 'Zzz' })];
     expect(searchPeople('Alice', people)).toEqual([]);
   });
+
+  it('finds a person by a nickname that appears only in their aliases', () => {
+    const people = [
+      person({ id: 'irene', name: 'Irene', aliases: ['Ire', 'Irenita'] }),
+      person({ id: 'other', name: 'Carlos' }),
+    ];
+    expect(searchPeople('Irenita', people).map((r) => r.id)).toEqual(['irene']);
+  });
+
+  it('ranks a canonical name match above an alias-only match', () => {
+    const people = [
+      person({ id: 'alias-only', name: 'Carmen', aliases: ['Mum'] }),
+      person({ id: 'name-match', name: 'Mum' }),
+    ];
+    const order = searchPeople('Mum', people).map((r) => r.id);
+    expect(order.indexOf('name-match')).toBeLessThan(order.indexOf('alias-only'));
+  });
+
+  it('does not let extra aliases inflate a person who does not match the query', () => {
+    const people = [person({ id: 'a', name: 'Zzz', aliases: ['Qqq', 'Www', 'Xxx'] })];
+    expect(searchPeople('Alice', people)).toEqual([]);
+  });
 });
 
 describe('searchPeopleCsv', () => {
   it('emits a header-only "no matches" row when nothing scores', () => {
     const csv = searchPeopleCsv('nobody', [person({ id: 'a', name: 'Alice' })]);
-    expect(csv).toBe('name,id,tags,notes,score\n# no matches');
+    expect(csv).toBe('name,aliases,id,tags,notes,score\n# no matches');
+  });
+
+  it('lists aliases so the model can see why a nickname matched', () => {
+    const csv = searchPeopleCsv('Ire', [person({ id: 'a', name: 'Irene', aliases: ['Ire', 'Irenita'] })]);
+    const [, row] = csv.split('\n');
+    expect(row).toContain('Irene,Ire|Irenita,a,');
   });
 
   it('quotes fields containing commas or quotes', () => {
@@ -64,7 +93,7 @@ describe('searchPeopleCsv', () => {
   it('prefaces phonetic fallback results with a note', () => {
     const csv = searchPeopleCsv('Yvonne', [person({ id: 'a', name: 'Ibón' })]);
     expect(csv.startsWith('No direct matches were found.')).toBe(true);
-    expect(csv).toContain('\n\nname,id,tags,notes,score\n');
-    expect(csv).toContain('\nIbón,a,,,' + '0.72');
+    expect(csv).toContain('\n\nname,aliases,id,tags,notes,score\n');
+    expect(csv).toContain('\nIbón,,a,,,' + '0.72');
   });
 });

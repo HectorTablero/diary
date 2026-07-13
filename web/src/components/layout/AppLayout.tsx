@@ -12,6 +12,7 @@ import { useSession } from '@/lib/authClient';
 import { isCheckupDue } from '@/lib/checkup';
 import { cancelIdle, onIdle } from '@/lib/idle';
 import { isNative } from '@/lib/native';
+import { preloadLoaders } from '@/lib/preloaders';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
 import { checkForUpdate, dismissUpdate, type UpdateInfo } from '@/lib/updateCheck';
 import { cn } from '@/lib/utils';
@@ -255,6 +256,9 @@ export default function AppLayout() {
     if (saveData) return;
     const handle = onIdle(() => {
       for (const load of Object.values(pageLoaders)) void load();
+      if (!isNative) {
+        for (const load of Object.values(preloadLoaders)) void load();
+      }
     });
     return () => cancelIdle(handle);
   }, [session]);

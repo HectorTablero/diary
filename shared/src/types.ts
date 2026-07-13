@@ -19,6 +19,21 @@ export interface PersonRefDto {
 export interface PersonDto {
   id: string;
   name: string;
+  /** Other names this person answers to (nicknames, surname variants). Widens @mention
+      autocomplete and the AI's person search without touching the canonical `name`. */
+  aliases: string[];
+  /** E.164 (`+34600123456`) when it could be normalized; otherwise whatever the contact held,
+      which the UI flags as incomplete. Only an E.164 number can open a WhatsApp chat. */
+  phone: string | null;
+  email: string | null;
+  /** WeChat ID, deep-linked as `weixin://dl/chat?<id>`. */
+  wechatId: string | null;
+  /** `YYYY-MM-DD`, or `--MM-DD` when the year is unknown (see BIRTHDAY_REGEX). */
+  birthday: string | null;
+  company: string | null;
+  jobTitle: string | null;
+  /** The device contact this person came from, so re-importing updates instead of duplicating. */
+  contactId: string | null;
   tags: TagDto[];
   notes: string;
   /** Days between checkup reminders for this person. `null` disables checkups. */

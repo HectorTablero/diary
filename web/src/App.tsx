@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage';
 import {
   CalendarPage,
   DiaryDayPage,
+  ImportContactsPage,
   PeopleListPage,
   PersonProfilePage,
   SearchPage,
@@ -33,6 +34,8 @@ export const router = createBrowserRouter([
       { path: 'diary/:date', element: withSuspense(<DiaryDayPage />) },
       { path: 'calendar', element: withSuspense(<CalendarPage />) },
       { path: 'people', element: withSuspense(<PeopleListPage />) },
+      // Ahead of `people/:id` so the literal segment always wins the match.
+      { path: 'people/import', element: withSuspense(<ImportContactsPage />) },
       { path: 'people/:id', element: withSuspense(<PersonProfilePage />) },
       { path: 'search', element: withSuspense(<SearchPage />) },
       { path: 'tags', element: withSuspense(<TagsPage />) },
@@ -57,11 +60,14 @@ if (isNative) {
     else void CapApp.exitApp();
   });
 
-  // Tapping a checkup/daily-reminder notification opens the relevant screen.
+  // Tapping a checkup/birthday/daily-reminder notification opens the relevant screen.
   void LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
-    const extra = notification.extra as { kind: 'checkup'; personId: string } | { kind: 'daily' };
-    if (extra.kind === 'checkup') void router.navigate(`/people/${extra.personId}`);
-    else void router.navigate('/diary');
+    const extra = notification.extra as
+      | { kind: 'checkup' | 'birthday'; personId: string }
+      | { kind: 'daily' };
+    if (extra.kind === 'checkup' || extra.kind === 'birthday') {
+      void router.navigate(`/people/${extra.personId}`);
+    } else void router.navigate('/diary');
   });
 
   // Resuming the app is the main way we notice a day has rolled over (there's

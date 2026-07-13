@@ -19,6 +19,16 @@ export interface LeanTag {
 export interface LeanPerson {
   _id: Types.ObjectId;
   name: string;
+  // All optional: documents created before contact metadata existed simply lack these keys,
+  // and the `??` defaults in personToDto are what let them map without a migration.
+  aliases?: string[];
+  phone?: string | null;
+  email?: string | null;
+  wechatId?: string | null;
+  birthday?: string | null;
+  company?: string | null;
+  jobTitle?: string | null;
+  contactId?: string | null;
   tags: LeanTag[];
   notes?: string;
   checkupIntervalDays?: number | null;
@@ -59,6 +69,14 @@ export const personRefToDto = (person: { _id: Types.ObjectId; name: string }): P
 export const personToDto = (person: LeanPerson): PersonDto => ({
   id: person._id.toString(),
   name: person.name,
+  aliases: person.aliases ?? [],
+  phone: person.phone ?? null,
+  email: person.email ?? null,
+  wechatId: person.wechatId ?? null,
+  birthday: person.birthday ?? null,
+  company: person.company ?? null,
+  jobTitle: person.jobTitle ?? null,
+  contactId: person.contactId ?? null,
   tags: person.tags.map(tagToDto),
   notes: person.notes ?? '',
   checkupIntervalDays: person.checkupIntervalDays ?? null,

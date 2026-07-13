@@ -1,10 +1,17 @@
 import { z } from 'zod';
 import {
   AI_MAX_TRANSCRIPT_LENGTH,
+  BIRTHDAY_REGEX,
   DATE_KEY_REGEX,
   HEX_COLOR_REGEX,
+  MAX_ALIAS_LENGTH,
+  MAX_ALIASES,
   MAX_CONTENT_LENGTH,
+  MAX_EMAIL_LENGTH,
   MAX_NOTES_LENGTH,
+  MAX_ORGANIZATION_LENGTH,
+  MAX_PHONE_LENGTH,
+  MAX_WECHAT_ID_LENGTH,
   OBJECT_ID_REGEX,
 } from './constants';
 
@@ -42,18 +49,45 @@ export const entryUpdateSchema = z.object({
 
 // --- People ---
 
+export const aliasesSchema = z.array(z.string().trim().min(1).max(MAX_ALIAS_LENGTH)).max(MAX_ALIASES);
+/** Stored as-is even when it isn't E.164: an imported local-format number is still worth
+    keeping (the UI flags it), and only the edit form insists on a full international number. */
+export const phoneSchema = z.string().trim().max(MAX_PHONE_LENGTH).nullable();
+export const emailSchema = z.string().trim().max(MAX_EMAIL_LENGTH).nullable();
+export const wechatIdSchema = z.string().trim().max(MAX_WECHAT_ID_LENGTH).nullable();
+export const birthdaySchema = z.string().regex(BIRTHDAY_REGEX, 'expected YYYY-MM-DD or --MM-DD').nullable();
+export const organizationSchema = z.string().trim().max(MAX_ORGANIZATION_LENGTH).nullable();
+
 export const personCreateSchema = z.object({
   id: objectIdSchema.optional(),
   createdAt: isoDateTimeSchema.optional(),
   name: z.string().trim().min(1).max(100),
+  aliases: aliasesSchema.default([]),
+  phone: phoneSchema.default(null),
+  email: emailSchema.default(null),
+  wechatId: wechatIdSchema.default(null),
+  birthday: birthdaySchema.default(null),
+  company: organizationSchema.default(null),
+  jobTitle: organizationSchema.default(null),
+  contactId: z.string().trim().max(200).nullable().default(null),
   tags: z.array(objectIdSchema).max(50).default([]),
   notes: z.string().max(MAX_NOTES_LENGTH).default(''),
   /** When omitted, the server copies the account's default checkup interval. */
   checkupIntervalDays: checkupIntervalDaysSchema.optional(),
 });
 
+// Every field optional and never defaulted — same reasoning as settingsSchema below: a PATCH
+// queued by an older client (one that predates these fields) must not blank them on replay.
 export const personUpdateSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
+  aliases: aliasesSchema.optional(),
+  phone: phoneSchema.optional(),
+  email: emailSchema.optional(),
+  wechatId: wechatIdSchema.optional(),
+  birthday: birthdaySchema.optional(),
+  company: organizationSchema.optional(),
+  jobTitle: organizationSchema.optional(),
+  contactId: z.string().trim().max(200).nullable().optional(),
   tags: z.array(objectIdSchema).max(50).optional(),
   notes: z.string().max(MAX_NOTES_LENGTH).optional(),
   checkupIntervalDays: checkupIntervalDaysSchema.optional(),
