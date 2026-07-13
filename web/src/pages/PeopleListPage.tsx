@@ -42,10 +42,14 @@ function sortPeople(people: PersonListItem[], sort: SortOption): PersonListItem[
 function PersonRow({
   person,
   onEdit,
+  matchedAliases,
   checkupPending = false,
 }: {
   person: PersonListItem;
   onEdit: (person: PersonListItem) => void;
+  /** Nicknames that matched the current search — shown so a hit on "Mum" explains why
+      Carmen is in the results. */
+  matchedAliases?: string[];
   checkupPending?: boolean;
 }) {
   const { t } = useTranslation();
@@ -60,6 +64,12 @@ function PersonRow({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{person.name}</p>
+          {matchedAliases && matchedAliases.length > 0 && (
+            <p className="truncate text-xs text-muted-foreground">
+              {t('people.alsoKnownAs')}{' '}
+              <span className="font-medium text-foreground">{matchedAliases.join(', ')}</span>
+            </p>
+          )}
           {person.tags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {person.tags.slice(0, 4).map((tag) => (
@@ -110,14 +120,26 @@ export default function PeopleListPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<PersonDto | null>(null);
 
+  /* Which nicknames each person matched the query on. Doubles as the search rule itself — a
+     person is a hit if their name matches *or* any alias does, so searching "Mum" finds Carmen. */
+  const aliasMatches = useMemo(() => {
+    const matches = new Map<string, string[]>();
+    if (!query.trim()) return matches;
+    for (const person of people ?? []) {
+      const hits = person.aliases.filter((alias) => fuzzyIncludes(alias, query));
+      if (hits.length) matches.set(person.id, hits);
+    }
+    return matches;
+  }, [people, query]);
+
   const filtered = useMemo(() => {
     const matching = (people ?? []).filter(
       (p) =>
-        (!query || fuzzyIncludes(p.name, query)) &&
+        (!query || fuzzyIncludes(p.name, query) || aliasMatches.has(p.id)) &&
         (tagFilter.length === 0 || p.tags.some((tag) => tagFilter.includes(tag.id))),
     );
     return sortPeople(matching, sort);
-  }, [people, query, sort, tagFilter]);
+  }, [people, query, sort, tagFilter, aliasMatches]);
 
   // Pending checkups always float to the top, as their own category; the chosen
   // sort still applies within each group since it's just a filter over `filtered`.
@@ -220,14 +242,25 @@ export default function PeopleListPage() {
               </div>
               <ul className="flex flex-col gap-2">
                 {pendingCheckups.map((person) => (
-                  <PersonRow key={person.id} person={person} onEdit={setEditing} checkupPending />
+                  <PersonRow
+                    key={person.id}
+                    person={person}
+                    onEdit={setEditing}
+                    matchedAliases={aliasMatches.get(person.id)}
+                    checkupPending
+                  />
                 ))}
               </ul>
             </div>
             {rest.length > 0 && (
               <ul className="flex flex-col gap-2 border-t pt-4">
                 {rest.map((person) => (
-                  <PersonRow key={person.id} person={person} onEdit={setEditing} />
+                  <PersonRow
+                    key={person.id}
+                    person={person}
+                    onEdit={setEditing}
+                    matchedAliases={aliasMatches.get(person.id)}
+                  />
                 ))}
               </ul>
             )}
@@ -235,7 +268,12 @@ export default function PeopleListPage() {
         ) : (
           <ul className="flex flex-col gap-2">
             {filtered.map((person) => (
-              <PersonRow key={person.id} person={person} onEdit={setEditing} />
+              <PersonRow
+                key={person.id}
+                person={person}
+                onEdit={setEditing}
+                matchedAliases={aliasMatches.get(person.id)}
+              />
             ))}
           </ul>
         )

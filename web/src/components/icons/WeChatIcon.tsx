@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 export function WeChatIcon({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 1024 1024"
+      viewBox="175 200 700 700"
       fill="currentColor"
       aria-hidden="true"
       className={cn('size-4 shrink-0', className)}
