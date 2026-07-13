@@ -35,6 +35,17 @@ export const telLink = (phone: string): string => `tel:${normalizePhone(phone)}`
 
 export const mailtoLink = (email: string): string => `mailto:${email.trim()}`;
 
-/** Opens a WeChat chat in the installed app. */
-export const wechatLink = (wechatId: string): string =>
-  `weixin://dl/chat?${encodeURIComponent(wechatId.trim())}`;
+/*
+ * WeChat has no public deep link that opens a chat with a given person.
+ *
+ * `weixin://dl/...` only exposes a handful of fixed destinations (the app itself, the scanner,
+ * Moments…) — there is no documented `chat?id=` form, and passing one lands on WeChat's own
+ * "Sorry, this page is not available." A person's real WeChat QR encodes an opaque server-issued
+ * token (`http://weixin.qq.com/r/…`), which cannot be derived from their WeChat ID.
+ *
+ * So the honest best is: open the app and put the ID on the clipboard, ready to paste into
+ * WeChat's search. That's the same workaround every third-party app lands on.
+ */
+
+/** Opens the WeChat app (or desktop client) — no chat can be targeted. */
+export const WECHAT_APP_URL = 'weixin://';

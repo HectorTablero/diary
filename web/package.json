@@ -10,8 +10,9 @@
     "build:app": "tsc --noEmit && vite build --mode app && cap sync android",
     "app:open": "cap open android",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "preview": "vite preview"
+    "test": "tsx scripts/checkI18n.ts && vitest run",
+    "preview": "vite preview",
+    "check:i18n": "tsx scripts/checkI18n.ts"
   },
   "dependencies": {
     "@capacitor-community/contacts": "^7.2.0",
