@@ -1,5 +1,5 @@
 import type { EntryCreateInput, EntryUpdateInput } from '@diary/shared';
-import { buildEntryTree, MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
 import { Types } from 'mongoose';
 import { badRequest, notFound } from '../errors';
 import { recordDeletions } from '../models/deletion';
@@ -34,11 +34,6 @@ async function assertDepthAllowed(userId: string, parentId: string) {
     if (!current) break;
   }
   if (depth > MAX_SUB_ENTRY_DEPTH) throw badRequest('entry.max_depth');
-}
-
-export async function getDayEntries(userId: string, dateKey: string) {
-  const entries = await Entry.find({ userId, dateKey }).populate(ENTRY_POPULATE).lean();
-  return buildEntryTree((entries as unknown as LeanEntry[]).map(entryToDto));
 }
 
 /** Bump the checkup clock: marking something as said counts as a real interaction.

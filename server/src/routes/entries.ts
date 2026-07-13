@@ -1,27 +1,17 @@
-import { dayQuerySchema, entryCreateSchema, entryUpdateSchema, OBJECT_ID_REGEX } from '@diary/shared';
+import { entryCreateSchema, entryUpdateSchema, OBJECT_ID_REGEX } from '@diary/shared';
 import { Hono } from 'hono';
 import { notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
-import { jsonValidator, queryValidator } from '../middleware/validate';
-import {
-  createEntry,
-  deleteEntry,
-  getDayEntries,
-  setHidden,
-  setSaid,
-  updateEntry,
-} from '../services/entryService';
+import { jsonValidator } from '../middleware/validate';
+import { createEntry, deleteEntry, setHidden, setSaid, updateEntry } from '../services/entryService';
 
 const oid = (value: string) => {
   if (!OBJECT_ID_REGEX.test(value)) throw notFound('errors.not_found');
   return value;
 };
 
+/* Writes only — a day's entries are read straight from the client's own Dexie store. */
 export const entriesRouter = new Hono<AppEnv>()
-  .get('/', queryValidator(dayQuerySchema), async (c) => {
-    const { date } = c.req.valid('query');
-    return c.json({ entries: await getDayEntries(c.get('userId'), date) });
-  })
   .post('/', jsonValidator(entryCreateSchema), async (c) => {
     const entry = await createEntry(c.get('userId'), c.req.valid('json'));
     return c.json(entry, 201);
