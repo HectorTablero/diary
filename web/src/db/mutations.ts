@@ -4,6 +4,7 @@ import type {
   EntryUpdateInput,
   PersonCreateInput,
   PersonDto,
+  PersonEventInput,
   PersonUpdateInput,
   SaidMark,
   SettingsDto,
@@ -216,6 +217,7 @@ export async function createPerson(input: PersonCreateInput): Promise<PersonDto>
     company: input.company ?? null,
     jobTitle: input.jobTitle ?? null,
     contactId: input.contactId ?? null,
+    events: input.events ?? [],
     tagIds: input.tags,
     notes: input.notes,
     checkupIntervalDays,
@@ -262,6 +264,7 @@ export async function updatePerson(personId: string, input: PersonUpdateInput): 
       if (input.company !== undefined) p.company = input.company;
       if (input.jobTitle !== undefined) p.jobTitle = input.jobTitle;
       if (input.contactId !== undefined) p.contactId = input.contactId;
+      if (input.events !== undefined) p.events = input.events;
       if (input.notes !== undefined) p.notes = input.notes;
       if (input.tags !== undefined) p.tagIds = input.tags;
       if (input.checkupIntervalDays !== undefined) p.checkupIntervalDays = input.checkupIntervalDays;
@@ -377,6 +380,7 @@ export async function importPeople(items: ImportItem[]): Promise<{ created: numb
       company: candidate.company,
       jobTitle: candidate.jobTitle,
       contactId: candidate.contactId,
+      events: [],
       tagIds: [],
       notes: '',
       checkupIntervalDays: settings.defaultCheckupIntervalDays,
@@ -412,6 +416,55 @@ export async function importPeople(items: ImportItem[]): Promise<{ created: numb
   await enqueueBatch(ops);
 
   return { created: creates.length, merged: updates.length };
+}
+
+// --- Person events ---
+
+async function requireLocalPerson(personId: string): Promise<LocalPerson> {
+  const person = await db.people.get(personId);
+  if (!person) throw new ApiError(404, 'person.not_found');
+  return person;
+}
+
+/** Add a new event, or replace the existing one with the same id. */
+export async function saveEvent(personId: string, event: PersonEventInput): Promise<PersonDto> {
+  const person = await requireLocalPerson(personId);
+  const existing = person.events ?? [];
+  const events = existing.some((e) => e.id === event.id)
+    ? existing.map((e) => (e.id === event.id ? { ...e, ...event } : e))
+    : [...existing, event];
+  // Rides the ordinary person PATCH — the events array is just another field on the person.
+  return updatePerson(personId, { events });
+}
+
+export async function deleteEvent(personId: string, eventId: string): Promise<PersonDto> {
+  const person = await requireLocalPerson(personId);
+  const events = (person.events ?? []).filter((event) => event.id !== eventId);
+  return updatePerson(personId, { events });
+}
+
+/**
+ * Clear an event's follow-up. Unlike saving an event this is NOT a plain field patch: asking
+ * someone how their trip went is an interaction, so it also bumps lastCheckupAt. The server route
+ * applies the identical rule, which is what keeps the two sides converged after a replay.
+ */
+export async function markEventAsked(personId: string, eventId: string): Promise<PersonDto> {
+  const person = await requireLocalPerson(personId);
+  if (!(person.events ?? []).some((event) => event.id === eventId)) {
+    throw new ApiError(404, 'person.not_found');
+  }
+  const now = nowIso();
+  await db.people
+    .where('id')
+    .equals(personId)
+    .modify((p) => {
+      p.events = (p.events ?? []).map((event) =>
+        event.id === eventId ? { ...event, askedAt: now } : event,
+      );
+    });
+  await bumpLastCheckup([personId], now);
+  await enqueue('PUT', `/people/${personId}/events/${eventId}/asked`);
+  return getPerson(personId);
 }
 
 export async function markCheckup(personId: string): Promise<PersonDto> {

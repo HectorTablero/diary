@@ -1,4 +1,5 @@
-import type { EntryDto, PersonDto, SaidMark, TagDto } from '@diary/shared';
+import type { EntryDto, PersonDto, PersonEventDto, SaidMark, TagDto } from '@diary/shared';
+import { normalizeBirthday } from '@diary/shared';
 import Dexie, { type EntityTable } from 'dexie';
 
 /* Local-first store: the source of truth the UI reads from. Entries and people
@@ -32,6 +33,7 @@ export interface LocalPerson {
   company: string | null;
   jobTitle: string | null;
   contactId: string | null;
+  events: PersonEventDto[];
   tagIds: string[];
   notes: string;
   checkupIntervalDays: number | null;
@@ -95,23 +97,28 @@ db.version(2)
       }),
   );
 
-/* ┌─ DROP THE LEGACY BIRTHDAY SHIM AT THE NEXT UPVERSION ────────────────────────────────────┐
-   │ An early build stored year-less birthdays as `---10-10` (three dashes) instead of        │
-   │ `--10-10`. Those rows still exist here and on the server, so `normalizeBirthday` is       │
-   │ currently applied on every read (parseBirthday) and every write (the Zod birthdaySchema). │
-   │                                                                                          │
-   │ Whoever adds db.version(3) — for whatever reason — should fold this migration in:         │
-   │                                                                                          │
-   │   db.version(3).stores({ ...same as v2 }).upgrade((tx) =>                                 │
-   │     tx.table<LocalPerson>('people').toCollection().modify((person) => {                   │
-   │       if (person.birthday) person.birthday = normalizeBirthday(person.birthday);          │
-   │     }),                                                                                   │
-   │   );                                                                                      │
-   │                                                                                          │
-   │ then delete LEGACY_YEARLESS_BIRTHDAY_REGEX + normalizeBirthday from shared/constants.ts   │
-   │ and their two call sites. Server-side rows heal on their own: any PATCH that touches a    │
-   │ birthday rewrites it to the canonical form.                                               │
-   └──────────────────────────────────────────────────────────────────────────────────────────┘ */
+/* v3 adds person events. It also settles the debt the v2 block left behind: an early build wrote
+   year-less birthdays as `---10-10` (three dashes) instead of `--10-10`, and the marker parked here
+   asked whoever bumped the version next to migrate them. Doing it now means `normalizeBirthday`
+   only has to survive as a read-side shim for rows this upgrade hasn't reached yet (a client that
+   hasn't opened the app since), not forever. */
+db.version(3)
+  .stores({
+    entries: 'id, dateKey, parentId, *tagIds, *peopleIds',
+    people: 'id, name, *aliases, contactId',
+    tags: 'id, name',
+    outbox: '++seq',
+    meta: 'key',
+  })
+  .upgrade((tx) =>
+    tx
+      .table<LocalPerson>('people')
+      .toCollection()
+      .modify((person) => {
+        person.events ??= [];
+        if (person.birthday) person.birthday = normalizeBirthday(person.birthday);
+      }),
+  );
 
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
@@ -138,6 +145,7 @@ export const personFromDto = (dto: PersonDto): LocalPerson => ({
   company: dto.company,
   jobTitle: dto.jobTitle,
   contactId: dto.contactId,
+  events: dto.events,
   tagIds: dto.tags.map((t) => t.id),
   notes: dto.notes,
   checkupIntervalDays: dto.checkupIntervalDays,

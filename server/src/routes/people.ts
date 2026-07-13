@@ -74,6 +74,7 @@ export const peopleRouter = new Hono<AppEnv>()
             company: input.company,
             jobTitle: input.jobTitle,
             contactId: input.contactId,
+            events: input.events,
             tags: await ownedTagIds(userId, input.tags),
             notes: input.notes,
             checkupIntervalDays,
@@ -112,6 +113,8 @@ export const peopleRouter = new Hono<AppEnv>()
     if (input.company !== undefined) person.company = input.company;
     if (input.jobTitle !== undefined) person.jobTitle = input.jobTitle;
     if (input.contactId !== undefined) person.contactId = input.contactId;
+    // Mongoose casts the ISO strings in askedAt/createdAt to Dates on save.
+    if (input.events !== undefined) person.set('events', input.events);
     if (input.notes !== undefined) person.notes = input.notes;
     if (input.tags !== undefined) person.tags = await ownedTagIds(userId, input.tags);
     if (input.checkupIntervalDays !== undefined) person.checkupIntervalDays = input.checkupIntervalDays;
@@ -148,6 +151,23 @@ export const peopleRouter = new Hono<AppEnv>()
     )
       .populate(PERSON_POPULATE)
       .lean();
+    if (!person) throw notFound('person.not_found');
+    return c.json(personToDto(person as unknown as LeanPerson));
+  })
+  /* Its own route rather than a plain PATCH of the events array, because asking someone how their
+     trip went *is* an interaction: it has to bump lastCheckupAt too. The client applies the same
+     rule locally (mutations.markEventAsked), so the two converge — same contract as /checkup. */
+  .put('/:id/events/:eventId/asked', async (c) => {
+    const userId = c.get('userId');
+    const now = new Date();
+    const person = await Person.findOneAndUpdate(
+      { _id: oid(c.req.param('id')), userId, 'events.id': c.req.param('eventId') },
+      { $set: { 'events.$.askedAt': now, lastCheckupAt: now } },
+      { new: true },
+    )
+      .populate(PERSON_POPULATE)
+      .lean();
+    // Also covers "the person exists but has no such event" — the filter above requires both.
     if (!person) throw notFound('person.not_found');
     return c.json(personToDto(person as unknown as LeanPerson));
   })

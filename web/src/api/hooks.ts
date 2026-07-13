@@ -4,6 +4,8 @@ import type {
   EntryCreateInput,
   EntryUpdateInput,
   PersonCreateInput,
+  PersonDto,
+  PersonEventInput,
   PersonUpdateInput,
   SettingsInput,
   TagCreateInput,
@@ -104,6 +106,35 @@ export function useMarkCheckup() {
     },
   });
 }
+
+/* Person events. All three seed ['people', id] with the returned person so the profile updates
+   instantly, then invalidate ['people'] — a prefix, so the list and every tab refresh with it. */
+
+function usePersonEventMutation<TArgs>(mutate: (args: TArgs) => Promise<PersonDto>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: mutate,
+    onSuccess: (data) => {
+      qc.setQueryData(['people', data.id], data);
+      qc.invalidateQueries({ queryKey: ['people'] });
+    },
+  });
+}
+
+export const useSaveEvent = () =>
+  usePersonEventMutation(({ personId, event }: { personId: string; event: PersonEventInput }) =>
+    mutations.saveEvent(personId, event),
+  );
+
+export const useDeleteEvent = () =>
+  usePersonEventMutation(({ personId, eventId }: { personId: string; eventId: string }) =>
+    mutations.deleteEvent(personId, eventId),
+  );
+
+export const useMarkEventAsked = () =>
+  usePersonEventMutation(({ personId, eventId }: { personId: string; eventId: string }) =>
+    mutations.markEventAsked(personId, eventId),
+  );
 
 export const useTalkingPoints = (personId: string) =>
   useQuery({

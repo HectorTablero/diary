@@ -1,5 +1,5 @@
-import { importanceWeight, MATCH_STRENGTH, type MatchType } from './constants';
-import type { EntryDto, EntryNode, SettingsDto, TalkingPointNode } from './types';
+import { EVENT_REMEMBER_MULTIPLIER, importanceWeight, MATCH_STRENGTH, type MatchType } from './constants';
+import type { EntryDto, EntryNode, PersonEventDto, SettingsDto, TalkingPointNode } from './types';
 
 /* Pure talking-points / memories math, shared verbatim by the API and the
    local-first client so the two can never drift apart. */
@@ -151,6 +151,73 @@ export function buildTalkingPointForest(
   kept.sort((a, b) => maxScore(b) - maxScore(a) || b.dateKey.localeCompare(a.dateKey));
   return kept;
 }
+
+/* --- Person events -------------------------------------------------------------------------
+   Something happened to someone; once it's over, you owe them a "how did it go?". That follow-up
+   decays: it's forgotten once EVENT_REMEMBER_MULTIPLIER × the event's own length has passed, so a
+   one-day thing goes stale in a week while a fortnight's holiday stays live for over three months.
+
+   Everything here compares *date keys*, never timestamps. `Date.parse('2026-07-13')` is UTC
+   midnight whereas `Date.now()` is local, so differencing the two (as `ageInDays` above does, quite
+   correctly for entry decay) drifts by up to a day near midnight. For "has this event ended yet?"
+   that's the difference between nagging a day early and not at all — so both sides are date keys,
+   and the caller passes today's *local* key from lib/dates.ts. */
+
+/** The minimum an event has to look like for the follow-up math. */
+export type EventLike = Pick<PersonEventDto, 'startDate' | 'endDate' | 'askedAt'>;
+
+/** Whole days between two date keys. Both parse as UTC midnight, so this is an exact integer. */
+const daysBetweenKeys = (from: string, to: string): number =>
+  Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
+
+/** A missing end date means the event began and ended on the same day. */
+export const eventEndKey = (event: EventLike): string => event.endDate ?? event.startDate;
+
+/** Inclusive length: a single-day event is 1, not 0. */
+export const eventLengthDays = (event: EventLike): number =>
+  Math.max(1, daysBetweenKeys(event.startDate, eventEndKey(event)) + 1);
+
+/** How many days after it ends the event is still worth asking about. */
+export const eventRememberDays = (event: EventLike): number =>
+  EVENT_REMEMBER_MULTIPLIER * eventLengthDays(event);
+
+export const isEventOngoing = (event: EventLike, todayKey: string): boolean =>
+  event.startDate <= todayKey && todayKey <= eventEndKey(event);
+
+export const isEventUpcoming = (event: EventLike, todayKey: string): boolean =>
+  todayKey < event.startDate;
+
+/**
+ * How badly you still owe this person a "how did it go?".
+ *
+ * ~1.0 the day after the event ends, halving every half of the remember window, and exactly 0 once
+ * the window lapses — or the moment it's marked asked. Longer events therefore stay urgent longer
+ * and outrank shorter ones of the same age, which falls straight out of the maths.
+ */
+export function eventFollowUpScore(event: EventLike, todayKey: string): number {
+  if (event.askedAt) return 0;
+  const daysSinceEnd = daysBetweenKeys(eventEndKey(event), todayKey);
+  // Still running, or it only ended today — don't nag them the same evening.
+  if (daysSinceEnd < 1) return 0;
+  const rememberDays = eventRememberDays(event);
+  if (daysSinceEnd > rememberDays) return 0; // decayed away
+  return Math.exp((-daysSinceEnd * Math.LN2) / (rememberDays / 2));
+}
+
+export const isEventFollowUpDue = (event: EventLike, todayKey: string): boolean =>
+  eventFollowUpScore(event, todayKey) > 0;
+
+/** Events still awaiting a "how did it go?", most urgent first. */
+export function pendingEventFollowUps<T extends EventLike>(events: T[], todayKey: string): T[] {
+  return events
+    .map((event) => ({ event, score: eventFollowUpScore(event, todayKey) }))
+    .filter((scored) => scored.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((scored) => scored.event);
+}
+
+export const ongoingEvents = <T extends EventLike>(events: T[], todayKey: string): T[] =>
+  events.filter((event) => isEventOngoing(event, todayKey));
 
 /** Minimal shape needed to group matches into clusters, without the display fields
     (content, tag/person names) a full EntryDto carries — cheap to build for a batch scan. */
