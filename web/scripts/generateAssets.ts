@@ -123,7 +123,7 @@ async function generateLegacyIcons(): Promise<void> {
     const outPath = path.join(outDir, 'ic_launcher.png');
 
     await sharp(SVG_SOURCE)
-      .resize(size, size, { fit: 'contain', background: WHITE })
+      .resize(size, size, { fit: 'contain', background: TRANSPARENT })
       .png()
       .toFile(outPath);
 
@@ -140,7 +140,7 @@ async function generateRoundIcons(): Promise<void> {
     const outPath = path.join(outDir, 'ic_launcher_round.png');
 
     await sharp(SVG_SOURCE)
-      .resize(size, size, { fit: 'contain', background: WHITE })
+      .resize(size, size, { fit: 'contain', background: TRANSPARENT })
       .png()
       .toFile(outPath);
 
@@ -214,7 +214,7 @@ async function generateStoreAsset(): Promise<void> {
   await ensureDir(outDir);
 
   await sharp(SVG_SOURCE)
-    .resize(1024, 1024, { fit: 'contain', background: WHITE })
+    .resize(1024, 1024, { fit: 'contain', background: TRANSPARENT })
     .png()
     .toFile(path.join(outDir, 'store-1024x1024.png'));
   log('  ✓ store-1024x1024.png (for Google Play Console)');

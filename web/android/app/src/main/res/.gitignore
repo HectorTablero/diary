@@ -1,0 +1,7 @@
+# Ignore generated density-specific launcher assets.
+mipmap-ldpi
+mipmap-mdpi
+mipmap-hdpi
+mipmap-xhdpi
+mipmap-xxhdpi
+mipmap-xxxhdpi
