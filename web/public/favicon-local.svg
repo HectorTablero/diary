@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
-  <g fill="none">
-    <path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke="rgb(220, 70, 70)" stroke-width="50" d="M 100 100 L 100 400" />
-    <path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke="rgb(220, 70, 70)" stroke-width="50" d="M 175 100 L 400 250 L 175 400" />
-    <path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke="rgb(220, 70, 70)" stroke-width="50" d="M 200 250 L 100 250" />
-  </g>
-</svg>
