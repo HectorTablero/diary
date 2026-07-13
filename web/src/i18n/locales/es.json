@@ -81,18 +81,18 @@
   "importance": {
     "label": "Importancia",
     "levels": {
-      "1": "Cambio de vida",
+      "1": "Transformativo",
       "2": "Significativo",
-      "3": "Anecdótico",
-      "4": "Evento",
-      "5": "Pensamiento"
+      "3": "Notable",
+      "4": "Casual",
+      "5": "Rutinario"
     },
     "descriptions": {
-      "1": "Grandes eventos vitales como casarse, un nuevo trabajo, mudarse a otro país",
-      "2": "Desarrollos personales importantes y experiencias significativas",
-      "3": "Historias interesantes y momentos memorables",
-      "4": "Acontecimientos rutinarios y pequeñas observaciones",
-      "5": "Pensamientos casuales y anécdotas triviales del día a día"
+      "1": "Eventos que cambian la vida como casarse, un nuevo trabajo, mudarse al extranjero",
+      "2": "Desarrollos personales, experiencias y logros memorables",
+      "3": "Momentos significativos e hitos sólidos que hacen que una semana sea especial",
+      "4": "Desviaciones de la norma, desarrollo de habilidades prácticas o pequeños objetivos",
+      "5": "Sucesos cotidianos y tareas triviales"
     }
   },
   "diary": {

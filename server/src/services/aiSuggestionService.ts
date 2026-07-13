@@ -159,33 +159,36 @@ function buildSystemPrompt(tags: TagRef[], dateKey: string, language: string, fo
 
 Take your time and prioritize correctness over speed. Reason carefully about the transcript before using tools or submitting the final result.
 
-The entries you submit are always filed under the date ${dateKey} (today is ${today}) — use any relative dates mentioned in the transcript ("yesterday", "last week") only to understand context, never to change where the entry is filed.
-${forceEnglishAIEvents
-  ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").`
-  : `Write every "content" field in the same language as the transcript (app language hint: "${language}").`}
+### 1. Core Extraction Rules
+- The entries you submit are always filed under the date ${dateKey} (today is ${today}). Use any relative dates mentioned ("yesterday", "last week") ONLY to understand context, never to change where the entry is filed.
+- ${forceEnglishAIEvents ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").` : `Write every "content" field in the same language as the transcript (app language hint: "${language}").`}
+- Split the transcript into concise, first-person diary bullet points.
+- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under the parent event. You may nest these sub-entries up to exactly ${MAX_SUB_ENTRY_DEPTH} levels deep to create a clean, hierarchical summary.
+- Never invent facts that are not in the transcript. If the transcript is ambiguous, prefer a conservative interpretation.
 
-Split the transcript into concise, first-person diary bullet points. Use "children" for sub-details that belong under a parent point, nested up to ${MAX_SUB_ENTRY_DEPTH} levels deep. Never invent facts that are not in the transcript.
+### 2. Importance Scale (1 = highest ... 5 = lowest)
+1. Transformative: Major milestones that permanently shift your life trajectory (e.g., Admission to a Master's program, starting a serious relationship, landing a career-defining job, moving abroad, launching a new business, or completing a multi-year project).
+2. Significant: Highly memorable achievements or major experiences that define a given year (e.g., Graduation, taking a long international trip, or hitting a massive project goal).
+3. Notable: Meaningful moments and solid milestones that make a week special (e.g., A short weekend getaway, great progress on a project you care about, or solid feature additions like bundling an app).
+4. Minor: Small deviations from the norm or practical skill-building (e.g., Learning to drive, going out to a nice dinner, attending a local event, or nice project improvements).
+5. Routinary: Standard, everyday happenings, necessary daily tasks, and basic maintenance (e.g., Going grocery shopping, doing household chores, standard bug fixes, or updating dependencies).
 
-Importance scale (1 = highest ... 5 = lowest): 1 = life-changing event, 2 = significant, 3 = anecdotal, 4 = routine event, 5 = casual thought. Default to 3 or 4 unless the transcript clearly signals otherwise.
-
+### 3. Tagging Convention
 Existing tags (id: name) — you may ONLY reference these ids/names, never invent a new one:
 ${tagLines}
 
-People convention: before writing about a specific named person, call query_people with their name. If a confident match is found, put their id in the entry's "people" array and write "@ExactName" in the content using the EXACT name query_people returned. If no confident match is found, write their name as plain text without "@".
+A tag can be linked in TWO ways (both are combined into one set, so use whichever fits best):
+- In the "tags" array: Put its ID here when the name doesn't fit naturally into the sentence (e.g., { content: "Did A with @B", tags: ["<id of tagC>"] }).
+- Inline text: Write "#TagName" in the content using the EXACT name from the list above when it reads naturally (e.g., { content: "#Trip with @A to B", tags: [] }).
 
-If the transcript is ambiguous, prefer a conservative interpretation and verify uncertain names, nicknames, or spelling variants with query_people before deciding.
+### 4. People & Name Verification
+Be aggressive about tool calls. If the transcript contains anything that could be a person's name (capitalized tokens, unusual proper-name words), treat it as a candidate. 
+- Step 1: Call \`query_people\` with the name. Do not rely on your internal memory; use the tool to verify. 
+- Step 2: Account for transcription errors. Audio transcripts often mangle names (e.g., transcribing "Ibón" as "Yvonne" or "Ivonne"). If a name looks plausible but isn't an exact match, try querying similar-sounding variants.
+- Step 3: If a confident match is found, put their ID in the entry's "people" array AND write "@ExactName" in the content using the EXACT name the tool returned.
+- Step 4: If no confident match is found after checking variants, write their name as plain text without the "@".
 
-Be aggressive about tool calls: if the transcript contains anything that could be a person name, treat it as a candidate and call query_people before deciding. This includes capitalized tokens, unusual proper-name-looking words, and any name-like phrase that could plausibly refer to someone in the user's profile.
-
-Do not rely on the model's memory of known people; use the tool to verify the match before deciding whether to tag the person or leave the name as plain text. Remember that the transcription may be slightly inaccurate, especially for names, so if a name looks plausible but not exact, assume the transcript may have mangled it and try similar-sounding variants too. For example: if the transcript contains "Ivonne" or "Yvonne" instead of "Ibón", which is the most likely correct spelling in my context.
-
-Remember that the transcription itself may be wrong. If a name looks plausible but not exact, assume the transcript may have mangled it and try similar-sounding variants too, because the spoken name may have been transcribed imperfectly.
-
-Tags convention: a tag can be linked EITHER by putting its id in the "tags" array (when its name doesn't fit naturally into the sentence) OR by writing "#TagName" inline in the content using the EXACT name from the list above (when it reads naturally). Both are combined into one set, so use whichever fits the sentence — never invent a name that isn't in the list. Examples:
-- { content: "Did A with @B", tags: ["<id of groupC>"] } — groupC is linked via the tags array because "#groupC" wouldn't read naturally in the sentence.
-- { content: "#Trip with @A to B", tags: [] } — Trip is written inline because it reads naturally as part of the sentence.
-
-You MUST finish by calling submit_entries exactly once, even if the list is empty.`;
+You MUST finish by calling \`submit_entries\` exactly once, even if the list is empty.`;
 }
 
 // --- Main loop ---

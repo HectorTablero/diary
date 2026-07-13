@@ -80,18 +80,18 @@
   "importance": {
     "label": "Importance",
     "levels": {
-      "1": "Life-changing",
+      "1": "Transformative",
       "2": "Significant",
-      "3": "Anecdotal",
-      "4": "Event",
-      "5": "Thought"
+      "3": "Notable",
+      "4": "Minor",
+      "5": "Routinary"
     },
     "descriptions": {
-      "1": "Major life events like getting married, a new job, moving abroad",
-      "2": "Important personal developments and meaningful experiences",
-      "3": "Interesting stories and memorable moments",
-      "4": "Routine happenings and small observations",
-      "5": "Casual thoughts and trivial daily anecdotes"
+      "1": "Life-changing events like getting married, a new job, moving abroad",
+      "2": "Memorable personal developments, experiences and achievements",
+      "3": "Meaningful moments and solid milestones that make a week special",
+      "4": "Deviations from the norm, practical skill-building or small goals",
+      "5": "Everyday happenings and trivial chores"
     }
   },
   "diary": {

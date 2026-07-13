@@ -60,7 +60,8 @@ export function ImportancePicker({
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p className="font-medium">{t(`importance.levels.${level}`)}</p>
+            <p className="font-medium mr-1">{t(`importance.levels.${level}`)}</p>
+            <div className="w-[0.75px] self-stretch bg-muted-foreground" />
             <p className="max-w-48 text-xs opacity-80">{t(`importance.descriptions.${level}`)}</p>
           </TooltipContent>
         </Tooltip>
