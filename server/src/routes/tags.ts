@@ -1,4 +1,3 @@
-import type { TagWithStats } from '@diary/shared';
 import { DEFAULT_TAG_COLORS, OBJECT_ID_REGEX, tagCreateSchema, tagUpdateSchema } from '@diary/shared';
 import { Hono } from 'hono';
 import { Types } from 'mongoose';
@@ -19,37 +18,14 @@ const oid = (value: string) => {
 const isDuplicateKey = (err: unknown): boolean =>
   typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
 
-async function usageCounts(userId: string, field: 'entries' | 'people') {
-  const Model = field === 'entries' ? Entry : Person;
-  const rows = await Model.aggregate<{ _id: Types.ObjectId; n: number }>([
-    { $match: { userId } },
-    { $unwind: '$tags' },
-    { $group: { _id: '$tags', n: { $sum: 1 } } },
-  ]);
-  return new Map(rows.map((r) => [r._id.toString(), r.n]));
-}
-
 /** First palette color not yet used by this user's tags (cycles when all are taken). */
 async function nextColor(userId: string): Promise<string> {
   const used = new Set((await Tag.find({ userId }, 'color').lean()).map((t) => t.color));
   return DEFAULT_TAG_COLORS.find((c) => !used.has(c)) ?? DEFAULT_TAG_COLORS[used.size % DEFAULT_TAG_COLORS.length];
 }
 
+/* Writes only — the tag list and its usage counts are derived on the client (repo.ts getTags). */
 export const tagsRouter = new Hono<AppEnv>()
-  .get('/', async (c) => {
-    const userId = c.get('userId');
-    const [tags, entryCounts, personCounts] = await Promise.all([
-      Tag.find({ userId }).sort({ name: 1 }).lean(),
-      usageCounts(userId, 'entries'),
-      usageCounts(userId, 'people'),
-    ]);
-    const result: TagWithStats[] = (tags as unknown as LeanTag[]).map((tag) => ({
-      ...tagToDto(tag),
-      entryCount: entryCounts.get(tag._id.toString()) ?? 0,
-      personCount: personCounts.get(tag._id.toString()) ?? 0,
-    }));
-    return c.json({ tags: result });
-  })
   .post('/', jsonValidator(tagCreateSchema), async (c) => {
     const userId = c.get('userId');
     const input = c.req.valid('json');

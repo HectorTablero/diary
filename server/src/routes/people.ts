@@ -1,22 +1,15 @@
-import type { PersonListItem } from '@diary/shared';
-import { OBJECT_ID_REGEX, pageQuerySchema, personCreateSchema, personUpdateSchema } from '@diary/shared';
+import { OBJECT_ID_REGEX, personCreateSchema, personUpdateSchema } from '@diary/shared';
 import { Hono } from 'hono';
 import { Types } from 'mongoose';
 import { conflict, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
-import { jsonValidator, queryValidator } from '../middleware/validate';
+import { jsonValidator } from '../middleware/validate';
 import { recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { personToDto, type LeanPerson } from '../dto';
 import { Tag } from '../models/tag';
-import {
-  countTalkingPoints,
-  getHistory,
-  getMemories,
-  getSettings,
-  getTalkingPoints,
-} from '../services/talkingPointsService';
+import { getSettings } from '../services/settingsService';
 
 const oid = (value: string) => {
   if (!OBJECT_ID_REGEX.test(value)) throw notFound('person.not_found');
@@ -34,19 +27,10 @@ async function ownedTagIds(userId: string, ids: string[]) {
 
 const PERSON_POPULATE = { path: 'tags', select: 'name color' };
 
+/* Writes only. The people list, a single person, talking points, memories and history are all
+   derived on the client from its Dexie store (web/src/db/repo.ts), so the server never serves
+   them — everything it needs to hand back comes through GET /sync. */
 export const peopleRouter = new Hono<AppEnv>()
-  .get('/', async (c) => {
-    const userId = c.get('userId');
-    const [people, counts] = await Promise.all([
-      Person.find({ userId }).sort({ name: 1 }).populate(PERSON_POPULATE).lean(),
-      countTalkingPoints(userId),
-    ]);
-    const result: PersonListItem[] = (people as unknown as LeanPerson[]).map((p) => ({
-      ...personToDto(p),
-      talkingPointCount: counts.get(p._id.toString()) ?? 0,
-    }));
-    return c.json({ people: result });
-  })
   .post('/', jsonValidator(personCreateSchema), async (c) => {
     const userId = c.get('userId');
     const input = c.req.valid('json');
@@ -89,13 +73,6 @@ export const peopleRouter = new Hono<AppEnv>()
       if (isDuplicateKey(err)) throw conflict('person.duplicate_name');
       throw err;
     }
-  })
-  .get('/:id', async (c) => {
-    const person = await Person.findOne({ _id: oid(c.req.param('id')), userId: c.get('userId') })
-      .populate(PERSON_POPULATE)
-      .lean();
-    if (!person) throw notFound('person.not_found');
-    return c.json(personToDto(person as unknown as LeanPerson));
   })
   .patch('/:id', jsonValidator(personUpdateSchema), async (c) => {
     const userId = c.get('userId');
@@ -170,14 +147,4 @@ export const peopleRouter = new Hono<AppEnv>()
     // Also covers "the person exists but has no such event" — the filter above requires both.
     if (!person) throw notFound('person.not_found');
     return c.json(personToDto(person as unknown as LeanPerson));
-  })
-  .get('/:id/talking-points', async (c) => {
-    return c.json(await getTalkingPoints(c.get('userId'), oid(c.req.param('id'))));
-  })
-  .get('/:id/memories', async (c) => {
-    return c.json({ memories: await getMemories(c.get('userId'), oid(c.req.param('id'))) });
-  })
-  .get('/:id/history', queryValidator(pageQuerySchema), async (c) => {
-    const { page, limit } = c.req.valid('query');
-    return c.json(await getHistory(c.get('userId'), oid(c.req.param('id')), page, limit));
   });

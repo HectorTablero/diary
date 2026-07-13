@@ -16,10 +16,8 @@ import {
 } from './services/liveSync';
 import { requireAuth, type AppEnv } from './middleware/session';
 import { aiRouter } from './routes/ai';
-import { calendarRouter, onThisDayRouter } from './routes/calendar';
 import { entriesRouter } from './routes/entries';
 import { peopleRouter } from './routes/people';
-import { searchRouter } from './routes/search';
 import { settingsRouter } from './routes/settings';
 import { syncRouter } from './routes/sync';
 import { tagsRouter } from './routes/tags';
@@ -74,13 +72,15 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
       notifyUserChanged(c.get('userId'), c.req.header('x-client-id') ?? null);
     }
   });
+  /* The client is local-first: it reads exclusively from its own Dexie store and reconciles via
+     GET /sync, so the API only needs to accept *writes* (replayed from the client's outbox) plus
+     the sync pull and the AI assistant. The read endpoints this once served — day entries, the
+     people list, talking points, memories, history, calendar, on-this-day, search — are all
+     computed on the client now (web/src/db/repo.ts) and have been removed. */
   api.route('/entries', entriesRouter);
   api.route('/people', peopleRouter);
   api.route('/tags', tagsRouter);
   api.route('/settings', settingsRouter);
-  api.route('/calendar', calendarRouter);
-  api.route('/on-this-day', onThisDayRouter);
-  api.route('/search', searchRouter);
   api.route('/sync', syncRouter);
   api.route('/ai', aiRouter);
   app.route('/api', api);
