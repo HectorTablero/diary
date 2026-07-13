@@ -15,6 +15,10 @@ import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const SILENT =
+  process.argv.includes('--silent') ||
+  process.env.npm_config_silent === 'true' ||
+  process.env.npm_config_loglevel === 'silent';
 
 const SVG_SOURCE = path.resolve(__dirname, '../public/icons/favicon-displaced.svg');
 const ANDROID_RES = path.resolve(__dirname, '../android/app/src/main/res');
@@ -71,8 +75,12 @@ async function ensureDir(dir: string): Promise<void> {
   await fs.promises.mkdir(dir, { recursive: true });
 }
 
+function log(...args: unknown[]): void {
+  if (!SILENT) console.log(...args);
+}
+
 async function generateAdaptiveForegrounds(): Promise<void> {
-  console.log('\n🎨 Generating adaptive icon foregrounds...');
+  log('\n🎨 Generating adaptive icon foregrounds...');
 
   for (const [folder, size] of Object.entries(ADAPTIVE_DENSITIES)) {
     const outDir = path.join(ANDROID_RES, folder);
@@ -84,12 +92,12 @@ async function generateAdaptiveForegrounds(): Promise<void> {
       .png()
       .toFile(outPath);
 
-    console.log(`  ✓ ${folder}: ${size}×${size}`);
+    log(`  ✓ ${folder}: ${size}×${size}`);
   }
 }
 
 async function generateAdaptiveBackgrounds(color = WHITE): Promise<void> {
-  console.log('\n🎨 Generating adaptive icon backgrounds...');
+  log('\n🎨 Generating adaptive icon backgrounds...');
 
   for (const [folder, size] of Object.entries(ADAPTIVE_DENSITIES)) {
     const outDir = path.join(ANDROID_RES, folder);
@@ -102,12 +110,12 @@ async function generateAdaptiveBackgrounds(color = WHITE): Promise<void> {
       .png()
       .toFile(outPath);
 
-    console.log(`  ✓ ${folder}: ${size}×${size}`);
+    log(`  ✓ ${folder}: ${size}×${size}`);
   }
 }
 
 async function generateLegacyIcons(): Promise<void> {
-  console.log('\n📱 Generating legacy launcher icons...');
+  log('\n📱 Generating legacy launcher icons...');
 
   for (const [folder, size] of Object.entries(LEGACY_DENSITIES)) {
     const outDir = path.join(ANDROID_RES, folder);
@@ -119,12 +127,12 @@ async function generateLegacyIcons(): Promise<void> {
       .png()
       .toFile(outPath);
 
-    console.log(`  ✓ ${folder}: ${size}×${size}`);
+    log(`  ✓ ${folder}: ${size}×${size}`);
   }
 }
 
 async function generateRoundIcons(): Promise<void> {
-  console.log('\n🔘 Generating round launcher icons...');
+  log('\n🔘 Generating round launcher icons...');
 
   for (const [folder, size] of Object.entries(LEGACY_DENSITIES)) {
     const outDir = path.join(ANDROID_RES, folder);
@@ -136,12 +144,12 @@ async function generateRoundIcons(): Promise<void> {
       .png()
       .toFile(outPath);
 
-    console.log(`  ✓ ${folder}: ${size}×${size}`);
+    log(`  ✓ ${folder}: ${size}×${size}`);
   }
 }
 
 async function generateSplashScreens(): Promise<void> {
-  console.log('\n💦 Generating splash screens...');
+  log('\n💦 Generating splash screens...');
 
   const splashSource = path.resolve(__dirname, '../assets/splash.svg');
   const splashDarkSource = path.resolve(__dirname, '../assets/splash-dark.svg');
@@ -150,7 +158,7 @@ async function generateSplashScreens(): Promise<void> {
   const hasDark = fs.existsSync(splashDarkSource);
 
   if (!hasLight && !hasDark) {
-    console.log('  (No splash.svg or splash-dark.svg found in assets/, skipping)');
+    log('  (No splash.svg or splash-dark.svg found in assets/, skipping)');
     return;
   }
 
@@ -170,12 +178,12 @@ async function generateSplashScreens(): Promise<void> {
       .png()
       .toFile(outPath);
 
-    console.log(`  ✓ ${folder}: ${w}×${h}`);
+    log(`  ✓ ${folder}: ${w}×${h}`);
   }
 }
 
 async function generateWebIcons(): Promise<void> {
-  console.log('\n🌐 Generating web/PWA icons...');
+  log('\n🌐 Generating web/PWA icons...');
 
   await ensureDir(WEB_PUBLIC);
 
@@ -183,24 +191,24 @@ async function generateWebIcons(): Promise<void> {
     .resize(192, 192, { fit: 'contain', background: TRANSPARENT })
     .png()
     .toFile(path.join(WEB_PUBLIC, 'icon-192.png'));
-  console.log('  ✓ icon-192.png');
+  log('  ✓ icon-192.png');
 
   await sharp(SVG_SOURCE)
     .resize(512, 512, { fit: 'contain', background: TRANSPARENT })
     .png()
     .toFile(path.join(WEB_PUBLIC, 'icon-512.png'));
-  console.log('  ✓ icon-512.png');
+  log('  ✓ icon-512.png');
 
   await sharp(SVG_SOURCE)
     .resize(384, 384, { fit: 'contain', background: TRANSPARENT })
     .extend({ top: 64, bottom: 64, left: 64, right: 64, background: TRANSPARENT })
     .png()
     .toFile(path.join(WEB_PUBLIC, 'icon-512-maskable.png'));
-  console.log('  ✓ icon-512-maskable.png');
+  log('  ✓ icon-512-maskable.png');
 }
 
 async function generateStoreAsset(): Promise<void> {
-  console.log('\n🏪 Generating store asset...');
+  log('\n🏪 Generating store asset...');
 
   const outDir = path.resolve(__dirname, '../assets');
   await ensureDir(outDir);
@@ -209,11 +217,11 @@ async function generateStoreAsset(): Promise<void> {
     .resize(1024, 1024, { fit: 'contain', background: WHITE })
     .png()
     .toFile(path.join(outDir, 'store-1024x1024.png'));
-  console.log('  ✓ store-1024x1024.png (for Google Play Console)');
+  log('  ✓ store-1024x1024.png (for Google Play Console)');
 }
 
 async function generateSplashIcon(): Promise<void> {
-  console.log('\n🎨 Generating Android SplashScreen icon...');
+  log('\n🎨 Generating Android SplashScreen icon...');
 
   const outDir = path.join(ANDROID_RES, 'drawable');
   await ensureDir(outDir);
@@ -263,9 +271,9 @@ async function generateSplashIcon(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  console.log('═══════════════════════════════════════════════');
-  console.log('  Diary Asset Generator');
-  console.log('═══════════════════════════════════════════════');
+  log('═══════════════════════════════════════════════');
+  log('  Diary Asset Generator');
+  log('═══════════════════════════════════════════════');
 
   if (!fs.existsSync(SVG_SOURCE)) {
     console.error(`\n❌ Source SVG not found: ${SVG_SOURCE}`);
@@ -281,9 +289,9 @@ async function main(): Promise<void> {
   await generateWebIcons();
   await generateStoreAsset();
   await generateSplashIcon();
-  console.log('\n═══════════════════════════════════════════════');
-  console.log('  ✅ All assets generated!');
-  console.log('═══════════════════════════════════════════════');
+  log('\n═══════════════════════════════════════════════');
+  log('  ✅ All assets generated!');
+  log('═══════════════════════════════════════════════');
 }
 
 main().catch((err: unknown) => {

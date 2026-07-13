@@ -65,6 +65,24 @@ export const AI_MAX_TRANSCRIPT_LENGTH = 20_000;
 export const AI_MAX_SUGGESTION_NODES = 40;
 export const AI_MAX_RECORDING_MS = 5 * 60_000;
 
+export const LOGO_COLOR = 'rgb(0, 114, 255)';
+export const LOGO_LOCAL_COLOR = 'rgb(220, 70, 70)';
+export const LOGO_STROKE_WIDTH = 50;
+export const LOGO_VIEWBOX = '0 0 500 500';
+export const LOGO_DISPLACED_VIEWBOX = '-10 0 490 500';
+
+export const BRAND_LOGO_PATHS = [
+  { d: 'M 375 250 L 50 250' },
+  { d: 'M 300 125 L 375 250 L 300 375' },
+  { d: 'M 450 100 L 450 400' },
+] as const;
+
+export const APP_LOGO_PATHS = [
+  { d: 'M 100 100 L 100 400' },
+  { d: 'M 175 100 L 400 250 L 175 400' },
+  { d: 'M 200 250 L 100 250' },
+] as const;
+
 /** Palette cycled through when creating tags without an explicit color. */
 export const DEFAULT_TAG_COLORS = [
   '#4ECDC4', // Teal

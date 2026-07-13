@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { isCheckupDue } from '@/lib/checkup';
 
 function TalkingPointsTab({ personId, personName }: { personId: string; personName: string }) {
   const { t } = useTranslation();
@@ -196,8 +197,6 @@ function HistoryTab({ personId, personName }: { personId: string; personName: st
   );
 }
 
-const DAY_MS = 86_400_000;
-
 export default function PersonProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -213,9 +212,7 @@ export default function PersonProfilePage() {
   if (isLoading) return <FullScreenSpinner />;
   if (isError || !person) return <Navigate to="/people" replace />;
 
-  const checkupDue =
-    person.checkupIntervalDays != null &&
-    Date.now() - Date.parse(person.lastCheckupAt) >= person.checkupIntervalDays * DAY_MS;
+  const checkupDue = isCheckupDue(person);
 
   return (
     <PageContainer>

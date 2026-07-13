@@ -1,10 +1,12 @@
 import { App as CapApp } from '@capacitor/app';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import AppLayout from './components/layout/AppLayout';
 import { FullScreenSpinner } from './components/common/Spinner';
 import { todayKey } from './lib/dates';
 import { isNative } from './lib/native';
+import { refreshNotifications } from './lib/notifications';
 import LoginPage from './pages/LoginPage';
 import {
   CalendarPage,
@@ -20,7 +22,7 @@ function withSuspense(element: React.ReactNode) {
   return <Suspense fallback={<FullScreenSpinner />}>{element}</Suspense>;
 }
 
-const router = createBrowserRouter([
+export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
     path: '/',
@@ -53,6 +55,19 @@ if (isNative) {
     }
     if (canGoBack) window.history.back();
     else void CapApp.exitApp();
+  });
+
+  // Tapping a checkup/daily-reminder notification opens the relevant screen.
+  void LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
+    const extra = notification.extra as { kind: 'checkup'; personId: string } | { kind: 'daily' };
+    if (extra.kind === 'checkup') void router.navigate(`/people/${extra.personId}`);
+    else void router.navigate('/diary');
+  });
+
+  // Resuming the app is the main way we notice a day has rolled over (there's
+  // no true native background poll), so re-arm reminders on every foreground.
+  void CapApp.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) refreshNotifications();
   });
 }
 

@@ -12,6 +12,7 @@ const apiPort = process.env.PORT ?? '3000';
 process.env.VITE_GOOGLE_CLIENT_ID ??= process.env.GOOGLE_CLIENT_ID;
 
 export default defineConfig({
+  envPrefix: ['VITE_', 'IS_'],
   plugins: [
     react(),
     tailwindcss(),
