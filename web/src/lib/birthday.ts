@@ -1,4 +1,4 @@
-import { BIRTHDAY_REGEX } from '@diary/shared';
+import { BIRTHDAY_REGEX, normalizeBirthday } from '@diary/shared';
 
 /* Birthdays are stored as `YYYY-MM-DD`, or `--MM-DD` when the year is unknown — phone contacts
    very often omit it, so nothing here may assume a year exists. */
@@ -12,15 +12,21 @@ export interface ParsedBirthday {
   day: number;
 }
 
-const PARTS = /^(\d{4}|--)-(\d{2})-(\d{2})$/;
+/** The year group is optional; `--` stands in for an unknown one. */
+const PARTS = /^(?:(\d{4})-|--)(\d{2})-(\d{2})$/;
 
 export function parseBirthday(value: string | null | undefined): ParsedBirthday | null {
-  if (!value || !BIRTHDAY_REGEX.test(value)) return null;
-  const match = PARTS.exec(value);
+  if (!value) return null;
+  // Tolerates the legacy `---MM-DD` rows still sitting in Dexie and Mongo. Every read in the
+  // app funnels through here, so nothing downstream has to know the old shape existed.
+  // Droppable at the next Dexie upversion — see the marker in db.ts.
+  const normalized = normalizeBirthday(value);
+  if (!BIRTHDAY_REGEX.test(normalized)) return null;
+  const match = PARTS.exec(normalized);
   if (!match) return null;
   const [, year, month, day] = match;
   return {
-    year: year === '--' ? null : Number(year),
+    year: year === undefined ? null : Number(year),
     month: Number(month),
     day: Number(day),
   };
@@ -29,22 +35,38 @@ export function parseBirthday(value: string | null | undefined): ParsedBirthday 
 const pad = (n: number) => String(n).padStart(2, '0');
 
 export function formatBirthdayValue(year: number | null, month: number, day: number): string {
-  return `${year === null ? '--' : String(year).padStart(4, '0')}-${pad(month)}-${pad(day)}`;
+  // The `-` after the year belongs to the year, not to the month: an unknown year is just `--`,
+  // giving `--07-13` rather than `---07-13`.
+  const prefix = year === null ? '--' : `${String(year).padStart(4, '0')}-`;
+  return `${prefix}${pad(month)}-${pad(day)}`;
 }
 
-/** Build the storage value from an `<input type="date">` (which always carries a year). */
-export const birthdayFromDateInput = (value: string, withYear: boolean): string | null => {
-  const parsed = parseBirthday(value);
-  if (!parsed) return null;
-  return formatBirthdayValue(withYear ? parsed.year : null, parsed.month, parsed.day);
-};
+const isLeapYear = (year: number): boolean =>
+  (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 
-/** An `<input type="date">` needs a real year; use a leap year so Feb 29 stays selectable. */
-export const birthdayToDateInput = (value: string | null): string => {
-  const parsed = parseBirthday(value);
-  if (!parsed) return '';
-  return formatBirthdayValue(parsed.year ?? 2000, parsed.month, parsed.day);
-};
+/**
+ * Does this birthday land on `dateKey` (a `YYYY-MM-DD`)? The birthday's own year is ignored —
+ * it's the anniversary we care about. A 29 February birthday is observed on the 28th in
+ * non-leap years, matching how nextOccurrence schedules its reminder.
+ */
+export function birthdayFallsOn(birthday: string | null, dateKey: string): boolean {
+  const parsed = parseBirthday(birthday);
+  if (!parsed) return false;
+  const year = Number(dateKey.slice(0, 4));
+  const month = Number(dateKey.slice(5, 7));
+  const day = Number(dateKey.slice(8, 10));
+  const observedDay =
+    parsed.month === 2 && parsed.day === 29 && !isLeapYear(year) ? 28 : parsed.day;
+  return parsed.month === month && observedDay === day;
+}
+
+/** The people celebrating a birthday on `dateKey`. */
+export function birthdaysOn<T extends { birthday: string | null }>(
+  people: T[],
+  dateKey: string,
+): T[] {
+  return people.filter((person) => birthdayFallsOn(person.birthday, dateKey));
+}
 
 /** Age on `on`, or `null` when the year is unknown. */
 export function ageOn(birthday: string | null, on: Date = new Date()): number | null {
@@ -74,8 +96,7 @@ export function nextOccurrence(
   if (!parsed) return null;
 
   const at = (year: number): Date => {
-    const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-    const day = parsed.month === 2 && parsed.day === 29 && !isLeap ? 28 : parsed.day;
+    const day = parsed.month === 2 && parsed.day === 29 && !isLeapYear(year) ? 28 : parsed.day;
     return new Date(year, parsed.month - 1, day, hour, 0, 0, 0);
   };
 

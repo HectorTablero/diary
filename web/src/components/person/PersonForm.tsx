@@ -18,16 +18,47 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/apiClient';
-import { birthdayToDateInput, formatBirthdayValue, parseBirthday } from '@/lib/birthday';
+import { formatBirthdayValue, parseBirthday } from '@/lib/birthday';
 import { normalizePhone, toE164 } from '@/lib/phone';
 import { fuzzyEquals } from '@/lib/tokens';
 
 interface PersonFormProps {
   person?: PersonDto | null;
   onDone: () => void;
+}
+
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+const monthName = (month: number, locale: string): string =>
+  new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(2000, month - 1, 1));
+
+/** Days in a month, using a leap year so 29 February stays selectable without a year. */
+const daysInMonth = (month: number): number => new Date(2000, month, 0).getDate();
+
+/**
+ * Month + day are required for a birthday; the year is not. A blank year stores `--MM-DD`,
+ * which is what most phone contacts actually hold.
+ */
+function buildBirthday(day: string, month: string, year: string): string | null {
+  const monthNum = Number(month);
+  const dayNum = Number(day);
+  if (!monthNum || !dayNum) return null;
+  // Clamp rather than reject, so "31 February" quietly becomes the 29th instead of failing
+  // validation on the server and losing the whole save.
+  const safeDay = Math.min(Math.max(dayNum, 1), daysInMonth(monthNum));
+  const yearNum = Number(year);
+  const safeYear = year.trim() && yearNum >= 1900 && yearNum <= new Date().getFullYear() ? yearNum : null;
+  return formatBirthdayValue(safeYear, monthNum, safeDay);
 }
 
 /** Free-text chips for the extra names a person answers to. */
@@ -100,7 +131,7 @@ function AliasEditor({
 }
 
 export function PersonForm({ person = null, onDone }: PersonFormProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: allTags = [] } = useTags();
   const { data: settings } = useSettings();
   const createTag = useCreateTag();
@@ -117,9 +148,15 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
   const [wechatId, setWechatId] = useState(person?.wechatId ?? '');
   const [company, setCompany] = useState(person?.company ?? '');
   const [jobTitle, setJobTitle] = useState(person?.jobTitle ?? '');
-  const [birthdayDate, setBirthdayDate] = useState(birthdayToDateInput(person?.birthday ?? null));
-  const [birthdayHasYear, setBirthdayHasYear] = useState(
-    parseBirthday(person?.birthday ?? null)?.year != null,
+  const initialBirthday = parseBirthday(person?.birthday ?? null);
+  const [birthdayDay, setBirthdayDay] = useState(
+    initialBirthday ? String(initialBirthday.day) : '',
+  );
+  const [birthdayMonth, setBirthdayMonth] = useState(
+    initialBirthday ? String(initialBirthday.month) : '',
+  );
+  const [birthdayYear, setBirthdayYear] = useState(
+    initialBirthday?.year != null ? String(initialBirthday.year) : '',
   );
   const [checkupEnabled, setCheckupEnabled] = useState(person?.checkupIntervalDays != null);
   const [checkupIntervalDays, setCheckupIntervalDays] = useState(person?.checkupIntervalDays ?? 30);
@@ -157,20 +194,13 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
     }
     setPhoneError(false);
 
-    const parsedBirthday = parseBirthday(birthdayDate);
     const input = {
       name: name.trim(),
       aliases,
       phone: e164,
       email: email.trim() || null,
       wechatId: wechatId.trim() || null,
-      birthday: parsedBirthday
-        ? formatBirthdayValue(
-            birthdayHasYear ? parsedBirthday.year : null,
-            parsedBirthday.month,
-            parsedBirthday.day,
-          )
-        : null,
+      birthday: buildBirthday(birthdayDay, birthdayMonth, birthdayYear),
       company: company.trim() || null,
       jobTitle: jobTitle.trim() || null,
       contactId: person?.contactId ?? null,
@@ -191,7 +221,9 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
   };
 
   return (
-    <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto pr-1">
+    // overflow-x-hidden is not redundant: setting overflow-y to auto makes the *other* axis
+    // compute to auto as well, so without this the dialog scrolls sideways too.
+    <div className="flex max-h-[70vh] flex-col gap-4 overflow-x-hidden overflow-y-auto pr-1">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="person-name">{t('people.name')}</Label>
         <Input
@@ -285,51 +317,77 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
         />
       </div>
 
+      {/* Deliberately not <input type="date">: that always demands a year, and a birthday very
+          often has none (phone contacts routinely store just the day and month). Month + day are
+          what matter; the year is genuinely optional and left blank means "unknown". */}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="person-birthday">
+        <Label htmlFor="person-birthday-day">
           {t('people.birthday')}{' '}
           <span className="font-normal text-muted-foreground">({t('common.optional')})</span>
         </Label>
-        <Input
-          id="person-birthday"
-          type="date"
-          value={birthdayDate}
-          onChange={(e) => setBirthdayDate(e.target.value)}
-        />
-        {birthdayDate && (
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <Label htmlFor="person-birthday-year" className="font-normal text-muted-foreground">
-              {t('people.birthdayKnowYear')}
-            </Label>
-            <Switch
-              id="person-birthday-year"
-              checked={birthdayHasYear}
-              onCheckedChange={setBirthdayHasYear}
-            />
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Input
+            id="person-birthday-day"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={31}
+            placeholder={t('people.birthdayDay')}
+            value={birthdayDay}
+            className="w-20 min-w-0"
+            onChange={(e) => setBirthdayDay(e.target.value)}
+          />
+          <Select
+            value={birthdayMonth}
+            onValueChange={(value) => setBirthdayMonth(value)}
+          >
+            <SelectTrigger className="min-w-0 flex-1">
+              <SelectValue placeholder={t('people.birthdayMonth')} />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((month) => (
+                <SelectItem key={month} value={String(month)}>
+                  {monthName(month, i18n.language)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={1900}
+            max={new Date().getFullYear()}
+            placeholder={t('people.birthdayYear')}
+            value={birthdayYear}
+            className="w-24 min-w-0"
+            onChange={(e) => setBirthdayYear(e.target.value)}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">{t('people.birthdayYearOptional')}</p>
       </div>
 
+      {/* min-w-0: flex children default to min-width:auto, so they refuse to shrink below their
+          label + input's min-content width and push the dialog wider than it is. */}
       <div className="flex gap-2">
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Label htmlFor="person-company">
-            {t('people.company')}{' '}
-            <span className="font-normal text-muted-foreground">({t('common.optional')})</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Label htmlFor="person-company" className="truncate">
+            {t('people.company')}
           </Label>
           <Input
             id="person-company"
             value={company}
+            className="w-full min-w-0"
             onChange={(e) => setCompany(e.target.value)}
           />
         </div>
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Label htmlFor="person-job">
-            {t('people.jobTitle')}{' '}
-            <span className="font-normal text-muted-foreground">({t('common.optional')})</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Label htmlFor="person-job" className="truncate">
+            {t('people.jobTitle')}
           </Label>
           <Input
             id="person-job"
             value={jobTitle}
+            className="w-full min-w-0"
             onChange={(e) => setJobTitle(e.target.value)}
           />
         </div>

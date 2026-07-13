@@ -12,6 +12,7 @@ import {
   MAX_ORGANIZATION_LENGTH,
   MAX_PHONE_LENGTH,
   MAX_WECHAT_ID_LENGTH,
+  normalizeBirthday,
   OBJECT_ID_REGEX,
 } from './constants';
 
@@ -55,7 +56,14 @@ export const aliasesSchema = z.array(z.string().trim().min(1).max(MAX_ALIAS_LENG
 export const phoneSchema = z.string().trim().max(MAX_PHONE_LENGTH).nullable();
 export const emailSchema = z.string().trim().max(MAX_EMAIL_LENGTH).nullable();
 export const wechatIdSchema = z.string().trim().max(MAX_WECHAT_ID_LENGTH).nullable();
-export const birthdaySchema = z.string().regex(BIRTHDAY_REGEX, 'expected YYYY-MM-DD or --MM-DD').nullable();
+/* Transform-then-validate, so a legacy `---MM-DD` value is accepted and rewritten to the
+   canonical `--MM-DD` on its way into the database — every write quietly heals the row.
+   (A queued offline PATCH from a client that predates the fix would otherwise 400 forever.) */
+export const birthdaySchema = z
+  .string()
+  .transform(normalizeBirthday)
+  .refine((value) => BIRTHDAY_REGEX.test(value), 'expected YYYY-MM-DD or --MM-DD')
+  .nullable();
 export const organizationSchema = z.string().trim().max(MAX_ORGANIZATION_LENGTH).nullable();
 
 export const personCreateSchema = z.object({

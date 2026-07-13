@@ -25,10 +25,29 @@
   },
   "notifications": {
     "dailyReminderTitle": "No olvides tu diario",
-    "dailyReminderBody": "Todavía no has añadido nada hoy.",
+    "dailyReminderBodies": [
+      "Todavía no has añadido nada hoy.",
+      "El día de hoy sigue en blanco. Qué maleducado, con todo lo que ha pasado.",
+      "Tu diario está cogiendo polvo. Una frase soluciona eso.",
+      "En algún lugar, tu yo del futuro espera que hayas escrito esto.",
+      "Hoy ha pasado. Técnicamente. Demuéstralo.",
+      "Una página completamente vacía te está mirando ahora mismo.",
+      "Recordatorio rápido: el día de hoy no se escribe solo.",
+      "En cinco minutos podrías tener una entrada de diario en vez de esta notificación.",
+      "Tu racha cuenta contigo. Sin presión.",
+      "Aún no hay nada en la entrada de hoy. Hasta \"no ha pasado nada\" cuenta."
+    ],
     "birthdayTitle": "🎂 Es el cumpleaños de {{name}}",
     "birthdayTitleWithAge": "🎂 {{name}} cumple {{age}} hoy",
-    "birthdayBody": "Felicita a {{name}}."
+    "birthdayBodies": [
+      "Felicita a {{name}}.",
+      "{{name}} solo cumple esta edad una vez. Buen momento para saludar.",
+      "Tarta, velas, {{name}} — hoy están las tres cosas. Únete.",
+      "Un mensaje tuyo podría alegrarle el día entero a {{name}}.",
+      "{{name}} espera como mínimo unos emojis de confeti.",
+      "Es el gran día de {{name}}. No seas la persona que se olvidó.",
+      "Escríbele a {{name}} antes de que alguien se te adelante."
+    ]
   },
   "update": {
     "available": "Actualización disponible: v{{version}}",
@@ -97,7 +116,10 @@
     "addTags": "Etiquetas",
     "addPeople": "Personas",
     "subEntries": "{{count}} sub-entrada",
-    "subEntries_other": "{{count}} sub-entradas"
+    "subEntries_other": "{{count}} sub-entradas",
+    "birthdays": "Cumpleaños",
+    "birthdayLine": "Cumpleaños de <mention>@{{name}}</mention>",
+    "birthdayLineWithAge": "Cumpleaños de <mention>@{{name}}</mention> ({{age}})"
   },
   "people": {
     "title": "Personas",
@@ -150,6 +172,20 @@
     "checkupEvery": "Cada",
     "checkupDueTitle": "Toca hacer seguimiento a {{name}}",
     "checkupDueDescription": "Ha pasado tiempo desde que marcaste algo como contado a esta persona.",
+    "checkupBodies": [
+      "Llevas {{days}} días sin hablar con {{name}}. Puede que ya piense que te has olvidado de su existencia.",
+      "{{name}} no sabe nada de ti desde hace {{days}} días. Hora de demostrar que no eres un fantasma.",
+      "Giro inesperado: {{name}} sigue existiendo, y llevas {{days}} días sin comprobarlo.",
+      "Última hora: {{name}} sigue esperando un simple hola. Ya van {{days}} días.",
+      "Tu amistad con {{name}} no está extinta todavía, pero llevas {{days}} días sin regarla.",
+      "{{name}} te llamó. Es broma, no lo hizo, porque llevas {{days}} días sin dar tú el primer paso.",
+      "Un empujoncito: {{name}} sigue siendo una persona real fuera de tus notificaciones. {{days}} días y contando.",
+      "Han pasado {{days}} días. {{name}} empieza a sospechar que lo han cambiado por un Tamagotchi que dejaste de alimentar.",
+      "Recordatorio amistoso: {{name}} te echa de menos, o al menos deberías asumirlo tras {{days}} días de silencio.",
+      "{{days}} días de silencio absoluto con {{name}}. Manda un meme, un hola, lo que sea.",
+      "Logro desbloqueado: {{days}} días sin hablar con {{name}}. Por favor, no vayas a por el siguiente nivel.",
+      "{{name}} espera pacientemente. Llevas {{days}} días — quizá deberías escribir antes de que se convierta en un hito."
+    ],
     "markCheckupDone": "Marcar como hecho",
     "checkupMarkedDone": "Seguimiento marcado como hecho",
     "disableCheckups": "Desactivar checkups",
@@ -172,14 +208,17 @@
     "aliasPlaceholder": "Apodo",
     "alsoKnownAs": "alias",
     "birthday": "Cumpleaños",
-    "birthdayKnowYear": "Sé el año",
     "birthdayToday": "¡hoy!",
     "birthdayInDays": "en {{count}} día",
     "birthdayInDays_other": "en {{count}} días",
     "ageYears": "{{count}} año",
     "ageYears_other": "{{count}} años",
     "company": "Empresa",
-    "jobTitle": "Puesto"
+    "jobTitle": "Puesto",
+    "birthdayDay": "Día",
+    "birthdayMonth": "Mes",
+    "birthdayYear": "Año",
+    "birthdayYearOptional": "El año es opcional — déjalo en blanco si no lo sabes."
   },
   "tags": {
     "title": "Etiquetas",
@@ -204,7 +243,9 @@
     "title": "Calendario",
     "onThisDay": "Tal día como hoy",
     "entriesCount": "{{count}} entrada",
-    "entriesCount_other": "{{count}} entradas"
+    "entriesCount_other": "{{count}} entradas",
+    "birthdayOf": "Cumpleaños de {{name}}",
+    "birthdayOfWithAge": "{{name}} cumple {{age}}"
   },
   "search": {
     "title": "Buscar",
@@ -346,6 +387,8 @@
     "resolveFirst_other": "Resuelve {{count}} conflictos para continuar.",
     "confirm": "Importar {{count}} contacto",
     "confirm_other": "Importar {{count}} contactos",
-    "done": "{{created}} añadidos, {{merged}} fusionados."
+    "done": "{{created}} añadidos, {{merged}} fusionados.",
+    "loading": "Leyendo tus contactos…",
+    "failed": "No se han podido leer tus contactos"
   }
 }

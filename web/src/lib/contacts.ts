@@ -96,8 +96,17 @@ export async function readContacts(): Promise<ContactCandidate[]> {
       // base64 photos would ride along in every /sync payload forever after.
     },
   });
-  return contacts
-    .map(toCandidate)
-    .filter((candidate): candidate is ContactCandidate => candidate !== null)
-    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const candidates: ContactCandidate[] = [];
+  for (const contact of contacts) {
+    try {
+      const candidate = toCandidate(contact);
+      if (candidate) candidates.push(candidate);
+    } catch (err) {
+      // One malformed row out of an address book of hundreds must not sink the whole import.
+      console.warn('contacts: skipping unreadable contact', contact?.contactId, err);
+    }
+  }
+  console.log(`contacts: read ${contacts.length}, usable ${candidates.length}`);
+  return candidates.sort((a, b) => a.name.localeCompare(b.name));
 }
