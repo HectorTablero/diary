@@ -20,7 +20,7 @@ import { chatCompletion, type ChatMessage } from '../lib/aiChatClient';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
 import { normalize, searchPeopleCsv, type SearchablePerson } from './personSearch';
-import { getSettings } from './talkingPointsService';
+import { getSettings } from './settingsService';
 
 interface TagRef {
   id: string;

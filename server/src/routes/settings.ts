@@ -4,7 +4,7 @@ import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
 import { Tag } from '../models/tag';
 import { UserSettings } from '../models/userSettings';
-import { getSettings } from '../services/talkingPointsService';
+import { getSettings } from '../services/settingsService';
 
 async function ownedTagIds(userId: string, ids: string[]) {
   if (!ids.length) return [];
@@ -12,10 +12,8 @@ async function ownedTagIds(userId: string, ids: string[]) {
   return tags.map((t) => t._id);
 }
 
+/* Write only — the client reads settings from its Dexie `meta` row, refreshed by GET /sync. */
 export const settingsRouter = new Hono<AppEnv>()
-  .get('/', async (c) => {
-    return c.json(await getSettings(c.get('userId')));
-  })
   .put('/', jsonValidator(settingsSchema), async (c) => {
     const userId = c.get('userId');
     const { groqApiKey, openRouterApiKey, cerebrasApiKey, ...input } = c.req.valid('json');

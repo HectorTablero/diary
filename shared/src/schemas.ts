@@ -174,34 +174,9 @@ export const aiSuggestionsRequestSchema = z.object({
   language: z.string().max(10).default('es'),
 });
 
-// --- Query params (validated as strings from the URL) ---
-
-export const dayQuerySchema = z.object({
-  date: dateKeySchema,
-});
-
-export const calendarQuerySchema = z.object({
-  year: z.coerce.number().int().min(1900).max(2200),
-  month: z.coerce.number().int().min(1).max(12),
-});
-
-export const searchQuerySchema = z.object({
-  q: z.string().trim().max(200).optional(),
-  /** Comma-separated object ids */
-  tags: z.string().optional(),
-  people: z.string().optional(),
-  /** Comma-separated importance levels */
-  importance: z.string().optional(),
-  from: dateKeySchema.optional(),
-  to: dateKeySchema.optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
-
-export const pageQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
+/* Query params (validated as strings from the URL). Only /sync takes any: the day, calendar,
+   search and pagination queries went with the read endpoints they validated, which the
+   local-first client no longer calls. */
 
 export const syncQuerySchema = z.object({
   /** Pull only changes after this instant; omit for a full dump (first sync). */
@@ -216,5 +191,4 @@ export type PersonEventInput = z.infer<typeof personEventSchema>;
 export type TagCreateInput = z.infer<typeof tagCreateSchema>;
 export type TagUpdateInput = z.infer<typeof tagUpdateSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
-export type SearchQueryInput = z.infer<typeof searchQuerySchema>;
 export type AiSuggestionsRequestInput = z.infer<typeof aiSuggestionsRequestSchema>;

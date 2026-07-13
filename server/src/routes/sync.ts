@@ -9,7 +9,7 @@ import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
 import { issueWsTicket } from '../services/liveSync';
-import { getSettings } from '../services/talkingPointsService';
+import { getSettings } from '../services/settingsService';
 import {
   ENTRY_POPULATE,
   entryToDto,
