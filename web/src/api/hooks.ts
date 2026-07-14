@@ -50,7 +50,10 @@ export function useDeleteTag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => mutations.deleteTag(id),
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => {
+      hapticWarning();
+      qc.invalidateQueries();
+    }
   });
 }
 
@@ -127,8 +130,10 @@ export const useSaveEvent = () =>
   );
 
 export const useDeleteEvent = () =>
-  usePersonEventMutation(({ personId, eventId }: { personId: string; eventId: string }) =>
-    mutations.deleteEvent(personId, eventId),
+  usePersonEventMutation(({ personId, eventId }: { personId: string; eventId: string }) => {
+      hapticWarning();
+      return mutations.deleteEvent(personId, eventId);
+    }
   );
 
 export const useMarkEventAsked = () =>
