@@ -25,6 +25,12 @@ const entrySchema = new Schema(
     /** People this entry must never be suggested to. */
     hiddenFor: [{ type: Schema.Types.ObjectId, ref: 'Person' }],
     parentId: { type: Schema.Types.ObjectId, ref: 'Entry', default: null },
+    /** Fractional-index sibling sort key. Stays optional forever: old documents predate this
+        field and there is no migration that will backfill them server-side — the local-first
+        client heals it lazily on read instead (see ensureOrderKeys in web/src/db/repo.ts), so
+        `required: true` here would reject legitimate PATCHes from clients that haven't healed
+        a given entry yet. */
+    orderKey: { type: String, required: false },
   },
   { timestamps: true },
 );

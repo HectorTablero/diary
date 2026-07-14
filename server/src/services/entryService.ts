@@ -1,5 +1,6 @@
 import type { EntryCreateInput, EntryUpdateInput } from '@diary/shared';
-import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { wouldExceedMaxDepth } from '@diary/shared';
+import { generateKeyBetween } from 'fractional-indexing';
 import { Types } from 'mongoose';
 import { badRequest, notFound } from '../errors';
 import { recordDeletions } from '../models/deletion';
@@ -23,17 +24,66 @@ async function ownedPersonIds(userId: string, ids: string[]) {
   return people.map((p) => p._id);
 }
 
-async function assertDepthAllowed(userId: string, parentId: string) {
-  let depth = 1; // the new entry's depth if the parent is a root
-  let current = await Entry.findOne({ _id: parentId, userId }, 'parentId').lean();
+/** 0-based depth of `id` itself (a root entry is depth 0). Throws if it isn't owned by userId. */
+async function ancestorDepth(userId: string, id: string): Promise<number> {
+  let depth = 0;
+  let current = await Entry.findOne({ _id: id, userId }, 'parentId').lean();
   if (!current) throw notFound('entry.not_found');
   while (current.parentId) {
     depth += 1;
-    if (depth > MAX_SUB_ENTRY_DEPTH) throw badRequest('entry.max_depth');
     current = await Entry.findOne({ _id: current.parentId, userId }, 'parentId').lean();
     if (!current) break;
   }
-  if (depth > MAX_SUB_ENTRY_DEPTH) throw badRequest('entry.max_depth');
+  return depth;
+}
+
+async function assertDepthAllowed(userId: string, parentId: string) {
+  if (wouldExceedMaxDepth(await ancestorDepth(userId, parentId), 1)) throw badRequest('entry.max_depth');
+}
+
+/** Height of movedId's own subtree (BFS down, same frontier-walk shape as cascadeDateKey/
+    deleteEntry below). A leaf is height 1. */
+async function measureSubtreeHeight(userId: string, movedId: string): Promise<number> {
+  let height = 1;
+  let frontier = [new Types.ObjectId(movedId)];
+  for (;;) {
+    const children = await Entry.find({ userId, parentId: { $in: frontier } }, '_id').lean();
+    if (!children.length) return height;
+    height += 1;
+    frontier = children.map((c) => c._id);
+  }
+}
+
+/** Cycle guard: would `newParentId` make movedId its own ancestor (itself, or one of its
+    descendants)? Same BFS shape as measureSubtreeHeight, checking membership as it goes. */
+async function isMovingIntoOwnSubtree(
+  userId: string,
+  movedId: string,
+  newParentId: string,
+): Promise<boolean> {
+  if (newParentId === movedId) return true;
+  let frontier = [new Types.ObjectId(movedId)];
+  for (;;) {
+    const children = await Entry.find({ userId, parentId: { $in: frontier } }, '_id').lean();
+    if (!children.length) return false;
+    if (children.some((c) => c._id.toString() === newParentId)) return true;
+    frontier = children.map((c) => c._id);
+  }
+}
+
+/** Fractional-index key placing a new/moved entry after the current last sibling. Root-level
+    siblings are scoped by dateKey (only same-day roots are ever siblings in the UI); sub-entry
+    siblings are scoped by parentId alone (they always share their parent's dateKey). */
+async function appendOrderKey(userId: string, parentId: string | null, dateKey: string): Promise<string> {
+  const filter = parentId
+    ? { userId, parentId: new Types.ObjectId(parentId) }
+    : { userId, parentId: null, dateKey };
+  const siblings = await Entry.find(filter, 'orderKey').lean();
+  let max: string | null = null;
+  for (const sibling of siblings) {
+    if (sibling.orderKey && (max === null || sibling.orderKey > max)) max = sibling.orderKey;
+  }
+  return generateKeyBetween(max, null);
 }
 
 /** Bump the checkup clock: marking something as said counts as a real interaction.
@@ -54,6 +104,8 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
   const saidToIds = input.saidTo === undefined ? people : await ownedPersonIds(userId, input.saidTo);
   // Offline creates replay with their original timestamp so ordering within a day survives.
   const now = input.createdAt ? new Date(input.createdAt) : new Date();
+  // Defense-in-depth for a client that predates orderKey — normally the client always sends one.
+  const orderKey = input.orderKey ?? (await appendOrderKey(userId, input.parentId ?? null, input.dateKey));
 
   // timestamps off for this save: mongoose would otherwise force updatedAt = createdAt on new
   // docs, hiding replayed offline creates from other clients' sync cursors.
@@ -71,6 +123,7 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
         people,
         saidTo: saidToIds.map((person) => ({ person, at: now })),
         parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
+        orderKey,
       },
     ],
     { timestamps: false },
@@ -97,6 +150,8 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
   if (!entry) throw notFound('entry.not_found');
 
   const originalDateKey = entry.dateKey;
+  const originalParentId = entry.parentId ? entry.parentId.toString() : null;
+
   if (input.content !== undefined) entry.content = input.content;
   if (input.dateKey !== undefined) entry.dateKey = input.dateKey;
   if (input.importance !== undefined) entry.importance = input.importance;
@@ -117,9 +172,31 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
   }
   if (input.hiddenFor !== undefined) entry.hiddenFor = await ownedPersonIds(userId, input.hiddenFor);
 
+  // Reparent: dragging elsewhere in the tree, or promoting to root with parentId: null.
+  const parentChanging = input.parentId !== undefined && input.parentId !== originalParentId;
+  if (parentChanging && input.parentId) {
+    const newParent = await Entry.findOne({ _id: input.parentId, userId }, '_id').lean();
+    if (!newParent) throw notFound('entry.not_found');
+    if (await isMovingIntoOwnSubtree(userId, entryId, input.parentId)) throw badRequest('entry.cycle');
+    const targetParentDepth = await ancestorDepth(userId, input.parentId);
+    const movedHeight = await measureSubtreeHeight(userId, entryId);
+    if (wouldExceedMaxDepth(targetParentDepth, movedHeight)) throw badRequest('entry.max_depth');
+  }
+  if (parentChanging) entry.parentId = input.parentId ? new Types.ObjectId(input.parentId) : null;
+
+  const dateChanging = input.dateKey !== undefined && input.dateKey !== originalDateKey;
+  if (input.orderKey !== undefined) {
+    entry.orderKey = input.orderKey;
+  } else if (parentChanging || dateChanging) {
+    // No explicit position from the client (an older client, or the plain "edit the date" path,
+    // which doesn't know about orderKey): land at the bottom of the new sibling group.
+    const parentId = entry.parentId ? entry.parentId.toString() : null;
+    entry.orderKey = await appendOrderKey(userId, parentId, entry.dateKey);
+  }
+
   await entry.save();
-  if (input.dateKey !== undefined && input.dateKey !== originalDateKey) {
-    await cascadeDateKey(userId, entryId, input.dateKey);
+  if (dateChanging) {
+    await cascadeDateKey(userId, entryId, input.dateKey!);
   }
   if (newlySaid.length) await bumpLastCheckup(userId, newlySaid, new Date());
   const populated = await entry.populate(ENTRY_POPULATE);

@@ -475,6 +475,18 @@ export default function PersonProfilePage() {
             <DropdownMenuItem onClick={() => setEditing(true)}>
               <Pencil className="size-3.5" /> {t('people.editPerson')}
             </DropdownMenuItem>
+            {person.checkupIntervalDays != null && (
+              <DropdownMenuItem
+                onClick={() =>
+                  markCheckup.mutate(person.id, {
+                    onSuccess: () => toast.success(t('people.checkupMarkedDone')),
+                    onError: () => toast.error(t('errors.unknown')),
+                  })
+                }
+              >
+                <Check className="size-3.5" /> {t('people.markCheckupNow')}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
               <Trash2 className="size-3.5" /> {t('people.deletePerson')}
             </DropdownMenuItem>

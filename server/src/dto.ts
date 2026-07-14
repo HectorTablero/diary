@@ -72,6 +72,8 @@ export interface LeanEntry {
   saidTo: LeanSaidMark[];
   hiddenFor: LeanRef[];
   parentId: Types.ObjectId | null;
+  /** Absent on documents created before drag-and-drop reorder existed. */
+  orderKey?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -121,6 +123,9 @@ export const entryToDto = (entry: LeanEntry): EntryDto => ({
   saidTo: entry.saidTo.map(saidMarkToDto),
   hiddenFor: entry.hiddenFor.map(refId),
   parentId: entry.parentId ? entry.parentId.toString() : null,
+  // '' for a not-yet-healed legacy document — only meaningful once the client has healed it
+  // (see ensureOrderKeys in web/src/db/repo.ts); other read paths don't sort by it at all.
+  orderKey: entry.orderKey ?? '',
   createdAt: entry.createdAt.toISOString(),
   updatedAt: entry.updatedAt.toISOString(),
 });

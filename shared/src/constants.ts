@@ -2,7 +2,7 @@
 export const IMPORTANCE_LEVELS = [1, 2, 3, 4, 5] as const;
 export type ImportanceLevel = (typeof IMPORTANCE_LEVELS)[number];
 
-export const MAX_SUB_ENTRY_DEPTH = 3;
+export const MAX_SUB_ENTRY_DEPTH = 2; // root(0) + up to 2 nested levels
 
 export const MAX_CONTENT_LENGTH = 2000;
 export const MAX_NOTES_LENGTH = 5000;

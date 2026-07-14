@@ -1,6 +1,6 @@
 import type { EntryCreateInput, PersonRefDto, SuggestedEntryNode, TagDto } from '@diary/shared';
 import { newObjectId } from '@diary/shared';
-import { AtSign, Hash, Trash2 } from 'lucide-react';
+import { AtSign, GripVertical, Hash, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -8,8 +8,9 @@ import { useCreateEntry, usePeople, useTags } from '@/api/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import { PersonChip, TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
-import { ImportancePicker } from '@/components/entry/ImportanceDot';
+import { ImportanceDot, ImportancePicker } from '@/components/entry/ImportanceDot';
 import { TokenTextarea } from '@/components/entry/TokenTextarea';
+import { SortableTreeProvider, useSortableTreeRow } from '@/components/tree/SortableTreeProvider';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -21,7 +22,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ApiError } from '@/lib/apiClient';
+import { applyMove } from '@/lib/sortableTree';
 import { cn } from '@/lib/utils';
+
+/** Horizontal indent per tree level in the markup below (ml-4 + pl-3 on a nested node) — must
+    match SortableTreeProvider's indentWidth, same reasoning as EntryItem's ENTRY_INDENT_WIDTH. */
+const SUGGESTION_INDENT_WIDTH = 28;
 
 interface DraftNode {
   /** Pre-generated so it can double as the eventual entry id (and its children's parentId). */
@@ -65,6 +71,7 @@ function SuggestionNodeEditor({
   allPeople,
   onChange,
   onRemove,
+  flat = false,
 }: {
   node: DraftNode;
   depth: number;
@@ -72,8 +79,12 @@ function SuggestionNodeEditor({
   allPeople: PersonRefDto[];
   onChange: (id: string, patch: Partial<DraftNode>) => void;
   onRemove: (id: string) => void;
+  /** Render just this node, no recursion into children, indented via margin instead of ancestor
+      nesting, and non-interactive — used only while a drag is in progress. */
+  flat?: boolean;
 }) {
   const { t } = useTranslation();
+  const row = useSortableTreeRow(node.id);
 
   // Adding a person auto-marks the entry as said to them, mirroring the main composer.
   const addPerson = (person: PersonRefDto) => {
@@ -96,8 +107,35 @@ function SuggestionNodeEditor({
     });
 
   return (
-    <div className={cn('flex flex-col gap-2', depth > 0 && 'ml-4 border-l border-border/70 pl-3')}>
-      <div className="flex items-start gap-2">
+    <div
+      ref={row.setNodeRef}
+      data-tree-row-id={node.id}
+      className={cn(
+        'flex flex-col gap-2',
+        !flat && depth > 0 && 'ml-4 border-l border-border/70 pl-3',
+        flat && 'pointer-events-none',
+      )}
+      style={flat ? { marginLeft: depth * SUGGESTION_INDENT_WIDTH } : undefined}
+    >
+      <div
+        className={cn(
+          'flex items-start gap-2 rounded-lg',
+          // Indentation alone can't say *which* node at that depth would become the parent when
+          // there are several siblings — so highlight the actual projected parent directly.
+          row.isProjectedParent &&
+            (row.isProjectedParentInvalid
+              ? 'ring-2 ring-destructive/50 bg-destructive/5'
+              : 'ring-2 ring-primary/50 bg-primary/5'),
+        )}
+      >
+        <button
+          type="button"
+          {...row.dragHandleProps}
+          aria-label={t('diary.dragHandle')}
+          className="mt-2 flex size-4 shrink-0 touch-none items-center justify-center self-start text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          <GripVertical className="size-3.5" />
+        </button>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <TokenTextarea
             value={node.content}
@@ -202,17 +240,18 @@ function SuggestionNodeEditor({
           <Trash2 className="size-3.5" />
         </Button>
       </div>
-      {node.children.map((child) => (
-        <SuggestionNodeEditor
-          key={child.id}
-          node={child}
-          depth={depth + 1}
-          allTags={allTags}
-          allPeople={allPeople}
-          onChange={onChange}
-          onRemove={onRemove}
-        />
-      ))}
+      {!flat &&
+        node.children.map((child) => (
+          <SuggestionNodeEditor
+            key={child.id}
+            node={child}
+            depth={depth + 1}
+            allTags={allTags}
+            allPeople={allPeople}
+            onChange={onChange}
+            onRemove={onRemove}
+          />
+        ))}
     </div>
   );
 }
@@ -252,6 +291,11 @@ export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }:
       nodes.filter((n) => n.id !== id).map((n) => ({ ...n, children: filterOut(n.children) }));
     setDraft((prev) => filterOut(prev));
   };
+
+  // No orderKey here — this tree only exists in memory until accept(), so array order alone is
+  // the order, and reparenting is just moving a node between children arrays.
+  const moveNode = (activeId: string, newParentId: string | null, newIndex: number): void =>
+    setDraft((prev) => applyMove(prev, activeId, newParentId, newIndex));
 
   const accept = async () => {
     setAccepting(true);
@@ -301,19 +345,48 @@ export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }:
           {draft.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">{t('ai.empty')}</p>
           ) : (
-            <div className="flex flex-col gap-4">
-              {draft.map((node) => (
+            <SortableTreeProvider
+              roots={draft}
+              onMove={moveNode}
+              indentWidth={SUGGESTION_INDENT_WIDTH}
+              listClassName="flex flex-col gap-4"
+              renderRow={(node, depth) => (
                 <SuggestionNodeEditor
-                  key={node.id}
                   node={node}
-                  depth={0}
+                  depth={depth}
                   allTags={allTags}
                   allPeople={allPeople}
                   onChange={updateNode}
                   onRemove={removeNode}
+                  flat
                 />
-              ))}
-            </div>
+              )}
+              renderGhost={(node) => (
+                <div className="flex max-w-72 items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-lg">
+                  <ImportanceDot importance={node.importance} />
+                  <span className="min-w-0 flex-1 truncate text-sm">{node.content}</span>
+                  {node.children.length > 0 && (
+                    <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-xs text-muted-foreground">
+                      {t('diary.subEntries', { count: node.children.length })}
+                    </span>
+                  )}
+                </div>
+              )}
+            >
+              <div className="flex flex-col gap-4">
+                {draft.map((node) => (
+                  <SuggestionNodeEditor
+                    key={node.id}
+                    node={node}
+                    depth={0}
+                    allTags={allTags}
+                    allPeople={allPeople}
+                    onChange={updateNode}
+                    onRemove={removeNode}
+                  />
+                ))}
+              </div>
+            </SortableTreeProvider>
           )}
         </div>
         <DialogFooter>

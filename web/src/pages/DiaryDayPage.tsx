@@ -6,7 +6,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useDayEntries, usePeople } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { EntryComposer } from '@/components/entry/EntryComposer';
-import { EntryItem } from '@/components/entry/EntryItem';
+import { EntryTree } from '@/components/entry/EntryTree';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,11 +72,7 @@ export default function DiaryDayPage() {
           <Skeleton className="h-8 w-4/5" />
         </div>
       ) : entries && entries.length > 0 ? (
-        <ul className="-mx-2 flex flex-col">
-          {entries.map((entry) => (
-            <EntryItem key={entry.id} entry={entry} />
-          ))}
-        </ul>
+        <EntryTree entries={entries} />
       ) : (
         <EmptyState
           icon={NotebookPen}

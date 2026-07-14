@@ -13,34 +13,24 @@ import type {
   TagDto,
   TagUpdateInput,
 } from '@diary/shared';
-import { DEFAULT_TAG_COLORS, MAX_ALIASES, newObjectId } from '@diary/shared';
+import {
+  DEFAULT_TAG_COLORS,
+  isSelfOrDescendant,
+  MAX_ALIASES,
+  newObjectId,
+  wouldExceedMaxDepth,
+} from '@diary/shared';
+import { generateKeyBetween } from 'fractional-indexing';
 import { ApiError } from '@/lib/apiClient';
 import type { ContactCandidate, Resolution } from '@/lib/conflicts';
-import { refreshNotifications } from '@/lib/notifications';
 import { fuzzyEquals, renameMentions } from '@/lib/tokens';
 import { db, type LocalEntry, type LocalPerson, type OutboxOp } from './db';
+import { enqueue, enqueueBatch } from './outbox';
 import { getDayEntries, getPerson, getSettings } from './repo';
-import { kick } from './sync';
 
 /* Local write layer: every mutation applies to Dexie immediately (the UI is
    optimistic by construction) and queues the equivalent REST call for replay.
    The rules here mirror the server services so both sides converge. */
-
-async function enqueue(method: OutboxOp['method'], path: string, body?: unknown): Promise<void> {
-  await db.outbox.add({ method, path, body });
-  kick();
-  refreshNotifications();
-}
-
-/** Queue many ops at once, kicking sync and rescheduling notifications a single time.
-    Importing 200 contacts through `enqueue` would otherwise run 200 full notification
-    reconciles, each of which re-reads every person. */
-async function enqueueBatch(ops: OutboxOp[]): Promise<void> {
-  if (!ops.length) return;
-  await db.outbox.bulkAdd(ops);
-  kick();
-  refreshNotifications();
-}
 
 const nowIso = () => new Date().toISOString();
 
@@ -70,6 +60,22 @@ async function entryDto(entryId: string, dateKey: string): Promise<EntryDto> {
   return found;
 }
 
+/** Fractional-index key placing a new/moved entry after the current last sibling. Root-level
+    siblings (parentId: null) can't be range-queried by Dexie's `parentId` index — IndexedDB
+    doesn't accept `null` as an index key — so, like getCalendarMonth in repo.ts, fetch by the
+    dateKey index and filter parentId in memory instead. Sub-entry siblings always share their
+    parent's dateKey, so a plain parentId query is enough for them. */
+async function bottomOrderKey(parentId: string | null, dateKey: string): Promise<string> {
+  const siblings = parentId
+    ? await db.entries.where('parentId').equals(parentId).toArray()
+    : (await db.entries.where('dateKey').equals(dateKey).toArray()).filter((e) => e.parentId === null);
+  let max: string | undefined;
+  for (const sibling of siblings) {
+    if (sibling.orderKey && (!max || sibling.orderKey > max)) max = sibling.orderKey;
+  }
+  return generateKeyBetween(max ?? null, null);
+}
+
 // --- Entries ---
 
 export async function createEntry(input: EntryCreateInput): Promise<EntryDto> {
@@ -77,6 +83,8 @@ export async function createEntry(input: EntryCreateInput): Promise<EntryDto> {
   const createdAt = input.createdAt ?? nowIso();
   // Auto-said: a direct mention means the person heard it, unless the client says otherwise.
   const saidToIds = input.saidTo === undefined ? input.people : input.saidTo;
+  // New entries default to the bottom of their sibling list.
+  const orderKey = input.orderKey ?? (await bottomOrderKey(input.parentId ?? null, input.dateKey));
 
   const entry: LocalEntry = {
     id,
@@ -88,12 +96,13 @@ export async function createEntry(input: EntryCreateInput): Promise<EntryDto> {
     saidTo: saidToIds.map((personId) => ({ personId, at: createdAt })),
     hiddenFor: [],
     parentId: input.parentId ?? null,
+    orderKey,
     createdAt,
     updatedAt: createdAt,
   };
   await db.entries.add(entry);
   await bumpLastCheckup(saidToIds, createdAt);
-  await enqueue('POST', '/entries', { ...input, id, createdAt });
+  await enqueue('POST', '/entries', { ...input, id, createdAt, orderKey });
   return entryDto(id, input.dateKey);
 }
 
@@ -123,6 +132,13 @@ export async function updateEntry(entryId: string, input: EntryUpdateInput): Pro
     );
   }
 
+  // A date edit moves the entry to a different day's sibling list — send it to the bottom there,
+  // same as a brand-new entry. (Only root entries can have their date edited today, since
+  // EntryComposer only shows the date field for entry.parentId === null, but this doesn't need
+  // to assume that.)
+  const dateChanging = input.dateKey !== undefined && input.dateKey !== entry.dateKey;
+  const orderKey = dateChanging ? await bottomOrderKey(entry.parentId, input.dateKey!) : entry.orderKey;
+
   const updated: LocalEntry = {
     ...entry,
     content: input.content ?? entry.content,
@@ -133,15 +149,57 @@ export async function updateEntry(entryId: string, input: EntryUpdateInput): Pro
     peopleIds: input.people ?? entry.peopleIds,
     saidTo,
     hiddenFor: input.hiddenFor ?? entry.hiddenFor,
+    orderKey,
     updatedAt: now,
   };
   await db.entries.put(updated);
-  if (input.dateKey !== undefined && input.dateKey !== entry.dateKey) {
-    await cascadeDateKey(entryId, input.dateKey, now);
+  if (dateChanging) {
+    await cascadeDateKey(entryId, input.dateKey!, now);
   }
   await bumpLastCheckup(newlySaid, now);
-  await enqueue('PATCH', `/entries/${entryId}`, input);
+  await enqueue('PATCH', `/entries/${entryId}`, dateChanging ? { ...input, orderKey } : input);
   return entryDto(entryId, updated.dateKey);
+}
+
+/** Reparent and/or reorder an entry via drag-and-drop within the same day's tree. `newOrderKey`
+    is the caller's already-projected sibling position (see web/src/lib/sortableTree.ts) — this
+    only re-derives the tree shape to re-validate depth/cycles as defense-in-depth, mirroring the
+    server's authoritative check in entryService.updateEntry; the drag UI already blocks invalid
+    projections visually, so these guards should never actually fire in practice. */
+export async function moveEntry(
+  entryId: string,
+  newParentId: string | null,
+  newOrderKey: string,
+): Promise<EntryDto> {
+  const entry = await db.entries.get(entryId);
+  if (!entry) throw new ApiError(404, 'entry.not_found');
+
+  if (newParentId !== entry.parentId) {
+    const rows = await db.entries.where('dateKey').equals(entry.dateKey).toArray();
+    const parentById = new Map(rows.map((r): [string, string | null] => [r.id, r.parentId]));
+    if (newParentId !== null && isSelfOrDescendant(newParentId, entryId, parentById)) {
+      throw new ApiError(400, 'entry.cycle');
+    }
+    const depthOf = (id: string | null): number => {
+      let depth = -1;
+      for (let current = id; current !== null; current = parentById.get(current) ?? null) depth += 1;
+      return depth;
+    };
+    const childrenByParent = new Map<string | null, string[]>();
+    for (const row of rows) childrenByParent.set(row.parentId, [...(childrenByParent.get(row.parentId) ?? []), row.id]);
+    const heightOf = (id: string): number => {
+      const kids = childrenByParent.get(id) ?? [];
+      return kids.length === 0 ? 1 : 1 + Math.max(...kids.map(heightOf));
+    };
+    if (wouldExceedMaxDepth(depthOf(newParentId), heightOf(entryId))) {
+      throw new ApiError(400, 'entry.max_depth');
+    }
+  }
+
+  const now = nowIso();
+  await db.entries.update(entryId, { parentId: newParentId, orderKey: newOrderKey, updatedAt: now });
+  await enqueue('PATCH', `/entries/${entryId}`, { parentId: newParentId, orderKey: newOrderKey });
+  return entryDto(entryId, entry.dateKey);
 }
 
 /** Delete an entry and all of its descendants (the server cascades the same way). */

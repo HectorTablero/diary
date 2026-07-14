@@ -163,7 +163,7 @@ Take your time and prioritize correctness over speed. Reason carefully about the
 - The entries you submit are always filed under the date ${dateKey} (today is ${today}). Use any relative dates mentioned ("yesterday", "last week") ONLY to understand context, never to change where the entry is filed.
 - ${forceEnglishAIEvents ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").` : `Write every "content" field in the same language as the transcript (app language hint: "${language}").`}
 - Split the transcript into concise, first-person diary bullet points.
-- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under the parent event. You may nest these sub-entries up to exactly ${MAX_SUB_ENTRY_DEPTH} levels deep to create a clean, hierarchical summary.
+- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under the parent event. You may nest these sub-entries up to exactly ${MAX_SUB_ENTRY_DEPTH} levels deep (parent (0) + ${MAX_SUB_ENTRY_DEPTH}) to create a clean, hierarchical summary.
 - Never invent facts that are not in the transcript. If the transcript is ambiguous, prefer a conservative interpretation.
 
 ### 2. Importance Scale (1 = highest ... 5 = lowest)

@@ -18,6 +18,9 @@ export interface LocalEntry {
   saidTo: SaidMark[];
   hiddenFor: string[];
   parentId: string | null;
+  /** Fractional-index sibling sort key. Optional (not `string`) because rows written before
+      drag-and-drop reorder existed genuinely lack it — see the note above db.version(3). */
+  orderKey?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -102,6 +105,14 @@ db.version(2)
    asked whoever bumped the version next to migrate them. Doing it now means `normalizeBirthday`
    only has to survive as a read-side shim for rows this upgrade hasn't reached yet (a client that
    hasn't opened the app since), not forever. */
+/* --- orderKey: no dedicated Dexie upgrade -----------------------------------------------------
+   Unlike the fields above, LocalEntry.orderKey has no `.upgrade()` here: it's populated lazily
+   on read instead, via ensureOrderKeys() in db/repo.ts (called from getDayEntries), following
+   the same "read heals the row" idea as normalizeBirthday above. Next time this version is
+   bumped for any other reason, add an `.upgrade()` that fills in any still-missing orderKeys via
+   generateNKeysBetween, then delete ensureOrderKeys and its call site, and make
+   LocalEntry.orderKey (and EntryDto.orderKey) required again. */
+
 db.version(3)
   .stores({
     entries: 'id, dateKey, parentId, *tagIds, *peopleIds',
@@ -130,6 +141,9 @@ export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   saidTo: dto.saidTo,
   hiddenFor: dto.hiddenFor,
   parentId: dto.parentId,
+  // '' from a not-yet-healed remote doc is falsy, same as a genuinely missing local orderKey —
+  // ensureOrderKeys treats both identically the next time this entry's siblings are read.
+  orderKey: dto.orderKey || undefined,
   createdAt: dto.createdAt,
   updatedAt: dto.updatedAt,
 });

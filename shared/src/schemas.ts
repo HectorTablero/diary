@@ -38,6 +38,9 @@ export const entryCreateSchema = z.object({
   /** When omitted, the server copies `people` (auto-said on mention). */
   saidTo: z.array(objectIdSchema).max(30).optional(),
   parentId: objectIdSchema.nullish().default(null),
+  /** Client-generated fractional-index sibling key. When omitted (an older client), the server
+      appends the entry to the end of its sibling list instead. */
+  orderKey: z.string().min(1).max(200).optional(),
 });
 
 export const entryUpdateSchema = z.object({
@@ -48,6 +51,12 @@ export const entryUpdateSchema = z.object({
   people: z.array(objectIdSchema).max(30).optional(),
   saidTo: z.array(objectIdSchema).max(30).optional(),
   hiddenFor: z.array(objectIdSchema).max(30).optional(),
+  /** Reparent — moving to a new parentId (or to root with null) is validated against
+      MAX_SUB_ENTRY_DEPTH and cycles server-side (see entryService.updateEntry). */
+  parentId: objectIdSchema.nullable().optional(),
+  /** New sibling position. Required for a drag reorder/reparent; the server also sets this
+      itself when only `dateKey` changes (an entry moved to a new day goes to the bottom). */
+  orderKey: z.string().min(1).max(200).optional(),
 });
 
 // --- People ---

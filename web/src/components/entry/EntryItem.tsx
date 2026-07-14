@@ -1,6 +1,6 @@
 import type { EntryNode } from '@diary/shared';
 import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
-import { ChevronRight, CornerDownRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ChevronRight, CornerDownRight, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import { PersonChip, TagChip } from '@/components/entry/chips';
 import { EntryComposer } from '@/components/entry/EntryComposer';
 import { EntryContent } from '@/components/entry/EntryContent';
 import { ImportanceDot } from '@/components/entry/ImportanceDot';
+import { useSortableTreeRow } from '@/components/tree/SortableTreeProvider';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,13 +27,32 @@ import {
 import { fuzzyEquals } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
-export function EntryItem({ entry, depth = 0 }: { entry: EntryNode; depth?: number }) {
+/** Horizontal indent per tree level in the rendered markup below (ml-5 + pl-1.5 on the child
+    list) in idle mode — SortableTreeProvider's indentWidth must match this so dragging left/
+    right maps to the same depth the user sees. In `flat` mode (during a drag) this same amount
+    is applied directly as a left margin instead, since there's no ancestor list nesting to
+    provide it. */
+export const ENTRY_INDENT_WIDTH = 26;
+
+export function EntryItem({
+  entry,
+  depth = 0,
+  flat = false,
+}: {
+  entry: EntryNode;
+  depth?: number;
+  /** Render just this row, no recursion into children, indented via margin instead of ancestor
+      nesting, and non-interactive — used only while a drag is in progress (see
+      SortableTreeProvider's renderRow). */
+  flat?: boolean;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [addingSub, setAddingSub] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteEntry = useDeleteEntry();
+  const row = useSortableTreeRow(entry.id);
 
   // Chips only for linked entities that are not already visible as tokens in the text.
   const { chipTags, chipPeople } = useMemo(() => {
@@ -53,8 +73,34 @@ export function EntryItem({ entry, depth = 0 }: { entry: EntryNode; depth?: numb
   const canAddSub = depth + 1 < MAX_SUB_ENTRY_DEPTH + 1; // root(0) + up to 3 nested levels
 
   return (
-    <li>
-      <div className="group flex items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/40">
+    <div
+      ref={row.setNodeRef}
+      data-tree-row-id={entry.id}
+      style={flat ? { marginLeft: depth * ENTRY_INDENT_WIDTH } : undefined}
+      // Only the ghost and the shadow should visually react while dragging — a flat row is just
+      // a reflowing preview of someone else's drag, not interactive (also keeps :hover from
+      // ever triggering on it, since pointer-events: none suppresses hover state entirely).
+      className={flat ? 'pointer-events-none' : undefined}
+    >
+      <div
+        className={cn(
+          'group flex items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/40',
+          // Indentation alone can't say *which* row at that depth the shadow would nest under
+          // when there are several — so highlight the actual projected parent directly.
+          row.isProjectedParent &&
+            (row.isProjectedParentInvalid
+              ? 'ring-2 ring-destructive/50 bg-destructive/5'
+              : 'ring-2 ring-primary/50 bg-primary/5'),
+        )}
+      >
+        <button
+          type="button"
+          {...row.dragHandleProps}
+          aria-label={t('diary.dragHandle')}
+          className="mt-1.5 flex size-4 shrink-0 touch-none items-center justify-center text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          <GripVertical className="size-3.5" />
+        </button>
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
@@ -116,12 +162,12 @@ export function EntryItem({ entry, depth = 0 }: { entry: EntryNode; depth?: numb
         </div>
       </div>
 
-      {expanded && entry.children.length > 0 && (
-        <ul className="ml-5 border-l border-border/70 pl-1.5">
+      {!flat && expanded && entry.children.length > 0 && (
+        <div className="ml-5 border-l border-border/70 pl-1.5">
           {entry.children.map((child) => (
             <EntryItem key={child.id} entry={child} depth={depth + 1} />
           ))}
-        </ul>
+        </div>
       )}
 
       <Dialog open={editing} onOpenChange={setEditing}>
@@ -170,6 +216,6 @@ export function EntryItem({ entry, depth = 0 }: { entry: EntryNode; depth?: numb
           })
         }
       />
-    </li>
+    </div>
   );
 }

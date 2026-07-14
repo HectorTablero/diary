@@ -117,6 +117,7 @@
     "addPeople": "Personas",
     "subEntries": "{{count}} sub-entrada",
     "subEntries_other": "{{count}} sub-entradas",
+    "dragHandle": "Arrastrar para reordenar o mover",
     "birthdays": "Cumpleaños",
     "birthdayLine": "Cumpleaños de <mention>@{{name}}</mention>",
     "birthdayLineWithAge": "Cumpleaños de <mention>@{{name}}</mention> ({{age}})"
@@ -187,6 +188,7 @@
       "{{name}} espera pacientemente. Llevas {{days}} días — quizá deberías escribir antes de que se convierta en un hito."
     ],
     "markCheckupDone": "Marcar como hecho",
+    "markCheckupNow": "Marcar seguimiento como hecho ahora",
     "checkupMarkedDone": "Seguimiento marcado como hecho",
     "disableCheckups": "Desactivar checkups",
     "checkupsDisabled": "Checkups desactivados para esta persona",
