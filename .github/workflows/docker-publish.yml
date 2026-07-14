@@ -77,6 +77,10 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Vite inlines these into the web bundle at build time; they cannot be set at runtime.
+          build-args: |
+            VITE_BETTERSTACK_SOURCE_TOKEN=${{ secrets.BETTERSTACK_CLIENT_SOURCE_TOKEN }}
+            VITE_BETTERSTACK_INGEST_URL=${{ vars.BETTERSTACK_CLIENT_INGEST_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

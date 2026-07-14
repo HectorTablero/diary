@@ -88,6 +88,84 @@ untracked `web/android/app/keystore.properties` (both gitignored — **back the 
 up**; losing it means new installs can't update in place). The signed APK lands in
 `web/android/app/build/outputs/apk/release/app-release.apk` — sideload it directly.
 
+## Versioning
+
+The **root `package.json` `version`** is the single source of truth. Everything —
+the git tag, the APK `versionName`/`versionCode`, the OTA bundle name, and the version
+logged to the console on the diary page — derives from it.
+
+A `pre-commit` hook (`.githooks/`, wired up by `npm ci` via the `prepare` script) asks
+whether the commit is a major / minor / patch change, applies the bump with the lower
+levels reset (`2.4.10` + major → `3.0.0`), and stages `package.json` into the commit.
+Choose `none` to leave it untouched. With no terminal attached (GUI client, rebase, CI)
+it keeps the version as-is rather than hanging.
+
+Android needs a monotonically increasing integer, so `versionCode` is derived as
+`major * 1_000_000 + minor * 1_000 + patch` (`2.4.10` → `2004010`). Keep minor and
+patch below 1000.
+
+## Releases and live updates
+
+Every push to `main` that touches the app publishes a release tagged `v<version>` with
+two assets:
+
+- **`diary.apk`** — the full install.
+- **`bundle-<version>-<fingerprint>.zip`** — just the web layer (JS/CSS/HTML), delivered
+  **over the air** to installed Android apps via
+  [`@capgo/capacitor-updater`](https://capgo.app) in manual mode. No Capgo cloud is
+  involved: the plugin downloads the zip straight from the GitHub release.
+
+The app (`web/src/lib/liveUpdate.ts`) checks for a newer release when it comes to the
+foreground, downloads the bundle in the background, and swaps it in when the app is
+backgrounded — so the reload is never seen. If a bundle fails to boot, Capgo rolls back
+to the last working one automatically (`appReadyTimeout` in `capacitor.config.ts`).
+
+A live update **cannot** carry native changes. The `<fingerprint>` is a hash of the
+Capacitor plugin set + `capacitor.config.ts`; when it doesn't match the installed APK's,
+OTA is skipped and the app shows a banner pointing at the APK instead. Nothing to
+maintain by hand — adding or removing a plugin changes the hash on its own.
+
+The web PWA updates itself through its service worker (re-checked hourly and on
+reconnect); it needs none of the above.
+
+> Adding the updater plugin is itself a native change, so the **first** OTA-capable APK
+> has to be installed manually. Every JS-only release after that flows over the air.
+
+## Telemetry (Better Stack)
+
+Errors and request/usage metrics go to [Better Stack](https://telemetry.betterstack.com).
+It is entirely optional — with the env vars unset, both the server and the client log to
+the console only.
+
+Create **two** sources (Sources → Connect source), because the client token is shipped
+inside the bundle and must not be the server's:
+
+| Source platform | Used by | Token env var | Host env var |
+| --- | --- | --- | --- |
+| Node.js | API server (runtime) | `BETTERSTACK_SOURCE_TOKEN` | `BETTERSTACK_INGEST_URL` |
+| JavaScript | web + Android app (build time) | `VITE_BETTERSTACK_SOURCE_TOKEN` | `VITE_BETTERSTACK_INGEST_URL` |
+
+Both values are on each source's **Configure** screen. For local development put all four
+in `.env`. For CI, see below.
+
+### CI configuration
+
+The `VITE_*` pair is **inlined into the bundle at build time**, so it must be available to
+the build, not to the container at runtime.
+
+In the GitHub repo settings:
+
+- **Secret** `BETTERSTACK_CLIENT_SOURCE_TOKEN` — the *JavaScript* source token.
+- **Variable** `BETTERSTACK_CLIENT_INGEST_URL` — the *JavaScript* source's ingesting host
+  (`https://s……..betterstackdata.com`).
+
+Both are consumed by `android-release.yml` (for the APK + OTA bundle) and by
+`docker-publish.yml` (passed as Docker build args for the web bundle).
+
+The **server**'s pair are plain runtime env vars — set `BETTERSTACK_SOURCE_TOKEN` and
+`BETTERSTACK_INGEST_URL` wherever the container's environment is configured, alongside
+`MONGODB_URI` and the Better Auth vars. They are not needed at image build time.
+
 ## Scripts
 
 - `npm run dev` — API (tsx watch) + web (Vite) concurrently

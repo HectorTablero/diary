@@ -14,7 +14,8 @@ import { cancelIdle, onIdle } from '@/lib/idle';
 import { isNative } from '@/lib/native';
 import { preloadLoaders } from '@/lib/preloaders';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
-import { checkForUpdate, dismissUpdate, refreshWebApp, type UpdateInfo } from '@/lib/updateCheck';
+import { getUpdateState, subscribeToUpdateState, type UpdateState } from '@/lib/liveUpdate';
+import { dismissUpdate, isDismissed } from '@/lib/updateCheck';
 import { cn } from '@/lib/utils';
 import { pageLoaders } from '@/pages/lazyPages';
 
@@ -157,50 +158,29 @@ function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
   );
 }
 
-/** Notifies once a newer build than the running one is published on GitHub. */
+/* Ordinary updates are silent: the web PWA swaps itself via the service worker, and the Android
+   app live-updates its bundle in the background (lib/liveUpdate.ts). This banner exists for the
+   one case neither can handle — a release whose native shell differs from the installed APK, so
+   only downloading a new APK can deliver it. */
 function UpdateBanner() {
-  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [update, setUpdate] = useState<UpdateState>(getUpdateState);
+  const [dismissed, setDismissed] = useState(true);
   const { t } = useTranslation();
 
+  useEffect(() => subscribeToUpdateState(setUpdate), []);
+
+  const version = update.kind === 'native-required' ? update.version : null;
+
   useEffect(() => {
-    let cancelled = false;
+    if (!version) return;
+    void isDismissed(version).then(setDismissed);
+  }, [version]);
 
-    const run = async () => {
-      const updateInfo = await checkForUpdate();
-      if (cancelled || !updateInfo) return;
-
-      if (!isNative) {
-        if (!navigator.onLine) return;
-        const refreshed = await refreshWebApp();
-        if (refreshed) return;
-      }
-
-      setUpdate(updateInfo);
-    };
-
-    void run();
-
-    if (isNative) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const handleOnline = () => {
-      void run();
-    };
-    window.addEventListener('online', handleOnline);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('online', handleOnline);
-    };
-  }, []);
-
-  if (!update) return null;
+  if (update.kind !== 'native-required' || dismissed) return null;
 
   return (
     <div className="sticky top-0 z-50 flex items-center justify-center gap-4 border-b border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
-      {t('update.available', { version: update.versionName })}
+      {t('update.needsInstall', { version: update.version })}
       <a
         href={update.releaseUrl}
         target="_blank"
@@ -213,8 +193,8 @@ function UpdateBanner() {
         type="button"
         className="text-muted-foreground underline-offset-2 hover:underline"
         onClick={() => {
-          void dismissUpdate(update.versionCode);
-          setUpdate(null);
+          void dismissUpdate(update.version);
+          setDismissed(true);
         }}
       >
         {t('update.dismiss')}
@@ -306,7 +286,7 @@ export default function AppLayout() {
     <div className="flex min-h-dvh">
       {!isNative && <Sidebar pendingCheckups={pendingCheckups} />}
       <main className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]', !isNative && 'md:pb-0')}>
-        {/* <UpdateBanner /> */}
+        <UpdateBanner />
         <SyncStatusOverlay />
         <Outlet />
       </main>

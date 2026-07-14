@@ -1,76 +1,69 @@
-import { App as CapApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
-import { isNative } from './native';
+import { compareVersions } from './version';
 
 const REPO = 'HectorTablero/diary';
-const DISMISSED_KEY = 'update.dismissedVersionCode';
+const DISMISSED_KEY = 'update.dismissedVersion';
 
-export interface UpdateInfo {
-  versionCode: number;
-  versionName: string;
+/** CI publishes `bundle-<version>-<nativeFingerprint>.zip` beside the APK on every release. */
+const BUNDLE_ASSET_PATTERN = /^bundle-(\d+\.\d+\.\d+)-([0-9a-f]+)\.zip$/;
+
+export interface ReleaseInfo {
+  /** Version from the release tag, e.g. "2.4.0" (tag `v2.4.0`). */
+  version: string;
   releaseUrl: string;
+  /** Direct download for the OTA bundle, or null when the release has no bundle asset. */
+  bundleUrl: string | null;
+  /** Native shell the published bundle was built against, or null when there is no bundle. */
+  fingerprint: string | null;
+}
+
+interface GithubAsset {
+  name: string;
+  browser_download_url: string;
 }
 
 interface GithubRelease {
   html_url: string;
-  name: string;
+  tag_name: string;
+  assets: GithubAsset[];
 }
 
-/** Matches the "Latest build (<code> / <name>)" release name set by the android-release
-    workflow, e.g. "Latest build (42 / 2.2.0+a64bc46)". */
-const RELEASE_NAME_PATTERN = /\((\d+)\s*\/\s*([^)]+)\)/;
+/* The bundle zip is downloaded by Capgo from *native* code (OkHttp), which is not bound by CORS
+   and follows GitHub's asset redirect normally. Only this metadata call goes through fetch, and
+   api.github.com sends permissive CORS headers — which is why the release JSON, not the asset,
+   is what the webview reads. */
+export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
+  if (!navigator.onLine) return null;
 
-function readVersionCode(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value;
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
-  return null;
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+  if (!res.ok) return null;
+  const release = (await res.json()) as GithubRelease;
+
+  const version = /^v?(\d+\.\d+\.\d+)$/.exec(release.tag_name.trim())?.[1];
+  if (!version) return null;
+
+  const bundle = (release.assets ?? [])
+    .map((asset) => ({ asset, match: BUNDLE_ASSET_PATTERN.exec(asset.name) }))
+    .find(({ match }) => match?.[1] === version);
+
+  return {
+    version,
+    releaseUrl: release.html_url,
+    bundleUrl: bundle?.asset.browser_download_url ?? null,
+    fingerprint: bundle?.match?.[2] ?? null,
+  };
 }
 
-function getWebVersionCode(): number | null {
-  const value = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_APP_VERSION_CODE;
-  return value ? readVersionCode(value) : null;
+/** True when the published release is newer than the bundle currently executing. */
+export function isNewerThanRunning(release: ReleaseInfo): boolean {
+  return compareVersions(release.version, __APP_VERSION__) > 0;
 }
 
-async function getCurrentVersionCode(): Promise<number | null> {
-  if (isNative) {
-    const { build } = await CapApp.getInfo();
-    return readVersionCode(build);
-  }
-  return getWebVersionCode();
+export async function isDismissed(version: string): Promise<boolean> {
+  const { value } = await Preferences.get({ key: DISMISSED_KEY });
+  return value === version;
 }
 
-/** Compares the running build against the CI-published "latest" GitHub release.
-    Reads the version straight off the release's `name` field rather than fetching the
-    `version.json` asset: that asset's `browser_download_url` 302-redirects to a different
-    host, and browsers don't reliably treat that redirect as CORS-safe. */
-export async function checkForUpdate(): Promise<UpdateInfo | null> {
-  const releaseRes = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
-  if (!releaseRes.ok) return null;
-  const release = (await releaseRes.json()) as GithubRelease;
-
-  const match = RELEASE_NAME_PATTERN.exec(release.name);
-  if (!match) return null;
-  const versionCode = readVersionCode(match[1]);
-  const versionName = match[2].trim();
-  if (versionCode === null) return null;
-
-  const currentVersionCode = await getCurrentVersionCode();
-  if (currentVersionCode === null || versionCode <= currentVersionCode) return null;
-
-  const dismissed = (await Preferences.get({ key: DISMISSED_KEY })).value;
-  if (dismissed === String(versionCode)) return null;
-
-  return { versionCode, versionName, releaseUrl: release.html_url };
-}
-
-export async function refreshWebApp(): Promise<boolean> {
-  if (isNative || typeof navigator.serviceWorker === 'undefined') return false;
-  const registration = await navigator.serviceWorker.getRegistration();
-  if (registration) await registration.update();
-  window.location.reload();
-  return true;
-}
-
-export async function dismissUpdate(versionCode: number): Promise<void> {
-  await Preferences.set({ key: DISMISSED_KEY, value: String(versionCode) });
+export async function dismissUpdate(version: string): Promise<void> {
+  await Preferences.set({ key: DISMISSED_KEY, value: version });
 }

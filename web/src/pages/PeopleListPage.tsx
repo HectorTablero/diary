@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   Search,
+  StickyNote,
   Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -43,10 +44,21 @@ import { canImportContacts } from '@/lib/contacts';
 import { todayKey } from '@/lib/dates';
 import { isNative } from '@/lib/native';
 import { visibleTags } from '@/lib/tags';
-import { fuzzyIncludes } from '@/lib/tokens';
+import { fuzzyIncludes, matchWindows, type MatchWindow } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
 type SortOption = 'name' | 'talkingPoints' | 'lastContact';
+
+/** What a person matched the current search on, beyond their plain name — everything a
+    `PersonRow` needs to explain why it's showing up. Computed once per person in a single
+    pass (see `searchMatches` below) rather than one map per field. */
+interface PersonSearchMatch {
+  aliases: string[];
+  job: string | null;
+  notes: MatchWindow[] | null;
+}
+
+const MAX_NOTE_SNIPPETS = 3;
 
 const pendingEventCount = (person: PersonListItem, today: string): number =>
   pendingEventFollowUps(person.events, today).length;
@@ -96,8 +108,7 @@ function PersonRow({
   onEdit,
   today,
   tagFilter,
-  matchedAliases,
-  matchedJob,
+  match,
   checkupPending = false,
 }: {
   person: PersonListItem;
@@ -105,12 +116,9 @@ function PersonRow({
   today: string;
   /** Tag ids currently being filtered on; anything else on the row is faded back. */
   tagFilter: string[];
-  /** Nicknames that matched the current search — shown so a hit on "Mum" explains why
-      Carmen is in the results. */
-  matchedAliases?: string[];
-  /** "Job title · company" when the search matched there instead of the name/aliases — shown
-      because job info isn't otherwise displayed in this list, so the hit would look unexplained. */
-  matchedJob?: string;
+  /** What the current search matched on this person outside their name — shown so a hit on
+      "Mum", a job title, or a note explains why the person is in the results. */
+  match?: PersonSearchMatch;
   checkupPending?: boolean;
 }) {
   const { t } = useTranslation();
@@ -134,16 +142,16 @@ function PersonRow({
               to its own line — still above the tags — when it doesn't. */}
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <span className="max-w-full truncate font-medium">{person.name}</span>
-            {matchedAliases && matchedAliases.length > 0 && (
+            {match && match.aliases.length > 0 && (
               <span className="max-w-full truncate text-xs text-muted-foreground">
                 {t('people.alsoKnownAs')}{' '}
-                <span className="font-medium text-foreground">{matchedAliases.join(', ')}</span>
+                <span className="font-medium text-foreground">{match.aliases.join(', ')}</span>
               </span>
             )}
-            {matchedJob && (
+            {match?.job && (
               <span className="flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground">
                 <Briefcase className="size-3 shrink-0" />
-                <span className="truncate font-medium text-foreground">{matchedJob}</span>
+                <span className="truncate font-medium text-foreground">{match.job}</span>
               </span>
             )}
           </div>
@@ -190,6 +198,30 @@ function PersonRow({
               {hiddenTagCount > 0 && (
                 <span className="text-xs text-muted-foreground">+{hiddenTagCount}</span>
               )}
+            </div>
+          )}
+          {match?.notes && match.notes.length > 0 && (
+            <div className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
+              <StickyNote className="mt-0.5 size-3 shrink-0" />
+              <p className="min-w-0 flex-1">
+                {match.notes.slice(0, MAX_NOTE_SNIPPETS).map((window, i) => (
+                  <span key={i}>
+                    {i > 0 && ' '}
+                    {window.segments.map((segment, j) =>
+                      segment.matched ? (
+                        <span key={j} className="font-medium text-foreground">
+                          {segment.text}
+                        </span>
+                      ) : (
+                        <span key={j}>{segment.text}</span>
+                      ),
+                    )}
+                  </span>
+                ))}
+                {match.notes.length > MAX_NOTE_SNIPPETS && (
+                  <span> +{match.notes.length - MAX_NOTE_SNIPPETS}</span>
+                )}
+              </p>
             </div>
           )}
         </div>
@@ -266,27 +298,20 @@ export default function PeopleListPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<PersonDto | null>(null);
 
-  /* Which nicknames each person matched the query on. Doubles as the search rule itself — a
-     person is a hit if their name matches *or* any alias does, so searching "Mum" finds Carmen. */
-  const aliasMatches = useMemo(() => {
-    const matches = new Map<string, string[]>();
+  /* What each person matched the query on, beyond their plain name: aliases, job title/company,
+     and notes all feed into one map in a single pass. This also doubles as the search rule
+     itself — a person is a hit if their name matches *or* any of these fields do, so searching
+     "Mum", a job title, or a phrase from a note all find the right person. Adding another
+     searchable field means adding one more computation here, not another parallel map. */
+  const searchMatches = useMemo(() => {
+    const matches = new Map<string, PersonSearchMatch>();
     if (!query.trim()) return matches;
     for (const person of people ?? []) {
-      const hits = person.aliases.filter((alias) => fuzzyIncludes(alias, query));
-      if (hits.length) matches.set(person.id, hits);
-    }
-    return matches;
-  }, [people, query]);
-
-  /* Same idea for job title/company: a hit here also counts as a search match, and the matched
-     "job title · company" string (format mirrors ContactInfo) is shown on the row so it's clear
-     why that person surfaced. */
-  const jobMatches = useMemo(() => {
-    const matches = new Map<string, string>();
-    if (!query.trim()) return matches;
-    for (const person of people ?? []) {
+      const aliases = person.aliases.filter((alias) => fuzzyIncludes(alias, query));
       const organization = [person.jobTitle, person.company].filter(Boolean).join(' · ');
-      if (organization && fuzzyIncludes(organization, query)) matches.set(person.id, organization);
+      const job = organization && fuzzyIncludes(organization, query) ? organization : null;
+      const notes = matchWindows(person.notes, query);
+      if (aliases.length > 0 || job || notes) matches.set(person.id, { aliases, job, notes });
     }
     return matches;
   }, [people, query]);
@@ -294,11 +319,11 @@ export default function PeopleListPage() {
   const filtered = useMemo(() => {
     const matching = (people ?? []).filter(
       (p) =>
-        (!query || fuzzyIncludes(p.name, query) || aliasMatches.has(p.id) || jobMatches.has(p.id)) &&
+        (!query || fuzzyIncludes(p.name, query) || searchMatches.has(p.id)) &&
         (tagFilter.length === 0 || p.tags.some((tag) => tagFilter.includes(tag.id))),
     );
     return eventsFirst(sortPeople(matching, sort), today);
-  }, [people, query, sort, tagFilter, aliasMatches, jobMatches, today]);
+  }, [people, query, sort, tagFilter, searchMatches, today]);
 
   // Pending checkups always float to the top, as their own category; the chosen
   // sort still applies within each group since it's just a filter over `filtered`.
@@ -407,8 +432,7 @@ export default function PeopleListPage() {
                     onEdit={setEditing}
                     today={today}
                     tagFilter={tagFilter}
-                    matchedAliases={aliasMatches.get(person.id)}
-                    matchedJob={jobMatches.get(person.id)}
+                    match={searchMatches.get(person.id)}
                     checkupPending
                   />
                 ))}
@@ -423,8 +447,7 @@ export default function PeopleListPage() {
                     onEdit={setEditing}
                     today={today}
                     tagFilter={tagFilter}
-                    matchedAliases={aliasMatches.get(person.id)}
-                    matchedJob={jobMatches.get(person.id)}
+                    match={searchMatches.get(person.id)}
                   />
                 ))}
               </ul>
@@ -439,8 +462,7 @@ export default function PeopleListPage() {
                 onEdit={setEditing}
                 today={today}
                 tagFilter={tagFilter}
-                matchedAliases={aliasMatches.get(person.id)}
-                matchedJob={jobMatches.get(person.id)}
+                match={searchMatches.get(person.id)}
               />
             ))}
           </ul>

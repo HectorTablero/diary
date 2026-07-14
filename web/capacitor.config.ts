@@ -23,6 +23,14 @@ const config: CapacitorConfig = {
       smallIcon: 'ic_stat_notify',
       iconColor: '#0072FF',
     },
+    CapacitorUpdater: {
+      // Manual mode: web/src/lib/liveUpdate.ts decides what to download and when to apply it,
+      // and the bundles come from our own GitHub release. The plugin never contacts Capgo.
+      autoUpdate: false,
+      // A bundle that does not reach notifyAppReady() within this window is assumed broken and
+      // is automatically rolled back to the last working one. This is the OTA safety net.
+      appReadyTimeout: 10_000,
+    },
   },
 };
 

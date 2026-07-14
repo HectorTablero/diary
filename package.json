@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -10,6 +10,8 @@
     "web"
   ],
   "scripts": {
+    "prepare": "node scripts/install-hooks.mjs",
+    "version:info": "node scripts/version-info.mjs",
     "dev": "npm run generate:logos -- --silent && concurrently -n api,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",

@@ -1,4 +1,6 @@
 *.env*
+# The template carries no secrets and is what the README tells you to copy.
+!.env.example
 deploy.bat
 node_modules/
 dist/
