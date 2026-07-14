@@ -75,9 +75,12 @@ export function buildEntryTree(entries: EntryDto[]): EntryNode[] {
     if (parent) parent.children.push(node);
     else roots.push(node);
   }
-  const byCreation = (a: EntryNode, b: EntryNode) => a.createdAt.localeCompare(b.createdAt);
+  // Ordinal compare, not localeCompare: the fractional-index orderKey alphabet's ordering must
+  // match plain code-point comparison, which locale-aware collation isn't guaranteed to preserve.
+  const byOrderKey = (a: EntryNode, b: EntryNode) =>
+    a.orderKey < b.orderKey ? -1 : a.orderKey > b.orderKey ? 1 : 0;
   const sortTree = (list: EntryNode[]) => {
-    list.sort(byCreation);
+    list.sort(byOrderKey);
     list.forEach((n) => sortTree(n.children));
   };
   sortTree(roots);

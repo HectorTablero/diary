@@ -3,10 +3,12 @@ import { ongoingEvents, pendingEventFollowUps } from '@diary/shared';
 import {
   BellRing,
   CalendarClock,
+  Check,
   ContactRound,
   Hash,
   MessageCircle,
   MessageCircleQuestion,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -15,7 +17,8 @@ import {
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { usePeople, useTags } from '@/api/hooks';
+import { toast } from 'sonner';
+import { useMarkCheckup, usePeople, useTags } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { TagChip } from '@/components/entry/chips';
@@ -25,6 +28,12 @@ import { PersonForm } from '@/components/person/PersonForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -100,6 +109,7 @@ function PersonRow({
   checkupPending?: boolean;
 }) {
   const { t } = useTranslation();
+  const markCheckup = useMarkCheckup();
   const ongoing = ongoingEvents(person.events, today);
   const pending = pendingEventCount(person, today);
   // Under a tag filter the matching tags claim the visible slots, so a person can't be shown
@@ -192,18 +202,42 @@ function PersonRow({
             {person.talkingPointCount}
           </Badge>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0 text-muted-foreground"
-          aria-label={t('people.editPerson')}
-          onClick={(e) => {
-            e.preventDefault();
-            onEdit(person);
-          }}
-        >
-          <Pencil className="size-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0 text-muted-foreground"
+              aria-label={t('people.editPerson')}
+              onClick={(e) => e.preventDefault()}
+            >
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.preventDefault();
+                onEdit(person);
+              }}
+            >
+              <Pencil className="size-3.5" /> {t('people.editPerson')}
+            </DropdownMenuItem>
+            {person.checkupIntervalDays != null && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault();
+                  markCheckup.mutate(person.id, {
+                    onSuccess: () => toast.success(t('people.checkupMarkedDone')),
+                    onError: () => toast.error(t('errors.unknown')),
+                  });
+                }}
+              >
+                <Check className="size-3.5" /> {t('people.markCheckupNow')}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </Link>
     </li>
   );

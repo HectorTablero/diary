@@ -201,6 +201,17 @@ export function useDeleteEntry() {
   });
 }
 
+/** Drag-and-drop reparent/reorder. Haptics fire from the drag interaction itself (pickup/drop),
+    not here — see the sortable tree provider. */
+export function useMoveEntry() {
+  const invalidate = useInvalidateEntryData();
+  return useMutation({
+    mutationFn: ({ id, newParentId, newOrderKey }: { id: string; newParentId: string | null; newOrderKey: string }) =>
+      mutations.moveEntry(id, newParentId, newOrderKey),
+    onSuccess: invalidate,
+  });
+}
+
 export function useSetSaid() {
   const invalidate = useInvalidateEntryData();
   return useMutation({

@@ -18,9 +18,11 @@ import {
   memoryCutoffDateKey,
   scoreCutoffDateKey,
 } from '@diary/shared';
+import { generateNKeysBetween } from 'fractional-indexing';
 import { ApiError } from '@/lib/apiClient';
 import { fuzzyIncludes } from '@/lib/tokens';
-import { db, getMeta, type LocalEntry, type LocalPerson } from './db';
+import { db, getMeta, type LocalEntry, type LocalPerson, type OutboxOp } from './db';
+import { enqueueBatch } from './outbox';
 
 /* Local read layer: mirrors the server's read endpoints over the Dexie store,
    so every page works identically offline. */
@@ -53,9 +55,57 @@ function entryToDto(entry: LocalEntry, maps: JoinMaps): EntryDto {
     saidTo: entry.saidTo,
     hiddenFor: entry.hiddenFor,
     parentId: entry.parentId,
+    // '' off the getDayEntries path, which always heals first (see ensureOrderKeys) — the other
+    // read paths here (search, memories, history...) don't sort by it, so a real value doesn't
+    // matter for them.
+    orderKey: entry.orderKey ?? '',
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
   };
+}
+
+/**
+ * Fill in `orderKey` for any entry that doesn't have one yet — rows written before drag-and-drop
+ * reorder existed. Mutates and returns the same entries in place. Groups by parentId and, within
+ * each group, appends the whole unkeyed batch (sorted by their existing createdAt, so nothing
+ * visibly reshuffles) after any already-keyed siblings — "start at the bottom of the list by
+ * default" applied to legacy data: the first time a legacy day is viewed, every sibling in a
+ * group is unkeyed at once, so the batch is keyed together in its original order. Persists
+ * locally and enqueues a sync PATCH per healed row so the fix reaches the server (and, in turn,
+ * other devices) too — see the note above db.version(3) in db.ts for the lifecycle this is part of.
+ */
+async function ensureOrderKeys(entries: LocalEntry[]): Promise<LocalEntry[]> {
+  const byParent = new Map<string | null, LocalEntry[]>();
+  for (const entry of entries) {
+    const siblings = byParent.get(entry.parentId);
+    if (siblings) siblings.push(entry);
+    else byParent.set(entry.parentId, [entry]);
+  }
+
+  const healed: LocalEntry[] = [];
+  for (const siblings of byParent.values()) {
+    const unkeyed = siblings.filter((e) => !e.orderKey);
+    if (!unkeyed.length) continue;
+    unkeyed.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const max = siblings.reduce<string | undefined>(
+      (acc, e) => (e.orderKey && (!acc || e.orderKey > acc) ? e.orderKey : acc),
+      undefined,
+    );
+    const keys = generateNKeysBetween(max ?? null, null, unkeyed.length);
+    unkeyed.forEach((entry, i) => {
+      entry.orderKey = keys[i];
+      healed.push(entry);
+    });
+  }
+  if (!healed.length) return entries;
+
+  await db.entries.bulkPut(healed);
+  await enqueueBatch(
+    healed.map(
+      (e): OutboxOp => ({ method: 'PATCH', path: `/entries/${e.id}`, body: { orderKey: e.orderKey } }),
+    ),
+  );
+  return entries;
 }
 
 function personToDto(person: LocalPerson, tags: Map<string, TagDto>): PersonDto {
@@ -98,7 +148,8 @@ export async function getDayEntries(dateKey: string): Promise<EntryNode[]> {
     db.entries.where('dateKey').equals(dateKey).toArray(),
     joinMaps(),
   ]);
-  return buildEntryTree(entries.map((e) => entryToDto(e, maps)));
+  const healed = await ensureOrderKeys(entries);
+  return buildEntryTree(healed.map((e) => entryToDto(e, maps)));
 }
 
 // --- Calendar ---

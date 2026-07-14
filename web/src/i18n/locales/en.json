@@ -116,6 +116,7 @@
     "addPeople": "People",
     "subEntries": "{{count}} sub-entry",
     "subEntries_other": "{{count}} sub-entries",
+    "dragHandle": "Drag to reorder or move",
     "birthdays": "Birthdays",
     "birthdayLine": "<mention>@{{name}}</mention>'s birthday",
     "birthdayLineWithAge": "<mention>@{{name}}</mention>'s birthday ({{age}})"
@@ -186,6 +187,7 @@
       "{{name}} is patiently waiting. It's been {{days}} days — maybe say something before it becomes a milestone."
     ],
     "markCheckupDone": "Mark as done",
+    "markCheckupNow": "Mark checkup done now",
     "checkupMarkedDone": "Checkup marked as done",
     "disableCheckups": "Disable checkups",
     "checkupsDisabled": "Checkups disabled for this person",

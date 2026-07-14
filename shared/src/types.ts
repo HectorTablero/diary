@@ -83,6 +83,10 @@ export interface EntryDto {
   /** Person ids this entry is hidden for (never a talking point). */
   hiddenFor: string[];
   parentId: string | null;
+  /** Fractional-index sort key among siblings (lexicographic ordinal compare, not localeCompare).
+      Legacy entries are healed to a real value lazily on read — see ensureOrderKeys in
+      web/src/db/repo.ts — so this is only reliably populated after that has run at least once. */
+  orderKey: string;
   createdAt: string;
   updatedAt: string;
 }
