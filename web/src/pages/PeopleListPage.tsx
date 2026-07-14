@@ -2,6 +2,7 @@ import type { PersonDto, PersonListItem } from '@diary/shared';
 import { ongoingEvents, pendingEventFollowUps } from '@diary/shared';
 import {
   BellRing,
+  Briefcase,
   CalendarClock,
   Check,
   ContactRound,
@@ -96,6 +97,7 @@ function PersonRow({
   today,
   tagFilter,
   matchedAliases,
+  matchedJob,
   checkupPending = false,
 }: {
   person: PersonListItem;
@@ -106,6 +108,9 @@ function PersonRow({
   /** Nicknames that matched the current search — shown so a hit on "Mum" explains why
       Carmen is in the results. */
   matchedAliases?: string[];
+  /** "Job title · company" when the search matched there instead of the name/aliases — shown
+      because job info isn't otherwise displayed in this list, so the hit would look unexplained. */
+  matchedJob?: string;
   checkupPending?: boolean;
 }) {
   const { t } = useTranslation();
@@ -133,6 +138,12 @@ function PersonRow({
               <span className="max-w-full truncate text-xs text-muted-foreground">
                 {t('people.alsoKnownAs')}{' '}
                 <span className="font-medium text-foreground">{matchedAliases.join(', ')}</span>
+              </span>
+            )}
+            {matchedJob && (
+              <span className="flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground">
+                <Briefcase className="size-3 shrink-0" />
+                <span className="truncate font-medium text-foreground">{matchedJob}</span>
               </span>
             )}
           </div>
@@ -267,14 +278,27 @@ export default function PeopleListPage() {
     return matches;
   }, [people, query]);
 
+  /* Same idea for job title/company: a hit here also counts as a search match, and the matched
+     "job title · company" string (format mirrors ContactInfo) is shown on the row so it's clear
+     why that person surfaced. */
+  const jobMatches = useMemo(() => {
+    const matches = new Map<string, string>();
+    if (!query.trim()) return matches;
+    for (const person of people ?? []) {
+      const organization = [person.jobTitle, person.company].filter(Boolean).join(' · ');
+      if (organization && fuzzyIncludes(organization, query)) matches.set(person.id, organization);
+    }
+    return matches;
+  }, [people, query]);
+
   const filtered = useMemo(() => {
     const matching = (people ?? []).filter(
       (p) =>
-        (!query || fuzzyIncludes(p.name, query) || aliasMatches.has(p.id)) &&
+        (!query || fuzzyIncludes(p.name, query) || aliasMatches.has(p.id) || jobMatches.has(p.id)) &&
         (tagFilter.length === 0 || p.tags.some((tag) => tagFilter.includes(tag.id))),
     );
     return eventsFirst(sortPeople(matching, sort), today);
-  }, [people, query, sort, tagFilter, aliasMatches, today]);
+  }, [people, query, sort, tagFilter, aliasMatches, jobMatches, today]);
 
   // Pending checkups always float to the top, as their own category; the chosen
   // sort still applies within each group since it's just a filter over `filtered`.
@@ -384,6 +408,7 @@ export default function PeopleListPage() {
                     today={today}
                     tagFilter={tagFilter}
                     matchedAliases={aliasMatches.get(person.id)}
+                    matchedJob={jobMatches.get(person.id)}
                     checkupPending
                   />
                 ))}
@@ -399,6 +424,7 @@ export default function PeopleListPage() {
                     today={today}
                     tagFilter={tagFilter}
                     matchedAliases={aliasMatches.get(person.id)}
+                    matchedJob={jobMatches.get(person.id)}
                   />
                 ))}
               </ul>
@@ -414,6 +440,7 @@ export default function PeopleListPage() {
                 today={today}
                 tagFilter={tagFilter}
                 matchedAliases={aliasMatches.get(person.id)}
+                matchedJob={jobMatches.get(person.id)}
               />
             ))}
           </ul>
