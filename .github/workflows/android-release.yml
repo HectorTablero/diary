@@ -43,7 +43,9 @@ jobs:
       # it, so the app can never disagree with what was published.
       - name: Compute version
         id: version
-        run: npm run version:info >> "$GITHUB_OUTPUT"
+        # Called directly rather than through `npm run`, whose banner ("> diary@x.y.z ...") would
+        # land in $GITHUB_OUTPUT, which only accepts key=value lines.
+        run: node scripts/version-info.mjs >> "$GITHUB_OUTPUT"
 
       - name: Restore signing keystore
         working-directory: web/android/app
@@ -69,7 +71,7 @@ jobs:
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           VITE_BETTERSTACK_SOURCE_TOKEN: ${{ secrets.BETTERSTACK_CLIENT_SOURCE_TOKEN }}
-          VITE_BETTERSTACK_INGEST_URL: ${{ vars.BETTERSTACK_CLIENT_INGEST_URL }}
+          VITE_BETTERSTACK_INGEST_URL: ${{ secrets.BETTERSTACK_CLIENT_INGEST_URL }}
         run: npm run build:app
 
       # web/dist is the app-mode build that `cap sync` just copied into the APK — the exact same

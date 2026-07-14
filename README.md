@@ -153,14 +153,23 @@ in `.env`. For CI, see below.
 The `VITE_*` pair is **inlined into the bundle at build time**, so it must be available to
 the build, not to the container at runtime.
 
-In the GitHub repo settings:
+Two GitHub **environments** hold the secrets, and both workflows declare the one they
+need (`environment: android` / `environment: docker`) — environment secrets are invisible
+to a job that doesn't declare it. The Better Stack pair is therefore **duplicated across
+both**:
 
-- **Secret** `BETTERSTACK_CLIENT_SOURCE_TOKEN` — the *JavaScript* source token.
-- **Variable** `BETTERSTACK_CLIENT_INGEST_URL` — the *JavaScript* source's ingesting host
-  (`https://s……..betterstackdata.com`).
+| Environment | Secret | Value |
+| --- | --- | --- |
+| `android` + `docker` | `BETTERSTACK_CLIENT_SOURCE_TOKEN` | *JavaScript* source token |
+| `android` + `docker` | `BETTERSTACK_CLIENT_INGEST_URL` | *JavaScript* source ingesting host |
 
-Both are consumed by `android-release.yml` (for the APK + OTA bundle) and by
-`docker-publish.yml` (passed as Docker build args for the web bundle).
+Both are **secrets**, not variables — `secrets.` and `vars.` are separate namespaces, and
+reading one through the other yields an empty string with no error. If the bundle ever
+comes out with telemetry off, that mismatch is the first thing to check: the app logs
+`[telemetry] disabled` to the console when either value is missing.
+
+`android-release.yml` uses them for the APK + OTA bundle; `docker-publish.yml` passes them
+as Docker build args for the web bundle.
 
 The **server**'s pair are plain runtime env vars — set `BETTERSTACK_SOURCE_TOKEN` and
 `BETTERSTACK_INGEST_URL` wherever the container's environment is configured, alongside
