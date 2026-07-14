@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "4.0.2",
+  "version": "4.0.3",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -16,7 +16,7 @@
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "generate:logos": "tsx web/scripts/generateLogos.ts",
-    "build": "npm run generate:logos && npm run build -w web && npm run build -w server",
+    "build": "npm run generate:logos && npm run generate:assets && npm run build -w web && npm run build -w server",
     "generate:assets": "tsx web/scripts/generateAssets.ts",
     "build:app": "npm run generate:logos && npm run generate:assets && npm run build:app -w web",
     "app:open": "npm run app:open -w web",
