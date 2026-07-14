@@ -22,8 +22,8 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    environment: docker
     permissions:
       contents: read
       packages: write
