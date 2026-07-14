@@ -16,6 +16,8 @@ i18n
     supportedLngs: ['es', 'en'],
     nonExplicitSupportedLngs: true,
     interpolation: { escapeValue: false },
+    // Silences i18next's "made possible by Locize" console advert on every boot.
+    showSupportNotice: false,
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],

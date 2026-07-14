@@ -14,11 +14,16 @@ import { initLiveUpdate } from './lib/liveUpdate';
 import { isNative } from './lib/native';
 import { initLocalNotifications, refreshNotifications } from './lib/notifications';
 import { initTelemetry } from './lib/telemetry';
+import { logVersion } from './lib/version';
 import i18n from './i18n';
 import './index.css';
 
 // First, so that anything failing below is reported.
 initTelemetry();
+
+// Every page, not just the landing page: the version is the first thing you want in the console
+// when a page misbehaves, and a deep link into any route is just as likely as one into /diary.
+void logVersion();
 
 // The Capacitor app ships its assets in the APK and updates them via Capgo (lib/liveUpdate.ts);
 // a service worker would only fight that. On the web the worker *is* the update mechanism.
@@ -27,11 +32,16 @@ if (!isNative) {
     immediate: true,
     onRegisteredSW(_url, registration) {
       // autoUpdate only re-checks on page load, so an installed PWA left open for days would
-      // never notice a deploy. Poll instead — update() is a no-op offline.
+      // never notice a deploy. Re-check periodically, on reconnect, and whenever the tab is
+      // brought back to the foreground. update() is a no-op offline.
+      // (For this to find anything, sw.js must not be cached — see setCacheHeaders in server/app.ts.)
       if (!registration) return;
       const check = () => void registration.update().catch(() => {});
       setInterval(check, 60 * 60 * 1000);
       window.addEventListener('online', check);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check();
+      });
     },
   });
 }

@@ -1,5 +1,5 @@
 import { serveStatic } from '@hono/node-server/serve-static';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import type { UpgradeWebSocket } from 'hono/ws';
@@ -27,6 +27,27 @@ import { tagsRouter } from './routes/tags';
 // from this file so it works both from the repo root and inside the container.
 const webDistAbs = fileURLToPath(new URL('../../web/dist', import.meta.url));
 const WEB_DIST = (relative(process.cwd(), webDistAbs) || '.').replace(/\\/g, '/');
+
+/** Vite fingerprints everything it emits into /assets/, so those URLs can never change meaning. */
+const HASHED_ASSET = /[\\/]assets[\\/]/;
+
+/* Cache headers for the SPA.
+
+   Without these the origin sends no Cache-Control at all, and a CDN in front of it falls back to
+   caching by file extension — which is how Cloudflare ended up serving a four-hour-old `sw.js`.
+   A stale service worker is uniquely damaging: the browser's update check re-fetches sw.js, gets
+   the cached copy back, concludes there is no new version, and keeps serving its old precache
+   forever. The site then looks frozen on an old build even though the server has the new one
+   (a hard reload bypasses the worker and shows the truth, a normal reload goes back to the past).
+
+   So: fingerprinted assets are immutable, and everything else — above all the service worker and
+   the HTML shell — must be revalidated on every request. */
+const setCacheHeaders = (path: string, c: Context): void => {
+  c.header(
+    'Cache-Control',
+    HASHED_ASSET.test(path) ? 'public, max-age=31536000, immutable' : 'no-cache',
+  );
+};
 
 /** Populates the given app (created by the caller so WebSocket upgrades can be wired in). */
 export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: UpgradeWebSocket) => {
@@ -90,8 +111,8 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   // Unknown API paths must 404 as JSON, never fall through to the SPA.
   app.all('/api/*', (c) => c.json({ error: 'errors.not_found' }, 404));
 
-  app.use('*', serveStatic({ root: WEB_DIST }));
-  app.get('*', serveStatic({ path: `${WEB_DIST}/index.html` }));
+  app.use('*', serveStatic({ root: WEB_DIST, onFound: setCacheHeaders }));
+  app.get('*', serveStatic({ path: `${WEB_DIST}/index.html`, onFound: setCacheHeaders }));
 
   return app;
 };
