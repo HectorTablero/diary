@@ -461,14 +461,6 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Section>
-
-        <Section title="Update test">
-          <div className="bg-destructive/10 flex items-center justify-between gap-3 border-2 border-destructive/50 rounded-xl border-dashed">
-            <div className="flex min-w-0 items-center gap-3 rounded-lg p-2">
-              <p>This is version <strong>2</strong> of the test, along with a bug fix.</p> 
-            </div>
-          </div>
-        </Section>
       </div>
     </PageContainer>
   );
