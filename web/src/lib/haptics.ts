@@ -21,12 +21,13 @@ const INTERACTIVE =
 
 /**
  * Global subtle haptics: one light tick whenever an interactive element is
- * pressed, instead of hand-wiring every button. Native only; no-op on the web.
+ * actually activated. Native only; no-op on the web.
  */
 export function initGlobalHaptics(): void {
   if (!isNative) return;
+
   document.addEventListener(
-    'pointerdown',
+    'click',
     (event) => {
       const target = event.target as Element | null;
       if (target?.closest(INTERACTIVE)) hapticTap();
