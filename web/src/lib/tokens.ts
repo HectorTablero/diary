@@ -15,6 +15,67 @@ export const fuzzyIncludes = (haystack: string, needle: string) =>
 
 export const fuzzyEquals = (a: string, b: string) => normalize(a) === normalize(b);
 
+export interface MatchSegment {
+  text: string;
+  matched: boolean;
+}
+
+/** One merged region of `text` worth showing as search-result context. */
+export interface MatchWindow {
+  segments: MatchSegment[];
+}
+
+/**
+ * Finds every fuzzy occurrence of `query` in `text` and collapses them into a handful of
+ * "windows" — each is `contextChars` of surrounding text plus every match inside it, so a
+ * few hits close together (e.g. a repeated word in a long note) share one snippet instead of
+ * each spawning its own overlapping "...before...match...after..." block.
+ *
+ * Relies on `normalize` preserving string length (NFD decomposition + stripping the combining
+ * marks it introduces nets out to the same length as the original for accented Latin text),
+ * so an index found in the normalized haystack lines up with the same index in `text`.
+ */
+export function matchWindows(text: string, query: string, contextChars = 24): MatchWindow[] | null {
+  if (!text || !query.trim()) return null;
+  const haystack = normalize(text);
+  const needle = normalize(query);
+  if (!needle) return null;
+
+  const ranges: { start: number; end: number }[] = [];
+  let from = 0;
+  for (;;) {
+    const index = haystack.indexOf(needle, from);
+    if (index === -1) break;
+    ranges.push({ start: index, end: index + needle.length });
+    from = index + needle.length;
+  }
+  if (ranges.length === 0) return null;
+
+  const windows: { start: number; end: number }[] = [];
+  for (const range of ranges) {
+    const start = Math.max(0, range.start - contextChars);
+    const end = Math.min(text.length, range.end + contextChars);
+    const last = windows[windows.length - 1];
+    if (last && start <= last.end) last.end = Math.max(last.end, end);
+    else windows.push({ start, end });
+  }
+
+  return windows.map((window) => {
+    const segments: MatchSegment[] = [];
+    if (window.start > 0) segments.push({ text: '...', matched: false });
+    let cursor = window.start;
+    for (const range of ranges) {
+      if (range.start < window.start || range.end > window.end) continue;
+      if (range.start > cursor) segments.push({ text: text.slice(cursor, range.start), matched: false });
+      segments.push({ text: text.slice(range.start, range.end), matched: true });
+      cursor = range.end;
+    }
+    if (cursor < window.end) segments.push({ text: text.slice(cursor, window.end), matched: false });
+    if (window.end < text.length) segments.push({ text: '...', matched: false });
+    return { segments };
+  });
+}
+
 /**
  * Split content into text/person/tag segments by matching linked entity names
  * after @ / # markers (longest name wins, so "Ana María" beats "Ana").

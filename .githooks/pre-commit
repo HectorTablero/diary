@@ -1,0 +1,9 @@
+#!/bin/sh
+# Ask which part of the version to bump, and stage the change into this commit.
+# Git detaches stdin from hooks, so reattach the terminal to make the prompt interactive.
+# When there is no terminal (GUI client, rebase, CI) the script keeps the version as-is.
+if [ -e /dev/tty ]; then
+  exec < /dev/tty
+fi
+
+node scripts/bump-version.mjs || exit 1

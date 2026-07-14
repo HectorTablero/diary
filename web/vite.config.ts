@@ -1,9 +1,11 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { computeNativeFingerprint } from './scripts/nativeFingerprint.mjs';
 
 // The API port lives in the repo-root .env (shared with the server).
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
@@ -11,8 +13,18 @@ const apiPort = process.env.PORT ?? '3000';
 // Expose the (public) Google client id to the bundle for native sign-in.
 process.env.VITE_GOOGLE_CLIENT_ID ??= process.env.GOOGLE_CLIENT_ID;
 
+/* The root package.json version is the single source of truth (bumped by the pre-commit hook).
+   Baking it into the bundle lets the *running* code report its own version — which is what the
+   OTA logic needs, since after a live update the JS is no longer the one shipped in the APK. */
+const rootPkg = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'));
+
 export default defineConfig({
   envPrefix: ['VITE_', 'IS_'],
+  define: {
+    __APP_VERSION__: JSON.stringify(rootPkg.version),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __NATIVE_FINGERPRINT__: JSON.stringify(computeNativeFingerprint()),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -66,7 +78,8 @@ export default defineConfig({
           'radix-vendor': ['radix-ui'],
           'icons-vendor': ['lucide-react'],
           'auth-vendor': ['better-auth', '@capgo/capacitor-social-login'],
-          'capacitor': ['@capacitor/core', '@capacitor/app', '@capacitor/haptics', '@capacitor/keyboard', '@capacitor/preferences', '@capacitor/splash-screen', '@capacitor/status-bar'],
+          'capacitor': ['@capacitor/core', '@capacitor/app', '@capacitor/haptics', '@capacitor/keyboard', '@capacitor/preferences', '@capacitor/splash-screen', '@capacitor/status-bar', '@capgo/capacitor-updater'],
+          'telemetry-vendor': ['@logtail/browser'],
         },
       },
     },

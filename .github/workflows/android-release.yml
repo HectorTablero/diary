@@ -6,6 +6,7 @@ on:
     paths:
       - "web/**"
       - "shared/**"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/android-release.yml"
@@ -37,13 +38,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The root package.json version is the single source of truth (bumped by the pre-commit
+      # hook). The tag, the APK versionName/versionCode and the OTA bundle name all derive from
+      # it, so the app can never disagree with what was published.
       - name: Compute version
         id: version
-        run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          echo "name=${PKG_VERSION}+${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+        run: npm run version:info >> "$GITHUB_OUTPUT"
 
       - name: Restore signing keystore
         working-directory: web/android/app
@@ -68,8 +68,17 @@ jobs:
       - name: Build web assets + sync Capacitor
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          VITE_APP_VERSION_CODE: ${{ steps.version.outputs.code }}
+          VITE_BETTERSTACK_SOURCE_TOKEN: ${{ secrets.BETTERSTACK_CLIENT_SOURCE_TOKEN }}
+          VITE_BETTERSTACK_INGEST_URL: ${{ vars.BETTERSTACK_CLIENT_INGEST_URL }}
         run: npm run build:app
+
+      # web/dist is the app-mode build that `cap sync` just copied into the APK — the exact same
+      # web layer, packaged for over-the-air delivery. index.html must sit at the zip root.
+      - name: Package OTA bundle
+        run: |
+          mkdir -p dist
+          cd web/dist
+          zip -qr "../../dist/bundle-${{ steps.version.outputs.version }}-${{ steps.version.outputs.fingerprint }}.zip" .
 
       - name: Build signed release APK
         working-directory: web/android
@@ -77,22 +86,34 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease \
             -PappVersionCode=${{ steps.version.outputs.code }} \
-            -PappVersionName=${{ steps.version.outputs.name }}
+            -PappVersionName=${{ steps.version.outputs.version }}
 
       - name: Prepare release assets
-        run: |
-          mkdir -p dist
-          cp web/android/app/build/outputs/apk/release/app-release.apk dist/diary.apk
+        run: cp web/android/app/build/outputs/apk/release/app-release.apk dist/diary.apk
 
-      - name: Publish rolling "latest" release
+      # softprops/action-gh-release will create a tag but never *moves* an existing one, which is
+      # why the old rolling `latest` release kept serving source zips from a stale commit while
+      # its APK was rebuilt. Point the tag at this commit explicitly before publishing.
+      - name: Move version tag to this commit
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$TAG"
+
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: "Latest build (${{ steps.version.outputs.code }} / ${{ steps.version.outputs.name }})"
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
           body: |
-            Automatically built from ${{ github.sha }} on ${{ github.event.repository.updated_at }}.
-            This release is overwritten by every push to `main` — it always points at the newest APK.
+            Built from ${{ github.sha }}.
+
+            - `diary.apk` — full install. Needed when the native shell changes.
+            - `bundle-*.zip` — web layer, delivered over the air to installed apps
+              (native shell `${{ steps.version.outputs.fingerprint }}`).
           prerelease: false
           make_latest: true
           files: |
             dist/diary.apk
+            dist/bundle-*.zip

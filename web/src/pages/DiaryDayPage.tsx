@@ -1,6 +1,7 @@
 import { DATE_KEY_REGEX } from '@diary/shared';
 import { addDays } from 'date-fns';
 import { Cake, ChevronLeft, ChevronRight, NotebookPen } from 'lucide-react';
+import { useEffect } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useDayEntries, usePeople } from '@/api/hooks';
@@ -13,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ageOn, birthdaysOn } from '@/lib/birthday';
 import { formatDateKey, parseDateKey, toDateKey, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
+import { logVersion } from '@/lib/version';
 
 export default function DiaryDayPage() {
   const { date } = useParams<{ date: string }>();
@@ -23,6 +25,12 @@ export default function DiaryDayPage() {
   const dateKey = valid ? date! : todayKey();
   const { data: entries, isLoading } = useDayEntries(dateKey);
   const { data: people = [] } = usePeople();
+
+  // The diary day is the app's landing page. logVersion() de-dupes itself, so navigating
+  // between days doesn't repeat it.
+  useEffect(() => {
+    void logVersion();
+  }, []);
 
   if (!valid) return <Navigate to={`/diary/${todayKey()}`} replace />;
 

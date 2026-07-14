@@ -50,8 +50,8 @@
     ]
   },
   "update": {
-    "available": "Actualización disponible: v{{version}}",
-    "view": "Ver versión",
+    "needsInstall": "La versión {{version}} necesita instalar la app de nuevo",
+    "view": "Descargar",
     "dismiss": "Descartar"
   },
   "common": {
@@ -360,7 +360,12 @@
     "not_found": "No encontrado",
     "unknown": "Algo ha salido mal",
     "offline": "Parece que no tienes conexión",
-    "validation": "Algunos campos no son válidos"
+    "validation": "Algunos campos no son válidos",
+    "crash": {
+      "title": "Algo ha salido mal",
+      "description": "La app ha tenido un error inesperado. Tus entradas están a salvo en este dispositivo.",
+      "reload": "Recargar"
+    }
   },
   "entry": {
     "max_depth": "Profundidad máxima de sub-entradas alcanzada",

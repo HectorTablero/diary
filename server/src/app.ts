@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import type { Auth } from './auth';
 import { config } from './config';
 import { handleError } from './errors';
+import { requestTelemetry } from './lib/telemetry';
 import {
   addLiveClient,
   notifyUserChanged,
@@ -30,6 +31,7 @@ const WEB_DIST = (relative(process.cwd(), webDistAbs) || '.').replace(/\\/g, '/'
 /** Populates the given app (created by the caller so WebSocket upgrades can be wired in). */
 export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: UpgradeWebSocket) => {
   app.use(logger());
+  app.use(requestTelemetry());
   app.onError(handleError);
 
   // The Capacitor app calls the API cross-origin from the native webview.
