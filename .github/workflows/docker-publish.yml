@@ -80,7 +80,7 @@ jobs:
           # Vite inlines these into the web bundle at build time; they cannot be set at runtime.
           build-args: |
             VITE_BETTERSTACK_SOURCE_TOKEN=${{ secrets.BETTERSTACK_CLIENT_SOURCE_TOKEN }}
-            VITE_BETTERSTACK_INGEST_URL=${{ vars.BETTERSTACK_CLIENT_INGEST_URL }}
+            VITE_BETTERSTACK_INGEST_URL=${{ secrets.BETTERSTACK_CLIENT_INGEST_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
