@@ -461,6 +461,14 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Section>
+
+        <Section title="Update test">
+          <div className="bg-destructive/10 flex items-center justify-between gap-3 border-2 border-destructive/50 rounded-xl border-dashed">
+            <div className="flex min-w-0 items-center gap-3 rounded-lg p-2">
+              If you see this, it means the update test is working and you are running the latest version of the app.
+            </div>
+          </div>
+        </Section>
       </div>
     </PageContainer>
   );
