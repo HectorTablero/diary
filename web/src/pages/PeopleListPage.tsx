@@ -74,15 +74,17 @@ const pendingEventCount = (person: PersonListItem, today: string): number =>
 function eventsFirst(people: PersonListItem[], today: string): PersonListItem[] {
   const pending: PersonListItem[] = [];
   const ongoing: PersonListItem[] = [];
+  const checkup: PersonListItem[] = [];
   const rest: PersonListItem[] = [];
 
   for (const person of people) {
     if (pendingEventCount(person, today) > 0) pending.push(person);
     else if (ongoingEvents(person.events, today).length > 0) ongoing.push(person);
+    else if (person.checkupIntervalDays !== null) checkup.push(person);
     else rest.push(person);
   }
 
-  return [...pending, ...ongoing, ...rest];
+  return [...pending, ...ongoing, ...checkup, ...rest];
 }
 
 function sortPeople(people: PersonListItem[], sort: SortOption): PersonListItem[] {
