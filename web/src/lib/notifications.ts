@@ -96,10 +96,12 @@ async function collectCheckupNotifications(people: LocalPeople): Promise<LocalNo
 
     if (!at) continue;
     const days = Math.round((at.getTime() - lastCheckupAt) / CHECKUP_DAY_MS);
+    const checkupBody = pickTemplate('people.checkupBodies', { name: person.name, days: String(days) });
     scheduled.push({
       id: checkupNotificationId(person.id),
       title: i18n.t('people.checkupDueTitle', { name: person.name }),
-      body: pickTemplate('people.checkupBodies', { name: person.name, days: String(days) }),
+      body: checkupBody,
+      largeBody: checkupBody,
       schedule: { at, allowWhileIdle: true },
       extra: { kind: 'checkup', personId: person.id },
     });
@@ -141,13 +143,15 @@ async function collectBirthdayNotifications(people: LocalPeople): Promise<LocalN
     }
 
     const age = ageOn(person.birthday, occurrence);
+    const birthdayBody = pickTemplate('notifications.birthdayBodies', { name: person.name });
     scheduled.push({
       id: birthdayNotificationId(person.id),
       title:
         age === null
           ? i18n.t('notifications.birthdayTitle', { name: person.name })
           : i18n.t('notifications.birthdayTitleWithAge', { name: person.name, age }),
-      body: pickTemplate('notifications.birthdayBodies', { name: person.name }),
+      body: birthdayBody,
+      largeBody: birthdayBody,
       schedule: { at, allowWhileIdle: true },
       extra: { kind: 'birthday', personId: person.id },
     });
@@ -171,11 +175,13 @@ async function collectDailyReminder(): Promise<LocalNotificationSchema[]> {
   const count = await db.entries.where('dateKey').equals(toDateKey(candidate)).count();
   if (count > 0) return [];
 
+  const dailyBody = pickTemplate('notifications.dailyReminderBodies');
   return [
     {
       id: DAILY_REMINDER_ID,
       title: i18n.t('notifications.dailyReminderTitle'),
-      body: pickTemplate('notifications.dailyReminderBodies'),
+      body: dailyBody,
+      largeBody: dailyBody,
       schedule: { at: candidate, allowWhileIdle: true },
       extra: { kind: 'daily' },
     },
