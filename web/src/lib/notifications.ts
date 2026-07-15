@@ -100,7 +100,7 @@ async function collectCheckupNotifications(people: LocalPeople): Promise<LocalNo
       id: checkupNotificationId(person.id),
       title: i18n.t('people.checkupDueTitle', { name: person.name }),
       body: pickTemplate('people.checkupBodies', { name: person.name, days: String(days) }),
-      schedule: { at },
+      schedule: { at, allowWhileIdle: true },
       extra: { kind: 'checkup', personId: person.id },
     });
   }
@@ -148,7 +148,7 @@ async function collectBirthdayNotifications(people: LocalPeople): Promise<LocalN
           ? i18n.t('notifications.birthdayTitle', { name: person.name })
           : i18n.t('notifications.birthdayTitleWithAge', { name: person.name, age }),
       body: pickTemplate('notifications.birthdayBodies', { name: person.name }),
-      schedule: { at },
+      schedule: { at, allowWhileIdle: true },
       extra: { kind: 'birthday', personId: person.id },
     });
   }
@@ -176,7 +176,7 @@ async function collectDailyReminder(): Promise<LocalNotificationSchema[]> {
       id: DAILY_REMINDER_ID,
       title: i18n.t('notifications.dailyReminderTitle'),
       body: pickTemplate('notifications.dailyReminderBodies'),
-      schedule: { at: candidate },
+      schedule: { at: candidate, allowWhileIdle: true },
       extra: { kind: 'daily' },
     },
   ];
@@ -211,11 +211,26 @@ export function refreshNotifications(): void {
   reconcileNotifications().catch((err) => console.warn('notifications: refresh failed', err));
 }
 
-/** Call once at app bootstrap. Scheduling itself doesn't need the permission
-    (only the visual notification is suppressed until it's granted), so this
-    never blocks refreshNotifications(). */
-export function initLocalNotifications(): void {
+/** Call once at app bootstrap. Requests both the notification display permission
+    (POST_NOTIFICATIONS on Android 13+) and, if needed, prompts the user to enable
+    exact alarms (SCHEDULE_EXACT_ALARM, denied by default on Android 14+). Without
+    exact alarm permission the plugin falls back to inexact non-wakeup alarms that
+    Android can defer indefinitely. */
+export async function initLocalNotifications(): Promise<void> {
   if (!isNative) return;
-  void LocalNotifications.requestPermissions();
+  await LocalNotifications.requestPermissions();
+
+  // On Android 12+ exact alarms require an explicit user opt-in via system settings.
+  // If the permission is missing or revoked, open the system screen so the user can
+  // grant it. This is a no-op on older Android versions.
+  try {
+    const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting();
+    if (exact_alarm !== 'granted') {
+      await LocalNotifications.changeExactNotificationSetting();
+    }
+  } catch {
+    // Pre-Android-12 or plugin version without exact-alarm API — safe to ignore.
+  }
+
   refreshNotifications();
 }

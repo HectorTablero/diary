@@ -36,6 +36,12 @@
     <!-- Without this, Android's audio subsystem refuses to hand the mic to the WebView even
          after RECORD_AUDIO is granted — getUserMedia() fails with NotReadableError. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Exact alarms (Android 12+): without this, AlarmManager.canScheduleExactAlarms() returns
+         false and the local-notifications plugin silently falls back to inexact non-wakeup alarms
+         that Android can defer indefinitely — especially during Doze mode.
+         On Android 14+ (targetSdk 34+) this permission is denied by default; the app prompts the
+         user at runtime via LocalNotifications.changeExactNotificationSetting(). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- The importer only ever reads. WRITE_CONTACTS is declared purely because the contacts
          plugin bundles both into a single "contacts" permission alias, and Capacitor treats an
          alias as granted only when *every* permission in it is granted (Bridge.java: "multiple
