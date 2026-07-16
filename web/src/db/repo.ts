@@ -226,6 +226,26 @@ export async function search(params: URLSearchParams): Promise<SearchResponse> {
   };
 }
 
+/** Every entry in a date range (optionally tag-filtered), unpaginated and chronological — for
+    the "export as Markdown for an agent" feature, which wants everything in range, not a page
+    of it. search() above stays paginated/rank-agnostic for the in-app search UI. */
+export async function getEntriesInRange(
+  from: string | null,
+  to: string | null,
+  tagIds: string[],
+): Promise<EntryDto[]> {
+  const [all, maps] = await Promise.all([db.entries.toArray(), joinMaps()]);
+  return all
+    .filter((e) => {
+      if (tagIds.length && !e.tagIds.some((id) => tagIds.includes(id))) return false;
+      if (from && e.dateKey < from) return false;
+      if (to && e.dateKey > to) return false;
+      return true;
+    })
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.createdAt.localeCompare(b.createdAt))
+    .map((e) => entryToDto(e, maps));
+}
+
 // --- People ---
 
 export async function getPeople(): Promise<PersonListItem[]> {
@@ -316,6 +336,24 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
     .map((e) => entryToDto(e, maps));
 
   return { active, said };
+}
+
+/** Every entry id currently stored locally — used to detect id collisions when restoring a
+    JSON backup (see lib/backup/conflicts.ts's detectEntryConflicts). */
+export async function getEntryIds(): Promise<Set<string>> {
+  return new Set((await db.entries.toArray()).map((e) => e.id));
+}
+
+/** Entries mentioning this person, created since they were added, that were never marked as said
+    to them — the "things you haven't caught them up on yet" count for the agent briefing export. */
+export async function getUnsaidCount(personId: string): Promise<number> {
+  const [person, entries] = await Promise.all([
+    requirePerson(personId),
+    db.entries.where('peopleIds').equals(personId).toArray(),
+  ]);
+  return entries.filter(
+    (e) => e.createdAt >= person.createdAt && !e.saidTo.some((s) => s.personId === personId),
+  ).length;
 }
 
 export async function getMemories(personId: string): Promise<EntryDto[]> {

@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage';
 import {
   CalendarPage,
   DiaryDayPage,
+  ImportBackupPage,
   ImportContactsPage,
   PeopleListPage,
   PersonProfilePage,
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       { path: 'search', element: withSuspense(<SearchPage />) },
       { path: 'tags', element: withSuspense(<TagsPage />) },
       { path: 'settings', element: withSuspense(<SettingsPage />) },
+      { path: 'settings/import-backup', element: withSuspense(<ImportBackupPage />) },
       { path: '*', element: <Navigate to="/diary" replace /> },
     ],
   },

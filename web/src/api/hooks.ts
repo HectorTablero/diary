@@ -271,6 +271,14 @@ export const useSettings = () =>
     queryFn: () => repo.getSettings(),
   });
 
+// --- Backup import ---
+
+export const useEntryIds = () =>
+  useQuery({
+    queryKey: ['entries', 'all-ids'],
+    queryFn: () => repo.getEntryIds(),
+  });
+
 export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({
