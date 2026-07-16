@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.svg" />
+    <title>Diary</title>
     <script type="module">
       const isLocalDevelopment = import.meta.env.IS_LOCAL_DEVELOPMENT === 'true';
       const favicon = document.querySelector('link[rel="icon"]');
@@ -10,9 +11,13 @@
       if (favicon) {
         favicon.href = isLocalDevelopment ? '/favicon-local.svg' : '/favicon.svg';
       }
+
+      const title = document.querySelector('title');
+      if (title) {
+        title.textContent = isLocalDevelopment ? '[DEV] Diary' : 'Diary';
+      }
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Diary</title>
     <script>
       (function () {
         try {
