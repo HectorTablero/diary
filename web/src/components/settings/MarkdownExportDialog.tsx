@@ -30,20 +30,24 @@ type ExportType = 'entries' | 'people';
 type OutputMode = 'merge' | 'zip';
 
 const DEFAULT_PERSON_OPTIONS: PersonMarkdownOptions = {
+  aliases: true,
   tags: true,
   workInfo: true,
   notes: true,
   saidTimeline: true,
   unsaidCount: true,
   age: true,
+  checkupInterval: true,
   events: true,
 };
 
 const PERSON_OPTION_KEYS = [
+  'aliases',
   'tags',
   'workInfo',
-  'notes',
   'age',
+  'checkupInterval',
+  'notes',
   'events',
   'saidTimeline',
   'unsaidCount',
@@ -166,178 +170,180 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="flex max-h-[85vh] max-w-md flex-col">
         <DialogHeader>
           <DialogTitle>{t('settings.markdownExport.title')}</DialogTitle>
           <DialogDescription>{t('settings.markdownExport.description')}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>{t('settings.markdownExport.type')}</Label>
-            <Select value={type} onValueChange={(v) => setType(v as ExportType)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="entries">{t('settings.markdownExport.typeEntries')}</SelectItem>
-                <SelectItem value="people">{t('settings.markdownExport.typePeople')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="-mx-1 flex-1 overflow-y-auto px-1">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label>{t('settings.markdownExport.type')}</Label>
+              <Select value={type} onValueChange={(v) => setType(v as ExportType)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entries">{t('settings.markdownExport.typeEntries')}</SelectItem>
+                  <SelectItem value="people">{t('settings.markdownExport.typePeople')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {type === 'entries' ? (
-            <>
-              <div className="flex gap-2">
-                <div className="flex flex-1 flex-col gap-1.5">
-                  <Label htmlFor="md-from">{t('settings.markdownExport.from')}</Label>
-                  <Input id="md-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            {type === 'entries' ? (
+              <>
+                <div className="flex gap-2">
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Label htmlFor="md-from">{t('settings.markdownExport.from')}</Label>
+                    <Input id="md-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Label htmlFor="md-to">{t('settings.markdownExport.to')}</Label>
+                    <Input id="md-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                  </div>
                 </div>
-                <div className="flex flex-1 flex-col gap-1.5">
-                  <Label htmlFor="md-to">{t('settings.markdownExport.to')}</Label>
-                  <Input id="md-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>{t('settings.markdownExport.tags')}</Label>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {tagIds.map((id) => {
-                    const tag = allTags.find((tg) => tg.id === id);
-                    return tag ? <TagChip key={tag.id} tag={tag} onRemove={() => toggleTag(tag.id)} /> : null;
-                  })}
-                  <EntityPicker
-                    trigger={
-                      <Button variant="outline" size="sm" className="h-6 gap-1 px-2 text-xs">
-                        {t('common.add')}
-                      </Button>
-                    }
-                    items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
-                    selectedIds={tagIds}
-                    onToggle={toggleTag}
-                    placeholder={t('tags.namePlaceholder')}
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <Label>{t('settings.markdownExport.people')}</Label>
-                <div className="relative">
-                  <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={personQuery}
-                    onChange={(e) => setPersonQuery(e.target.value)}
-                    placeholder={t('common.search')}
-                    className="h-8 pl-8 text-sm"
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t('settings.markdownExport.tags')}</Label>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {personTagFilter.map((id) => {
+                    {tagIds.map((id) => {
                       const tag = allTags.find((tg) => tg.id === id);
-                      return tag ? (
-                        <TagChip key={id} tag={tag} onRemove={() => togglePersonTag(id)} />
-                      ) : null;
+                      return tag ? <TagChip key={tag.id} tag={tag} onRemove={() => toggleTag(tag.id)} /> : null;
                     })}
-                    {allTags.length > 0 && (
-                      <EntityPicker
-                        trigger={
-                          <Button variant="outline" size="sm" className="h-6 gap-1 px-2 text-xs">
-                            <Hash className="size-3" />
-                            {t('people.filterByTag')}
-                          </Button>
-                        }
-                        items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
-                        selectedIds={personTagFilter}
-                        onToggle={togglePersonTag}
-                        placeholder={t('tags.namePlaceholder')}
-                      />
+                    <EntityPicker
+                      trigger={
+                        <Button variant="outline" size="sm" className="h-6 gap-1 px-2 text-xs">
+                          {t('common.add')}
+                        </Button>
+                      }
+                      items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
+                      selectedIds={tagIds}
+                      onToggle={toggleTag}
+                      placeholder={t('tags.namePlaceholder')}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t('settings.markdownExport.people')}</Label>
+                  <div className="relative">
+                    <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={personQuery}
+                      onChange={(e) => setPersonQuery(e.target.value)}
+                      placeholder={t('common.search')}
+                      className="h-8 pl-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {personTagFilter.map((id) => {
+                        const tag = allTags.find((tg) => tg.id === id);
+                        return tag ? (
+                          <TagChip key={id} tag={tag} onRemove={() => togglePersonTag(id)} />
+                        ) : null;
+                      })}
+                      {allTags.length > 0 && (
+                        <EntityPicker
+                          trigger={
+                            <Button variant="outline" size="sm" className="h-6 gap-1 px-2 text-xs">
+                              <Hash className="size-3" />
+                              {t('people.filterByTag')}
+                            </Button>
+                          }
+                          items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
+                          selectedIds={personTagFilter}
+                          onToggle={togglePersonTag}
+                          placeholder={t('tags.namePlaceholder')}
+                        />
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0 text-xs"
+                      onClick={toggleSelectAll}
+                      disabled={filteredPeople.length === 0}
+                    >
+                      {allFilteredSelected
+                        ? t('settings.markdownExport.selectNone')
+                        : personFilterActive
+                          ? t('settings.markdownExport.selectAllMatching', { count: filteredPeople.length })
+                          : t('settings.markdownExport.selectAll')}
+                    </Button>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto rounded-lg border">
+                    {filteredPeople.length === 0 ? (
+                      <p className="p-3 text-center text-xs text-muted-foreground">{t('common.noResults')}</p>
+                    ) : (
+                      <ul className="divide-y">
+                        {filteredPeople.map((person) => {
+                          const match = personMatches.get(person.id);
+                          return (
+                            <li key={person.id}>
+                              <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-accent/40">
+                                <Checkbox
+                                  checked={personIds.includes(person.id)}
+                                  onCheckedChange={() => togglePerson(person.id)}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm">{person.name}</p>
+                                  {match?.alias && (
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {t('people.alsoKnownAs')} {match.alias}
+                                    </p>
+                                  )}
+                                  {match?.job && (
+                                    <p className="truncate text-xs text-muted-foreground">{match.job}</p>
+                                  )}
+                                </div>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 shrink-0 text-xs"
-                    onClick={toggleSelectAll}
-                    disabled={filteredPeople.length === 0}
-                  >
-                    {allFilteredSelected
-                      ? t('settings.markdownExport.selectNone')
-                      : personFilterActive
-                        ? t('settings.markdownExport.selectAllMatching', { count: filteredPeople.length })
-                        : t('settings.markdownExport.selectAll')}
-                  </Button>
-                </div>
-                <div className="max-h-56 overflow-y-auto rounded-lg border">
-                  {filteredPeople.length === 0 ? (
-                    <p className="p-3 text-center text-xs text-muted-foreground">{t('common.noResults')}</p>
-                  ) : (
-                    <ul className="divide-y">
-                      {filteredPeople.map((person) => {
-                        const match = personMatches.get(person.id);
-                        return (
-                          <li key={person.id}>
-                            <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-accent/40">
-                              <Checkbox
-                                checked={personIds.includes(person.id)}
-                                onCheckedChange={() => togglePerson(person.id)}
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm">{person.name}</p>
-                                {match?.alias && (
-                                  <p className="truncate text-xs text-muted-foreground">
-                                    {t('people.alsoKnownAs')} {match.alias}
-                                  </p>
-                                )}
-                                {match?.job && (
-                                  <p className="truncate text-xs text-muted-foreground">{match.job}</p>
-                                )}
-                              </div>
-                            </label>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                  {personIds.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.markdownExport.selectedCount', { count: personIds.length })}
+                    </p>
                   )}
                 </div>
-                {personIds.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {t('settings.markdownExport.selectedCount', { count: personIds.length })}
-                  </p>
+
+                {personIds.length > 1 && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label>{t('settings.markdownExport.outputMode')}</Label>
+                    <Select value={outputMode} onValueChange={(v) => setOutputMode(v as OutputMode)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="merge">{t('settings.markdownExport.outputMerge')}</SelectItem>
+                        <SelectItem value="zip">{t('settings.markdownExport.outputZip')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
-              </div>
 
-              {personIds.length > 1 && (
-                <div className="flex flex-col gap-1.5">
-                  <Label>{t('settings.markdownExport.outputMode')}</Label>
-                  <Select value={outputMode} onValueChange={(v) => setOutputMode(v as OutputMode)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="merge">{t('settings.markdownExport.outputMerge')}</SelectItem>
-                      <SelectItem value="zip">{t('settings.markdownExport.outputZip')}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-col gap-2">
+                  {PERSON_OPTION_KEYS.map((key) => (
+                    <label key={key} className="flex items-center gap-2.5">
+                      <Checkbox
+                        checked={personOptions[key]}
+                        onCheckedChange={(v) =>
+                          setPersonOptions((prev) => ({ ...prev, [key]: v === true }))
+                        }
+                      />
+                      <span className="text-sm">{t(`settings.markdownExport.option.${key}`)}</span>
+                    </label>
+                  ))}
                 </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                {PERSON_OPTION_KEYS.map((key) => (
-                  <label key={key} className="flex items-center gap-2.5">
-                    <Checkbox
-                      checked={personOptions[key]}
-                      onCheckedChange={(v) =>
-                        setPersonOptions((prev) => ({ ...prev, [key]: v === true }))
-                      }
-                    />
-                    <span className="text-sm">{t(`settings.markdownExport.option.${key}`)}</span>
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
 
         <DialogFooter className="gap-2">

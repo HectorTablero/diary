@@ -1,4 +1,5 @@
 import type { EntryDto } from '@diary/shared';
+import { buildImportanceLegend } from './importanceLegend';
 
 export interface EntriesMarkdownOptions {
   from: string | null;
@@ -11,7 +12,7 @@ export interface EntriesMarkdownOptions {
    info about them can leak into the export by construction. */
 export function buildEntriesMarkdown(entries: EntryDto[], options: EntriesMarkdownOptions): string {
   const range = options.from || options.to ? ` (${options.from ?? '…'} – ${options.to ?? '…'})` : '';
-  const lines: string[] = [`# Diary export${range}`, ''];
+  const lines: string[] = [`# Diary export${range}`, '', buildImportanceLegend(), '---', ''];
 
   const byDate = new Map<string, EntryDto[]>();
   for (const entry of entries) {

@@ -388,10 +388,12 @@
       "export": "Exportar",
       "done": "Markdown exportado",
       "option": {
+        "aliases": "Alias / apodos",
         "tags": "Etiquetas",
         "workInfo": "Información laboral (empresa, puesto)",
         "notes": "Notas",
         "age": "Edad",
+        "checkupInterval": "Intervalo de recordatorio de seguimiento",
         "events": "Eventos",
         "saidTimeline": "Cronología de lo que se le ha contado",
         "unsaidCount": "Recuento de cosas aún no contadas"

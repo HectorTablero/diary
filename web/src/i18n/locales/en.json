@@ -387,10 +387,12 @@
       "export": "Export",
       "done": "Markdown exported",
       "option": {
+        "aliases": "Aliases / nicknames",
         "tags": "Tags",
         "workInfo": "Work info (company, role)",
         "notes": "Notes",
         "age": "Age",
+        "checkupInterval": "Checkup reminder interval",
         "events": "Events",
         "saidTimeline": "Timeline of what's been said to them",
         "unsaidCount": "Count of things not yet said"
