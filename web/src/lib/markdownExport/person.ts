@@ -89,3 +89,15 @@ export function buildPersonMarkdown(
 
   return `${lines.join('\n').trimEnd()}\n`;
 }
+
+/** Several people's briefings joined into one document — the "merge" output mode when more than
+    one person is selected (the alternative being a zip of individually-named files, one per
+    person, built by the caller from repeated buildPersonMarkdown calls). */
+export function buildPeopleMarkdown(
+  people: { person: PersonDto; said: EntryDto[]; unsaidCount: number }[],
+  options: PersonMarkdownOptions,
+): string {
+  return people
+    .map(({ person, said, unsaidCount }) => buildPersonMarkdown(person, said, unsaidCount, options))
+    .join('\n---\n\n');
+}

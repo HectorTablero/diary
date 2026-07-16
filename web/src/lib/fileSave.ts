@@ -19,7 +19,24 @@ export async function saveTextFile(filename: string, content: string, mimeType: 
     return;
   }
 
-  const blob = new Blob([content], { type: mimeType });
+  downloadBlob(new Blob([content], { type: mimeType }), filename);
+}
+
+/** Same as saveTextFile, for binary content (e.g. a zip) already base64-encoded — Capacitor's
+    Filesystem plugin takes base64 directly when no `encoding` is given, and the web path just
+    decodes it into a Blob. */
+export async function saveBinaryFile(filename: string, base64Data: string, mimeType: string): Promise<void> {
+  if (isNative) {
+    const { uri } = await Filesystem.writeFile({ path: filename, data: base64Data, directory: Directory.Cache });
+    await Share.share({ url: uri, title: filename });
+    return;
+  }
+
+  const bytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+  downloadBlob(new Blob([bytes], { type: mimeType }), filename);
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   try {
     const a = document.createElement('a');
