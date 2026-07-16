@@ -9,14 +9,16 @@ import { Button } from '@/components/ui/button';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { ApiError } from '@/lib/apiClient';
 import { transcribeAudio } from '@/lib/groq';
+import { cn } from '@/lib/utils';
 import { SuggestionReviewDialog } from './SuggestionReviewDialog';
 
 type Phase = 'idle' | 'transcribing' | 'thinking';
 
 /** Mic button in the entry composer: record → transcribe with Groq Whisper (the
     user's own key) → ask the server to turn the transcript into entry suggestions
-    → let the user review them before anything is actually created. */
-export function VoiceEntryButton({ dateKey }: { dateKey: string }) {
+    → let the user review them before anything is actually created. `disabled` covers the
+    "no live session" case — the suggestions call always needs a real authenticated request. */
+export function VoiceEntryButton({ dateKey, disabled = false }: { dateKey: string; disabled?: boolean }) {
   const { t, i18n } = useTranslation();
   const { data: settings } = useSettings();
   const aiSuggestions = useAiSuggestions();
@@ -59,6 +61,10 @@ export function VoiceEntryButton({ dateKey }: { dateKey: string }) {
   const recorder = useVoiceRecorder({ onStop: (blob) => void handleStop(blob) });
 
   const startRecording = async () => {
+    if (disabled) {
+      toast.info(t('ai.signInRequiredForVoice'));
+      return;
+    }
     try {
       await recorder.start();
     } catch (err) {
@@ -115,7 +121,7 @@ export function VoiceEntryButton({ dateKey }: { dateKey: string }) {
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0 text-muted-foreground"
+        className={cn('size-8 shrink-0 text-muted-foreground', disabled && 'opacity-50')}
         onClick={() => void startRecording()}
         aria-label={t('ai.record')}
       >

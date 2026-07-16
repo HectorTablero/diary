@@ -24,6 +24,21 @@ async function ownedPersonIds(userId: string, ids: string[]) {
   return people.map((p) => p._id);
 }
 
+/** A `saidTo` entry is either a bare person id (legacy — server stamps `at` itself) or an
+    explicit `{personId, at}` pair (a client restoring history, e.g. a backup import). */
+const saidToIdList = (input: EntryCreateInput['saidTo']): string[] =>
+  (input ?? []).map((item) => (typeof item === 'string' ? item : item.personId));
+
+/** Any explicit historical timestamps supplied, keyed by person id. Plain-id entries contribute
+    nothing here, so old clients keep getting the "everyone said just now" fallback unchanged. */
+const saidToProvidedAt = (input: EntryCreateInput['saidTo']): Map<string, Date> => {
+  const map = new Map<string, Date>();
+  for (const item of input ?? []) {
+    if (typeof item !== 'string') map.set(item.personId, new Date(item.at));
+  }
+  return map;
+};
+
 /** 0-based depth of `id` itself (a root entry is depth 0). Throws if it isn't owned by userId. */
 async function ancestorDepth(userId: string, id: string): Promise<number> {
   let depth = 0;
@@ -87,12 +102,22 @@ async function appendOrderKey(userId: string, parentId: string | null, dateKey: 
 }
 
 /** Bump the checkup clock: marking something as said counts as a real interaction.
-    Only moves forward — a replayed offline mutation must not rewind it. */
-async function bumpLastCheckup(userId: string, personIds: Types.ObjectId[], at: Date) {
-  if (!personIds.length) return;
-  await Person.updateMany(
-    { userId, _id: { $in: personIds }, lastCheckupAt: { $lt: at } },
-    { lastCheckupAt: at },
+    Only moves forward — a replayed offline mutation must not rewind it. Grouped by distinct `at`
+    (rather than one shared timestamp for everyone) so restoring history — different people said
+    to on different historical dates — bumps each to their own true date, not import time. */
+async function bumpLastCheckup(userId: string, marks: { personId: Types.ObjectId; at: Date }[]) {
+  if (!marks.length) return;
+  const groups = new Map<number, { at: Date; ids: Types.ObjectId[] }>();
+  for (const { personId, at } of marks) {
+    const key = at.getTime();
+    const group = groups.get(key);
+    if (group) group.ids.push(personId);
+    else groups.set(key, { at, ids: [personId] });
+  }
+  await Promise.all(
+    [...groups.values()].map(({ at, ids }) =>
+      Person.updateMany({ userId, _id: { $in: ids }, lastCheckupAt: { $lt: at } }, { lastCheckupAt: at }),
+    ),
   );
 }
 
@@ -101,7 +126,9 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
 
   const people = await ownedPersonIds(userId, input.people);
   // Auto-said: a direct mention means the person heard it, unless the client says otherwise.
-  const saidToIds = input.saidTo === undefined ? people : await ownedPersonIds(userId, input.saidTo);
+  const saidToIds =
+    input.saidTo === undefined ? people : await ownedPersonIds(userId, saidToIdList(input.saidTo));
+  const providedAt = saidToProvidedAt(input.saidTo);
   // Offline creates replay with their original timestamp so ordering within a day survives.
   const now = input.createdAt ? new Date(input.createdAt) : new Date();
   // Defense-in-depth for a client that predates orderKey — normally the client always sends one.
@@ -121,14 +148,17 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
         importance: input.importance,
         tags: await ownedTagIds(userId, input.tags),
         people,
-        saidTo: saidToIds.map((person) => ({ person, at: now })),
+        saidTo: saidToIds.map((person) => ({ person, at: providedAt.get(person.toString()) ?? now })),
         parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
         orderKey,
       },
     ],
     { timestamps: false },
   );
-  await bumpLastCheckup(userId, saidToIds, now);
+  await bumpLastCheckup(
+    userId,
+    saidToIds.map((id) => ({ personId: id, at: providedAt.get(id.toString()) ?? now })),
+  );
   const populated = await entry.populate(ENTRY_POPULATE);
   return entryToDto(populated.toObject() as unknown as LeanEntry);
 }
@@ -160,14 +190,19 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
   if (input.people !== undefined) entry.people = await ownedPersonIds(userId, input.people);
 
   let newlySaid: Types.ObjectId[] = [];
+  let providedAt = new Map<string, Date>();
   if (input.saidTo !== undefined) {
-    const ids = await ownedPersonIds(userId, input.saidTo);
+    const ids = await ownedPersonIds(userId, saidToIdList(input.saidTo));
     const existingAt = new Map(entry.saidTo.map((s) => [s.person.toString(), s.at]));
+    providedAt = saidToProvidedAt(input.saidTo);
     newlySaid = ids.filter((id) => !existingAt.has(id.toString()));
     const now = new Date();
     entry.set(
       'saidTo',
-      ids.map((id) => ({ person: id, at: existingAt.get(id.toString()) ?? now })),
+      ids.map((id) => ({
+        person: id,
+        at: existingAt.get(id.toString()) ?? providedAt.get(id.toString()) ?? now,
+      })),
     );
   }
   if (input.hiddenFor !== undefined) entry.hiddenFor = await ownedPersonIds(userId, input.hiddenFor);
@@ -198,7 +233,12 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
   if (dateChanging) {
     await cascadeDateKey(userId, entryId, input.dateKey!);
   }
-  if (newlySaid.length) await bumpLastCheckup(userId, newlySaid, new Date());
+  if (newlySaid.length) {
+    await bumpLastCheckup(
+      userId,
+      newlySaid.map((id) => ({ personId: id, at: providedAt.get(id.toString()) ?? new Date() })),
+    );
+  }
   const populated = await entry.populate(ENTRY_POPULATE);
   return entryToDto(populated.toObject() as unknown as LeanEntry);
 }
@@ -236,7 +276,7 @@ export async function setSaid(userId: string, entryId: string, personId: string,
   if (said) {
     const now = new Date();
     await Entry.updateOne({ _id: entryId, userId }, { $push: { saidTo: { person: pid, at: now } } });
-    await bumpLastCheckup(userId, [pid], now);
+    await bumpLastCheckup(userId, [{ personId: pid, at: now }]);
   }
 }
 

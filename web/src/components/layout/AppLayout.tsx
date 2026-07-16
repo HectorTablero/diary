@@ -11,6 +11,7 @@ import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
 import { isCheckupDue } from '@/lib/checkup';
 import { cancelIdle, onIdle } from '@/lib/idle';
+import { isLocalOnly, setLocalOnly } from '@/lib/localOnly';
 import { isNative } from '@/lib/native';
 import { preloadLoaders } from '@/lib/preloaders';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
@@ -208,6 +209,12 @@ function SyncStatusOverlay() {
   const status = useSyncStatus();
   const { t } = useTranslation();
 
+  // Nothing to report for a device that was never linked to an account — there's no server
+  // relationship to be "offline" from or "reconnected" to. initSync()'s online/offline window
+  // listeners flip SyncStatus.offline directly, independent of the sync engine's own account
+  // gate, so this needs its own explicit check rather than trusting SyncStatus to stay quiet.
+  if (isLocalOnly()) return null;
+
   if (status.needsAuth) {
     return (
       <div className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
@@ -252,6 +259,10 @@ export default function AppLayout() {
         email: session.user.email,
         image: session.user.image,
       });
+      // A real session now exists — whether this is a brand-new sign-in or an account just
+      // linked from Settings, local-only mode is over. The kick() below drains anything queued
+      // in the outbox while local-only, exactly like an ordinary reconnect-and-sync.
+      setLocalOnly(false);
       kick();
     }
   }, [session]);
@@ -272,7 +283,7 @@ export default function AppLayout() {
     return () => cancelIdle(handle);
   }, [session]);
 
-  if (!session?.user) {
+  if (!session?.user && !isLocalOnly()) {
     // With a cached user, stay usable while the session check is pending or the
     // network is down (local-first). A definitive "signed out" still redirects.
     const offlineUsable = !!cached && (isPending || !!error);

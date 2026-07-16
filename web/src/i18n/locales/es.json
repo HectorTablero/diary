@@ -13,7 +13,8 @@
   },
   "auth": {
     "signInWithGoogle": "Continuar con Google",
-    "signOut": "Cerrar sesión"
+    "signOut": "Cerrar sesión",
+    "continueWithoutAccount": "Continuar sin cuenta"
   },
   "sync": {
     "offline": "Sin conexión",
@@ -339,6 +340,7 @@
     "ai": {
       "title": "Asistente de IA",
       "description": "Graba una nota de voz y deja que la IA la convierta en sugerencias de entradas que puedes revisar antes de guardarlas. Groq es necesario para la transcripción; si además añades una clave de OpenRouter o Cerebras, el paso de sugerencias usará un modelo más potente en lugar del de Groq.",
+      "signInRequired": "Inicia sesión para usar las funciones de IA — la transcripción y las sugerencias se procesan en el servidor.",
       "apiKey": "Clave de API de Groq",
       "apiKeyPlaceholder": "gsk_…",
       "apiKeyHint": "Necesaria para la transcripción de voz. Gratis de obtener, se usa solo para llamar a Groq directamente desde este dispositivo. Consíguela en",
@@ -352,8 +354,43 @@
       "cerebrasApiKeyHint": "Si la añades, se usa en lugar de Groq para convertir las transcripciones en sugerencias de entradas. Gratis de obtener, se usa solo para llamar a Cerebras directamente desde este dispositivo. Consíguela en"
     },
     "account": "Cuenta",
+    "accountLocalOnlyDescription": "Tus datos se quedan solo en este dispositivo. Inicia sesión para respaldarlos y sincronizarlos entre dispositivos.",
     "resetDefaults": "Restablecer valores",
-    "settingsSaved": "Ajustes guardados"
+    "settingsSaved": "Ajustes guardados",
+    "data": {
+      "title": "Datos",
+      "description": "Haz una copia de seguridad completa, restaura una copia anterior, o exporta parte de tu diario como Markdown para que un agente de IA lo analice.",
+      "export": "Exportar copia de seguridad",
+      "import": "Importar copia de seguridad",
+      "includeSensitive": "Incluir datos sensibles (claves de API)",
+      "exportDone": "Copia de seguridad exportada",
+      "invalidFile": "Ese archivo no es una copia de seguridad válida",
+      "exportMarkdown": "Exportar como Markdown",
+      "exportMarkdownDescription": "Exporta entradas o el resumen de una persona como archivo Markdown, para pegarlo en un agente de IA."
+    },
+    "markdownExport": {
+      "title": "Exportar como Markdown",
+      "description": "Elige qué incluir — el archivo está pensado para dárselo a un agente de IA, no para leerlo como copia de seguridad.",
+      "type": "Tipo de exportación",
+      "typeEntries": "Entradas",
+      "typePerson": "Resumen de una persona",
+      "from": "Desde",
+      "to": "Hasta",
+      "tags": "Etiquetas",
+      "person": "Persona",
+      "choosePerson": "Elige una persona",
+      "export": "Exportar",
+      "done": "Markdown exportado",
+      "option": {
+        "tags": "Etiquetas",
+        "workInfo": "Información laboral (empresa, puesto)",
+        "notes": "Notas",
+        "age": "Edad",
+        "events": "Eventos",
+        "saidTimeline": "Cronología de lo que se le ha contado",
+        "unsaidCount": "Recuento de cosas aún no contadas"
+      }
+    }
   },
   "errors": {
     "unauthorized": "Necesitas iniciar sesión",
@@ -401,7 +438,8 @@
     "upstream_error": "El LLM no ha podido procesar eso",
     "timeout": "El LLM ha tardado demasiado en responder",
     "no_key": "Añade una clave de API de Groq en los ajustes primero",
-    "no_submission": "No se ha podido obtener un resultado del asistente"
+    "no_submission": "No se ha podido obtener un resultado del asistente",
+    "signInRequiredForVoice": "Inicia sesión para usar las entradas de voz."
   },
   "import": {
     "title": "Importar de contactos",
@@ -435,5 +473,32 @@
     "done": "{{created}} añadidos, {{merged}} fusionados.",
     "loading": "Leyendo tus contactos…",
     "failed": "No se han podido leer tus contactos"
+  },
+  "importBackup": {
+    "title": "Importar copia de seguridad",
+    "noFile": "No se ha seleccionado ningún archivo",
+    "noFileDescription": "Vuelve a Ajustes y elige un archivo de copia de seguridad para importar.",
+    "summary": "{{tags}} etiquetas, {{people}} personas, {{entries}} entradas",
+    "exportedAt": "Exportado {{date}}",
+    "reviewTitle": "Resolver conflictos",
+    "sectionSummary": "{{label}}: {{clean}} nuevos, {{conflicts}} necesitan atención.",
+    "tags": "Etiquetas",
+    "people": "Personas",
+    "entries": "Entradas",
+    "conflictIdExists": "Ya existe en este dispositivo.",
+    "conflictDuplicate": "«{{name}}» ya existe. Dos no pueden llamarse igual.",
+    "conflictContainment": "Se parece a «{{name}}» — podría ser la misma persona.",
+    "conflictPhone": "Mismo número de teléfono que «{{name}}».",
+    "mergeInto": "Fusionar con {{name}}",
+    "keepBoth": "Mantener ambos",
+    "addAsNew": "Añadir como entrada nueva",
+    "overwrite": "Sobrescribir",
+    "rename": "Renombrar",
+    "resolveFirst": "Resuelve {{count}} conflicto para continuar.",
+    "resolveFirst_other": "Resuelve {{count}} conflictos para continuar.",
+    "confirm": "Importar copia de seguridad",
+    "done": "Etiquetas: {{tagsCreated}} añadidas, {{tagsMerged}} fusionadas. Personas: {{peopleCreated}} añadidas, {{peopleMerged}} fusionadas. Entradas: {{entriesCreated}} añadidas, {{entriesMerged}} sobrescritas.",
+    "orphaned": "{{count}} entrada se movió al nivel superior porque no se importó su padre.",
+    "orphaned_other": "{{count}} entradas se movieron al nivel superior porque no se importó su padre."
   }
 }

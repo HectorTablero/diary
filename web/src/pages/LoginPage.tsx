@@ -1,74 +1,19 @@
-import { SocialLogin } from '@capgo/capacitor-social-login';
 import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { FullScreenSpinner, Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
-import { kick } from '@/db/sync';
-import { authClient, signIn, useSession } from '@/lib/authClient';
-import { isNative } from '@/lib/native';
-
-let socialLoginReady = false;
-
-/**
- * Native sign-in: Google blocks its OAuth pages inside webviews, so the app
- * uses the platform's native Google Sign-In and hands the resulting idToken
- * to Better Auth, which creates the session (returned as a bearer token).
- */
-async function nativeGoogleSignIn(): Promise<void> {
-  if (!socialLoginReady) {
-    await SocialLogin.initialize({
-      google: { webClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID as string },
-    });
-    socialLoginReady = true;
-  }
-  // No `scopes`: identity (email/name/picture) already comes in the idToken, and
-  // requesting scopes would require the plugin's MainActivity modification.
-  const { result } = await SocialLogin.login({
-    provider: 'google',
-    options: {},
-  });
-  if (!('idToken' in result) || !result.idToken) throw new Error('Google sign-in returned no idToken');
-  const { error } = await authClient.signIn.social({
-    provider: 'google',
-    idToken: { token: result.idToken, accessToken: result.accessToken?.token },
-  });
-  if (error) throw new Error(error.message ?? 'sign-in failed');
-  // Better Auth only auto-refreshes useSession for a fixed list of paths that
-  // doesn't include /sign-in/social (the web flow reloads the page instead, so
-  // it never notices). Nudge the session store manually.
-  authClient.$store.notify('$sessionSignal');
-  kick();
-}
-
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.78.43 3.45 1.18 4.94l3.66-2.84z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-      />
-    </svg>
-  );
-}
+import { useSession } from '@/lib/authClient';
+import { googleSignIn } from '@/lib/googleSignIn';
+import { setLocalOnly } from '@/lib/localOnly';
 
 export default function LoginPage() {
   const { data: session, isPending } = useSession();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [signingIn, setSigningIn] = useState(false);
 
   if (isPending) return <FullScreenSpinner />;
@@ -77,17 +22,19 @@ export default function LoginPage() {
   const handleSignIn = async () => {
     setSigningIn(true);
     try {
-      if (isNative) {
-        await nativeGoogleSignIn();
-        // useSession refreshes after signIn and the <Navigate> above redirects.
-        setSigningIn(false);
-      } else {
-        await signIn.social({ provider: 'google', callbackURL: '/diary' });
-      }
+      await googleSignIn('/diary');
+      // useSession refreshes after signIn and the <Navigate> above redirects (native); the web
+      // flow has already navigated away by the time this resolves.
+      setSigningIn(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('errors.unknown'));
       setSigningIn(false);
     }
+  };
+
+  const continueWithoutAccount = () => {
+    setLocalOnly(true);
+    void navigate('/diary');
   };
 
   return (
@@ -99,10 +46,19 @@ export default function LoginPage() {
         <h1 className="text-2xl font-semibold tracking-tight">{t('app.name')}</h1>
         <p className="max-w-xs text-sm text-balance text-muted-foreground">{t('app.tagline')}</p>
       </div>
-      <Button size="lg" variant="outline" onClick={handleSignIn} disabled={signingIn}>
-        {signingIn ? <Spinner className="size-4" /> : <GoogleIcon />}
-        {t('auth.signInWithGoogle')}
-      </Button>
+      <div className="flex flex-col items-center gap-3">
+        <Button size="lg" variant="outline" onClick={handleSignIn} disabled={signingIn}>
+          {signingIn ? <Spinner className="size-4" /> : <GoogleIcon />}
+          {t('auth.signInWithGoogle')}
+        </Button>
+        <button
+          type="button"
+          onClick={continueWithoutAccount}
+          className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+        >
+          {t('auth.continueWithoutAccount')}
+        </button>
+      </div>
     </div>
   );
 }

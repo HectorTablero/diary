@@ -1,17 +1,20 @@
 import type { SettingsDto } from '@diary/shared';
 import { DEFAULT_SETTINGS } from '@diary/shared';
-import { Hash, LogOut, Moon, RotateCcw, Sun, SunMoon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Download, FileText, Hash, LogOut, Moon, RotateCcw, Sun, SunMoon, Upload } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useSaveSettings, useSettings, useTags } from '@/api/hooks';
+import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Spinner } from '@/components/common/Spinner';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { importanceDotClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
+import { MarkdownExportDialog } from '@/components/settings/MarkdownExportDialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -27,6 +30,11 @@ import { clearLocalData } from '@/db/db';
 import { closeLiveChannel } from '@/db/sync';
 import { signOut, useSession } from '@/lib/authClient';
 import { setAuthToken } from '@/lib/authToken';
+import { buildBackupEnvelope } from '@/lib/backup/export';
+import { backupEnvelopeSchema } from '@/lib/backup/schema';
+import { saveTextFile } from '@/lib/fileSave';
+import { googleSignIn } from '@/lib/googleSignIn';
+import { setLocalOnly } from '@/lib/localOnly';
 import { cacheUser } from '@/lib/sessionCache';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -55,6 +63,12 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<SettingsDto | null>(null);
   const [checkupsEnabled, setCheckupsEnabled] = useState(false);
   const [checkupIntervalDays, setCheckupIntervalDays] = useState(30);
+  const [includeSensitiveExport, setIncludeSensitiveExport] = useState(false);
+  const [exportingBackup, setExportingBackup] = useState(false);
+  const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
+  const [linkingAccount, setLinkingAccount] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const aiDisabled = !session?.user;
 
   useEffect(() => {
     if (settings && !draft) {
@@ -130,7 +144,50 @@ export default function SettingsPage() {
     await clearLocalData();
     setAuthToken(null);
     cacheUser(null);
+    setLocalOnly(false);
     navigate('/login');
+  };
+
+  const handleLinkAccount = async () => {
+    setLinkingAccount(true);
+    try {
+      await googleSignIn('/settings');
+      // Native resolves in place and stays on this page; AppLayout's session effect clears
+      // local-only mode and kicks the sync engine, which drains anything queued while offline.
+      setLinkingAccount(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('errors.unknown'));
+      setLinkingAccount(false);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    setExportingBackup(true);
+    try {
+      const envelope = await buildBackupEnvelope(includeSensitiveExport);
+      await saveTextFile(
+        `diary-backup-${envelope.exportedAt.slice(0, 10)}.json`,
+        JSON.stringify(envelope, null, 2),
+        'application/json',
+      );
+      toast.success(t('settings.data.exportDone'));
+    } catch {
+      toast.error(t('errors.unknown'));
+    } finally {
+      setExportingBackup(false);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // clears the input so re-selecting the same file still fires onChange
+    if (!file) return;
+    try {
+      const parsed = backupEnvelopeSchema.parse(JSON.parse(await file.text()));
+      void navigate('/settings/import-backup', { state: { envelope: parsed } });
+    } catch {
+      toast.error(t('settings.data.invalidFile'));
+    }
   };
 
   const toggleBroadcastTag = (id: string) => {
@@ -349,12 +406,16 @@ export default function SettingsPage() {
             <Skeleton className="h-32" />
           ) : (
             <div className="flex flex-col gap-4">
+              {aiDisabled && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">{t('settings.ai.signInRequired')}</p>
+              )}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="groq-api-key">{t('settings.ai.apiKey')}</Label>
                 <Input
                   id="groq-api-key"
                   type="password"
                   autoComplete="off"
+                  disabled={aiDisabled}
                   value={draft.groqApiKey}
                   onChange={(e) => setDraft({ ...draft, groqApiKey: e.target.value })}
                   placeholder={t('settings.ai.apiKeyPlaceholder')}
@@ -379,6 +440,7 @@ export default function SettingsPage() {
                 </div>
                 <Switch
                   id="force-english-ai-events"
+                  disabled={aiDisabled}
                   checked={draft.forceEnglishAIEvents}
                   onCheckedChange={(checked) => setDraft({ ...draft, forceEnglishAIEvents: checked })}
                 />
@@ -389,6 +451,7 @@ export default function SettingsPage() {
                   id="cerebras-api-key"
                   type="password"
                   autoComplete="off"
+                  disabled={aiDisabled}
                   value={draft.cerebrasApiKey}
                   onChange={(e) => setDraft({ ...draft, cerebrasApiKey: e.target.value })}
                   placeholder={t('settings.ai.cerebrasApiKeyPlaceholder')}
@@ -412,6 +475,7 @@ export default function SettingsPage() {
                   id="openrouter-api-key"
                   type="password"
                   autoComplete="off"
+                  disabled={aiDisabled}
                   value={draft.openRouterApiKey}
                   onChange={(e) => setDraft({ ...draft, openRouterApiKey: e.target.value })}
                   placeholder={t('settings.ai.openRouterApiKeyPlaceholder')}
@@ -445,23 +509,95 @@ export default function SettingsPage() {
         </div>
 
         <Section title={t('settings.account')}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              {session?.user?.image && (
-                <img src={session.user.image} alt="" className="size-9 rounded-full" referrerPolicy="no-referrer" />
-              )}
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{session?.user?.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{session?.user?.email}</p>
+          {session?.user ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                {session.user.image && (
+                  <img src={session.user.image} alt="" className="size-9 rounded-full" referrerPolicy="no-referrer" />
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{session.user.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{session.user.email}</p>
+                </div>
               </div>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void handleSignOut()}>
+                <LogOut className="size-3.5" />
+                {t('auth.signOut')}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void handleSignOut()}>
-              <LogOut className="size-3.5" />
-              {t('auth.signOut')}
-            </Button>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">{t('settings.accountLocalOnlyDescription')}</p>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={linkingAccount}
+                onClick={() => void handleLinkAccount()}
+              >
+                {linkingAccount ? <Spinner className="size-3.5" /> : <GoogleIcon />}
+                {t('auth.signInWithGoogle')}
+              </Button>
+            </div>
+          )}
+        </Section>
+
+        <Section title={t('settings.data.title')} description={t('settings.data.description')}>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={exportingBackup}
+                  onClick={() => void handleExportBackup()}
+                >
+                  {exportingBackup ? <Spinner className="size-3.5" /> : <Download className="size-3.5" />}
+                  {t('settings.data.export')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => importFileRef.current?.click()}
+                >
+                  <Upload className="size-3.5" />
+                  {t('settings.data.import')}
+                </Button>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => void handleImportFile(e)}
+                />
+              </div>
+              <label className="flex items-center gap-2.5">
+                <Checkbox
+                  checked={includeSensitiveExport}
+                  onCheckedChange={(checked) => setIncludeSensitiveExport(checked === true)}
+                />
+                <span className="text-xs text-muted-foreground">{t('settings.data.includeSensitive')}</span>
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-fit gap-1.5"
+                onClick={() => setMarkdownDialogOpen(true)}
+              >
+                <FileText className="size-3.5" />
+                {t('settings.data.exportMarkdown')}
+              </Button>
+              <p className="text-xs text-muted-foreground">{t('settings.data.exportMarkdownDescription')}</p>
+            </div>
           </div>
         </Section>
       </div>
+
+      <MarkdownExportDialog open={markdownDialogOpen} onOpenChange={setMarkdownDialogOpen} />
     </PageContainer>
   );
 }

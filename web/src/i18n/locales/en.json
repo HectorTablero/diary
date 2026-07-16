@@ -13,7 +13,8 @@
   },
   "auth": {
     "signInWithGoogle": "Continue with Google",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "continueWithoutAccount": "Continue without an account"
   },
   "sync": {
     "offline": "Offline",
@@ -338,6 +339,7 @@
     "ai": {
       "title": "AI assistant",
       "description": "Record a voice note and let AI turn it into diary entry suggestions you can review before saving. Groq is required for transcription; adding an OpenRouter or Cerebras key switches the suggestion step to a stronger model instead of Groq's.",
+      "signInRequired": "Sign in to use AI features — voice transcription and suggestions run on the server.",
       "apiKey": "Groq API key",
       "apiKeyPlaceholder": "gsk_…",
       "apiKeyHint": "Required for voice transcription. Free to get, used only to call Groq directly from this device. Get one at",
@@ -351,8 +353,43 @@
       "cerebrasApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call Cerebras directly from this device. Get one at"
     },
     "account": "Account",
+    "accountLocalOnlyDescription": "Your data stays on this device only. Sign in to back it up and sync across devices.",
     "resetDefaults": "Reset to defaults",
-    "settingsSaved": "Settings saved"
+    "settingsSaved": "Settings saved",
+    "data": {
+      "title": "Data",
+      "description": "Back up everything to a file, restore from a previous backup, or export part of your diary as Markdown for an AI agent to analyze.",
+      "export": "Export backup",
+      "import": "Import backup",
+      "includeSensitive": "Include sensitive data (API keys)",
+      "exportDone": "Backup exported",
+      "invalidFile": "That file isn't a valid backup",
+      "exportMarkdown": "Export as Markdown",
+      "exportMarkdownDescription": "Export entries or a person's briefing as a Markdown file, for pasting into an AI agent."
+    },
+    "markdownExport": {
+      "title": "Export as Markdown",
+      "description": "Choose what to include — the file is meant to be handed to an AI agent, not read as a backup.",
+      "type": "Export type",
+      "typeEntries": "Entries",
+      "typePerson": "Person briefing",
+      "from": "From",
+      "to": "To",
+      "tags": "Tags",
+      "person": "Person",
+      "choosePerson": "Choose a person",
+      "export": "Export",
+      "done": "Markdown exported",
+      "option": {
+        "tags": "Tags",
+        "workInfo": "Work info (company, role)",
+        "notes": "Notes",
+        "age": "Age",
+        "events": "Events",
+        "saidTimeline": "Timeline of what's been said to them",
+        "unsaidCount": "Count of things not yet said"
+      }
+    }
   },
   "errors": {
     "unauthorized": "You need to sign in",
@@ -400,7 +437,8 @@
     "upstream_error": "The LLM couldn't process that",
     "timeout": "The LLM took too long to respond",
     "no_key": "Add a Groq API key in settings first",
-    "no_submission": "Couldn't get a result from the assistant"
+    "no_submission": "Couldn't get a result from the assistant",
+    "signInRequiredForVoice": "Sign in to use voice entries."
   },
   "import": {
     "title": "Import from contacts",
@@ -434,5 +472,32 @@
     "done": "{{created}} added, {{merged}} merged.",
     "loading": "Reading your contacts…",
     "failed": "Couldn't read your contacts"
+  },
+  "importBackup": {
+    "title": "Import backup",
+    "noFile": "No backup file selected",
+    "noFileDescription": "Go back to Settings and choose a backup file to import.",
+    "summary": "{{tags}} tags, {{people}} people, {{entries}} entries",
+    "exportedAt": "Exported {{date}}",
+    "reviewTitle": "Resolve conflicts",
+    "sectionSummary": "{{label}}: {{clean}} new, {{conflicts}} need attention.",
+    "tags": "Tags",
+    "people": "People",
+    "entries": "Entries",
+    "conflictIdExists": "Already exists on this device.",
+    "conflictDuplicate": "“{{name}}” already exists. Two can’t share a name.",
+    "conflictContainment": "Looks similar to “{{name}}” — might be the same person.",
+    "conflictPhone": "Same phone number as “{{name}}”.",
+    "mergeInto": "Merge into {{name}}",
+    "keepBoth": "Keep both",
+    "addAsNew": "Add as new entry",
+    "overwrite": "Overwrite",
+    "rename": "Rename",
+    "resolveFirst": "Resolve {{count}} conflict to continue.",
+    "resolveFirst_other": "Resolve {{count}} conflicts to continue.",
+    "confirm": "Import backup",
+    "done": "Tags: {{tagsCreated}} added, {{tagsMerged}} merged. People: {{peopleCreated}} added, {{peopleMerged}} merged. Entries: {{entriesCreated}} added, {{entriesMerged}} overwritten.",
+    "orphaned": "{{count}} entry moved to the top level because its parent wasn't imported.",
+    "orphaned_other": "{{count}} entries moved to the top level because their parent wasn't imported."
   }
 }

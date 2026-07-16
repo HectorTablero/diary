@@ -26,6 +26,13 @@ export const checkupIntervalDaysSchema = z.number().int().min(1).max(3650).nulla
 
 // --- Entries ---
 
+/** Either a bare person id (legacy shape — the server stamps `at` itself) or an explicit
+    `{personId, at}` pair, so a client restoring history (e.g. a backup import) can preserve the
+    real historical said-date instead of everything collapsing to "now" on the server. */
+export const saidToInputSchema = z
+  .array(z.union([objectIdSchema, z.object({ personId: objectIdSchema, at: isoDateTimeSchema })]))
+  .max(30);
+
 export const entryCreateSchema = z.object({
   /** Client-generated id + timestamp let offline creates sync later with stable identity and order. */
   id: objectIdSchema.optional(),
@@ -36,7 +43,7 @@ export const entryCreateSchema = z.object({
   tags: z.array(objectIdSchema).max(30).default([]),
   people: z.array(objectIdSchema).max(30).default([]),
   /** When omitted, the server copies `people` (auto-said on mention). */
-  saidTo: z.array(objectIdSchema).max(30).optional(),
+  saidTo: saidToInputSchema.optional(),
   parentId: objectIdSchema.nullish().default(null),
   /** Client-generated fractional-index sibling key. When omitted (an older client), the server
       appends the entry to the end of its sibling list instead. */
@@ -49,7 +56,7 @@ export const entryUpdateSchema = z.object({
   importance: importanceSchema.optional(),
   tags: z.array(objectIdSchema).max(30).optional(),
   people: z.array(objectIdSchema).max(30).optional(),
-  saidTo: z.array(objectIdSchema).max(30).optional(),
+  saidTo: saidToInputSchema.optional(),
   hiddenFor: z.array(objectIdSchema).max(30).optional(),
   /** Reparent — moving to a new parentId (or to root with null) is validated against
       MAX_SUB_ENTRY_DEPTH and cycles server-side (see entryService.updateEntry). */

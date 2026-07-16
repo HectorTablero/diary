@@ -1,5 +1,6 @@
 import type { SyncResponse } from '@diary/shared';
 import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
+import { getCachedUser } from '@/lib/sessionCache';
 import { db, entryFromDto, getMeta, personFromDto, setMeta, type OutboxOp } from './db';
 
 /* Sync engine: replays the outbox against the REST API in order (push), then
@@ -274,6 +275,10 @@ export function kick(): void {
 }
 
 export function syncNow(): Promise<void> {
+  // Never linked to an account (or explicitly local-only) — nothing to push or pull yet.
+  // Mutations still queue in db.outbox unconditionally; the moment an account is linked,
+  // getCachedUser() becomes non-null and the very next kick() drains the whole queue in order.
+  if (!getCachedUser()) return Promise.resolve();
   ensureLiveChannel();
   if (running) {
     rerun = true; // something changed mid-sync: go again right after

@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/common/Spinner';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { ApiError } from '@/lib/apiClient';
+import { useSession } from '@/lib/authClient';
 import { isNative } from '@/lib/native';
 
 interface EntryComposerProps {
@@ -38,6 +39,7 @@ export function EntryComposer({
   const { data: allTags = [] } = useTags();
   const { data: allPeople = [] } = usePeople();
   const { data: settings } = useSettings();
+  const { data: session } = useSession();
   const { offline } = useSyncStatus();
   const createTag = useCreateTag();
   const createEntry = useCreateEntry();
@@ -229,7 +231,7 @@ export function EntryComposer({
           </label>
         )}
         <div className="ml-auto flex items-center gap-1">
-          {showMic && <VoiceEntryButton dateKey={date} />}
+          {showMic && <VoiceEntryButton dateKey={date} disabled={!session?.user} />}
           <Button
             size="sm"
             className="h-8 gap-1.5"
