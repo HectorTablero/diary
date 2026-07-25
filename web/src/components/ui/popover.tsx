@@ -21,10 +21,21 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  container,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> & {
+  /**
+   * Portal target. Pass the enclosing Dialog's content element so this
+   * renders as its DOM descendant instead of a sibling under <body> —
+   * Radix's Dialog scroll-lock only exempts its own content subtree from
+   * the global wheel/touch block (see `shards` in DialogOverlayImpl), so a
+   * Popover portalled straight to body can't be scrolled while a Dialog is
+   * open otherwise.
+   */
+  container?: Element | DocumentFragment | null
+}) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}
