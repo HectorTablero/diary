@@ -1,5 +1,5 @@
-import type { PersonRefDto, TagDto } from '@diary/shared';
-import { X } from 'lucide-react';
+import type { PersonRefDto, TagDto, ThreadDto } from '@diary/shared';
+import { GitBranch, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function ChipShell({
@@ -72,6 +72,39 @@ export function TagChip({
       style={{ backgroundColor: tag.color, color: contrastColor(tag.color) }}
     >
       #{tag.name}
+    </ChipShell>
+  );
+}
+
+/**
+ * Outlined and unfilled, where a TagChip is filled with its colour and a PersonChip is filled with
+ * `secondary`. That's what tells the three apart, together with the leading icon — the theme is
+ * greyscale (`--muted` and `--secondary` are literally the same value), so a different fill shade
+ * couldn't do it.
+ *
+ * Text is `foreground`, not `muted-foreground`: the thread's name is identifying content, so it
+ * takes the theme's highest-contrast pair in both light and dark. Only the border is dialled back,
+ * and it's a `foreground` tint rather than `border` so the outline stays visible on a card.
+ */
+export function ThreadChip({
+  thread,
+  onRemove,
+  onClick,
+  className,
+}: {
+  thread: ThreadDto;
+  onRemove?: () => void;
+  onClick?: () => void;
+  className?: string;
+}) {
+  return (
+    <ChipShell
+      onRemove={onRemove}
+      onClick={onClick}
+      className={cn('gap-1 border border-foreground/25 bg-transparent text-foreground', className)}
+    >
+      <GitBranch className="mr-0.5 inline size-3 shrink-0 align-[-2px]" />
+      {thread.name}
     </ChipShell>
   );
 }

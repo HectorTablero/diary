@@ -2,6 +2,7 @@ import type { PersonDto, PersonEventDto } from '@diary/shared';
 import {
   eventEndKey,
   eventLengthDays,
+  groupTalkingPointsByThread,
   isEventFollowUpDue,
   isEventOngoing,
   isEventUpcoming,
@@ -50,6 +51,7 @@ import { ContactInfo } from '@/components/person/ContactInfo';
 import { EntryRow } from '@/components/person/EntryRow';
 import { EventForm } from '@/components/person/EventForm';
 import { PersonForm } from '@/components/person/PersonForm';
+import { TalkingPointGroup } from '@/components/person/TalkingPointGroup';
 import { TalkingPointItem } from '@/components/person/TalkingPointItem';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -70,6 +72,13 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
   const { data, isLoading } = useTalkingPoints(personId);
   const setSaid = useSetSaid();
 
+  // Threads come off the entries themselves, so grouping needs no extra query. With no threads
+  // defined this returns one singleton group per cluster, in the order the forest already had.
+  const groups = useMemo(
+    () => (data ? groupTalkingPointsByThread(data.active) : []),
+    [data],
+  );
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-3">
@@ -81,11 +90,27 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
 
   return (
     <div className="flex flex-col gap-4">
-      {data && data.active.length > 0 ? (
+      {groups.length > 0 ? (
         <ul className="flex flex-col gap-2">
-          {data.active.map((node) => (
-            <TalkingPointItem key={node.id} node={node} personId={personId} personName={personName} />
-          ))}
+          {groups.map((group) =>
+            group.thread ? (
+              <TalkingPointGroup
+                key={group.thread.id}
+                thread={group.thread}
+                clusters={group.clusters}
+                markableIds={group.markableIds}
+                personId={personId}
+                personName={personName}
+              />
+            ) : (
+              <TalkingPointItem
+                key={group.clusters[0].id}
+                node={group.clusters[0]}
+                personId={personId}
+                personName={personName}
+              />
+            ),
+          )}
         </ul>
       ) : (
         <EmptyState

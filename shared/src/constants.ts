@@ -18,6 +18,10 @@ export const MAX_WECHAT_ID_LENGTH = 60;
 export const MAX_EVENTS = 50;
 export const MAX_EVENT_TITLE_LENGTH = 120;
 
+/** Ongoing topics one entry can belong to. Small on purpose: a thread is a topic, not a label. */
+export const MAX_THREADS_PER_ENTRY = 10;
+export const MAX_THREAD_NAME_LENGTH = 60;
+
 /** How long a finished event stays worth asking about: this many times its own length.
     A weekend trip goes stale in a fortnight; a two-month secondment stays live for a year. */
 export const EVENT_REMEMBER_MULTIPLIER = 7;

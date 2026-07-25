@@ -1,5 +1,13 @@
 import { EVENT_REMEMBER_MULTIPLIER, importanceWeight, MATCH_STRENGTH, type MatchType } from './constants';
-import type { EntryDto, EntryNode, PersonEventDto, SettingsDto, TalkingPointNode } from './types';
+import type {
+  EntryDto,
+  EntryNode,
+  PersonEventDto,
+  SettingsDto,
+  TalkingPointGroup,
+  TalkingPointNode,
+  ThreadDto,
+} from './types';
 
 /* Pure talking-points / memories math, shared verbatim by the API and the
    local-first client so the two can never drift apart. */
@@ -155,6 +163,105 @@ export function buildTalkingPointForest(
   return kept;
 }
 
+/* --- Threads ---------------------------------------------------------------------------------
+   A thread is an ongoing topic spanning many days, so its entries land in many different root
+   clusters. Gathering those clusters under one header lets you catch someone up on the whole
+   topic in one action.
+
+   The action itself stores nothing on the thread: it writes the ordinary per-entry saidTo marks
+   for the ids in `markableIds`, which is computed here from the *current* forest. That is the
+   whole trick — an entry added to the thread tomorrow was never in today's markableIds, and a
+   member that has decayed below epsilon already has matchType null and so is excluded too. */
+
+/** Every node in this subtree that matches the person on its own merits, deepest-last. */
+function collectMatches(node: TalkingPointNode, into: TalkingPointNode[] = []): TalkingPointNode[] {
+  if (node.matchType !== null) into.push(node);
+  for (const child of node.children) collectMatches(child, into);
+  return into;
+}
+
+/**
+ * Which thread a cluster belongs under, given its matching nodes: the thread holding the
+ * highest-scoring member wins. A cluster gets at most one home, otherwise one touching two
+ * threads would render (and be marked) twice.
+ *
+ * Ties are broken by the lower thread id — arbitrary, but stable and, crucially, decidable
+ * without thread names, so the cheap people-list counter below can reach the same verdict as
+ * the full grouping without hydrating any thread objects.
+ */
+function assignThreadId(matching: { score: number; threadIds: string[] }[]): string | null {
+  let bestId: string | null = null;
+  let bestScore = -1;
+  for (const node of matching) {
+    for (const id of node.threadIds) {
+      if (node.score > bestScore || (node.score === bestScore && bestId !== null && id < bestId)) {
+        bestScore = node.score;
+        bestId = id;
+      }
+    }
+  }
+  return bestId;
+}
+
+/**
+ * Gather a talking-point forest into the rows the profile renders: one row per thread that has
+ * live clusters, plus one row per ungrouped cluster.
+ *
+ * Threads come off the nodes themselves (EntryDto.threads is hydrated), so a thread with nothing
+ * live simply doesn't appear. With no threads defined anywhere the result is one singleton group
+ * per cluster in the forest's original order — i.e. exactly the flat list this replaced.
+ */
+export function groupTalkingPointsByThread(forest: TalkingPointNode[]): TalkingPointGroup[] {
+  const groups: TalkingPointGroup[] = [];
+  const byThreadId = new Map<string, TalkingPointGroup>();
+
+  for (const cluster of forest) {
+    const matching = collectMatches(cluster);
+    const homeId = assignThreadId(
+      matching.map((node) => ({ score: node.score, threadIds: node.threads.map((t) => t.id) })),
+    );
+
+    if (homeId === null) {
+      groups.push({
+        thread: null,
+        clusters: [cluster],
+        markableIds: matching.map((node) => node.id),
+        score: matching.reduce((max, node) => Math.max(max, node.score), 0),
+      });
+      continue;
+    }
+
+    // Only members of *this* thread are markable. A matching sibling that isn't in the thread
+    // stays on screen with its own button, but "mark all" must not sweep it up.
+    const members = matching.filter((node) => node.threads.some((t) => t.id === homeId));
+    const existing = byThreadId.get(homeId);
+    if (existing) {
+      existing.clusters.push(cluster);
+      existing.markableIds.push(...members.map((node) => node.id));
+      existing.score = members.reduce((max, node) => Math.max(max, node.score), existing.score);
+      continue;
+    }
+
+    const thread = matching
+      .flatMap((node) => node.threads)
+      .find((t) => t.id === homeId) as ThreadDto;
+    const group: TalkingPointGroup = {
+      thread,
+      clusters: [cluster],
+      markableIds: members.map((node) => node.id),
+      score: members.reduce((max, node) => Math.max(max, node.score), 0),
+    };
+    byThreadId.set(homeId, group);
+    groups.push(group);
+  }
+
+  // Array#sort is stable, so groups of equal score keep the order the forest gave them — which
+  // already applied the dateKey tiebreak. Clusters within a thread keep forest order for the
+  // same reason: they were appended as they came.
+  groups.sort((a, b) => b.score - a.score);
+  return groups;
+}
+
 /* --- Person events -------------------------------------------------------------------------
    Something happened to someone; once it's over, you owe them a "how did it go?". That follow-up
    decays: it's forgotten once EVENT_REMEMBER_MULTIPLIER × the event's own length has passed, so a
@@ -223,7 +330,7 @@ export const ongoingEvents = <T extends EventLike>(events: T[], todayKey: string
   events.filter((event) => isEventOngoing(event, todayKey));
 
 /** Minimal shape needed to group matches into clusters, without the display fields
-    (content, tag/person names) a full EntryDto carries — cheap to build for a batch scan. */
+    (content, tag/person/thread names) a full EntryDto carries — cheap to build for a batch scan. */
 export interface ClusterCandidate {
   id: string;
   parentId: string | null;
@@ -231,17 +338,21 @@ export interface ClusterCandidate {
   importance: number;
   tagIds: string[];
   peopleIds: string[];
+  threadIds: string[];
   saidToIds: string[];
   hiddenForIds: string[];
 }
 
 /**
- * Count distinct root-entry clusters that contain at least one match for this
- * person — the same grouping `buildTalkingPointForest` renders, without building
- * full display trees. A matching parent and its matching sub-entry(ies) count as
- * one talking point, not one per matching node.
+ * How many rows this person's Talking Points tab would show, without building the display trees:
+ * one per thread that has live clusters, plus one per ungrouped cluster.
+ *
+ * Two collapses are at work, and both exist so the badge counts *things you'd bring up* rather
+ * than raw matched entries. A matching parent and its matching sub-entries are one cluster, and
+ * every live cluster of one thread is one row. This must stay in step with
+ * groupTalkingPointsByThread — it shares assignThreadId with it for exactly that reason.
  */
-export function countMatchingClusters(
+export function countTalkingPointGroups(
   entries: ClusterCandidate[],
   personId: string,
   personTagIds: ReadonlySet<string>,
@@ -250,13 +361,15 @@ export function countMatchingClusters(
   now: number,
 ): number {
   const byId = new Map(entries.map((e) => [e.id, e]));
-  const roots = new Set<string>();
+  const matchesByRoot = new Map<string, { score: number; threadIds: string[] }[]>();
+
   for (const entry of entries) {
     if (entry.saidToIds.includes(personId)) continue;
     if (entry.hiddenForIds.includes(personId)) continue;
     const matchType = matchTypeFor(entry, personId, personTagIds, settings, broadcastTagIds);
     if (!matchType) continue;
-    if (scoreEntry(entry, matchType, settings, now) < settings.epsilon) continue;
+    const score = scoreEntry(entry, matchType, settings, now);
+    if (score < settings.epsilon) continue;
 
     let root = entry;
     while (root.parentId) {
@@ -264,7 +377,16 @@ export function countMatchingClusters(
       if (!parent) break;
       root = parent;
     }
-    roots.add(root.id);
+    const matches = matchesByRoot.get(root.id);
+    if (matches) matches.push({ score, threadIds: entry.threadIds });
+    else matchesByRoot.set(root.id, [{ score, threadIds: entry.threadIds }]);
   }
-  return roots.size;
+
+  // Namespaced so a thread id can never be mistaken for a root entry id.
+  const rows = new Set<string>();
+  for (const [rootId, matches] of matchesByRoot) {
+    const homeId = assignThreadId(matches);
+    rows.add(homeId === null ? `c:${rootId}` : `t:${homeId}`);
+  }
+  return rows.size;
 }

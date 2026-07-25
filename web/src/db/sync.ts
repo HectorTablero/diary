@@ -123,6 +123,7 @@ async function removeLocalDoc(op: OutboxOp) {
   if (op.path.startsWith('/entries')) await db.entries.delete(id);
   else if (op.path.startsWith('/people')) await db.people.delete(id);
   else if (op.path.startsWith('/tags')) await db.tags.delete(id);
+  else if (op.path.startsWith('/threads')) await db.threads.delete(id);
 }
 
 /* Live channel: a WebSocket per open client. The server nudges the user's
@@ -213,14 +214,17 @@ async function pull(): Promise<void> {
   const dirty = await dirtyIds();
   const clean = <T extends { id: string }>(docs: T[]) => docs.filter((d) => !dirty.has(d.id));
 
-  await db.transaction('rw', [db.entries, db.people, db.tags, db.meta], async () => {
+  await db.transaction('rw', [db.entries, db.people, db.tags, db.threads, db.meta], async () => {
     await db.entries.bulkPut(clean(res.entries).map(entryFromDto));
     await db.people.bulkPut(clean(res.people).map(personFromDto));
     await db.tags.bulkPut(clean(res.tags));
+    // `?? []` tolerates a server that predates threads (a stale deploy mid-rollout).
+    await db.threads.bulkPut(clean(res.threads ?? []));
     for (const del of res.deletions) {
       if (dirty.has(del.docId)) continue;
       if (del.coll === 'entry') await db.entries.delete(del.docId);
       else if (del.coll === 'person') await db.people.delete(del.docId);
+      else if (del.coll === 'thread') await db.threads.delete(del.docId);
       else await db.tags.delete(del.docId);
     }
     await setMeta('settings', res.settings);

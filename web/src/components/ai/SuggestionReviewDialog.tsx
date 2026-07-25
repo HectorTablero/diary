@@ -314,6 +314,9 @@ export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }:
             importance: node.importance,
             tags: node.tags.map((tag) => tag.id),
             people: node.people.map((p) => p.id),
+            // The AI never assigns threads — grouping is a deliberate, human call, and the
+            // entries can be threaded afterwards from the day view's ⋯ menu.
+            threads: [],
             saidTo: node.saidTo,
             parentId,
           };

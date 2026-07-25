@@ -8,6 +8,7 @@ import { Deletion } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
+import { Thread } from '../models/thread';
 import { issueWsTicket } from '../services/liveSync';
 import { getSettings } from '../services/settingsService';
 import {
@@ -15,9 +16,11 @@ import {
   entryToDto,
   personToDto,
   tagToDto,
+  threadToDto,
   type LeanEntry,
   type LeanPerson,
   type LeanTag,
+  type LeanThread,
 } from '../dto';
 
 const PERSON_POPULATE = { path: 'tags', select: 'name color' };
@@ -40,10 +43,11 @@ export const syncRouter = new Hono<AppEnv>()
     const serverTime = new Date().toISOString();
     const changedSince = since ? { updatedAt: { $gt: new Date(since) } } : {};
 
-    const [entries, people, tags, settings, deletions] = await Promise.all([
+    const [entries, people, tags, threads, settings, deletions] = await Promise.all([
       Entry.find({ userId, ...changedSince }).populate(ENTRY_POPULATE).lean(),
       Person.find({ userId, ...changedSince }).populate(PERSON_POPULATE).lean(),
       Tag.find({ userId, ...changedSince }).lean(),
+      Thread.find({ userId, ...changedSince }).lean(),
       getSettings(userId),
       since
         ? Deletion.find({ userId, deletedAt: { $gt: new Date(since) } }).lean()
@@ -55,6 +59,7 @@ export const syncRouter = new Hono<AppEnv>()
       entries: (entries as unknown as LeanEntry[]).map(entryToDto),
       people: (people as unknown as LeanPerson[]).map(personToDto),
       tags: (tags as unknown as LeanTag[]).map(tagToDto),
+      threads: (threads as unknown as LeanThread[]).map(threadToDto),
       settings,
       deletions: (deletions as unknown as LeanDeletion[]).map((d) => ({
         coll: d.coll,

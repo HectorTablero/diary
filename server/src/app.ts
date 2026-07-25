@@ -22,6 +22,7 @@ import { peopleRouter } from './routes/people';
 import { settingsRouter } from './routes/settings';
 import { syncRouter } from './routes/sync';
 import { tagsRouter } from './routes/tags';
+import { threadsRouter } from './routes/threads';
 
 // serveStatic resolves relative to process.cwd(); compute the path to web/dist
 // from this file so it works both from the repo root and inside the container.
@@ -103,6 +104,7 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   api.route('/entries', entriesRouter);
   api.route('/people', peopleRouter);
   api.route('/tags', tagsRouter);
+  api.route('/threads', threadsRouter);
   api.route('/settings', settingsRouter);
   api.route('/sync', syncRouter);
   api.route('/ai', aiRouter);

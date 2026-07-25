@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { useEntryIds, usePeople, useTags } from '@/api/hooks';
+import { useEntryIds, usePeople, useTags, useThreads } from '@/api/hooks';
 import { BackupConflictRow, type BackupMergeTarget } from '@/components/backup/BackupConflictRow';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
@@ -15,22 +15,33 @@ import {
   type EntryImportItem,
   type PersonImportItem,
   type TagImportItem,
+  type ThreadImportItem,
 } from '@/db/mutations';
 import {
   defaultEntryResolution,
   defaultPersonResolution,
   defaultTagResolution,
+  defaultThreadResolution,
   detectEntryConflicts,
   detectPersonBackupConflicts,
   detectTagConflicts,
+  detectThreadConflicts,
   isPersonHardConflict,
   isTagHardConflict,
+  isThreadHardConflict,
   type BackupResolution,
   type EntryConflictMatch,
   type PersonConflictMatch,
   type TagConflictMatch,
+  type ThreadConflictMatch,
 } from '@/lib/backup/conflicts';
-import type { BackupEnvelope, EntryBackupRow, PersonBackupRow, TagBackupRow } from '@/lib/backup/schema';
+import type {
+  BackupEnvelope,
+  EntryBackupRow,
+  PersonBackupRow,
+  TagBackupRow,
+  ThreadBackupRow,
+} from '@/lib/backup/schema';
 
 function conflictLabel(kind: string, name: string, t: TFunction): string {
   switch (kind) {
@@ -55,11 +66,14 @@ export default function ImportBackupPage() {
 
   const { data: existingPeople = [] } = usePeople();
   const { data: existingTags = [] } = useTags();
+  const { data: existingThreads = [] } = useThreads();
   const { data: existingEntryIds } = useEntryIds();
 
   const [tagRenames, setTagRenames] = useState<Record<string, string>>({});
+  const [threadRenames, setThreadRenames] = useState<Record<string, string>>({});
   const [personRenames, setPersonRenames] = useState<Record<string, string>>({});
   const [tagResolutions, setTagResolutions] = useState<Record<string, BackupResolution>>({});
+  const [threadResolutions, setThreadResolutions] = useState<Record<string, BackupResolution>>({});
   const [personResolutions, setPersonResolutions] = useState<Record<string, BackupResolution>>({});
   const [entryResolutions, setEntryResolutions] = useState<Record<string, BackupResolution>>({});
   const [importing, setImporting] = useState(false);
@@ -69,6 +83,13 @@ export default function ImportBackupPage() {
   const tagRows = useMemo<TagBackupRow[]>(
     () => (envelope ? envelope.tags.map((row) => ({ ...row, name: tagRenames[row.id] ?? row.name })) : []),
     [envelope, tagRenames],
+  );
+  const threadRows = useMemo<ThreadBackupRow[]>(
+    () =>
+      envelope
+        ? envelope.threads.map((row) => ({ ...row, name: threadRenames[row.id] ?? row.name }))
+        : [],
+    [envelope, threadRenames],
   );
   const personRows = useMemo<PersonBackupRow[]>(
     () =>
@@ -80,6 +101,10 @@ export default function ImportBackupPage() {
   const tagConflicts = useMemo(
     () => detectTagConflicts(tagRows, existingTags),
     [tagRows, existingTags],
+  );
+  const threadConflicts = useMemo(
+    () => detectThreadConflicts(threadRows, existingThreads),
+    [threadRows, existingThreads],
   );
   const personConflicts = useMemo(
     () => detectPersonBackupConflicts(personRows, existingPeople),
@@ -94,6 +119,11 @@ export default function ImportBackupPage() {
     (id: string): BackupResolution | null => tagResolutions[id] ?? defaultTagResolution(tagConflicts.get(id)),
     [tagResolutions, tagConflicts],
   );
+  const threadResolutionFor = useCallback(
+    (id: string): BackupResolution | null =>
+      threadResolutions[id] ?? defaultThreadResolution(threadConflicts.get(id)),
+    [threadResolutions, threadConflicts],
+  );
   const personResolutionFor = useCallback(
     (id: string): BackupResolution | null =>
       personResolutions[id] ?? defaultPersonResolution(personConflicts.get(id)),
@@ -105,12 +135,14 @@ export default function ImportBackupPage() {
   );
 
   const conflictedTags = tagRows.filter((row) => tagConflicts.has(row.id));
+  const conflictedThreads = threadRows.filter((row) => threadConflicts.has(row.id));
   const conflictedPeople = personRows.filter((row) => personConflicts.has(row.id));
   const conflictedEntries = entryRows.filter((row) => entryConflicts.has(row.id));
 
   const unresolvedTags = conflictedTags.filter((row) => tagResolutionFor(row.id) === null);
+  const unresolvedThreads = conflictedThreads.filter((row) => threadResolutionFor(row.id) === null);
   const unresolvedPeople = conflictedPeople.filter((row) => personResolutionFor(row.id) === null);
-  const totalUnresolved = unresolvedTags.length + unresolvedPeople.length;
+  const totalUnresolved = unresolvedTags.length + unresolvedThreads.length + unresolvedPeople.length;
 
   const backButton = (
     <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void navigate('/settings')}>
@@ -140,6 +172,10 @@ export default function ImportBackupPage() {
     setImporting(true);
     try {
       const tags: TagImportItem[] = tagRows.map((row) => ({ row, resolution: tagResolutionFor(row.id)! }));
+      const threads: ThreadImportItem[] = threadRows.map((row) => ({
+        row,
+        resolution: threadResolutionFor(row.id)!,
+      }));
       const people: PersonImportItem[] = personRows.map((row) => ({
         row,
         resolution: personResolutionFor(row.id)!,
@@ -148,11 +184,13 @@ export default function ImportBackupPage() {
         row,
         resolution: entryResolutionFor(row.id),
       }));
-      const summary = await importBackup({ tags, people, entries });
+      const summary = await importBackup({ tags, threads, people, entries });
       toast.success(
         t('importBackup.done', {
           tagsCreated: summary.tags.created,
           tagsMerged: summary.tags.merged,
+          threadsCreated: summary.threads.created,
+          threadsMerged: summary.threads.merged,
           peopleCreated: summary.people.created,
           peopleMerged: summary.people.merged,
           entriesCreated: summary.entries.created,
@@ -175,6 +213,7 @@ export default function ImportBackupPage() {
 
       <div className="mb-4 flex flex-col gap-1 rounded-xl border bg-card p-3 text-sm">
         <p>{t('importBackup.sectionSummary', { label: t('importBackup.tags'), clean: tagRows.length - conflictedTags.length, conflicts: conflictedTags.length })}</p>
+        <p>{t('importBackup.sectionSummary', { label: t('importBackup.threads'), clean: threadRows.length - conflictedThreads.length, conflicts: conflictedThreads.length })}</p>
         <p>{t('importBackup.sectionSummary', { label: t('importBackup.people'), clean: personRows.length - conflictedPeople.length, conflicts: conflictedPeople.length })}</p>
         <p>{t('importBackup.sectionSummary', { label: t('importBackup.entries'), clean: entryRows.length - conflictedEntries.length, conflicts: conflictedEntries.length })}</p>
       </div>
@@ -198,6 +237,32 @@ export default function ImportBackupPage() {
                   allowCreate={!isTagHardConflict(matches)}
                   onResolve={(resolution) => setTagResolutions((prev) => ({ ...prev, [row.id]: resolution }))}
                   onRename={(name) => setTagRenames((prev) => ({ ...prev, [row.id]: name }))}
+                />
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {conflictedThreads.length > 0 && (
+        <section className="mb-4">
+          <h2 className="mb-2 text-sm font-semibold">{t('importBackup.threads')}</h2>
+          <ul className="flex flex-col gap-2">
+            {conflictedThreads.map((row) => {
+              const matches: ThreadConflictMatch[] = threadConflicts.get(row.id)!;
+              const mergeTargets: BackupMergeTarget[] = matches.map((m) => ({ targetId: m.targetId, name: m.name }));
+              return (
+                <BackupConflictRow
+                  key={row.id}
+                  name={row.name}
+                  conflictLabels={matches.map((m) => conflictLabel(m.kind, m.name, t))}
+                  hard={isThreadHardConflict(matches)}
+                  resolution={threadResolutionFor(row.id)}
+                  mergeTargets={mergeTargets}
+                  createLabel={t('importBackup.keepBoth')}
+                  allowCreate={!isThreadHardConflict(matches)}
+                  onResolve={(resolution) => setThreadResolutions((prev) => ({ ...prev, [row.id]: resolution }))}
+                  onRename={(name) => setThreadRenames((prev) => ({ ...prev, [row.id]: name }))}
                 />
               );
             })}

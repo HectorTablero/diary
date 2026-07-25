@@ -9,6 +9,7 @@
     "people": "People",
     "search": "Search",
     "tags": "Tags",
+    "threads": "Threads",
     "settings": "Settings"
   },
   "auth": {
@@ -279,6 +280,34 @@
     "tagDeleted": "Tag deleted",
     "duplicate_name": "A tag with that name already exists"
   },
+  "threads": {
+    "title": "Threads",
+    "count": "{{count}} thread",
+    "count_other": "{{count}} threads",
+    "addThread": "New thread",
+    "editThread": "Edit thread",
+    "deleteThread": "Delete thread",
+    "name": "Name",
+    "namePlaceholder": "Thread name",
+    "noThreads": "No threads yet",
+    "noThreadsDescription": "A thread groups entries about one ongoing topic — a project, a move, your research — so you can catch someone up on all of it at once.",
+    "entriesCount": "{{count}} entry",
+    "entriesCount_other": "{{count}} entries",
+    "showEntries": "Show entries",
+    "noEntries": "Nothing in this thread yet.",
+    "deleteConfirmTitle": "Delete thread \"{{name}}\"?",
+    "deleteConfirmDescription": "The entries themselves are kept, along with everything already marked as said — they just stop being grouped.",
+    "threadSaved": "Thread saved",
+    "threadDeleted": "Thread deleted",
+    "addToThread": "Add to thread",
+    "createThread": "Create thread \"{{name}}\"",
+    "limitReached": "An entry can belong to at most {{count}} threads.",
+    "toTell": "{{count}} to tell",
+    "toTell_other": "{{count}} to tell",
+    "markAllSaid": "Mark all",
+    "markedAllSaid": "{{count}} entry in \"{{name}}\" marked as said",
+    "markedAllSaid_other": "{{count}} entries in \"{{name}}\" marked as said"
+  },
   "calendar": {
     "title": "Calendar",
     "onThisDay": "On this day",
@@ -423,6 +452,10 @@
     "not_found": "Tag not found",
     "duplicate_name": "A tag with that name already exists"
   },
+  "thread": {
+    "not_found": "Thread not found",
+    "duplicate_name": "A thread with that name already exists"
+  },
   "ai": {
     "record": "Record a voice note",
     "stopRecording": "Stop recording",
@@ -490,6 +523,7 @@
     "reviewTitle": "Resolve conflicts",
     "sectionSummary": "{{label}}: {{clean}} new, {{conflicts}} need attention.",
     "tags": "Tags",
+    "threads": "Threads",
     "people": "People",
     "entries": "Entries",
     "conflictIdExists": "Already exists on this device.",
@@ -504,7 +538,7 @@
     "resolveFirst": "Resolve {{count}} conflict to continue.",
     "resolveFirst_other": "Resolve {{count}} conflicts to continue.",
     "confirm": "Import backup",
-    "done": "Tags: {{tagsCreated}} added, {{tagsMerged}} merged. People: {{peopleCreated}} added, {{peopleMerged}} merged. Entries: {{entriesCreated}} added, {{entriesMerged}} overwritten.",
+    "done": "Tags: {{tagsCreated}} added, {{tagsMerged}} merged. Threads: {{threadsCreated}} added, {{threadsMerged}} merged. People: {{peopleCreated}} added, {{peopleMerged}} merged. Entries: {{entriesCreated}} added, {{entriesMerged}} overwritten.",
     "orphaned": "{{count}} entry moved to the top level because its parent wasn't imported.",
     "orphaned_other": "{{count}} entries moved to the top level because their parent wasn't imported."
   }

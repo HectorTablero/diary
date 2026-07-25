@@ -32,6 +32,7 @@ async function main() {
     importance: 3,
     tags: [],
     people: [],
+    threads: [],
     parentId: null,
   });
   check('client id respected', dto.id === id, `${dto.id} vs ${id}`);
@@ -49,6 +50,7 @@ async function main() {
       importance: 3,
       tags: [],
       people: [],
+      threads: [],
       parentId: null,
     });
   } catch (err) {
@@ -73,6 +75,7 @@ async function main() {
     importance: 3,
     tags: [],
     people: [],
+    threads: [],
     parentId: id,
   });
   await deleteEntry(USER, id);

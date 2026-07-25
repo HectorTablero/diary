@@ -4,7 +4,7 @@ import { model, Schema, type Types } from 'mongoose';
 /** Tombstones so offline clients learn about deletes on their next sync pull. */
 const deletionSchema = new Schema({
   userId: { type: String, required: true },
-  coll: { type: String, required: true, enum: ['entry', 'person', 'tag'] },
+  coll: { type: String, required: true, enum: ['entry', 'person', 'tag', 'thread'] },
   docId: { type: Schema.Types.ObjectId, required: true },
   deletedAt: { type: Date, required: true, default: Date.now },
 });

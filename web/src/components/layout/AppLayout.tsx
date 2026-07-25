@@ -1,4 +1,14 @@
-import { BellRing, BookOpen, CalendarDays, CloudOff, Search, Settings, Tag, Users } from 'lucide-react';
+import {
+  BellRing,
+  BookOpen,
+  CalendarDays,
+  CloudOff,
+  GitBranch,
+  Search,
+  Settings,
+  Tag,
+  Users,
+} from 'lucide-react';
 import { AnimatedLogo } from '@/components/icons/AnimatedLogo';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -42,6 +52,7 @@ const MAIN_NAV: NavItem[] = [
 
 const SECONDARY_NAV: NavItem[] = [
   { to: '/tags', icon: Tag, labelKey: 'nav.tags' },
+  { to: '/threads', icon: GitBranch, labelKey: 'nav.threads' },
   { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 

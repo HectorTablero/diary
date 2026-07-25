@@ -9,11 +9,13 @@ import type {
   TagDto,
   TagWithStats,
   TalkingPointsResponse,
+  ThreadDto,
+  ThreadWithStats,
 } from '@diary/shared';
 import {
   buildEntryTree,
   buildTalkingPointForest,
-  countMatchingClusters,
+  countTalkingPointGroups,
   DEFAULT_SETTINGS,
   memoryCutoffDateKey,
   scoreCutoffDateKey,
@@ -30,13 +32,19 @@ import { enqueueBatch } from './outbox';
 interface JoinMaps {
   tags: Map<string, TagDto>;
   people: Map<string, LocalPerson>;
+  threads: Map<string, ThreadDto>;
 }
 
 async function joinMaps(): Promise<JoinMaps> {
-  const [tags, people] = await Promise.all([db.tags.toArray(), db.people.toArray()]);
+  const [tags, people, threads] = await Promise.all([
+    db.tags.toArray(),
+    db.people.toArray(),
+    db.threads.toArray(),
+  ]);
   return {
     tags: new Map(tags.map((t) => [t.id, t])),
     people: new Map(people.map((p) => [p.id, p])),
+    threads: new Map(threads.map((t) => [t.id, t])),
   };
 }
 
@@ -52,6 +60,8 @@ function entryToDto(entry: LocalEntry, maps: JoinMaps): EntryDto {
       const person = maps.people.get(id);
       return person ? [{ id: person.id, name: person.name }] : [];
     }),
+    // `?? []` guards rows a mid-flight sync re-put while the v4 upgrade was still pending.
+    threads: (entry.threadIds ?? []).flatMap((id) => maps.threads.get(id) ?? []),
     saidTo: entry.saidTo,
     hiddenFor: entry.hiddenFor,
     parentId: entry.parentId,
@@ -257,8 +267,9 @@ export async function getPeople(): Promise<PersonListItem[]> {
   ]);
   const now = Date.now();
   const cutoff = scoreCutoffDateKey(settings, now);
-  // A matching parent and its matching sub-entries count as one talking point,
-  // so the badge counts distinct root clusters rather than raw matched entries.
+  // The badge counts *things you'd bring up*, not matched entries: a matching parent and its
+  // matching sub-entries are one cluster, and every live cluster of one thread is one row. So it
+  // matches the number of rows the profile's Talking Points tab will actually show.
   const recent = entries
     .filter((e) => e.dateKey >= cutoff)
     .map((e) => ({
@@ -268,6 +279,7 @@ export async function getPeople(): Promise<PersonListItem[]> {
       importance: e.importance,
       tagIds: e.tagIds,
       peopleIds: e.peopleIds,
+      threadIds: e.threadIds ?? [],
       saidToIds: e.saidTo.map((s) => s.personId),
       hiddenForIds: e.hiddenFor,
     }));
@@ -276,7 +288,7 @@ export async function getPeople(): Promise<PersonListItem[]> {
   return people
     .map((person) => {
       const personTagIds = new Set(person.tagIds);
-      const count = countMatchingClusters(
+      const count = countTalkingPointGroups(
         recent,
         person.id,
         personTagIds,
@@ -411,4 +423,37 @@ export async function getTags(): Promise<TagWithStats[]> {
       personCount: personCounts.get(tag.id) ?? 0,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// --- Threads ---
+
+export async function getThreads(): Promise<ThreadWithStats[]> {
+  const [threads, entries] = await Promise.all([db.threads.toArray(), db.entries.toArray()]);
+  const entryCounts = new Map<string, number>();
+  const newestDateKey = new Map<string, string>();
+  for (const entry of entries)
+    for (const id of entry.threadIds ?? []) {
+      entryCounts.set(id, (entryCounts.get(id) ?? 0) + 1);
+      const seen = newestDateKey.get(id);
+      if (!seen || entry.dateKey > seen) newestDateKey.set(id, entry.dateKey);
+    }
+
+  /* Ordered by each thread's newest entry, so a topic you're currently writing about stays at the
+     top and a finished one sinks — not by `thread.updatedAt`, which only moves when the thread
+     itself is renamed or recoloured and so would rank a long-dead thread you just tidied above a
+     live one. A thread with no entries yet falls back to its own creation day; both sides are
+     YYYY-MM-DD, so a plain string compare is a correct date compare. */
+  const rank = (thread: ThreadDto) => newestDateKey.get(thread.id) ?? thread.createdAt.slice(0, 10);
+  return threads
+    .map((thread) => ({ ...thread, entryCount: entryCounts.get(thread.id) ?? 0 }))
+    .sort((a, b) => rank(b).localeCompare(rank(a)) || a.name.localeCompare(b.name));
+}
+
+/** Entries in a thread, newest day first — the member list on the threads page. */
+export async function getThreadEntries(threadId: string): Promise<EntryDto[]> {
+  const [entries, maps] = await Promise.all([
+    db.entries.where('threadIds').equals(threadId).toArray(),
+    joinMaps(),
+  ]);
+  return entries.sort(byDateDesc).map((e) => entryToDto(e, maps));
 }

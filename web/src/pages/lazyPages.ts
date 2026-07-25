@@ -13,6 +13,7 @@ export const pageLoaders = {
   search: () => import('./SearchPage'),
   settings: () => import('./SettingsPage'),
   tags: () => import('./TagsPage'),
+  threads: () => import('./ThreadsPage'),
 } as const;
 
 export const DiaryDayPage = lazy(pageLoaders.diary);
@@ -24,3 +25,4 @@ export const ImportBackupPage = lazy(pageLoaders.importBackup);
 export const SearchPage = lazy(pageLoaders.search);
 export const SettingsPage = lazy(pageLoaders.settings);
 export const TagsPage = lazy(pageLoaders.tags);
+export const ThreadsPage = lazy(pageLoaders.threads);

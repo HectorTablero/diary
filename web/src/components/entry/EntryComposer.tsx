@@ -1,11 +1,20 @@
-import type { EntryDto, PersonRefDto, TagDto } from '@diary/shared';
-import { AtSign, CalendarIcon, Hash, Send } from 'lucide-react';
+import type { EntryDto, PersonRefDto, TagDto, ThreadDto } from '@diary/shared';
+import { AtSign, CalendarIcon, GitBranch, Hash, Send } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { useCreateEntry, useCreateTag, usePeople, useSettings, useTags, useUpdateEntry } from '@/api/hooks';
+import {
+  useCreateEntry,
+  useCreateTag,
+  useCreateThread,
+  usePeople,
+  useSettings,
+  useTags,
+  useThreads,
+  useUpdateEntry,
+} from '@/api/hooks';
 import { VoiceEntryButton } from '@/components/ai/VoiceEntryButton';
-import { PersonChip, TagChip } from '@/components/entry/chips';
+import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { ImportancePicker } from '@/components/entry/ImportanceDot';
 import { TokenTextarea } from '@/components/entry/TokenTextarea';
@@ -38,10 +47,12 @@ export function EntryComposer({
   const { t } = useTranslation();
   const { data: allTags = [] } = useTags();
   const { data: allPeople = [] } = usePeople();
+  const { data: allThreads = [] } = useThreads();
   const { data: settings } = useSettings();
   const { data: session } = useSession();
   const { offline } = useSyncStatus();
   const createTag = useCreateTag();
+  const createThread = useCreateThread();
   const createEntry = useCreateEntry();
   const updateEntry = useUpdateEntry();
 
@@ -49,6 +60,7 @@ export function EntryComposer({
   const [importance, setImportance] = useState(entry?.importance ?? 3);
   const [date, setDate] = useState(entry?.dateKey ?? dateKey);
   const [tags, setTags] = useState<TagDto[]>(entry?.tags ?? []);
+  const [threads, setThreads] = useState<ThreadDto[]>(entry?.threads ?? []);
   const [people, setPeople] = useState<PersonRefDto[]>(entry?.people ?? []);
   const [saidTo, setSaidTo] = useState<string[]>(entry?.saidTo.map((s) => s.personId) ?? []);
 
@@ -81,6 +93,17 @@ export function EntryComposer({
     }
   };
 
+  const addThread = (thread: ThreadDto) =>
+    setThreads((prev) => (prev.some((th) => th.id === thread.id) ? prev : [...prev, thread]));
+
+  const handleCreateThread = async (name: string): Promise<void> => {
+    try {
+      addThread(await createThread.mutateAsync({ name }));
+    } catch (err) {
+      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+    }
+  };
+
   const reset = () => {
     setContent('');
     setImportance(3);
@@ -88,6 +111,9 @@ export function EntryComposer({
     setPeople([]);
     setSaidTo([]);
     setDate(dateKey);
+    // Threads deliberately survive a reset: writing several entries about the same ongoing topic
+    // in one sitting is the normal case, and re-picking the thread each time is the friction that
+    // stops threads getting used at all.
   };
 
   const submit = async () => {
@@ -98,6 +124,7 @@ export function EntryComposer({
       importance,
       tags: tags.map((tag) => tag.id),
       people: people.map((p) => p.id),
+      threads: threads.map((th) => th.id),
       saidTo,
     };
     try {
@@ -148,10 +175,17 @@ export function EntryComposer({
         onSubmit={submit}
       />
 
-      {(tags.length > 0 || people.length > 0) && (
+      {(tags.length > 0 || people.length > 0 || threads.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
           {tags.map((tag) => (
             <TagChip key={tag.id} tag={tag} onRemove={() => setTags((p) => p.filter((tg) => tg.id !== tag.id))} />
+          ))}
+          {threads.map((thread) => (
+            <ThreadChip
+              key={thread.id}
+              thread={thread}
+              onRemove={() => setThreads((p) => p.filter((th) => th.id !== thread.id))}
+            />
           ))}
           {people.map((person) => (
             <PersonChip key={person.id} person={person} onRemove={() => removePerson(person.id)} />
@@ -217,6 +251,27 @@ export function EntryComposer({
               else addPerson(person);
             }}
             placeholder={t('people.namePlaceholder')}
+          />
+          <EntityPicker
+            trigger={
+              <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-muted-foreground">
+                <GitBranch className="size-3.5" />
+                {t('threads.addToThread')}
+              </Button>
+            }
+            // No `color`: EntityPicker falls back to a muted dot, which is right for threads.
+            items={allThreads.map((th) => ({ id: th.id, label: th.name }))}
+            selectedIds={threads.map((th) => th.id)}
+            onToggle={(id) => {
+              const thread = allThreads.find((th) => th.id === id);
+              if (!thread) return;
+              if (threads.some((th) => th.id === id)) setThreads((p) => p.filter((th) => th.id !== id));
+              else addThread(thread);
+            }}
+            onCreate={(name) => void handleCreateThread(name)}
+            createLabel={(name) => t('threads.createThread', { name })}
+            placeholder={t('threads.namePlaceholder')}
+            contentClassName="w-64"
           />
         </div>
         {showDateInput && (

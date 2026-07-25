@@ -1,4 +1,4 @@
-import type { EntryDto, PersonDto, PersonEventDto, SaidMark, TagDto } from '@diary/shared';
+import type { EntryDto, PersonDto, PersonEventDto, SaidMark, TagDto, ThreadDto } from '@diary/shared';
 import { normalizeBirthday } from '@diary/shared';
 import Dexie, { type EntityTable } from 'dexie';
 
@@ -15,6 +15,7 @@ export interface LocalEntry {
   importance: number;
   tagIds: string[];
   peopleIds: string[];
+  threadIds: string[];
   saidTo: SaidMark[];
   hiddenFor: string[];
   parentId: string | null;
@@ -61,6 +62,7 @@ export const db = new Dexie('diary') as Dexie & {
   entries: EntityTable<LocalEntry, 'id'>;
   people: EntityTable<LocalPerson, 'id'>;
   tags: EntityTable<TagDto, 'id'>;
+  threads: EntityTable<ThreadDto, 'id'>;
   outbox: EntityTable<OutboxOp, 'seq'>;
   meta: EntityTable<MetaRow, 'key'>;
 };
@@ -105,13 +107,19 @@ db.version(2)
    asked whoever bumped the version next to migrate them. Doing it now means `normalizeBirthday`
    only has to survive as a read-side shim for rows this upgrade hasn't reached yet (a client that
    hasn't opened the app since), not forever. */
-/* --- orderKey: no dedicated Dexie upgrade -----------------------------------------------------
+/* --- orderKey: still no dedicated Dexie upgrade ------------------------------------------------
    Unlike the fields above, LocalEntry.orderKey has no `.upgrade()` here: it's populated lazily
    on read instead, via ensureOrderKeys() in db/repo.ts (called from getDayEntries), following
-   the same "read heals the row" idea as normalizeBirthday above. Next time this version is
-   bumped for any other reason, add an `.upgrade()` that fills in any still-missing orderKeys via
-   generateNKeysBetween, then delete ensureOrderKeys and its call site, and make
-   LocalEntry.orderKey (and EntryDto.orderKey) required again. */
+   the same "read heals the row" idea as normalizeBirthday above.
+
+   The marker that used to live here asked whoever bumped the version next to backfill it. v4
+   below deliberately didn't, because the two jobs aren't the same size: ensureOrderKeys groups
+   siblings by parentId only, which is correct for the one day it is handed, but a whole-database
+   backfill would have to scope root siblings by dateKey as well (all roots share parentId null),
+   and getting that subtly wrong silently reorders the user's entire diary. It isn't worth
+   attaching to an unrelated feature migration. Do it as its own change: an `.upgrade()` keying
+   each `parentId ?? root:<dateKey>` group with generateNKeysBetween, then delete ensureOrderKeys
+   and its call site and make LocalEntry.orderKey (and EntryDto.orderKey) required again. */
 
 db.version(3)
   .stores({
@@ -131,6 +139,28 @@ db.version(3)
       }),
   );
 
+/* v4 adds threads: a named grouping of entries across days, so one ongoing topic can be caught
+   someone up on in a single action. Entries carry `threadIds` (multi-indexed, same as tagIds), and
+   the backfill is required for the usual reason — a cursor-based pull only re-sends entries the
+   server considers changed, so untouched rows would keep `undefined` and break `.includes()`. */
+db.version(4)
+  .stores({
+    entries: 'id, dateKey, parentId, *tagIds, *peopleIds, *threadIds',
+    people: 'id, name, *aliases, contactId',
+    tags: 'id, name',
+    threads: 'id, name',
+    outbox: '++seq',
+    meta: 'key',
+  })
+  .upgrade((tx) =>
+    tx
+      .table<LocalEntry>('entries')
+      .toCollection()
+      .modify((entry) => {
+        entry.threadIds ??= [];
+      }),
+  );
+
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
   content: dto.content,
@@ -138,6 +168,7 @@ export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   importance: dto.importance,
   tagIds: dto.tags.map((t) => t.id),
   peopleIds: dto.people.map((p) => p.id),
+  threadIds: (dto.threads ?? []).map((t) => t.id),
   saidTo: dto.saidTo,
   hiddenFor: dto.hiddenFor,
   parentId: dto.parentId,
@@ -178,13 +209,18 @@ export async function setMeta(key: string, value: unknown): Promise<void> {
 
 /** Wipe everything local (used on sign-out). Keeps the database usable afterwards. */
 export async function clearLocalData(): Promise<void> {
-  await db.transaction('rw', [db.entries, db.people, db.tags, db.outbox, db.meta], async () => {
-    await Promise.all([
-      db.entries.clear(),
-      db.people.clear(),
-      db.tags.clear(),
-      db.outbox.clear(),
-      db.meta.clear(),
-    ]);
-  });
+  await db.transaction(
+    'rw',
+    [db.entries, db.people, db.tags, db.threads, db.outbox, db.meta],
+    async () => {
+      await Promise.all([
+        db.entries.clear(),
+        db.people.clear(),
+        db.tags.clear(),
+        db.threads.clear(),
+        db.outbox.clear(),
+        db.meta.clear(),
+      ]);
+    },
+  );
 }

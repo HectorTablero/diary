@@ -9,6 +9,8 @@ import {
   importanceSchema,
   isoDateTimeSchema,
   MAX_NOTES_LENGTH,
+  MAX_THREAD_NAME_LENGTH,
+  MAX_THREADS_PER_ENTRY,
   objectIdSchema,
   organizationSchema,
   phoneSchema,
@@ -36,6 +38,8 @@ export const localEntrySchema = z.object({
   importance: importanceSchema,
   tagIds: z.array(objectIdSchema).max(30),
   peopleIds: z.array(objectIdSchema).max(30),
+  /** Defaulted, unlike its neighbours: a version-1 file predates threads entirely. */
+  threadIds: z.array(objectIdSchema).max(MAX_THREADS_PER_ENTRY).default([]),
   saidTo: z.array(saidMarkSchema).max(30),
   hiddenFor: z.array(objectIdSchema).max(30),
   parentId: objectIdSchema.nullable(),
@@ -69,16 +73,30 @@ export const tagRowSchema = z.object({
   color: z.string().regex(HEX_COLOR_REGEX, 'expected #RRGGBB'),
 });
 
+export const threadRowSchema = z.object({
+  id: objectIdSchema,
+  name: z.string().trim().min(1).max(MAX_THREAD_NAME_LENGTH),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+/** What buildBackupEnvelope writes. Bumped to 2 when threads arrived. */
+export const BACKUP_VERSION = 2;
+
 export const backupEnvelopeSchema = z.object({
-  version: z.literal(1),
+  // Version 1 (pre-threads) still imports: `threads` and every row's `threadIds` default to
+  // empty, so an older file restores as a diary with no threads rather than refusing to load.
+  version: z.union([z.literal(1), z.literal(2)]),
   exportedAt: isoDateTimeSchema,
   entries: z.array(localEntrySchema),
   people: z.array(localPersonSchema),
   tags: z.array(tagRowSchema),
+  threads: z.array(threadRowSchema).default([]),
   settings: settingsSchema,
 });
 
 export type EntryBackupRow = z.infer<typeof localEntrySchema>;
 export type PersonBackupRow = z.infer<typeof localPersonSchema>;
 export type TagBackupRow = z.infer<typeof tagRowSchema>;
+export type ThreadBackupRow = z.infer<typeof threadRowSchema>;
 export type BackupEnvelope = z.infer<typeof backupEnvelopeSchema>;

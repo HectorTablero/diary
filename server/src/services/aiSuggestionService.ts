@@ -162,8 +162,9 @@ Take your time and prioritize correctness over speed. Reason carefully about the
 ### 1. Core Extraction Rules
 - The entries you submit are always filed under the date ${dateKey} (today is ${today}). Use any relative dates mentioned ("yesterday", "last week") ONLY to understand context, never to change where the entry is filed.
 - ${forceEnglishAIEvents ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").` : `Write every "content" field in the same language as the transcript (app language hint: "${language}").`}
-- Split the transcript into concise, first-person diary bullet points.
-- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under the parent event. You may nest these sub-entries up to exactly ${MAX_SUB_ENTRY_DEPTH} levels deep (parent (0) + ${MAX_SUB_ENTRY_DEPTH}) to create a clean, hierarchical summary.
+- Split the transcript into concise, first-person diary bullet points. Capture every distinct action, fact, or event mentioned in the transcript. Never omit details, minor tasks, or routine activities just to keep the summary short.
+- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under the parent event. You may nest entries up to ${MAX_SUB_ENTRY_DEPTH} levels deep below the top-level parent to create a clean, hierarchical summary.
+- DO NOT group unrelated events or projects together. Also do not invent general parent events just to hold children ("Had a very productive day", "Had many social outings", "Had a varied day"); only create a parent entry if the transcript explicitly describes a main event that has sub-details.
 - Never invent facts that are not in the transcript. If the transcript is ambiguous, prefer a conservative interpretation.
 
 ### 2. Importance Scale (1 = highest ... 5 = lowest)
@@ -180,6 +181,8 @@ ${tagLines}
 A tag can be linked in TWO ways (both are combined into one set, so use whichever fits best):
 - In the "tags" array: Put its ID here when the name doesn't fit naturally into the sentence (e.g., { content: "Did A with @B", tags: ["<id of tagC>"] }).
 - Inline text: Write "#TagName" in the content using the EXACT name from the list above when it reads naturally (e.g., { content: "#Trip with @A to B", tags: [] }).
+
+For sub-entries, if the parent entry already has a tag, you do NOT need to repeat it in the child entry's "tags" array. Only include tags that are relevant to the specific entry.
 
 ### 4. People & Name Verification
 Be aggressive about tool calls. If the transcript contains anything that could be a person's name (capitalized tokens, unusual proper-name words), treat it as a candidate. 

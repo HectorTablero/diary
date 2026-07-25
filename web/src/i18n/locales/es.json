@@ -9,6 +9,7 @@
     "people": "Personas",
     "search": "Buscar",
     "tags": "Etiquetas",
+    "threads": "Hilos",
     "settings": "Ajustes"
   },
   "auth": {
@@ -280,6 +281,34 @@
     "tagDeleted": "Etiqueta eliminada",
     "duplicate_name": "Ya existe una etiqueta con ese nombre"
   },
+  "threads": {
+    "title": "Hilos",
+    "count": "{{count}} hilo",
+    "count_other": "{{count}} hilos",
+    "addThread": "Nuevo hilo",
+    "editThread": "Editar hilo",
+    "deleteThread": "Eliminar hilo",
+    "name": "Nombre",
+    "namePlaceholder": "Nombre del hilo",
+    "noThreads": "Aún no hay hilos",
+    "noThreadsDescription": "Un hilo agrupa entradas sobre un mismo tema en curso — un proyecto, una mudanza, tu investigación — para poder poner a alguien al día de todo a la vez.",
+    "entriesCount": "{{count}} entrada",
+    "entriesCount_other": "{{count}} entradas",
+    "showEntries": "Ver entradas",
+    "noEntries": "Todavía no hay nada en este hilo.",
+    "deleteConfirmTitle": "¿Eliminar el hilo «{{name}}»?",
+    "deleteConfirmDescription": "Las entradas se conservan, y también todo lo que ya esté marcado como contado — solo dejan de estar agrupadas.",
+    "threadSaved": "Hilo guardado",
+    "threadDeleted": "Hilo eliminado",
+    "addToThread": "Añadir a un hilo",
+    "createThread": "Crear hilo «{{name}}»",
+    "limitReached": "Una entrada puede pertenecer como máximo a {{count}} hilos.",
+    "toTell": "{{count}} por contar",
+    "toTell_other": "{{count}} por contar",
+    "markAllSaid": "Marcar todo",
+    "markedAllSaid": "{{count}} entrada de «{{name}}» marcada como contada",
+    "markedAllSaid_other": "{{count}} entradas de «{{name}}» marcadas como contadas"
+  },
   "calendar": {
     "title": "Calendario",
     "onThisDay": "Tal día como hoy",
@@ -424,6 +453,10 @@
     "not_found": "Etiqueta no encontrada",
     "duplicate_name": "Ya existe una etiqueta con ese nombre"
   },
+  "thread": {
+    "not_found": "Hilo no encontrado",
+    "duplicate_name": "Ya existe un hilo con ese nombre"
+  },
   "ai": {
     "record": "Grabar una nota de voz",
     "stopRecording": "Detener grabación",
@@ -491,6 +524,7 @@
     "reviewTitle": "Resolver conflictos",
     "sectionSummary": "{{label}}: {{clean}} nuevos, {{conflicts}} necesitan atención.",
     "tags": "Etiquetas",
+    "threads": "Hilos",
     "people": "Personas",
     "entries": "Entradas",
     "conflictIdExists": "Ya existe en este dispositivo.",
@@ -505,7 +539,7 @@
     "resolveFirst": "Resuelve {{count}} conflicto para continuar.",
     "resolveFirst_other": "Resuelve {{count}} conflictos para continuar.",
     "confirm": "Importar copia de seguridad",
-    "done": "Etiquetas: {{tagsCreated}} añadidas, {{tagsMerged}} fusionadas. Personas: {{peopleCreated}} añadidas, {{peopleMerged}} fusionadas. Entradas: {{entriesCreated}} añadidas, {{entriesMerged}} sobrescritas.",
+    "done": "Etiquetas: {{tagsCreated}} añadidas, {{tagsMerged}} fusionadas. Hilos: {{threadsCreated}} añadidos, {{threadsMerged}} fusionados. Personas: {{peopleCreated}} añadidas, {{peopleMerged}} fusionadas. Entradas: {{entriesCreated}} añadidas, {{entriesMerged}} sobrescritas.",
     "orphaned": "{{count}} entrada se movió al nivel superior porque no se importó su padre.",
     "orphaned_other": "{{count}} entradas se movieron al nivel superior porque no se importó su padre."
   }

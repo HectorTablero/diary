@@ -12,6 +12,9 @@ import type {
   TagCreateInput,
   TagDto,
   TagUpdateInput,
+  ThreadCreateInput,
+  ThreadDto,
+  ThreadUpdateInput,
 } from '@diary/shared';
 import {
   DEFAULT_TAG_COLORS,
@@ -23,7 +26,12 @@ import {
 import { generateKeyBetween } from 'fractional-indexing';
 import { ApiError } from '@/lib/apiClient';
 import type { BackupResolution } from '@/lib/backup/conflicts';
-import type { EntryBackupRow, PersonBackupRow, TagBackupRow } from '@/lib/backup/schema';
+import type {
+  EntryBackupRow,
+  PersonBackupRow,
+  TagBackupRow,
+  ThreadBackupRow,
+} from '@/lib/backup/schema';
 import type { ContactCandidate, Resolution } from '@/lib/conflicts';
 import { fuzzyEquals, renameMentions } from '@/lib/tokens';
 import { db, type LocalEntry, type LocalPerson, type OutboxOp } from './db';
@@ -102,6 +110,7 @@ export async function createEntry(input: EntryCreateInput): Promise<EntryDto> {
     importance: input.importance,
     tagIds: input.tags,
     peopleIds: input.people,
+    threadIds: input.threads,
     saidTo: saidToIds.map((personId) => ({ personId, at: createdAt })),
     hiddenFor: [],
     parentId: input.parentId ?? null,
@@ -153,6 +162,7 @@ export async function updateEntry(entryId: string, input: EntryUpdateInput): Pro
     dateKey: input.dateKey ?? entry.dateKey,
     importance: input.importance ?? entry.importance,
     tagIds: input.tags ?? entry.tagIds,
+    threadIds: input.threads ?? entry.threadIds ?? [],
     // Editing mentions intentionally does NOT touch saidTo (independently editable).
     peopleIds: input.people ?? entry.peopleIds,
     saidTo,
@@ -236,6 +246,45 @@ export async function setSaid(entryId: string, personId: string, said: boolean):
     });
   if (said) await bumpLastCheckup([personId], now);
   await enqueue(said ? 'PUT' : 'DELETE', `/entries/${entryId}/said/${personId}`);
+}
+
+/**
+ * Mark (or unmark) a whole set of entries as said to one person in a single action — what the
+ * profile's per-thread "mark all" button does.
+ *
+ * The caller passes the exact ids, taken from the TalkingPointGroup it rendered, rather than
+ * having this re-derive them: that way the count on the button and the set that gets written are
+ * provably the same, and nothing can be marked that the user never had on screen.
+ *
+ * There is deliberately no bulk endpoint. This queues the ordinary per-entry ops, which keeps
+ * replay idempotent and — important — keeps the outbox path shape at `entries/<id>/said/<person>`,
+ * which sync.ts's dirtyIds() parses positionally to protect unpushed edits from being clobbered.
+ */
+export async function setSaidBulk(
+  entryIds: string[],
+  personId: string,
+  said: boolean,
+): Promise<void> {
+  if (!entryIds.length) return;
+  const now = nowIso();
+  await db.entries
+    .where('id')
+    .anyOf(entryIds)
+    .modify((entry) => {
+      entry.saidTo = entry.saidTo.filter((s) => s.personId !== personId);
+      if (said) entry.saidTo.push({ personId, at: now });
+      entry.updatedAt = now;
+    });
+  // One bump, not one per entry — it only ever moves lastCheckupAt forward anyway.
+  if (said) await bumpLastCheckup([personId], now);
+  await enqueueBatch(
+    entryIds.map(
+      (entryId): OutboxOp => ({
+        method: said ? 'PUT' : 'DELETE',
+        path: `/entries/${entryId}/said/${personId}`,
+      }),
+    ),
+  );
 }
 
 export async function setHidden(entryId: string, personId: string, hidden: boolean): Promise<void> {
@@ -627,6 +676,68 @@ export async function deleteTag(tagId: string): Promise<void> {
   await enqueue('DELETE', `/tags/${tagId}`);
 }
 
+// --- Threads ---
+
+async function assertUniqueThreadName(name: string, exceptId?: string): Promise<void> {
+  const clash = (await db.threads.toArray()).find(
+    (t) => t.id !== exceptId && fuzzyEquals(t.name, name),
+  );
+  if (clash) throw new ApiError(409, 'thread.duplicate_name');
+}
+
+export async function createThread(input: ThreadCreateInput): Promise<ThreadDto> {
+  await assertUniqueThreadName(input.name);
+  const id = input.id ?? newObjectId();
+  const createdAt = input.createdAt ?? nowIso();
+  const thread: ThreadDto = { id, name: input.name, createdAt, updatedAt: createdAt };
+  await db.threads.add(thread);
+  await enqueue('POST', '/threads', { ...input, id, createdAt });
+  return thread;
+}
+
+export async function updateThread(threadId: string, input: ThreadUpdateInput): Promise<ThreadDto> {
+  if (input.name !== undefined) await assertUniqueThreadName(input.name, threadId);
+  const now = nowIso();
+  const count = await db.threads
+    .where('id')
+    .equals(threadId)
+    .modify((t) => {
+      if (input.name !== undefined) t.name = input.name;
+      t.updatedAt = now;
+    });
+  if (!count) throw new ApiError(404, 'thread.not_found');
+  // No mention-text rewrite to do, unlike renameTagMentions: a thread is never typed into an
+  // entry's content, so the structured link is the only place its name appears.
+  await enqueue('PATCH', `/threads/${threadId}`, input);
+  return (await db.threads.get(threadId))!;
+}
+
+/** Deleting a thread only ungroups its entries. Every saidTo mark a "mark all" ever wrote lives on
+    the entries themselves and is untouched, so the history stays accurate. */
+export async function deleteThread(threadId: string): Promise<void> {
+  await db.threads.delete(threadId);
+  const now = nowIso();
+  await db.entries
+    .where('threadIds')
+    .equals(threadId)
+    .modify((e) => {
+      e.threadIds = e.threadIds.filter((id) => id !== threadId);
+      e.updatedAt = now;
+    });
+  await enqueue('DELETE', `/threads/${threadId}`);
+}
+
+/** Add or remove one entry's membership of one thread — the "Add to thread…" menu action, which is
+    how an ongoing topic usually gets assembled: after the fact, from entries already written. */
+export async function setEntryThreads(entryId: string, threadIds: string[]): Promise<EntryDto> {
+  const entry = await db.entries.get(entryId);
+  if (!entry) throw new ApiError(404, 'entry.not_found');
+  const now = nowIso();
+  await db.entries.update(entryId, { threadIds, updatedAt: now });
+  await enqueue('PATCH', `/entries/${entryId}`, { threads: threadIds });
+  return entryDto(entryId, entry.dateKey);
+}
+
 // --- Settings ---
 
 export async function saveSettings(input: SettingsInput): Promise<SettingsDto> {
@@ -685,6 +796,44 @@ export async function importTags(
 
   if (creates.length) await db.tags.bulkAdd(creates);
   return { created: creates.length, merged, tagIdMap, ops };
+}
+
+export interface ThreadImportItem {
+  row: ThreadBackupRow;
+  resolution: BackupResolution;
+}
+
+/** Threads import exactly like tags — same two resolutions, same id-map-forward contract. */
+export async function importThreads(
+  items: ThreadImportItem[],
+): Promise<{ created: number; merged: number; threadIdMap: Map<string, string>; ops: OutboxOp[] }> {
+  const threadIdMap = new Map<string, string>();
+  const creates: ThreadDto[] = [];
+  const ops: OutboxOp[] = [];
+  let merged = 0;
+
+  for (const { row, resolution } of items) {
+    switch (resolution.action) {
+      case 'overwrite':
+        throw new Error('threads do not support the overwrite resolution');
+      case 'merge':
+        threadIdMap.set(row.id, resolution.targetId);
+        merged++;
+        continue;
+      case 'create':
+        threadIdMap.set(row.id, row.id);
+        creates.push(row);
+        ops.push({
+          method: 'POST',
+          path: '/threads',
+          body: { id: row.id, name: row.name, createdAt: row.createdAt },
+        });
+        continue;
+    }
+  }
+
+  if (creates.length) await db.threads.bulkAdd(creates);
+  return { created: creates.length, merged, threadIdMap, ops };
 }
 
 export interface PersonImportItem {
@@ -846,6 +995,7 @@ export async function importEntries(
   items: EntryImportItem[],
   tagIdMap: Map<string, string>,
   personIdMap: Map<string, string>,
+  threadIdMap: Map<string, string>,
 ): Promise<{ created: number; merged: number; orphaned: number; ops: OutboxOp[] }> {
   const existingIds = new Set((await db.entries.toArray()).map((e) => e.id));
   const remapIds = (ids: string[], map: Map<string, string>) =>
@@ -886,6 +1036,7 @@ export async function importEntries(
 
     const tagIds = remapIds(row.tagIds, tagIdMap);
     const peopleIds = remapIds(row.peopleIds, personIdMap);
+    const threadIds = remapIds(row.threadIds, threadIdMap);
     const hiddenFor = remapIds(row.hiddenFor, personIdMap);
     const saidTo: SaidMark[] = row.saidTo.flatMap((s) => {
       const personId = personIdMap.get(s.personId);
@@ -899,6 +1050,7 @@ export async function importEntries(
       importance: row.importance,
       tagIds,
       peopleIds,
+      threadIds,
       saidTo,
       hiddenFor,
       parentId,
@@ -920,6 +1072,7 @@ export async function importEntries(
           importance: entry.importance,
           tags: tagIds,
           people: peopleIds,
+          threads: threadIds,
           saidTo,
           hiddenFor,
           parentId: entry.parentId,
@@ -938,6 +1091,7 @@ export async function importEntries(
           importance: entry.importance,
           tags: tagIds,
           people: peopleIds,
+          threads: threadIds,
           saidTo,
           parentId: entry.parentId,
           orderKey: entry.orderKey,
@@ -960,28 +1114,43 @@ export async function importEntries(
 
 export interface BackupImportPlan {
   tags: TagImportItem[];
+  threads: ThreadImportItem[];
   people: PersonImportItem[];
   entries: EntryImportItem[];
 }
 
 export interface BackupImportSummary {
   tags: { created: number; merged: number };
+  threads: { created: number; merged: number };
   people: { created: number; merged: number };
   entries: { created: number; merged: number; orphaned: number };
 }
 
-/** Applies a fully-resolved backup import plan: tags first, then people (their tagIds rewritten
-    through the fresh tagIdMap), then entries (rewritten through both maps) — each step needs the
-    id map(s) the previous one produced. One shared enqueueBatch at the end, not one per step. */
+/** Applies a fully-resolved backup import plan: tags and threads first, then people (their tagIds
+    rewritten through the fresh tagIdMap), then entries (rewritten through all three maps) — each
+    step needs the id map(s) the previous one produced. Threads only have to precede entries, since
+    nothing but an entry references one. One shared enqueueBatch at the end, not one per step. */
 export async function importBackup(plan: BackupImportPlan): Promise<BackupImportSummary> {
   const tagsResult = await importTags(plan.tags);
+  const threadsResult = await importThreads(plan.threads);
   const peopleResult = await importPeopleFromBackup(plan.people, tagsResult.tagIdMap);
-  const entriesResult = await importEntries(plan.entries, tagsResult.tagIdMap, peopleResult.personIdMap);
+  const entriesResult = await importEntries(
+    plan.entries,
+    tagsResult.tagIdMap,
+    peopleResult.personIdMap,
+    threadsResult.threadIdMap,
+  );
 
-  await enqueueBatch([...tagsResult.ops, ...peopleResult.ops, ...entriesResult.ops]);
+  await enqueueBatch([
+    ...tagsResult.ops,
+    ...threadsResult.ops,
+    ...peopleResult.ops,
+    ...entriesResult.ops,
+  ]);
 
   return {
     tags: { created: tagsResult.created, merged: tagsResult.merged },
+    threads: { created: threadsResult.created, merged: threadsResult.merged },
     people: { created: peopleResult.created, merged: peopleResult.merged },
     entries: {
       created: entriesResult.created,

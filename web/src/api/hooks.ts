@@ -10,6 +10,8 @@ import type {
   SettingsInput,
   TagCreateInput,
   TagUpdateInput,
+  ThreadCreateInput,
+  ThreadUpdateInput,
 } from '@diary/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as mutations from '@/db/mutations';
@@ -54,6 +56,49 @@ export function useDeleteTag() {
       hapticWarning();
       qc.invalidateQueries();
     }
+  });
+}
+
+// --- Threads ---
+
+export const useThreads = () =>
+  useQuery({
+    queryKey: ['threads'],
+    queryFn: () => repo.getThreads(),
+  });
+
+export const useThreadEntries = (threadId: string) =>
+  useQuery({
+    queryKey: ['threads', threadId, 'entries'],
+    queryFn: () => repo.getThreadEntries(threadId),
+  });
+
+export function useCreateThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ThreadCreateInput) => mutations.createThread(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['threads'] }),
+  });
+}
+
+export function useUpdateThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ThreadUpdateInput }) =>
+      mutations.updateThread(id, input),
+    // A rename shows up on every entry row and talking-point header, not just the threads page.
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useDeleteThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => mutations.deleteThread(id),
+    onSuccess: () => {
+      hapticWarning();
+      qc.invalidateQueries();
+    },
   });
 }
 
@@ -175,6 +220,8 @@ function useInvalidateEntryData() {
     qc.invalidateQueries({ queryKey: ['on-this-day'] });
     qc.invalidateQueries({ queryKey: ['people'] });
     qc.invalidateQueries({ queryKey: ['search'] });
+    // Thread membership and entry counts both live on entries.
+    qc.invalidateQueries({ queryKey: ['threads'] });
   };
 }
 
@@ -222,6 +269,33 @@ export function useSetSaid() {
   return useMutation({
     mutationFn: ({ entryId, personId, said }: { entryId: string; personId: string; said: boolean }) =>
       mutations.setSaid(entryId, personId, said),
+    onSuccess: invalidate,
+  });
+}
+
+/** One click, many entries: the per-thread "mark all as said" on the person profile. `entryIds`
+    must be the group's `markableIds` — see the note on mutations.setSaidBulk. */
+export function useSetSaidBulk() {
+  const invalidate = useInvalidateEntryData();
+  return useMutation({
+    mutationFn: ({
+      entryIds,
+      personId,
+      said,
+    }: {
+      entryIds: string[];
+      personId: string;
+      said: boolean;
+    }) => mutations.setSaidBulk(entryIds, personId, said),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetEntryThreads() {
+  const invalidate = useInvalidateEntryData();
+  return useMutation({
+    mutationFn: ({ entryId, threadIds }: { entryId: string; threadIds: string[] }) =>
+      mutations.setEntryThreads(entryId, threadIds),
     onSuccess: invalidate,
   });
 }
