@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { clearLocalData } from '@/db/db';
 import { closeLiveChannel } from '@/db/sync';
+import { LANGUAGES, resolveLanguage } from '@/i18n';
 import { signOut, useSession } from '@/lib/authClient';
 import { setAuthToken } from '@/lib/authToken';
 import { buildBackupEnvelope } from '@/lib/backup/export';
@@ -231,13 +232,19 @@ export default function SettingsPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>{t('settings.language')}</Label>
-              <Select value={i18n.language.startsWith('en') ? 'en' : 'es'} onValueChange={(lng) => void i18n.changeLanguage(lng)}>
+              <Select
+                value={resolveLanguage(i18n.language)}
+                onValueChange={(lng) => void i18n.changeLanguage(lng)}
+              >
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="es">Español</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
+                  {LANGUAGES.map((language) => (
+                    <SelectItem key={language.code} value={language.code}>
+                      {language.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

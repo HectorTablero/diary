@@ -270,6 +270,10 @@
   --color-importance-5: #8ea6bd;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Minimal themed scrollbar (desktop) */
 @media (pointer: fine) {
   * {
