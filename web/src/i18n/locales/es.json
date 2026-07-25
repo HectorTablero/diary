@@ -29,23 +29,22 @@
     "dailyReminderTitle": "No olvides tu diario",
     "dailyReminderBodies": [
       "Todavía no has añadido nada hoy.",
-      "El día de hoy sigue en blanco. Qué maleducado, con todo lo que ha pasado.",
-      "Tu diario está cogiendo polvo. Una frase soluciona eso.",
+      "Tu diario ya está pensando en abrir un expediente por abandono.",
+      "Hoy pasaron cosas. Tu diario tiene cero pruebas.",
+      "Tu diario está de huelga. Una frase soluciona eso.",
       "En algún lugar, tu yo del futuro espera que hayas escrito esto.",
-      "Hoy ha pasado. Técnicamente. Demuéstralo.",
-      "Una página completamente vacía te está mirando ahora mismo.",
       "Recordatorio rápido: el día de hoy no se escribe solo.",
       "En cinco minutos podrías tener una entrada de diario en vez de esta notificación.",
-      "Tu racha cuenta contigo. Sin presión.",
-      "Aún no hay nada en la entrada de hoy. Hasta \"no ha pasado nada\" cuenta."
+      "Tu racha cuenta contigo. Sin presión."
     ],
     "birthdayTitle": "🎂 Es el cumpleaños de {{name}}",
     "birthdayTitleWithAge": "🎂 {{name}} cumple {{age}} hoy",
     "birthdayBodies": [
       "Felicita a {{name}}.",
       "{{name}} solo cumple esta edad una vez. Buen momento para saludar.",
-      "Tarta, velas, {{name}} — hoy están las tres cosas. Únete.",
+      "Tarta, velas, {{name}}. Es ley de vida felicitar, no te hagas el sueco.",
       "Un mensaje tuyo podría alegrarle el día entero a {{name}}.",
+      "Es el gran día de {{name}}. No seas 'ese amigo'.",
       "{{name}} espera como mínimo unos emojis de confeti.",
       "Es el gran día de {{name}}. No seas la persona que se olvidó.",
       "Escríbele a {{name}} antes de que alguien se te adelante."
@@ -178,16 +177,14 @@
     "checkupBodies": [
       "Llevas {{days}} días sin hablar con {{name}}. Puede que ya piense que te has olvidado de su existencia.",
       "{{name}} no sabe nada de ti desde hace {{days}} días. Hora de demostrar que no eres un fantasma.",
-      "Giro inesperado: {{name}} sigue existiendo, y llevas {{days}} días sin comprobarlo.",
-      "Última hora: {{name}} sigue esperando un simple hola. Ya van {{days}} días.",
-      "Tu amistad con {{name}} no está extinta todavía, pero llevas {{days}} días sin regarla.",
-      "{{name}} te llamó. Es broma, no lo hizo, porque llevas {{days}} días sin dar tú el primer paso.",
+      "Plot twist: {{name}} sigue existiendo, y llevas {{days}} días sin comprobarlo.",
+      "Última hora: {{name}} sigue esperando un 'holi'. Ya van {{days}} días.",
+      "Te llamó {{name}}. Es broma. Llevas {{days}} días sin dar señal de vida, claro.",
       "Un empujoncito: {{name}} sigue siendo una persona real fuera de tus notificaciones. {{days}} días y contando.",
-      "Han pasado {{days}} días. {{name}} empieza a sospechar que lo han cambiado por un Tamagotchi que dejaste de alimentar.",
+      "Han pasado {{days}} días. {{name}} cree que lo dejaste olvidado como a un Tamagotchi sin pila.",
       "Recordatorio amistoso: {{name}} te echa de menos, o al menos deberías asumirlo tras {{days}} días de silencio.",
       "{{days}} días de silencio absoluto con {{name}}. Manda un meme, un hola, lo que sea.",
-      "Logro desbloqueado: {{days}} días sin hablar con {{name}}. Por favor, no vayas a por el siguiente nivel.",
-      "{{name}} espera pacientemente. Llevas {{days}} días — quizá deberías escribir antes de que se convierta en un hito."
+      "Logro desbloqueado: {{days}} días ignorando a {{name}}. Por favor, no vayas a por el oro."
     ],
     "markCheckupDone": "Marcar como hecho",
     "markCheckupNow": "Marcar seguimiento como hecho ahora",
