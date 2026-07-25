@@ -13,6 +13,8 @@ import {
   MAX_NOTES_LENGTH,
   MAX_ORGANIZATION_LENGTH,
   MAX_PHONE_LENGTH,
+  MAX_THREAD_NAME_LENGTH,
+  MAX_THREADS_PER_ENTRY,
   MAX_WECHAT_ID_LENGTH,
   normalizeBirthday,
   OBJECT_ID_REGEX,
@@ -42,6 +44,7 @@ export const entryCreateSchema = z.object({
   importance: importanceSchema.default(3),
   tags: z.array(objectIdSchema).max(30).default([]),
   people: z.array(objectIdSchema).max(30).default([]),
+  threads: z.array(objectIdSchema).max(MAX_THREADS_PER_ENTRY).default([]),
   /** When omitted, the server copies `people` (auto-said on mention). */
   saidTo: saidToInputSchema.optional(),
   parentId: objectIdSchema.nullish().default(null),
@@ -56,6 +59,7 @@ export const entryUpdateSchema = z.object({
   importance: importanceSchema.optional(),
   tags: z.array(objectIdSchema).max(30).optional(),
   people: z.array(objectIdSchema).max(30).optional(),
+  threads: z.array(objectIdSchema).max(MAX_THREADS_PER_ENTRY).optional(),
   saidTo: saidToInputSchema.optional(),
   hiddenFor: z.array(objectIdSchema).max(30).optional(),
   /** Reparent — moving to a new parentId (or to root with null) is validated against
@@ -154,6 +158,18 @@ export const tagUpdateSchema = z.object({
   color: z.string().regex(HEX_COLOR_REGEX, 'expected #RRGGBB').optional(),
 });
 
+// --- Threads ---
+
+export const threadCreateSchema = z.object({
+  id: objectIdSchema.optional(),
+  createdAt: isoDateTimeSchema.optional(),
+  name: z.string().trim().min(1).max(MAX_THREAD_NAME_LENGTH),
+});
+
+export const threadUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(MAX_THREAD_NAME_LENGTH).optional(),
+});
+
 // --- Settings ---
 
 const halfLifeRange = z.number().min(1).max(3650);
@@ -206,5 +222,7 @@ export type PersonUpdateInput = z.infer<typeof personUpdateSchema>;
 export type PersonEventInput = z.infer<typeof personEventSchema>;
 export type TagCreateInput = z.infer<typeof tagCreateSchema>;
 export type TagUpdateInput = z.infer<typeof tagUpdateSchema>;
+export type ThreadCreateInput = z.infer<typeof threadCreateSchema>;
+export type ThreadUpdateInput = z.infer<typeof threadUpdateSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
 export type AiSuggestionsRequestInput = z.infer<typeof aiSuggestionsRequestSchema>;

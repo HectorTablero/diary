@@ -1,12 +1,21 @@
 import type { EntryNode } from '@diary/shared';
 import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
-import { ChevronRight, CornerDownRight, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import {
+  ChevronRight,
+  CornerDownRight,
+  GitBranch,
+  GripVertical,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useDeleteEntry } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
-import { PersonChip, TagChip } from '@/components/entry/chips';
+import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
+import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
 import { EntryComposer } from '@/components/entry/EntryComposer';
 import { EntryContent } from '@/components/entry/EntryContent';
 import { ImportanceDot } from '@/components/entry/ImportanceDot';
@@ -50,6 +59,7 @@ export function EntryItem({
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [addingSub, setAddingSub] = useState(false);
+  const [threading, setThreading] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteEntry = useDeleteEntry();
   const row = useSortableTreeRow(entry.id);
@@ -116,10 +126,15 @@ export function EntryItem({
         <ImportanceDot importance={entry.importance} className="mt-2" />
         <div className="min-w-0 flex-1">
           <EntryContent entry={entry} />
-          {(chipTags.length > 0 || chipPeople.length > 0) && (
+          {(chipTags.length > 0 || chipPeople.length > 0 || entry.threads.length > 0) && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {chipTags.map((tag) => (
                 <TagChip key={tag.id} tag={tag} />
+              ))}
+              {/* Always shown, unlike tags and people: a thread is never a token in the text, so
+                  there's no inline copy for a chip to duplicate. */}
+              {entry.threads.map((thread) => (
+                <ThreadChip key={thread.id} thread={thread} />
               ))}
               {chipPeople.map((person) => (
                 <PersonChip key={person.id} person={person} />
@@ -154,6 +169,9 @@ export function EntryItem({
                   <CornerDownRight className="size-3.5" /> {t('diary.addSubEntry')}
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={() => setThreading(true)}>
+                <GitBranch className="size-3.5" /> {t('threads.addToThread')}
+              </DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
                 <Trash2 className="size-3.5" /> {t('common.delete')}
               </DropdownMenuItem>
@@ -169,6 +187,8 @@ export function EntryItem({
           ))}
         </div>
       )}
+
+      <AddToThreadDialog entry={entry} open={threading} onOpenChange={setThreading} />
 
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="sm:max-w-lg">

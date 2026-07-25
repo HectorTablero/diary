@@ -1,11 +1,21 @@
 import type { TalkingPointNode } from '@diary/shared';
 import { subtreeHasMatch } from '@diary/shared';
-import { AtSign, Check, ChevronRight, EyeOff, Megaphone, MoreHorizontal, Tag as TagIcon } from 'lucide-react';
+import {
+  AtSign,
+  Check,
+  ChevronRight,
+  EyeOff,
+  GitBranch,
+  Megaphone,
+  MoreHorizontal,
+  Tag as TagIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useSetHidden, useSetSaid } from '@/api/hooks';
 import { EntryRow } from '@/components/person/EntryRow';
+import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +53,7 @@ export function TalkingPointItem({
 }: TalkingPointItemProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [threading, setThreading] = useState(false);
   const setSaid = useSetSaid();
   const setHidden = useSetHidden();
 
@@ -119,6 +130,11 @@ export function TalkingPointItem({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {/* Right where you notice this is one of several entries about the same topic. */}
+                  <DropdownMenuItem onClick={() => setThreading(true)}>
+                    <GitBranch className="size-3.5" />
+                    {t('threads.addToThread')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={hide}>
                     <EyeOff className="size-3.5" />
                     {t('people.hideForPerson', { name: personName })}
@@ -129,6 +145,8 @@ export function TalkingPointItem({
           )}
         </EntryRow>
       </div>
+
+      <AddToThreadDialog entry={node} open={threading} onOpenChange={setThreading} />
 
       {(forced.length > 0 || rest.length > 0) && (
         <ul className="mt-1 ml-5 border-l border-border/70 pl-1.5">

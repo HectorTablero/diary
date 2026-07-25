@@ -18,6 +18,8 @@ const entrySchema = new Schema(
     // 1 = highest importance, 5 = lowest (matches the original app).
     importance: { type: Number, required: true, min: 1, max: 5, default: 3 },
     tags: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
+    /** Ongoing topics this entry is part of. No bearing on matching — organisational only. */
+    threads: [{ type: Schema.Types.ObjectId, ref: 'Thread' }],
     /** Direct mentions. */
     people: [{ type: Schema.Types.ObjectId, ref: 'Person' }],
     /** People this entry has been told to (auto-filled from mentions on create), with the date. */
@@ -39,6 +41,7 @@ entrySchema.index({ userId: 1, dateKey: -1 });
 entrySchema.index({ userId: 1, parentId: 1 });
 entrySchema.index({ userId: 1, people: 1 });
 entrySchema.index({ userId: 1, tags: 1 });
+entrySchema.index({ userId: 1, threads: 1 });
 // No stemming ("none"): entries mix Spanish and English.
 entrySchema.index({ content: 'text' }, { default_language: 'none' });
 

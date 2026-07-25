@@ -1,4 +1,12 @@
-import type { EntryDto, PersonDto, PersonEventDto, PersonRefDto, SaidMark, TagDto } from '@diary/shared';
+import type {
+  EntryDto,
+  PersonDto,
+  PersonEventDto,
+  PersonRefDto,
+  SaidMark,
+  TagDto,
+  ThreadDto,
+} from '@diary/shared';
 import { Types } from 'mongoose';
 import type { PopulateOptions } from 'mongoose';
 
@@ -14,6 +22,13 @@ export interface LeanTag {
   _id: Types.ObjectId;
   name: string;
   color: string;
+}
+
+export interface LeanThread {
+  _id: Types.ObjectId;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface LeanPersonEvent {
@@ -68,6 +83,8 @@ export interface LeanEntry {
   dateKey: string;
   importance: number;
   tags: LeanTag[];
+  /** Absent on documents created before threads existed — hence the `?? []` in entryToDto. */
+  threads?: LeanThread[];
   people: { _id: Types.ObjectId; name: string }[];
   saidTo: LeanSaidMark[];
   hiddenFor: LeanRef[];
@@ -82,6 +99,13 @@ export const tagToDto = (tag: LeanTag): TagDto => ({
   id: tag._id.toString(),
   name: tag.name,
   color: tag.color,
+});
+
+export const threadToDto = (thread: LeanThread): ThreadDto => ({
+  id: thread._id.toString(),
+  name: thread.name,
+  createdAt: thread.createdAt.toISOString(),
+  updatedAt: thread.updatedAt.toISOString(),
 });
 
 export const personRefToDto = (person: { _id: Types.ObjectId; name: string }): PersonRefDto => ({
@@ -119,6 +143,7 @@ export const entryToDto = (entry: LeanEntry): EntryDto => ({
   dateKey: entry.dateKey,
   importance: entry.importance,
   tags: entry.tags.map(tagToDto),
+  threads: (entry.threads ?? []).map(threadToDto),
   people: entry.people.map(personRefToDto),
   saidTo: entry.saidTo.map(saidMarkToDto),
   hiddenFor: entry.hiddenFor.map(refId),
@@ -132,5 +157,7 @@ export const entryToDto = (entry: LeanEntry): EntryDto => ({
 
 export const ENTRY_POPULATE: PopulateOptions[] = [
   { path: 'tags', select: 'name color' },
+  // createdAt/updatedAt come along because ThreadDto carries them (the threads page sorts by them).
+  { path: 'threads', select: 'name createdAt updatedAt' },
   { path: 'people', select: 'name' },
 ];

@@ -7,6 +7,7 @@ import { recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
+import { Thread } from '../models/thread';
 import { ENTRY_POPULATE, entryToDto, type LeanEntry } from '../dto';
 
 const toObjectIds = (ids: string[]) => ids.map((id) => new Types.ObjectId(id));
@@ -16,6 +17,12 @@ async function ownedTagIds(userId: string, ids: string[]) {
   if (!ids.length) return [];
   const tags = await Tag.find({ userId, _id: { $in: toObjectIds(ids) } }, '_id').lean();
   return tags.map((t) => t._id);
+}
+
+async function ownedThreadIds(userId: string, ids: string[]) {
+  if (!ids.length) return [];
+  const threads = await Thread.find({ userId, _id: { $in: toObjectIds(ids) } }, '_id').lean();
+  return threads.map((t) => t._id);
 }
 
 async function ownedPersonIds(userId: string, ids: string[]) {
@@ -147,6 +154,7 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
         dateKey: input.dateKey,
         importance: input.importance,
         tags: await ownedTagIds(userId, input.tags),
+        threads: await ownedThreadIds(userId, input.threads),
         people,
         saidTo: saidToIds.map((person) => ({ person, at: providedAt.get(person.toString()) ?? now })),
         parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
@@ -186,6 +194,7 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
   if (input.dateKey !== undefined) entry.dateKey = input.dateKey;
   if (input.importance !== undefined) entry.importance = input.importance;
   if (input.tags !== undefined) entry.tags = await ownedTagIds(userId, input.tags);
+  if (input.threads !== undefined) entry.threads = await ownedThreadIds(userId, input.threads);
   // Editing mentions intentionally does NOT touch saidTo (independently editable).
   if (input.people !== undefined) entry.people = await ownedPersonIds(userId, input.people);
 

@@ -1,8 +1,8 @@
-import type { PersonDto, TagDto } from '@diary/shared';
+import type { PersonDto, TagDto, ThreadDto } from '@diary/shared';
 import { isContained } from '../conflicts';
 import { toE164 } from '../phone';
 import { fuzzyEquals } from '../tokens';
-import type { EntryBackupRow, PersonBackupRow, TagBackupRow } from './schema';
+import type { EntryBackupRow, PersonBackupRow, TagBackupRow, ThreadBackupRow } from './schema';
 
 /* Conflict detection for restoring a JSON backup. Deliberately kept separate from
    lib/conflicts.ts (built for the device-contacts import) rather than extending it: a backup row
@@ -59,6 +59,55 @@ export function defaultTagResolution(matches: TagConflictMatch[] | undefined): B
 }
 
 export const isTagHardConflict = (matches: TagConflictMatch[]): boolean =>
+  matches.some((m) => m.kind === 'nameDuplicate');
+
+// --- Threads ---
+
+/* Threads collide on exactly the same two things tags do (their own id, or a name the unique
+   index would reject), so the shapes and the default rule are deliberately identical. Kept as
+   separate functions rather than a generic over both: the two lists are reviewed independently
+   in the import UI, and a future thread-only conflict kind shouldn't have to widen tags. */
+
+export type ThreadConflictKind = 'idExists' | 'nameDuplicate';
+
+export interface ThreadConflictMatch {
+  kind: ThreadConflictKind;
+  targetId: string;
+  name: string;
+}
+
+export function detectThreadConflicts(
+  rows: ThreadBackupRow[],
+  existing: ThreadDto[],
+): Map<string, ThreadConflictMatch[]> {
+  const result = new Map<string, ThreadConflictMatch[]>();
+  const byId = new Map(existing.map((thread) => [thread.id, thread]));
+
+  for (const row of rows) {
+    const matches: ThreadConflictMatch[] = [];
+    const sameId = byId.get(row.id);
+    if (sameId) {
+      matches.push({ kind: 'idExists', targetId: sameId.id, name: sameId.name });
+    } else {
+      const clash = existing.find((thread) => fuzzyEquals(thread.name, row.name));
+      if (clash) matches.push({ kind: 'nameDuplicate', targetId: clash.id, name: clash.name });
+    }
+    if (matches.length) result.set(row.id, matches);
+  }
+  return result;
+}
+
+/** Same rule as tags: an id that's already there merges into itself, a name clash needs a choice. */
+export function defaultThreadResolution(
+  matches: ThreadConflictMatch[] | undefined,
+): BackupResolution | null {
+  if (!matches?.length) return { action: 'create' };
+  const idExists = matches.find((m) => m.kind === 'idExists');
+  if (idExists) return { action: 'merge', targetId: idExists.targetId };
+  return null;
+}
+
+export const isThreadHardConflict = (matches: ThreadConflictMatch[]): boolean =>
   matches.some((m) => m.kind === 'nameDuplicate');
 
 // --- People ---

@@ -11,6 +11,26 @@ export interface TagWithStats extends TagDto {
   personCount: number;
 }
 
+/**
+ * A named, cross-day grouping of entries about one ongoing topic — a research project, a
+ * house move. Deliberately *not* a tag: threads never take part in person matching or
+ * broadcasting (see matchTypeFor), they exist purely so related entries can be read, and
+ * caught someone up on, as one unit.
+ */
+export interface ThreadDto {
+  id: string;
+  name: string;
+  /* No colour, deliberately, unlike TagDto: a thread is identified by its name and its icon. The
+     app's palette is greyscale, so a per-thread colour could only be shown as coloured text or a
+     tinted border — both of which read at poor contrast against a card in at least one theme. */
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ThreadWithStats extends ThreadDto {
+  entryCount: number;
+}
+
 export interface PersonRefDto {
   id: string;
   name: string;
@@ -78,6 +98,8 @@ export interface EntryDto {
   importance: number;
   tags: TagDto[];
   people: PersonRefDto[];
+  /** Ongoing topics this entry is part of. Purely organisational — no effect on matching. */
+  threads: ThreadDto[];
   /** People this entry has been marked as said to, with the date it happened. */
   saidTo: SaidMark[];
   /** Person ids this entry is hidden for (never a talking point). */
@@ -105,6 +127,25 @@ export interface TalkingPointNode extends EntryDto {
 export interface TalkingPointsResponse {
   active: TalkingPointNode[];
   said: EntryDto[];
+}
+
+/**
+ * One row of the person profile's Talking Points tab: either a thread with every one of its
+ * live clusters gathered under it, or (when `thread` is null) a single ungrouped cluster.
+ * Built by groupTalkingPointsByThread.
+ */
+export interface TalkingPointGroup {
+  /** `null` for an ungrouped cluster, which is rendered exactly as it was before threads. */
+  thread: ThreadDto | null;
+  clusters: TalkingPointNode[];
+  /**
+   * Exactly the entry ids a single "mark all as said" writes: nodes that match this person on
+   * their own merits *and* belong to this thread. Members that have decayed away, are already
+   * said, or are hidden for this person are absent — which is what keeps a bulk mark honest.
+   */
+  markableIds: string[];
+  /** Best score among the group's matching nodes; groups are ordered by it, descending. */
+  score: number;
 }
 
 export interface CalendarDay {
@@ -173,7 +214,7 @@ export interface ApiError {
   error: string;
 }
 
-export type SyncCollection = 'entry' | 'person' | 'tag';
+export type SyncCollection = 'entry' | 'person' | 'tag' | 'thread';
 
 export interface SyncDeletion {
   coll: SyncCollection;
@@ -187,6 +228,7 @@ export interface SyncResponse {
   entries: EntryDto[];
   people: PersonDto[];
   tags: TagDto[];
+  threads: ThreadDto[];
   settings: SettingsDto;
   deletions: SyncDeletion[];
 }

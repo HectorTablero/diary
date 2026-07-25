@@ -2,9 +2,14 @@ import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { describe, expect, it } from 'vitest';
 
-/* The v1 -> v2 upgrade runs once on every existing install, against real diaries. If it left the
-   new fields undefined, reads like `person.aliases.map(...)` would throw on any person who
-   existed before the contact metadata landed. */
+/* The upgrades run once on every existing install, against real diaries. If one left its new
+   fields undefined, reads like `person.aliases.map(...)` or `entry.threadIds.includes(...)` would
+   throw on any row that predates the field.
+
+   All of it is asserted from a single v1 open, because that's the only shape the fake-indexeddb
+   database can take here: `db` is a module-level singleton on a fixed name, so once one test has
+   migrated it to the current version, no later test in this file can stage an older one. One
+   install, one upgrade run, every assertion — which is also exactly what happens in production. */
 
 const V1_SCHEMA = {
   entries: 'id, dateKey, parentId, *tagIds, *peopleIds',
@@ -14,8 +19,8 @@ const V1_SCHEMA = {
   meta: 'key',
 };
 
-describe('people store upgrade', () => {
-  it('backfills contact metadata and events, and heals legacy birthdays, from v1', async () => {
+describe('schema upgrades from v1', () => {
+  it('backfills every field added since, and heals legacy birthdays', async () => {
     // An existing install: v1 schema, a person with none of the fields added since.
     const v1 = new Dexie('diary');
     v1.version(1).stores(V1_SCHEMA);
@@ -41,9 +46,23 @@ describe('people store upgrade', () => {
       lastCheckupAt: '2026-01-01T00:00:00.000Z',
       createdAt: '2026-01-01T00:00:00.000Z',
     });
+    // An entry from before threads existed (v4).
+    await v1.table('entries').add({
+      id: 'e1',
+      content: 'reran the benchmark',
+      dateKey: '2026-07-20',
+      importance: 3,
+      tagIds: [],
+      peopleIds: [],
+      saidTo: [],
+      hiddenFor: [],
+      parentId: null,
+      createdAt: '2026-07-20T09:00:00.000Z',
+      updatedAt: '2026-07-20T09:00:00.000Z',
+    });
     v1.close();
 
-    // Re-opening through the app's schema triggers the upgrade.
+    // Re-opening through the app's schema triggers every upgrade in turn.
     const { db } = await import('./db');
     await db.open();
     const person = await db.people.get('p1');
@@ -71,10 +90,20 @@ describe('people store upgrade', () => {
     expect(carmen?.birthday).toBe('--10-10');
     expect(carmen?.events).toEqual([]);
 
-    // The new alias index must be queryable, or @mention lookups silently return nothing.
+    // v4: an entry left with `threadIds: undefined` would throw on every talking-point scan.
+    const entry = await db.entries.get('e1');
+    expect(entry?.threadIds).toEqual([]);
+    expect(entry?.content).toBe('reran the benchmark');
+
+    // The new indexes must be queryable, or the lookups built on them silently return nothing:
+    // `aliases` backs @mention autocomplete, `threadIds` backs getThreadEntries and deleteThread.
     await db.people.update('p1', { aliases: ['Ire'] });
     const byAlias = await db.people.where('aliases').equals('Ire').toArray();
     expect(byAlias.map((p) => p.id)).toEqual(['p1']);
+
+    await db.entries.update('e1', { threadIds: ['t1'] });
+    const byThread = await db.entries.where('threadIds').equals('t1').toArray();
+    expect(byThread.map((e) => e.id)).toEqual(['e1']);
 
     db.close();
   });
