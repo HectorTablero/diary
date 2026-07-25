@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Command,
@@ -45,6 +45,8 @@ export function EntityPicker({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [dialogContainer, setDialogContainer] = useState<HTMLElement | null>(null);
   const selected = new Set(selectedIds);
   const canCreate =
     onCreate &&
@@ -52,9 +54,25 @@ export function EntityPicker({
     !items.some((i) => i.label.toLowerCase() === query.trim().toLowerCase());
 
   return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQuery(''); }}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent className={cn('w-56 p-0', contentClassName)} align="start">
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          // Portal into the enclosing Dialog (if any) so this stays scrollable
+          // under Radix's Dialog scroll-lock — see PopoverContent's `container` doc.
+          setDialogContainer(triggerRef.current?.closest<HTMLElement>('[role="dialog"]') ?? null);
+        } else {
+          setQuery('');
+        }
+      }}
+    >
+      <PopoverTrigger asChild ref={triggerRef}>{trigger}</PopoverTrigger>
+      <PopoverContent
+        container={dialogContainer}
+        className={cn('w-56 p-0', contentClassName)}
+        align="start"
+      >
         <Command>
           <CommandInput placeholder={placeholder} value={query} onValueChange={setQuery} />
           <CommandList>
