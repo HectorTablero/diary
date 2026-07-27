@@ -27,7 +27,17 @@ interface TagRef {
   name: string;
 }
 
-// --- Tool schema (inlined to exactly MAX_SUB_ENTRY_DEPTH levels — no $ref/$defs, unreliable on Groq) ---
+// --- Tool schema (inlined to exactly the remaining depth — no $ref/$defs, unreliable on Groq) ---
+
+/**
+ * How many levels of `children` the model may still nest, given the depth the suggested roots
+ * will be created at. A top-level recording gets the full MAX_SUB_ENTRY_DEPTH; a recording made
+ * from an entry's ⋯ menu spends one level per ancestor, so an entry already at the deepest
+ * allowed level yields 0 and the model is handed a schema with no `children` at all.
+ */
+function availableDepthFor(parentPath: string[]): number {
+  return Math.max(0, MAX_SUB_ENTRY_DEPTH - parentPath.length);
+}
 
 function buildEntryNodeSchema(remainingDepth: number): Record<string, unknown> {
   return {
@@ -46,36 +56,39 @@ function buildEntryNodeSchema(remainingDepth: number): Record<string, unknown> {
   };
 }
 
-const ENTRY_NODE_JSON_SCHEMA = buildEntryNodeSchema(MAX_SUB_ENTRY_DEPTH);
+const QUERY_PEOPLE_TOOL = {
+  type: 'function',
+  function: {
+    name: 'query_people',
+    description:
+      'Search the user\'s saved people by name (fuzzy, typo-tolerant). Always call this before writing "@Name" for a person who might already be saved, so you can use their id and exact canonical name.',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Name or partial name to search for' } },
+      required: ['query'],
+    },
+  },
+} as const;
 
-const TOOLS = [
-  {
-    type: 'function',
-    function: {
-      name: 'query_people',
-      description:
-        'Search the user\'s saved people by name (fuzzy, typo-tolerant). Always call this before writing "@Name" for a person who might already be saved, so you can use their id and exact canonical name.',
-      parameters: {
-        type: 'object',
-        properties: { query: { type: 'string', description: 'Name or partial name to search for' } },
-        required: ['query'],
+/** Built per request: the nesting budget baked into the schema depends on where the entries land. */
+function buildTools(availableDepth: number): unknown[] {
+  return [
+    QUERY_PEOPLE_TOOL,
+    {
+      type: 'function',
+      function: {
+        name: 'submit_entries',
+        description:
+          'REQUIRED final step. Submit the extracted diary entries. Call this exactly once when done, with an empty list if nothing extractable was found.',
+        parameters: {
+          type: 'object',
+          properties: { entries: { type: 'array', items: buildEntryNodeSchema(availableDepth) } },
+          required: ['entries'],
+        },
       },
     },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'submit_entries',
-      description:
-        'REQUIRED final step. Submit the extracted diary entries. Call this exactly once when done, with an empty list if nothing extractable was found.',
-      parameters: {
-        type: 'object',
-        properties: { entries: { type: 'array', items: ENTRY_NODE_JSON_SCHEMA } },
-        required: ['entries'],
-      },
-    },
-  },
-] as const;
+  ];
+}
 
 // --- Lenient zod parsing of the model's submit_entries arguments ---
 
@@ -98,9 +111,8 @@ function nodeSchemaAtDepth(remainingDepth: number): z.ZodType<SuggestedEntryNode
   });
 }
 
-const submitEntriesArgsSchema = z.object({
-  entries: z.array(nodeSchemaAtDepth(MAX_SUB_ENTRY_DEPTH)).catch([]),
-});
+const buildSubmitEntriesArgsSchema = (availableDepth: number) =>
+  z.object({ entries: z.array(nodeSchemaAtDepth(availableDepth)).catch([]) });
 
 // --- Sanitization: never trust the model's ids, depth, or lengths ---
 
@@ -129,8 +141,13 @@ interface SanitizeCtx {
   remainingNodes: number;
 }
 
-function sanitizeNodes(nodes: SuggestedEntryNode[], depth: number, ctx: SanitizeCtx): SuggestedEntryNode[] {
-  if (depth > MAX_SUB_ENTRY_DEPTH) return [];
+/** `remainingDepth` counts levels the returned nodes may still nest, so it lines up exactly with
+    the budget baked into the tool schema — the model can never talk us past the tree's max depth. */
+function sanitizeNodes(
+  nodes: SuggestedEntryNode[],
+  remainingDepth: number,
+  ctx: SanitizeCtx,
+): SuggestedEntryNode[] {
   const result: SuggestedEntryNode[] = [];
   for (const node of nodes) {
     if (ctx.remainingNodes <= 0) break;
@@ -144,7 +161,7 @@ function sanitizeNodes(nodes: SuggestedEntryNode[], depth: number, ctx: Sanitize
 
     ctx.remainingNodes -= 1;
     const children =
-      depth < MAX_SUB_ENTRY_DEPTH ? sanitizeNodes(node.children, depth + 1, ctx) : [];
+      remainingDepth > 0 ? sanitizeNodes(node.children, remainingDepth - 1, ctx) : [];
     result.push({ content, importance: clampImportance(node.importance), tags, people, children });
   }
   return result;
@@ -152,10 +169,43 @@ function sanitizeNodes(nodes: SuggestedEntryNode[], depth: number, ctx: Sanitize
 
 // --- System prompt ---
 
-function buildSystemPrompt(tags: TagRef[], dateKey: string, language: string, forceEnglishAIEvents: boolean): string {
+/**
+ * The placement section, present only when the recording was started from an existing entry's
+ * ⋯ menu. It states the ancestor chain verbatim so the model knows what its output is elaborating
+ * on, and states the remaining nesting budget in the same terms as the tool schema it was given.
+ */
+function buildPlacementSection(parentPath: string[], availableDepth: number): string {
+  if (!parentPath.length) return '';
+  const chain = parentPath.map((content, i) => `${'  '.repeat(i)}- level ${i}: "${content}"`).join('\n');
+  const target = parentPath.length - 1;
+  return `
+### 0. Where These Entries Go
+This recording does NOT start a new topic. It adds detail to an entry that already exists in the diary, nested here:
+${chain}
+
+Everything you submit becomes a direct child of the level ${target} entry, at level ${parentPath.length}. That means:
+- The parent entries above are already written and already on screen. Do not restate, summarise or re-file them — start from the detail the transcript adds to them.
+- Read the transcript as a continuation of that entry: pronouns and bare references ("it", "the second one", "there") point at the chain above, so resolve them against it.
+- ${
+    availableDepth === 0
+      ? 'You are at the deepest level this diary allows, so every entry you submit MUST have "children": []. Anything that reads like a sub-detail becomes its own entry in the list instead.'
+      : `You have ${availableDepth} nesting level${availableDepth === 1 ? '' : 's'} left below the entries you submit.`
+  }
+`;
+}
+
+function buildSystemPrompt(
+  tags: TagRef[],
+  dateKey: string,
+  language: string,
+  forceEnglishAIEvents: boolean,
+  parentPath: string[],
+  availableDepth: number,
+): string {
   const today = new Date().toISOString().slice(0, 10);
   const tagLines = tags.length ? tags.map((t) => `${t.id}: ${t.name}`).join('\n') : '(no tags exist yet)';
   return `You extract diary bullet points from a voice transcript recorded by the user.
+${buildPlacementSection(parentPath, availableDepth)}
 
 Take your time and prioritize correctness over speed. Reason carefully about the transcript before using tools or submitting the final result.
 
@@ -163,8 +213,13 @@ Take your time and prioritize correctness over speed. Reason carefully about the
 - The entries you submit are always filed under the date ${dateKey} (today is ${today}). Use any relative dates mentioned ("yesterday", "last week") ONLY to understand context, never to change where the entry is filed.
 - ${forceEnglishAIEvents ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").` : `Write every "content" field in the same language as the transcript (app language hint: "${language}").`}
 - Split the transcript into concise, first-person diary bullet points. Capture every distinct action, fact, or event mentioned in the transcript. Never omit details, minor tasks, or routine activities just to keep the summary short.
-- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under the parent event. You may nest entries up to ${MAX_SUB_ENTRY_DEPTH} levels deep below the top-level parent to create a clean, hierarchical summary.
-- DO NOT group unrelated events or projects together. Also do not invent general parent events just to hold children ("Had a very productive day", "Had many social outings", "Had a varied day"); only create a parent entry if the transcript explicitly describes a main event that has sub-details.
+${
+    availableDepth === 0
+      ? `- Submit a flat list: every entry MUST have "children": []. Where you would normally nest a detail under an event, submit both as separate entries in order instead, with the detail written so it still stands on its own.`
+      : `- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under that event. You may nest up to ${availableDepth} level${availableDepth === 1 ? '' : 's'} below each entry you submit.`
+  }
+- Every parent entry must be an event the transcript itself states, in the user's own words. Before writing a parent, find the phrase in the transcript it comes from; if there is no such phrase, its children are separate entries side by side, not a group. An entry that describes the day as a whole rather than a specific event always fails this check — the diary already knows the date.
+- One entry covers exactly one event, project or topic. A detail belongs under a parent only when it is a detail of that specific event. Two things that merely happened on the same day, are the same kind of activity, or involve the same person still stay separate: shared subject matter is not a parent.
 - Never invent facts that are not in the transcript. If the transcript is ambiguous, prefer a conservative interpretation.
 
 ### 2. Importance Scale (1 = highest ... 5 = lowest)
@@ -247,10 +302,13 @@ export async function generateSuggestions(
   transcript: string,
   dateKey: string,
   language: string,
+  /** Ancestor entry contents, outermost first; empty for a normal top-level recording. */
+  parentPath: string[] = [],
 ): Promise<SuggestedEntryNode[]> {
   const settings = await getSettings(userId);
   const provider = pickProvider(settings);
   const aiLanguage = settings.forceEnglishAIEvents ? 'en' : language;
+  const availableDepth = availableDepthFor(parentPath);
 
   const [tagDocs, personDocs] = await Promise.all([
     Tag.find({ userId }, 'name').lean(),
@@ -273,10 +331,21 @@ export async function generateSuggestions(
   const ownedPersonIds = new Set(searchablePeople.map((p) => p.id));
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(tags, dateKey, aiLanguage, settings.forceEnglishAIEvents) },
+    {
+      role: 'system',
+      content: buildSystemPrompt(
+        tags,
+        dateKey,
+        aiLanguage,
+        settings.forceEnglishAIEvents,
+        parentPath,
+        availableDepth,
+      ),
+    },
     { role: 'user', content: transcript },
   ];
 
+  const tools = buildTools(availableDepth);
   let reminders = 0;
   for (let i = 0; i < AI_MAX_TOOL_ITERATIONS; i++) {
     const res = await chatCompletion(
@@ -285,7 +354,7 @@ export async function generateSuggestions(
       {
         model: provider.model,
         messages,
-        tools: TOOLS as unknown as unknown[],
+        tools,
         tool_choice: 'auto',
         temperature: 0.2,
         max_tokens: 4096,
@@ -308,8 +377,8 @@ export async function generateSuggestions(
             messages.push({ role: 'tool', tool_call_id: call.id, content: 'error: invalid JSON arguments' });
             continue;
           }
-          const parsed = submitEntriesArgsSchema.parse(args);
-          return sanitizeNodes(parsed.entries, 1, {
+          const parsed = buildSubmitEntriesArgsSchema(availableDepth).parse(args);
+          return sanitizeNodes(parsed.entries, availableDepth, {
             ownedTagIds,
             ownedPersonIds,
             tags,

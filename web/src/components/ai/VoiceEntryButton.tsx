@@ -1,78 +1,28 @@
-import type { SuggestedEntryNode } from '@diary/shared';
 import { Mic, Square, X } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { useAiSuggestions, useSettings } from '@/api/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
-import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
-import { ApiError } from '@/lib/apiClient';
-import { transcribeAudio } from '@/lib/groq';
+import { useVoiceToSuggestions } from '@/hooks/useVoiceToSuggestions';
 import { cn } from '@/lib/utils';
 import { SuggestionReviewDialog } from './SuggestionReviewDialog';
 
-type Phase = 'idle' | 'transcribing' | 'thinking';
-
-/** Mic button in the entry composer: record → transcribe with Groq Whisper (the
-    user's own key) → ask the server to turn the transcript into entry suggestions
-    → let the user review them before anything is actually created. `disabled` covers the
-    "no live session" case — the suggestions call always needs a real authenticated request. */
+/** Mic button in the entry composer: records a take and hands the resulting suggestions to the
+    review dialog (see useVoiceToSuggestions for the pipeline itself). Always top-level — the
+    sub-entry flavour lives in VoiceSubEntryDialog, reached from an entry's ⋯ menu. `disabled`
+    covers the "no live session" case: the suggestions call always needs a real authenticated
+    request. */
 export function VoiceEntryButton({ dateKey, disabled = false }: { dateKey: string; disabled?: boolean }) {
-  const { t, i18n } = useTranslation();
-  const { data: settings } = useSettings();
-  const aiSuggestions = useAiSuggestions();
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [suggestions, setSuggestions] = useState<SuggestedEntryNode[] | null>(null);
+  const { t } = useTranslation();
+  const { phase, recorder, start, suggestions, clearSuggestions } = useVoiceToSuggestions({ dateKey });
 
-  const handleStop = async (blob: Blob | null) => {
-    const apiKey = settings?.groqApiKey?.trim();
-    if (!blob || !apiKey) {
-      setPhase('idle');
-      return;
-    }
-    setPhase('transcribing');
-    try {
-      const transcript = await transcribeAudio(apiKey, blob);
-      if (!transcript) {
-        toast.error(t('ai.empty'));
-        setPhase('idle');
-        return;
-      }
-      setPhase('thinking');
-      const { entries } = await aiSuggestions.mutateAsync({
-        transcript,
-        dateKey,
-        language: i18n.language.startsWith('en') ? 'en' : 'es',
-      });
-      if (!entries.length) {
-        toast.error(t('ai.empty'));
-        setPhase('idle');
-        return;
-      }
-      setSuggestions(entries);
-      setPhase('idle');
-    } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
-      setPhase('idle');
-    }
-  };
-
-  const recorder = useVoiceRecorder({ onStop: (blob) => void handleStop(blob) });
-
-  const startRecording = async () => {
+  const startRecording = () => {
     if (disabled) {
       toast.info(t('ai.signInRequiredForVoice'));
       return;
     }
-    try {
-      await recorder.start();
-    } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
-    }
+    void start();
   };
-
-  const cancelRecording = () => recorder.cancel();
 
   if (phase !== 'idle') {
     return (
@@ -93,7 +43,7 @@ export function VoiceEntryButton({ dateKey, disabled = false }: { dateKey: strin
           variant="ghost"
           size="icon"
           className="size-8 shrink-0 text-muted-foreground"
-          onClick={cancelRecording}
+          onClick={() => recorder.cancel()}
           aria-label={t('ai.cancelRecording')}
         >
           <X className="size-4" />
@@ -122,7 +72,7 @@ export function VoiceEntryButton({ dateKey, disabled = false }: { dateKey: strin
         variant="ghost"
         size="icon"
         className={cn('size-8 shrink-0 text-muted-foreground', disabled && 'opacity-50')}
-        onClick={() => void startRecording()}
+        onClick={startRecording}
         aria-label={t('ai.record')}
       >
         <Mic className="size-4" />
@@ -132,7 +82,7 @@ export function VoiceEntryButton({ dateKey, disabled = false }: { dateKey: strin
         entries={suggestions ?? []}
         dateKey={dateKey}
         onOpenChange={(open) => {
-          if (!open) setSuggestions(null);
+          if (!open) clearSuggestions();
         }}
       />
     </>

@@ -5,6 +5,7 @@ import {
   CornerDownRight,
   GitBranch,
   GripVertical,
+  Mic,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -13,6 +14,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useDeleteEntry } from '@/api/hooks';
+import { VoiceSubEntryDialog } from '@/components/ai/VoiceSubEntryDialog';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
 import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
@@ -47,6 +49,8 @@ export function EntryItem({
   entry,
   depth = 0,
   flat = false,
+  ancestors = [],
+  voiceEnabled = false,
 }: {
   entry: EntryNode;
   depth?: number;
@@ -54,11 +58,19 @@ export function EntryItem({
       nesting, and non-interactive — used only while a drag is in progress (see
       SortableTreeProvider's renderRow). */
   flat?: boolean;
+  /** Contents of this entry's ancestors, outermost first. Threaded down the recursion rather than
+      looked up, because the voice sub-entry flow sends the whole chain to the model as context and
+      the tree is the only place that knows it. */
+  ancestors?: string[];
+  /** Whether the ⋯ menu offers voice capture: resolved once in EntryTree so a row doesn't have to
+      subscribe to settings/session/sync status just to decide whether to show one menu item. */
+  voiceEnabled?: boolean;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [addingSub, setAddingSub] = useState(false);
+  const [recordingSub, setRecordingSub] = useState(false);
   const [threading, setThreading] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteEntry = useDeleteEntry();
@@ -169,6 +181,11 @@ export function EntryItem({
                   <CornerDownRight className="size-3.5" /> {t('diary.addSubEntry')}
                 </DropdownMenuItem>
               )}
+              {canAddSub && voiceEnabled && (
+                <DropdownMenuItem onClick={() => setRecordingSub(true)}>
+                  <Mic className="size-3.5" /> {t('ai.recordSubEntries')}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setThreading(true)}>
                 <GitBranch className="size-3.5" /> {t('threads.addToThread')}
               </DropdownMenuItem>
@@ -183,12 +200,28 @@ export function EntryItem({
       {!flat && expanded && entry.children.length > 0 && (
         <div className="ml-5 border-l border-border/70 pl-1.5">
           {entry.children.map((child) => (
-            <EntryItem key={child.id} entry={child} depth={depth + 1} />
+            <EntryItem
+              key={child.id}
+              entry={child}
+              depth={depth + 1}
+              ancestors={[...ancestors, entry.content]}
+              voiceEnabled={voiceEnabled}
+            />
           ))}
         </div>
       )}
 
       <AddToThreadDialog entry={entry} open={threading} onOpenChange={setThreading} />
+
+      {recordingSub && (
+        <VoiceSubEntryDialog
+          open={recordingSub}
+          onOpenChange={setRecordingSub}
+          dateKey={entry.dateKey}
+          parentId={entry.id}
+          parentPath={[...ancestors, entry.content]}
+        />
+      )}
 
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="sm:max-w-lg">
