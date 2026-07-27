@@ -196,7 +196,15 @@ export function EntryItem({
                   </DropdownMenuItem>
                   {voiceEnabled && (
                     <>
-                      <Separator orientation="vertical" className="mx-1 h-5 self-center" />
+                      {/* The centring has to be written with the same `data-vertical:` variant the
+                          Separator sets `self-stretch` with. A bare `self-center` survives
+                          tailwind-merge as a *second* rule and then loses on specificity to the
+                          attribute selector — leaving align-self: stretch, which a definite `h-5`
+                          turns into flex-start, pinning the bar to the top of the row. */}
+                      <Separator
+                        orientation="vertical"
+                        className="mx-1 h-5 data-vertical:self-center"
+                      />
                       <DropdownMenuItem
                         className="justify-center px-2 py-1.5"
                         onClick={() => setRecordingSub(true)}
