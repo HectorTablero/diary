@@ -9,6 +9,7 @@ import { Toaster } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { initSync, onReconnected, onSyncApplied } from './db/sync';
 import { initAuthToken } from './lib/authToken';
+import { initBackgroundSync } from './lib/backgroundSync';
 import { initGlobalHaptics } from './lib/haptics';
 import { initLiveUpdate } from './lib/liveUpdate';
 import { isNative } from './lib/native';
@@ -69,6 +70,10 @@ onReconnected(() => toast.success(i18n.t('sync.reconnected')));
 async function bootstrap() {
   // The bearer token must be in memory before anything talks to the API.
   await initAuthToken();
+  // Registered before the first render, and only after the token is loaded: Android can launch the
+  // app directly into a background-fetch event, so the handler has to exist — and be able to
+  // authenticate — by the time anything else runs.
+  void initBackgroundSync();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <ErrorBoundary>

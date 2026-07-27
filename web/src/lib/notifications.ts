@@ -211,10 +211,27 @@ async function reconcileNotifications(): Promise<void> {
   }
 }
 
+/* Reconciles run strictly one at a time. Two overlapping passes would each read `notifiedCheckups`
+   before the other wrote it, and each would cancel every pending id the *other* had just scheduled
+   between its own schedule and cancel steps. Nothing triggered a second pass mid-flight while every
+   call site was fire-and-forget from the UI thread, but a background-fetch wake-up lands on top of
+   whatever the app was already doing, so the ordering has to be explicit. */
+let reconcileChain: Promise<void> = Promise.resolve();
+
+/** Awaitable refresh — resolves once *this* caller's reconcile has finished (any earlier queued
+    pass included). Background work must use this: the OS closes the wake-up window as soon as the
+    task reports done, and a half-written schedule is worse than none. */
+export function refreshNotificationsNow(): Promise<void> {
+  if (!isNative) return Promise.resolve();
+  reconcileChain = reconcileChain.then(() =>
+    reconcileNotifications().catch((err) => console.warn('notifications: refresh failed', err)),
+  );
+  return reconcileChain;
+}
+
 /** Fire-and-forget refresh; safe to call from any mutation/sync/resume path. */
 export function refreshNotifications(): void {
-  if (!isNative) return;
-  reconcileNotifications().catch((err) => console.warn('notifications: refresh failed', err));
+  void refreshNotificationsNow();
 }
 
 /** Call once at app bootstrap. Requests both the notification display permission

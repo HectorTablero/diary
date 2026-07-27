@@ -1,10 +1,12 @@
 import type { EntryNode } from '@diary/shared';
 import { generateKeyBetween } from 'fractional-indexing';
 import { useEffect, useState } from 'react';
-import { useMoveEntry } from '@/api/hooks';
+import { useMoveEntry, useSettings } from '@/api/hooks';
 import { EntryDragGhost } from '@/components/entry/EntryDragGhost';
 import { ENTRY_INDENT_WIDTH, EntryItem } from '@/components/entry/EntryItem';
 import { SortableTreeProvider } from '@/components/tree/SortableTreeProvider';
+import { useSyncStatus } from '@/db/useSyncStatus';
+import { useSession } from '@/lib/authClient';
 import { applyMove } from '@/lib/sortableTree';
 
 const LIST_CLASS_NAME = '-mx-2 flex flex-col';
@@ -23,6 +25,12 @@ function findNode(roots: EntryNode[], id: string): EntryNode | null {
     a resolved drop position into a fractional-index orderKey and persists it. */
 export function EntryTree({ entries }: { entries: EntryNode[] }) {
   const moveEntry = useMoveEntry();
+  const { data: settings } = useSettings();
+  const { data: session } = useSession();
+  const { offline } = useSyncStatus();
+  // Same three conditions as the composer's mic (EntryComposer's `showMic`): a key to transcribe
+  // with, a live session for the authenticated suggestions call, and a reachable server.
+  const voiceEnabled = !!settings?.groqApiKey?.trim() && !!session?.user && !offline;
   // A drop's real effect only shows up once useMoveEntry's Dexie write + query invalidation +
   // refetch round-trips (all local, but still async) — without this, the drag state clearing
   // instantly on drop made every row snap back to the *stale* `entries` for a beat, then jump to
@@ -59,7 +67,7 @@ export function EntryTree({ entries }: { entries: EntryNode[] }) {
     >
       <div className={LIST_CLASS_NAME}>
         {displayEntries.map((entry) => (
-          <EntryItem key={entry.id} entry={entry} />
+          <EntryItem key={entry.id} entry={entry} voiceEnabled={voiceEnabled} />
         ))}
       </div>
     </SortableTreeProvider>

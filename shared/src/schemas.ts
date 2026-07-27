@@ -13,6 +13,7 @@ import {
   MAX_NOTES_LENGTH,
   MAX_ORGANIZATION_LENGTH,
   MAX_PHONE_LENGTH,
+  MAX_SUB_ENTRY_DEPTH,
   MAX_THREAD_NAME_LENGTH,
   MAX_THREADS_PER_ENTRY,
   MAX_WECHAT_ID_LENGTH,
@@ -204,6 +205,15 @@ export const aiSuggestionsRequestSchema = z.object({
   transcript: z.string().trim().min(1).max(AI_MAX_TRANSCRIPT_LENGTH),
   dateKey: dateKeySchema,
   language: z.string().max(10).default('es'),
+  /** Contents of the existing entries the suggestions will be nested under, outermost first.
+      Empty = a normal top-level recording. Its *length* is the depth the suggested roots will
+      be created at, which is what shrinks the nesting budget the model is given; its *contents*
+      are what tell the model which conversation it is adding detail to. Capped at
+      MAX_SUB_ENTRY_DEPTH because an entry that deep can't take children at all. */
+  parentPath: z
+    .array(z.string().trim().min(1).max(MAX_CONTENT_LENGTH))
+    .max(MAX_SUB_ENTRY_DEPTH)
+    .default([]),
 });
 
 /* Query params (validated as strings from the URL). Only /sync takes any: the day, calendar,

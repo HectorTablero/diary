@@ -8,8 +8,14 @@ export const aiRouter = new Hono<AppEnv>().post(
   '/suggestions',
   jsonValidator(aiSuggestionsRequestSchema),
   async (c) => {
-    const { transcript, dateKey, language } = c.req.valid('json');
-    const entries = await generateSuggestions(c.get('userId'), transcript, dateKey, language);
+    const { transcript, dateKey, language, parentPath } = c.req.valid('json');
+    const entries = await generateSuggestions(
+      c.get('userId'),
+      transcript,
+      dateKey,
+      language,
+      parentPath,
+    );
     return c.json({ entries });
   },
 );

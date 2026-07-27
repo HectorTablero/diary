@@ -42,6 +42,13 @@
          On Android 14+ (targetSdk 34+) this permission is denied by default; the app prompts the
          user at runtime via LocalNotifications.changeExactNotificationSetting(). -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Periodic background sync (lib/backgroundSync.ts): WorkManager needs a wake lock to hold the
+         device awake for the length of a fetch event, and the boot receiver needs this to re-register
+         the periodic task after a reboot (startOnBoot). The background-fetch AAR declares both too,
+         but they're spelled out here so a permission the app requests is visible in the app's own
+         manifest rather than only in a merged dependency. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- The importer only ever reads. WRITE_CONTACTS is declared purely because the contacts
          plugin bundles both into a single "contacts" permission alias, and Capacitor treats an
          alias as granted only when *every* permission in it is granted (Bridge.java: "multiple

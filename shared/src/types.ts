@@ -204,6 +204,8 @@ export interface AiSuggestionsRequest {
   transcript: string;
   dateKey: string;
   language: string;
+  /** Ancestor entry contents, outermost first; omit or leave empty for top-level suggestions. */
+  parentPath?: string[];
 }
 
 export interface AiSuggestionsResponse {

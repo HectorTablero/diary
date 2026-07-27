@@ -261,9 +261,25 @@ interface SuggestionReviewDialogProps {
   onOpenChange: (open: boolean) => void;
   entries: SuggestedEntryNode[];
   dateKey: string;
+  /** Existing entry these become children of; null for a top-level recording. */
+  parentId?: string | null;
+  /** Content of that entry, shown so the user can see what they're adding under. */
+  parentContent?: string;
+  /** Depth budget for the draft tree, measured from its own roots — smaller than the diary's
+      maximum whenever the draft is already nested under something. Left to
+      wouldExceedMaxDepth's MAX_SUB_ENTRY_DEPTH default for top-level recordings. */
+  maxDepth?: number;
 }
 
-export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }: SuggestionReviewDialogProps) {
+export function SuggestionReviewDialog({
+  open,
+  onOpenChange,
+  entries,
+  dateKey,
+  parentId = null,
+  parentContent,
+  maxDepth,
+}: SuggestionReviewDialogProps) {
   const { t } = useTranslation();
   const { data: allTags = [] } = useTags();
   const { data: allPeople = [] } = usePeople();
@@ -325,7 +341,7 @@ export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }:
           await walk(node.children, node.id);
         }
       };
-      await walk(draft, null);
+      await walk(draft, parentId);
       toast.success(t('ai.entriesCreated', { count: created }));
       onOpenChange(false);
     } catch (err) {
@@ -342,7 +358,11 @@ export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }:
       <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('ai.reviewTitle')}</DialogTitle>
-          <DialogDescription>{t('ai.reviewDescription')}</DialogDescription>
+          <DialogDescription>
+            {parentId
+              ? t('ai.reviewDescriptionSub', { parent: parentContent ?? '' })
+              : t('ai.reviewDescription')}
+          </DialogDescription>
         </DialogHeader>
         <div className="-mx-1 flex-1 overflow-y-auto px-1">
           {draft.length === 0 ? (
@@ -351,6 +371,7 @@ export function SuggestionReviewDialog({ open, onOpenChange, entries, dateKey }:
             <SortableTreeProvider
               roots={draft}
               onMove={moveNode}
+              maxDepth={maxDepth}
               indentWidth={SUGGESTION_INDENT_WIDTH}
               listClassName="flex flex-col gap-4"
               renderRow={(node, depth) => (
