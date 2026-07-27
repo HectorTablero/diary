@@ -3,6 +3,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import AppLayout from './components/layout/AppLayout';
+import ExploreLayout from './components/layout/ExploreLayout';
 import { FullScreenSpinner } from './components/common/Spinner';
 import { todayKey } from './lib/dates';
 import { isNative } from './lib/native';
@@ -39,9 +40,16 @@ export const router = createBrowserRouter([
       // Ahead of `people/:id` so the literal segment always wins the match.
       { path: 'people/import', element: withSuspense(<ImportContactsPage />) },
       { path: 'people/:id', element: withSuspense(<PersonProfilePage />) },
-      { path: 'search', element: withSuspense(<SearchPage />) },
-      { path: 'tags', element: withSuspense(<TagsPage />) },
-      { path: 'threads', element: withSuspense(<ThreadsPage />) },
+      // Pathless layout route: the three "find entries by …" screens keep their own URLs (chips
+      // all over the app link straight to /tags and /threads) but share one segmented switcher.
+      {
+        element: <ExploreLayout />,
+        children: [
+          { path: 'search', element: withSuspense(<SearchPage />) },
+          { path: 'tags', element: withSuspense(<TagsPage />) },
+          { path: 'threads', element: withSuspense(<ThreadsPage />) },
+        ],
+      },
       { path: 'settings', element: withSuspense(<SettingsPage />) },
       { path: 'settings/import-backup', element: withSuspense(<ImportBackupPage />) },
       { path: '*', element: <Navigate to="/diary" replace /> },

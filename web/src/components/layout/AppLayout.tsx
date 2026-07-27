@@ -13,9 +13,10 @@ import { AnimatedLogo } from '@/components/icons/AnimatedLogo';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, NavLink, Outlet } from 'react-router';
+import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router';
 import { usePeople } from '@/api/hooks';
 import { FullScreenSpinner } from '@/components/common/Spinner';
+import { EXPLORE_PATHS } from '@/components/layout/ExploreLayout';
 import { kick } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
@@ -34,6 +35,9 @@ interface NavItem {
   to: string;
   icon: LucideIcon;
   labelKey: string;
+  /** Extra paths that should light this item up — set on an item that fronts a group of screens
+      (the tab bar's Explore), where NavLink's own `to`-only matching isn't enough. */
+  activeOn?: readonly string[];
 }
 
 /** Pending-checkups count for the People nav badge; reactive since `usePeople` is
@@ -53,6 +57,18 @@ const MAIN_NAV: NavItem[] = [
 const SECONDARY_NAV: NavItem[] = [
   { to: '/tags', icon: Tag, labelKey: 'nav.tags' },
   { to: '/threads', icon: GitBranch, labelKey: 'nav.threads' },
+  { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
+];
+
+/* The phone bar is its own list, not MAIN_NAV + SECONDARY_NAV: seven labels across a 360px screen
+   overlap each other. Search, Tags and Threads collapse into one Explore item that lands on
+   /search, where ExploreLayout's switcher takes over. The sidebar has the height for all seven and
+   keeps them flat — a click saved on a surface that was never crowded. */
+const TAB_NAV: NavItem[] = [
+  { to: '/diary', icon: BookOpen, labelKey: 'nav.diary' },
+  { to: '/calendar', icon: CalendarDays, labelKey: 'nav.calendar' },
+  { to: '/people', icon: Users, labelKey: 'nav.people' },
+  { to: '/search', icon: Search, labelKey: 'nav.explore', activeOn: EXPLORE_PATHS },
   { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
@@ -111,7 +127,11 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
 
 function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
   const { t } = useTranslation();
-  const items = [...MAIN_NAV, ...SECONDARY_NAV];
+  const { pathname } = useLocation();
+  const items = TAB_NAV;
+  /** A group item stays lit on any of its own screens, not just the one it navigates to. */
+  const inGroup = (item: NavItem) =>
+    item.activeOn?.some((path) => pathname === path || pathname.startsWith(`${path}/`)) ?? false;
   return (
     <nav
       className={cn(
@@ -130,11 +150,13 @@ function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
               className={({ isActive }) =>
                 cn(
                   'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative',
-                  isActive ? 'text-primary' : 'text-muted-foreground',
+                  isActive || inGroup(item) ? 'text-primary' : 'text-muted-foreground',
                 )
               }
             >
-              {({ isActive }) => (
+              {({ isActive: linkActive }) => {
+                const isActive = linkActive || inGroup(item);
+                return (
                 <>
                   <span
                     className={cn('relative flex items-center justify-center rounded-full p-1 transition-colors')}
@@ -161,7 +183,8 @@ function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
                     <span className="absolute -top-0.5 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-primary" />
                   )}
                 </>
-              )}
+                );
+              }}
             </NavLink>
           );
         })}

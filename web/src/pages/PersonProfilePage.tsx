@@ -25,7 +25,8 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -66,6 +67,33 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { isCheckupDue } from '@/lib/checkup';
 import { formatDateKey, parseDateKey, todayKey } from '@/lib/dates';
+
+/** Shared by all four profile tabs — see the note at the TabsList below for why it un-sets
+    `whitespace-nowrap` and lets the trigger grow, but only up to the `sm` breakpoint. */
+const TAB_TRIGGER =
+  'h-auto min-h-8 py-1 text-center leading-tight whitespace-normal ' +
+  'sm:h-[calc(100%-1px)] sm:min-h-0 sm:py-0.5 sm:whitespace-nowrap';
+
+/**
+ * Icon and label as one *inline* run rather than two flex children.
+ *
+ * As flex siblings they can't be centred together once the label wraps: the label becomes a flex
+ * item shrunk to all the width the icon left over, so `justify-center` centres a box whose left
+ * edge is already against the icon, and there is no way to ask a block to shrink to the width of
+ * its own longest line (`fit-content` resolves to the available width once wrapping is involved).
+ *
+ * Handing the trigger a single child sidesteps it entirely. The icon rides inline at the head of
+ * the text, so it wraps with the text and `text-center` centres every line — including the one
+ * carrying the icon. `mr-1.5` reproduces the `gap-1.5` it no longer gets from the flex container.
+ */
+function TabLabel({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <span>
+      <Icon className="mr-1.5 inline size-4 align-[-0.2em]" />
+      {children}
+    </span>
+  );
+}
 
 function TalkingPointsTab({ personId, personName }: { personId: string; personName: string }) {
   const { t } = useTranslation();
@@ -622,22 +650,27 @@ export default function PersonProfilePage() {
         {/* Four tabs no longer fit one phone-width row, so they wrap into an even 2x2 grid and
             only straighten out into a single row from `sm` up. The height override has to reuse
             the same group-data variant TabsList sets it with, or it loses on specificity. */}
+        {/* Four tabs no longer fit one phone-width row, so they wrap into an even 2x2 grid and
+            only straighten out into a single row from `sm` up. The height override has to reuse
+            the same group-data variant TabsList sets it with, or it loses on specificity.
+
+            TAB_TRIGGER also drops TabsTrigger's own `whitespace-nowrap` below `sm`: a label that
+            can't shrink and can't wrap simply overflows its grid cell, which is what Spanish's
+            "Temas de conversación" did — pushing the icon off the left edge and the text off the
+            right. Letting it take a second line costs height only in the languages that need it,
+            and the grid keeps both cells in a row the same height by itself. */}
         <TabsList className="mb-4 grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-auto sm:gap-0 sm:group-data-horizontal/tabs:h-8">
-          <TabsTrigger value="talking-points" className="h-8 gap-1.5 sm:h-[calc(100%-1px)]">
-            <MessageCircle className="size-4" />
-            {t('people.talkingPoints')}
+          <TabsTrigger value="talking-points" className={TAB_TRIGGER}>
+            <TabLabel icon={MessageCircle}>{t('people.talkingPoints')}</TabLabel>
           </TabsTrigger>
-          <TabsTrigger value="events" className="h-8 gap-1.5 sm:h-[calc(100%-1px)]">
-            <CalendarClock className="size-4" />
-            {t('people.events')}
+          <TabsTrigger value="events" className={TAB_TRIGGER}>
+            <TabLabel icon={CalendarClock}>{t('people.events')}</TabLabel>
           </TabsTrigger>
-          <TabsTrigger value="memories" className="h-8 gap-1.5 sm:h-[calc(100%-1px)]">
-            <Sparkles className="size-4" />
-            {t('people.memories')}
+          <TabsTrigger value="memories" className={TAB_TRIGGER}>
+            <TabLabel icon={Sparkles}>{t('people.memories')}</TabLabel>
           </TabsTrigger>
-          <TabsTrigger value="history" className="h-8 gap-1.5 sm:h-[calc(100%-1px)]">
-            <AtSign className="size-4" />
-            {t('people.history')}
+          <TabsTrigger value="history" className={TAB_TRIGGER}>
+            <TabLabel icon={AtSign}>{t('people.history')}</TabLabel>
           </TabsTrigger>
         </TabsList>
         <TabsContent value="talking-points">
