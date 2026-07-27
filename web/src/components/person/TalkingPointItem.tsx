@@ -96,10 +96,15 @@ export function TalkingPointItem({
 
   return (
     <li>
-      <div className={cn('rounded-xl pl-3 py-1.5', isMatch ? 'border bg-card shadow-xs' : 'opacity-70')}>
+      {/* `pr-2` is not decoration: this card had no right padding at all, which was survivable
+          while the actions were a flex sibling but leaves the floated cluster sitting flush on the
+          rounded border. Less than the `pl-3` on the other side because the trailing ⋯ button is a
+          ghost icon that already carries its own optical padding. */}
+      <div className={cn('rounded-xl py-1.5 pr-2 pl-3', isMatch ? 'border bg-card shadow-xs' : 'opacity-70')}>
         <EntryRow entry={node} showChips={false} showDate={depth === 0}>
           {isMatch && (
-            <div className="flex shrink-0 items-center gap-1">
+            // No wrapper of its own — EntryRow floats these and already lays them out in a row.
+            <>
               <Badge
                 variant="outline"
                 className="hidden gap-1 text-[11px] text-muted-foreground sm:inline-flex"
@@ -119,13 +124,13 @@ export function TalkingPointItem({
                       : 'people.matchBroadcast',
                 )}
               </Badge>
-              <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={markSaid}>
+              <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs mt-1.5" onClick={markSaid}>
                 <Check className="size-3.5" />
                 {t('people.markSaid')}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
+                  <Button variant="ghost" size="icon" className="size-7 text-muted-foreground mt-1.5">
                     <MoreHorizontal className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -141,7 +146,7 @@ export function TalkingPointItem({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
+            </>
           )}
         </EntryRow>
       </div>

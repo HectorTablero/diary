@@ -35,6 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
 import { fuzzyEquals } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
@@ -172,19 +173,40 @@ export function EntryItem({
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            {/* `w-auto` rather than a fixed width: DropdownMenuContent otherwise sizes itself to
+                the trigger, and a size-7 ⋯ button leaves only the 128px min-width — too tight for
+                the sub-entry label plus the mic beside it. Pinning a width instead would leave
+                dead space on the right whenever the mic isn't there to fill it, so let the menu
+                shrink-to-fit and be exactly as wide as whatever it's actually showing. */}
+            <DropdownMenuContent align="end" className="w-auto">
               <DropdownMenuItem onClick={() => setEditing(true)}>
                 <Pencil className="size-3.5" /> {t('common.edit')}
               </DropdownMenuItem>
               {canAddSub && (
-                <DropdownMenuItem onClick={() => setAddingSub(true)}>
-                  <CornerDownRight className="size-3.5" /> {t('diary.addSubEntry')}
-                </DropdownMenuItem>
-              )}
-              {canAddSub && voiceEnabled && (
-                <DropdownMenuItem onClick={() => setRecordingSub(true)}>
-                  <Mic className="size-3.5" /> {t('ai.recordSubEntries')}
-                </DropdownMenuItem>
+                // Split row: typing and dictating produce the same thing, so the mic sits beside
+                // "Add sub-entry" rather than repeating the label on a line of its own. Both halves
+                // stay real menu items, so arrow-key navigation and close-on-select still work.
+                <div className="flex items-center">
+                  {/* `grow`, not `flex-1`: flex-1 zeroes the basis, which makes this row's
+                      max-content width — the thing the shrink-to-fit menu is measured against —
+                      depend on scaled flex contributions rather than on the label itself. */}
+                  <DropdownMenuItem className="min-w-0 grow" onClick={() => setAddingSub(true)}>
+                    <CornerDownRight className="size-3.5" />
+                    <span className="truncate">{t('diary.addSubEntry')}</span>
+                  </DropdownMenuItem>
+                  {voiceEnabled && (
+                    <>
+                      <Separator orientation="vertical" className="mx-1 h-5 self-center" />
+                      <DropdownMenuItem
+                        className="justify-center px-2 py-1.5"
+                        onClick={() => setRecordingSub(true)}
+                        aria-label={t('ai.recordSubEntries')}
+                      >
+                        <Mic className="size-3.5" />
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </div>
               )}
               <DropdownMenuItem onClick={() => setThreading(true)}>
                 <GitBranch className="size-3.5" /> {t('threads.addToThread')}

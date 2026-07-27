@@ -13,7 +13,8 @@ import {
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
-import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
+import { BOTTOM_NAV_ONLY, SIDEBAR_ONLY, SIDEBAR_ONLY_SR } from '@/components/layout/ExploreLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -188,16 +189,34 @@ export default function ThreadsPage() {
   const [deleting, setDeleting] = useState<ThreadWithStats | null>(null);
 
   return (
-    <PageContainer>
+    <>
+      {/* Only the page's *name* collapses under the bottom tab bar, not the row: the create button
+          has to stay reachable, and PageHeader's `ml-auto` keeps it on the right once the h1 has
+          nothing but the count left in it. */}
       <PageHeader
         title={
           <span className="flex items-baseline gap-2">
-            {t('threads.title')}
+            {/* Under the bottom tab bar the switcher above is what names the page, so the word
+                itself only has to reach a screen reader — but it must still reach one, or the
+                page would have no heading at all. */}
+            <span className={SIDEBAR_ONLY_SR}>{t('threads.title')}</span>
             {threads && threads.length > 0 && (
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground">
-                <span className="sr-only">{t('threads.count', { count: threads.length })}</span>
-                <span className="px-2">{threads.length}</span>
-              </span>
+              <>
+                <span
+                  className={cn(
+                    'flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground',
+                    SIDEBAR_ONLY,
+                  )}
+                >
+                  <span className="sr-only">{t('threads.count', { count: threads.length })}</span>
+                  <span className="px-2">{threads.length}</span>
+                </span>
+                {/* Spelled out rather than a bare badge here: with the title hidden, a lone number
+                    sitting next to a button reads as nothing in particular. */}
+                <span className={cn('text-sm font-normal text-muted-foreground', BOTTOM_NAV_ONLY)}>
+                  {t('threads.count', { count: threads.length })}
+                </span>
+              </>
             )}
           </span>
         }
@@ -260,6 +279,6 @@ export default function ThreadsPage() {
           });
         }}
       />
-    </PageContainer>
+    </>
   );
 }

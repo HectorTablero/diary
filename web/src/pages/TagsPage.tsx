@@ -7,7 +7,8 @@ import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
-import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
+import { BOTTOM_NAV_ONLY, SIDEBAR_ONLY, SIDEBAR_ONLY_SR } from '@/components/layout/ExploreLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/apiClient';
+import { cn } from '@/lib/utils';
 
 function TagFormDialog({
   tag,
@@ -119,19 +121,34 @@ export default function TagsPage() {
   const [deleting, setDeleting] = useState<TagWithStats | null>(null);
 
   return (
-    <PageContainer>
+    <>
+      {/* Only the page's *name* collapses under the bottom tab bar, not the row: the create button
+          has to stay reachable, and PageHeader's `ml-auto` keeps it on the right once the h1 has
+          nothing but the count left in it. */}
       <PageHeader
         title={
           <span className="flex items-baseline gap-2">
-            {t('tags.title')}
+            {/* Under the bottom tab bar the switcher above is what names the page, so the word
+                itself only has to reach a screen reader — but it must still reach one, or the
+                page would have no heading at all. */}
+            <span className={SIDEBAR_ONLY_SR}>{t('tags.title')}</span>
             {tags && tags.length > 0 && (
-              // <span className="text-sm font-normal text-muted-foreground">
-              //   {t('tags.count', { count: tags.length })}
-              // </span>
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground">
-                <span className="sr-only">{t('tags.count', { count: tags.length })}</span>
-                <span className="px-2">{tags.length}</span>
-              </span>
+              <>
+                <span
+                  className={cn(
+                    'flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground',
+                    SIDEBAR_ONLY,
+                  )}
+                >
+                  <span className="sr-only">{t('tags.count', { count: tags.length })}</span>
+                  <span className="px-2">{tags.length}</span>
+                </span>
+                {/* Spelled out rather than a bare badge here: with the title hidden, a lone number
+                    sitting next to a button reads as nothing in particular. */}
+                <span className={cn('text-sm font-normal text-muted-foreground', BOTTOM_NAV_ONLY)}>
+                  {t('tags.count', { count: tags.length })}
+                </span>
+              </>
             )}
           </span>
         }
@@ -217,6 +234,6 @@ export default function TagsPage() {
           });
         }}
       />
-    </PageContainer>
+    </>
   );
 }

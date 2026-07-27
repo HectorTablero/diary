@@ -28,6 +28,19 @@ export function EntryRow({
     <div className="flex items-start gap-2.5">
       <ImportanceDot importance={entry.importance} className="mt-2" />
       <div className="min-w-0 flex-1">
+        {/* Floated rather than a flex sibling. As a flex item the action cluster reserved its
+            width for the *entire* height of the card, so a long entry — especially in a language
+            with long labels, where "Mark as said" is "Marcar como contado" — was squeezed into a
+            ribbon barely a dozen characters wide for every one of its lines. A float only shortens
+            the line boxes it physically overlaps, so the text takes the full width back as soon as
+            it passes below the buttons. Nothing else does this: flex and grid have no concept of
+            text flowing around a box.
+
+            Source order is load-bearing — a float only affects content that comes after it, so
+            this must stay above EntryContent even though it renders on the right. */}
+        {children && (
+          <div className="float-right mb-1 ml-2.5 flex items-center gap-1">{children}</div>
+        )}
         <EntryContent
           entry={entry}
           className={cn(crossedOut && 'text-muted-foreground line-through')}
@@ -47,7 +60,6 @@ export function EntryRow({
           </div>
         )}
       </div>
-      {children}
     </div>
   );
 }

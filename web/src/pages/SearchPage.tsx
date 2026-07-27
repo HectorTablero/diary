@@ -7,7 +7,8 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { PersonChip, TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { importanceDotClass } from '@/components/entry/ImportanceDot';
-import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
+import { SIDEBAR_ONLY } from '@/components/layout/ExploreLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,9 +84,12 @@ export default function SearchPage() {
     update({ [key]: next.length ? csv(next) : null });
   };
 
+  // No container of its own — ExploreLayout provides that. The whole heading row, not just its
+  // text, is hidden under the bottom tab bar: with no actions to keep on the right there would be
+  // nothing left in it but its own bottom margin, pushing the input down for no reason.
   return (
-    <PageContainer>
-      <PageHeader title={t('search.title')} />
+    <>
+      <PageHeader className={SIDEBAR_ONLY} title={t('search.title')} />
 
       <div className="relative mb-3">
         <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -243,6 +247,6 @@ export default function SearchPage() {
           description={t('search.noResultsDescription')}
         />
       )}
-    </PageContainer>
+    </>
   );
 }
