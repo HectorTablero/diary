@@ -71,7 +71,7 @@ import { formatDateKey, parseDateKey, todayKey } from '@/lib/dates';
 /** Shared by all four profile tabs — see the note at the TabsList below for why it un-sets
     `whitespace-nowrap` and lets the trigger grow, but only up to the `sm` breakpoint. */
 const TAB_TRIGGER =
-  'h-auto min-h-8 py-1 text-center leading-tight whitespace-normal ' +
+  'h-full min-h-8 py-1 text-center leading-tight whitespace-normal ' +
   'sm:h-[calc(100%-1px)] sm:min-h-0 sm:py-0.5 sm:whitespace-nowrap';
 
 /**
@@ -348,14 +348,14 @@ function EventRow({
 
       {/* Footer only appears when you owe them something, and says *why* it's here. */}
       {followUpDue && (
-        <div className="flex items-center justify-between gap-2 border-t border-amber-500/30 bg-amber-500/[0.07] px-3 py-2">
-          <span className="min-w-0 truncate text-xs text-muted-foreground">
+        <div className="flex flex-col items-stretch gap-2 border-t border-amber-500/30 bg-amber-500/[0.07] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="min-w-0 text-xs text-muted-foreground">
             {t('people.eventEndedDaysAgo', { count: daysSinceEnd })}
           </span>
           <Button
             variant="outline"
             size="sm"
-            className="h-7 shrink-0 gap-1.5 text-xs"
+            className="h-7 w-full shrink-0 gap-1.5 text-xs sm:w-auto"
             onClick={() =>
               markAsked.mutate(
                 { personId: person.id, eventId: event.id },
@@ -611,7 +611,7 @@ export default function PersonProfilePage() {
             {pendingFollowUps.map((event) => (
               <li
                 key={event.id}
-                className="flex items-start justify-between gap-2 rounded-lg border border-amber-500/25 bg-background/40 p-2.5"
+                className="flex flex-col items-stretch gap-2 rounded-lg border border-amber-500/25 bg-background/40 p-2.5 sm:flex-row sm:items-start sm:justify-between"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{event.title}</p>
@@ -626,7 +626,7 @@ export default function PersonProfilePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="shrink-0 gap-1.5"
+                  className="w-full shrink-0 gap-1.5 sm:w-auto"
                   onClick={() =>
                     markEventAsked.mutate(
                       { personId: person.id, eventId: event.id },
