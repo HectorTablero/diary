@@ -39,6 +39,7 @@ import { setLocalOnly } from '@/lib/localOnly';
 import { cacheUser } from '@/lib/sessionCache';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { getVersionInfo, type VersionInfo } from '@/lib/version';
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -47,6 +48,25 @@ function Section({ title, description, children }: { title: string; description?
       {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
       <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+/** Build identity, quietly, at the very bottom — the thing to ask for first in a bug report.
+    On Android the JS bundle can be newer than the APK it runs inside, so show both when
+    they've drifted apart. */
+function VersionFooter() {
+  const [info, setInfo] = useState<VersionInfo | null>(null);
+
+  useEffect(() => {
+    void getVersionInfo().then(setInfo);
+  }, []);
+
+  if (!info) return null;
+  const parts = [`v${info.version}`];
+  if (info.apkVersion && info.apkVersion !== info.version) parts.push(`APK v${info.apkVersion}`);
+
+  return (
+    <p className="mt-6 text-center text-xs text-muted-foreground">Diary {parts.join(' · ')}</p>
   );
 }
 
@@ -603,6 +623,8 @@ export default function SettingsPage() {
           </div>
         </Section>
       </div>
+
+      <VersionFooter />
 
       <MarkdownExportDialog open={markdownDialogOpen} onOpenChange={setMarkdownDialogOpen} />
     </PageContainer>

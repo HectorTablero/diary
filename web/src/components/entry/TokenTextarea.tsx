@@ -203,8 +203,14 @@ export function TokenTextarea({
             ) : (
               <span
                 key={i}
+                /* Faux bold. A real font-weight would widen these glyphs relative to the
+                   weight-400 copy in the textarea underneath, pushing the two layers out of
+                   sync — text after a token would no longer sit under its highlight, and the
+                   caret would land in the wrong place. A stroke thickens the paint without
+                   changing any advance width, so the layers stay glyph-for-glyph aligned. */
+                style={{ WebkitTextStroke: '0.3px currentColor' }}
                 className={cn(
-                  'rounded-sm font-medium',
+                  'rounded-sm',
                   seg.kind === 'person'
                     ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
                     : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
