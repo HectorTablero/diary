@@ -377,7 +377,6 @@
     "account": "アカウント",
     "accountLocalOnlyDescription": "データはこの端末の中だけにあります。ログインするとバックアップされ、複数の端末で同期されます。",
     "resetDefaults": "既定値に戻す",
-    "settingsSaved": "設定を保存しました",
     "data": {
       "title": "データ",
       "description": "すべてをファイルにバックアップする、以前のバックアップから復元する、または日記の一部を Markdown で書き出して AI エージェントに分析させることができます。",
@@ -419,7 +418,12 @@
         "saidTimeline": "これまでに話したことの履歴",
         "unsaidCount": "まだ話していないことの件数"
       }
-    }
+    },
+    "resetDefaultsConfirmTitle": "初期設定に戻しますか？",
+    "resetDefaultsConfirmDescription": "減衰・思い出・全員への提案・連絡リマインダー・AI の設定がすべて初期値に戻ります。記録や人物、タグはそのままです。",
+    "settingsSaved": "設定を保存しました",
+    "stepDown": "減らす",
+    "stepUp": "増やす"
   },
   "errors": {
     "unauthorized": "ログインが必要です",

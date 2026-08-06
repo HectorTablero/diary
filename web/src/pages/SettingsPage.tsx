@@ -1,4 +1,4 @@
-import type { SettingsDto } from '@diary/shared';
+import type { SettingsDto, SettingsInput } from '@diary/shared';
 import { DEFAULT_SETTINGS } from '@diary/shared';
 import { Download, FileText, Hash, LogOut, Moon, RotateCcw, Sun, SunMoon, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useSaveSettings, useSettings, useTags } from '@/api/hooks';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Select,
   SelectContent,
@@ -113,6 +115,51 @@ function VersionFooter() {
 
 const LEVELS = ['1', '2', '3', '4', '5'] as const;
 
+const clampDays = (value: number, min: number) => Math.min(3650, Math.max(min, Math.round(value)));
+
+/**
+ * The draft as a payload the API will accept, or null while a number is mid-edit.
+ *
+ * That null is the whole reason this is a function rather than an inline object: clearing an
+ * input to retype it leaves `valueAsNumber` as NaN for as long as the field is empty, and saving
+ * *that* would quietly write a default over the value the user is halfway through replacing.
+ * With a Save button the user chose when to submit and never noticed; without one, an invalid
+ * draft simply isn't saved until it becomes valid again.
+ */
+function buildPayload(
+  draft: SettingsDto,
+  checkupsEnabled: boolean,
+  checkupIntervalDays: number,
+): SettingsInput | null {
+  const numbers = [
+    ...LEVELS.map((level) => draft.halfLifeDays[level]),
+    draft.memoryMinAgeDays,
+    ...(checkupsEnabled ? [checkupIntervalDays] : []),
+  ];
+  if (numbers.some((value) => !Number.isFinite(value))) return null;
+
+  return {
+    halfLifeDays: {
+      1: clampDays(draft.halfLifeDays['1'], 1),
+      2: clampDays(draft.halfLifeDays['2'], 1),
+      3: clampDays(draft.halfLifeDays['3'], 1),
+      4: clampDays(draft.halfLifeDays['4'], 1),
+      5: clampDays(draft.halfLifeDays['5'], 1),
+    },
+    epsilon: draft.epsilon,
+    talkingPointsLimit: draft.talkingPointsLimit,
+    memoryImportanceThreshold: draft.memoryImportanceThreshold,
+    memoryMinAgeDays: clampDays(draft.memoryMinAgeDays, 0),
+    broadcastLifeChangingEvents: draft.broadcastLifeChangingEvents,
+    broadcastTagIds: draft.broadcastTagIds,
+    forceEnglishAIEvents: draft.forceEnglishAIEvents,
+    defaultCheckupIntervalDays: checkupsEnabled ? clampDays(checkupIntervalDays, 1) : null,
+    groqApiKey: draft.groqApiKey,
+    openRouterApiKey: draft.openRouterApiKey,
+    cerebrasApiKey: draft.cerebrasApiKey,
+  };
+}
+
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -129,8 +176,17 @@ export default function SettingsPage() {
   const [exportingBackup, setExportingBackup] = useState(false);
   const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
   const [linkingAccount, setLinkingAccount] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  /* Bumped by every control that considers its change settled. It exists because a handler
+     can't save the value it just set — setDraft hasn't been applied yet — so the request rides
+     the same render as the change and is picked up by the effect below. */
+  const [commitSignal, setCommitSignal] = useState(0);
   const importFileRef = useRef<HTMLInputElement>(null);
+  /** Serialized payload last written; null until the first load has settled. */
+  const lastSaved = useRef<string | null>(null);
   const aiDisabled = !session?.user;
+
+  const requestCommit = () => setCommitSignal((signal) => signal + 1);
 
   useEffect(() => {
     if (settings && !draft) {
@@ -145,42 +201,66 @@ export default function SettingsPage() {
     applyTheme(value);
   };
 
-  const save = () => {
+  /** Writes the current draft if it differs from what was last written. Safe to call freely:
+      an unchanged draft, an invalid one, or one saved already is a no-op. */
+  const commit = () => {
     if (!draft) return;
-    saveSettings.mutate(
-      {
-        halfLifeDays: {
-          1: Number(draft.halfLifeDays['1']) || DEFAULT_SETTINGS.halfLifeDays[1],
-          2: Number(draft.halfLifeDays['2']) || DEFAULT_SETTINGS.halfLifeDays[2],
-          3: Number(draft.halfLifeDays['3']) || DEFAULT_SETTINGS.halfLifeDays[3],
-          4: Number(draft.halfLifeDays['4']) || DEFAULT_SETTINGS.halfLifeDays[4],
-          5: Number(draft.halfLifeDays['5']) || DEFAULT_SETTINGS.halfLifeDays[5],
-        },
-        epsilon: draft.epsilon,
-        talkingPointsLimit: draft.talkingPointsLimit,
-        memoryImportanceThreshold: draft.memoryImportanceThreshold,
-        memoryMinAgeDays: Number(draft.memoryMinAgeDays) || DEFAULT_SETTINGS.memoryMinAgeDays,
-        broadcastLifeChangingEvents: draft.broadcastLifeChangingEvents,
-        broadcastTagIds: draft.broadcastTagIds,
-        forceEnglishAIEvents: draft.forceEnglishAIEvents,
-        defaultCheckupIntervalDays: checkupsEnabled
-          ? Math.min(3650, Math.max(1, Math.round(checkupIntervalDays) || 1))
-          : null,
-        groqApiKey: draft.groqApiKey,
-        openRouterApiKey: draft.openRouterApiKey,
-        cerebrasApiKey: draft.cerebrasApiKey,
-      },
-      {
-        onSuccess: (data) => {
-          setDraft(data);
-          setCheckupsEnabled(data.defaultCheckupIntervalDays != null);
-          setCheckupIntervalDays(data.defaultCheckupIntervalDays ?? 30);
-          toast.success(t('settings.settingsSaved'));
-        },
-        onError: () => toast.error(t('errors.unknown')),
-      },
-    );
+    const payload = buildPayload(draft, checkupsEnabled, checkupIntervalDays);
+    if (!payload) return;
+    const serialized = JSON.stringify(payload);
+    // Null means the loaded settings haven't been recorded yet, so there is nothing to compare
+    // against and nothing the user has changed.
+    if (lastSaved.current === null || lastSaved.current === serialized) return;
+
+    /* Recorded before the write, and rewound on failure so the next commit sends this payload
+       again. The draft is deliberately never replaced with the response: a reply landing while
+       the user is still typing would yank the field back to what the server had a moment ago.
+
+       mutateAsync rather than mutate's callbacks, because react-query drops those once the
+       component unmounts — and the save on the way out of the page is precisely the one whose
+       confirmation the user has no other way of seeing. */
+    const previous = lastSaved.current;
+    lastSaved.current = serialized;
+    void saveSettings
+      .mutateAsync(payload)
+      .then(() => toast.success(t('settings.settingsSaved')))
+      .catch(() => {
+        lastSaved.current = previous;
+        toast.error(t('errors.unknown'));
+      });
   };
+
+  // Record the settings as loaded, so the first real edit has something to differ from.
+  useEffect(() => {
+    if (!draft || lastSaved.current !== null) return;
+    const payload = buildPayload(draft, checkupsEnabled, checkupIntervalDays);
+    if (payload) lastSaved.current = JSON.stringify(payload);
+  }, [draft, checkupsEnabled, checkupIntervalDays]);
+
+  useEffect(() => {
+    if (commitSignal > 0) commit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs only when a commit is asked for
+  }, [commitSignal]);
+
+  /* The last save. Leaving the Settings page is the normal way to finish with it, and a field
+     edited and then navigated away from never blurs — so unmount is a real save point, not just
+     a safety net. pagehide covers the tab going away and visibilitychange the app being
+     backgrounded on Android, neither of which unmounts anything. */
+  const commitRef = useRef(commit);
+  useEffect(() => {
+    commitRef.current = commit;
+  });
+  useEffect(() => {
+    const flush = () => commitRef.current();
+    const flushIfHidden = () => document.visibilityState === 'hidden' && flush();
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', flushIfHidden);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', flushIfHidden);
+      flush();
+    };
+  }, []);
 
   const resetDefaults = () => {
     if (!draft) return;
@@ -197,6 +277,7 @@ export default function SettingsPage() {
     });
     setCheckupsEnabled(DEFAULT_SETTINGS.defaultCheckupIntervalDays != null);
     setCheckupIntervalDays(DEFAULT_SETTINGS.defaultCheckupIntervalDays ?? 30);
+    requestCommit();
   };
 
   const handleSignOut = async () => {
@@ -260,6 +341,7 @@ export default function SettingsPage() {
         ? draft.broadcastTagIds.filter((tagId) => tagId !== id)
         : [...draft.broadcastTagIds, id],
     });
+    requestCommit();
   };
 
   return (
@@ -322,19 +404,20 @@ export default function SettingsPage() {
                 <div key={level} className="flex items-center gap-3">
                   <span className={cn('size-3 shrink-0 rounded-full', importanceDotClass(Number(level)))} />
                   <span className="w-36 flex-1 text-sm sm:flex-none">{t(`importance.levels.${level}`)}</span>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={3650}
-                    step={1}
+                    aria-label={t(`importance.levels.${level}`)}
+                    stepDownLabel={t('settings.stepDown')}
+                    stepUpLabel={t('settings.stepUp')}
                     value={draft.halfLifeDays[level]}
-                    onChange={(e) =>
+                    onCommit={requestCommit}
+                    onChange={(value) =>
                       setDraft({
                         ...draft,
-                        halfLifeDays: { ...draft.halfLifeDays, [level]: e.target.valueAsNumber },
+                        halfLifeDays: { ...draft.halfLifeDays, [level]: value },
                       })
                     }
-                    className="w-24"
                   />
                   <span className="text-xs text-muted-foreground">{t('settings.memories.days')}</span>
                 </div>
@@ -352,9 +435,10 @@ export default function SettingsPage() {
                 <Label>{t('settings.memories.threshold')}</Label>
                 <Select
                   value={String(draft.memoryImportanceThreshold)}
-                  onValueChange={(value) =>
-                    setDraft({ ...draft, memoryImportanceThreshold: Number(value) })
-                  }
+                  onValueChange={(value) => {
+                    setDraft({ ...draft, memoryImportanceThreshold: Number(value) });
+                    requestCommit();
+                  }}
                 >
                   <SelectTrigger className="w-48">
                     <SelectValue />
@@ -373,15 +457,15 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="memory-age">{t('settings.memories.minAge')}</Label>
                 <div className="flex items-center gap-2">
-                  <Input
+                  <NumberInput
                     id="memory-age"
-                    type="number"
                     min={0}
                     max={3650}
-                    step={1}
+                    stepDownLabel={t('settings.stepDown')}
+                    stepUpLabel={t('settings.stepUp')}
                     value={draft.memoryMinAgeDays}
-                    onChange={(e) => setDraft({ ...draft, memoryMinAgeDays: e.target.valueAsNumber })}
-                    className="w-24"
+                    onCommit={requestCommit}
+                    onChange={(value) => setDraft({ ...draft, memoryMinAgeDays: value })}
                   />
                   <span className="text-xs text-muted-foreground">{t('settings.memories.days')}</span>
                 </div>
@@ -405,9 +489,10 @@ export default function SettingsPage() {
                 <Switch
                   id="broadcast-life-changing"
                   checked={draft.broadcastLifeChangingEvents}
-                  onCheckedChange={(checked) =>
-                    setDraft({ ...draft, broadcastLifeChangingEvents: checked })
-                  }
+                  onCheckedChange={(checked) => {
+                    setDraft({ ...draft, broadcastLifeChangingEvents: checked });
+                    requestCommit();
+                  }}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -447,21 +532,25 @@ export default function SettingsPage() {
                 <Switch
                   id="checkups-enabled"
                   checked={checkupsEnabled}
-                  onCheckedChange={setCheckupsEnabled}
+                  onCheckedChange={(checked) => {
+                    setCheckupsEnabled(checked);
+                    requestCommit();
+                  }}
                 />
                 <Label htmlFor="checkups-enabled">{t('settings.checkups.enable')}</Label>
               </div>
               {checkupsEnabled && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{t('people.checkupEvery')}</span>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={3650}
-                    step={1}
+                    aria-label={t('people.checkupEvery')}
+                    stepDownLabel={t('settings.stepDown')}
+                    stepUpLabel={t('settings.stepUp')}
                     value={checkupIntervalDays}
-                    onChange={(e) => setCheckupIntervalDays(e.target.valueAsNumber)}
-                    className="w-24"
+                    onCommit={requestCommit}
+                    onChange={setCheckupIntervalDays}
                   />
                   <span className="text-xs text-muted-foreground">{t('settings.memories.days')}</span>
                 </div>
@@ -487,6 +576,7 @@ export default function SettingsPage() {
                   disabled={aiDisabled}
                   value={draft.groqApiKey}
                   onChange={(e) => setDraft({ ...draft, groqApiKey: e.target.value })}
+                  onBlur={requestCommit}
                   placeholder={t('settings.ai.apiKeyPlaceholder')}
                   className="max-w-sm"
                 />
@@ -511,7 +601,10 @@ export default function SettingsPage() {
                   id="force-english-ai-events"
                   disabled={aiDisabled}
                   checked={draft.forceEnglishAIEvents}
-                  onCheckedChange={(checked) => setDraft({ ...draft, forceEnglishAIEvents: checked })}
+                  onCheckedChange={(checked) => {
+                    setDraft({ ...draft, forceEnglishAIEvents: checked });
+                    requestCommit();
+                  }}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -523,6 +616,7 @@ export default function SettingsPage() {
                   disabled={aiDisabled}
                   value={draft.cerebrasApiKey}
                   onChange={(e) => setDraft({ ...draft, cerebrasApiKey: e.target.value })}
+                  onBlur={requestCommit}
                   placeholder={t('settings.ai.cerebrasApiKeyPlaceholder')}
                   className="max-w-sm"
                 />
@@ -547,6 +641,7 @@ export default function SettingsPage() {
                   disabled={aiDisabled}
                   value={draft.openRouterApiKey}
                   onChange={(e) => setDraft({ ...draft, openRouterApiKey: e.target.value })}
+                  onBlur={requestCommit}
                   placeholder={t('settings.ai.openRouterApiKeyPlaceholder')}
                   className="max-w-sm"
                 />
@@ -566,14 +661,16 @@ export default function SettingsPage() {
           )}
         </Section>
 
-        <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={resetDefaults}>
+        <div className="flex items-center justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+            disabled={!draft}
+            onClick={() => setResetConfirmOpen(true)}
+          >
             <RotateCcw className="size-3.5" />
             {t('settings.resetDefaults')}
-          </Button>
-          <Button onClick={save} disabled={!draft || saveSettings.isPending}>
-            {saveSettings.isPending && <Spinner className="size-3.5" />}
-            {t('common.save')}
           </Button>
         </div>
 
@@ -669,6 +766,17 @@ export default function SettingsPage() {
       <VersionFooter />
 
       <MarkdownExportDialog open={markdownDialogOpen} onOpenChange={setMarkdownDialogOpen} />
+
+      {/* Autosave took away the pause before a destructive change took effect, so the reset
+          asks first — it's the one control on the page that can't be undone by retyping. */}
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        onOpenChange={setResetConfirmOpen}
+        title={t('settings.resetDefaultsConfirmTitle')}
+        description={t('settings.resetDefaultsConfirmDescription')}
+        confirmLabel={t('settings.resetDefaults')}
+        onConfirm={resetDefaults}
+      />
     </PageContainer>
   );
 }

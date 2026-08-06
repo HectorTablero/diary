@@ -393,7 +393,6 @@
     "account": "Cuenta",
     "accountLocalOnlyDescription": "Tus datos se quedan solo en este dispositivo. Inicia sesión para respaldarlos y sincronizarlos entre dispositivos.",
     "resetDefaults": "Restablecer valores",
-    "settingsSaved": "Ajustes guardados",
     "data": {
       "title": "Datos",
       "description": "Haz una copia de seguridad completa, restaura una copia anterior, o exporta parte de tu diario como Markdown para que un agente de IA lo analice.",
@@ -435,7 +434,12 @@
         "saidTimeline": "Cronología de lo que se le ha contado",
         "unsaidCount": "Recuento de cosas aún no contadas"
       }
-    }
+    },
+    "resetDefaultsConfirmTitle": "¿Restablecer los valores por defecto?",
+    "resetDefaultsConfirmDescription": "Los ajustes de decaimiento, recuerdos, difusión, seguimiento e IA vuelven a sus valores por defecto. Tus entradas, personas y etiquetas no se ven afectadas.",
+    "settingsSaved": "Ajustes guardados",
+    "stepDown": "Disminuir",
+    "stepUp": "Aumentar"
   },
   "errors": {
     "unauthorized": "Necesitas iniciar sesión",

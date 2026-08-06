@@ -371,7 +371,6 @@
     "account": "账号",
     "accountLocalOnlyDescription": "你的数据只保存在这台设备上。登录后可以备份并在多设备间同步。",
     "resetDefaults": "恢复默认值",
-    "settingsSaved": "设置已保存",
     "data": {
       "title": "数据",
       "description": "把所有内容备份成文件、从之前的备份恢复，或者把日记的一部分导出成 Markdown 交给 AI 助手分析。",
@@ -413,7 +412,12 @@
         "saidTimeline": "已经说过的内容时间线",
         "unsaidCount": "还没说的条数"
       }
-    }
+    },
+    "resetDefaultsConfirmTitle": "恢复默认设置？",
+    "resetDefaultsConfirmDescription": "衰减、回忆、广播、联系提醒和 AI 设置都会恢复默认值。你的记录、人物和标签不受影响。",
+    "settingsSaved": "设置已保存",
+    "stepDown": "减少",
+    "stepUp": "增加"
   },
   "errors": {
     "unauthorized": "需要先登录",

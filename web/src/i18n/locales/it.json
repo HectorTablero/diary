@@ -392,7 +392,6 @@
     "account": "Account",
     "accountLocalOnlyDescription": "I tuoi dati restano solo su questo dispositivo. Accedi per farne un backup e sincronizzarli fra più dispositivi.",
     "resetDefaults": "Ripristina i valori predefiniti",
-    "settingsSaved": "Impostazioni salvate",
     "data": {
       "title": "Dati",
       "description": "Fai il backup di tutto in un file, ripristina da un backup precedente, oppure esporta una parte del diario in Markdown per farla analizzare da un agente IA.",
@@ -434,7 +433,12 @@
         "saidTimeline": "Cronologia di ciò che è già stato raccontato",
         "unsaidCount": "Numero di cose non ancora dette"
       }
-    }
+    },
+    "resetDefaultsConfirmTitle": "Ripristinare i valori predefiniti?",
+    "resetDefaultsConfirmDescription": "Le impostazioni di decadimento, ricordi, diffusione, promemoria di contatto e IA tornano ai valori predefiniti. Le tue voci, le persone e le etichette non vengono toccate.",
+    "settingsSaved": "Impostazioni salvate",
+    "stepDown": "Diminuisci",
+    "stepUp": "Aumenta"
   },
   "errors": {
     "unauthorized": "Devi accedere",
