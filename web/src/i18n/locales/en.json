@@ -398,7 +398,6 @@
     "account": "Account",
     "accountLocalOnlyDescription": "Your data stays on this device only. Sign in to back it up and sync across devices.",
     "resetDefaults": "Reset to defaults",
-    "settingsSaved": "Settings saved",
     "data": {
       "title": "Data",
       "description": "Back up everything to a file, restore from a previous backup, or export part of your diary as Markdown for an AI agent to analyze.",
@@ -440,7 +439,12 @@
         "saidTimeline": "Timeline of what's been said to them",
         "unsaidCount": "Count of things not yet said"
       }
-    }
+    },
+    "resetDefaultsConfirmTitle": "Reset to defaults?",
+    "resetDefaultsConfirmDescription": "The decay, memory, broadcast, checkup and AI settings all go back to their default values. Your entries, people and tags are not affected.",
+    "settingsSaved": "Settings saved",
+    "stepDown": "Decrease",
+    "stepUp": "Increase"
   },
   "errors": {
     "unauthorized": "You need to sign in",
