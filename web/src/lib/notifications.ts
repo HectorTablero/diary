@@ -1,11 +1,12 @@
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications';
-import { addDays, set } from 'date-fns';
 import { db, getMeta, setMeta, type LocalPerson } from '@/db/db';
 import i18n from '@/i18n';
 import { ageOn, daysUntilBirthday, nextOccurrence } from './birthday';
 import { CHECKUP_DAY_MS } from './checkup';
 import { toDateKey } from './dates';
 import { isNative } from './native';
+import { birthdayFireAt, nextDailyReminderAt, nextWakingTime } from './notificationSchedule';
+import { getPreferences, type Preferences } from './preferences';
 
 /* Native-only local notifications for checkup reminders, birthdays, and the daily "add
    something to your diary" nudge. No-ops on the web, mirroring lib/haptics.ts.
@@ -17,11 +18,15 @@ import { isNative } from './native';
    kinds' notifications on every run. */
 
 const DAILY_REMINDER_ID = 1;
+/** Several overdue checkups at once become one digest instead of a burst — importing an address
+    book and coming back a month later otherwise buzzes once per person, all in the same second. */
+const CHECKUP_DIGEST_ID = 0;
+const CHECKUP_DIGEST_THRESHOLD = 3;
+/** Names listed in the digest body before it stops enumerating. */
+const CHECKUP_DIGEST_NAMES = 3;
 /** How soon a just-discovered overdue checkup (or a birthday whose hour already passed) fires —
     there's no true native background poll, so "discovery" only happens on a refresh trigger. */
 const CATCH_UP_DELAY_MS = 5_000;
-/** Local hour birthday reminders fire at. */
-const BIRTHDAY_HOUR = 9;
 /** Don't book an alarm months out: Android caps pending exact alarms, and refreshNotifications
     runs on every app resume, mutation and sync — so a birthday is always armed well in time. */
 const BIRTHDAY_LOOKAHEAD_DAYS = 30;
@@ -42,7 +47,7 @@ const ID_SPACE = 0x3ffffffe;
 const CHECKUP_ID_BASE = 2;
 const BIRTHDAY_ID_BASE = 0x40000000;
 
-/** Stable id per person, disjoint from DAILY_REMINDER_ID (reserved as 1) and from birthdays. */
+/** Stable id per person, disjoint from the two fixed ids (0 and 1) and from birthdays. */
 function checkupNotificationId(personId: string): number {
   return CHECKUP_ID_BASE + (fnv1a(personId) % ID_SPACE);
 }
@@ -73,10 +78,16 @@ function pickTemplate(key: string, vars: Record<string, string> = {}): string {
  * `db.meta.notifiedCheckups` so an already-overdue person doesn't get re-notified on every
  * unrelated mutation until the checkup is marked done.
  */
-async function collectCheckupNotifications(people: LocalPeople): Promise<LocalNotificationSchema[]> {
+async function collectCheckupNotifications(
+  people: LocalPeople,
+  prefs: Preferences,
+): Promise<LocalNotificationSchema[]> {
+  if (!prefs.checkupReminders) return [];
+
   const notified = (await getMeta<NotifiedCheckups>('notifiedCheckups')) ?? {};
   const nextNotified: NotifiedCheckups = {};
   const scheduled: LocalNotificationSchema[] = [];
+  const overdue: { person: LocalPerson; lastCheckupAt: number }[] = [];
   const now = Date.now();
 
   for (const person of people) {
@@ -84,31 +95,72 @@ async function collectCheckupNotifications(people: LocalPeople): Promise<LocalNo
     const lastCheckupAt = Date.parse(person.lastCheckupAt);
     const dueAt = lastCheckupAt + person.checkupIntervalDays * CHECKUP_DAY_MS;
 
-    let at: Date | null = null;
     if (dueAt > now) {
-      at = new Date(dueAt);
-    } else if (notified[person.id] !== person.lastCheckupAt) {
-      at = new Date(now + CATCH_UP_DELAY_MS);
-      nextNotified[person.id] = person.lastCheckupAt;
-    } else {
-      nextNotified[person.id] = person.lastCheckupAt; // already notified this cycle, keep tracking
+      /* The due moment inherits its clock time from whenever the checkup was last marked done, so
+         marking one at 03:12 would otherwise mean a 03:12 reminder every cycle from then on. The
+         user never chose that minute, which is exactly the case quiet hours exist for. */
+      const at = nextWakingTime(new Date(dueAt), prefs.quietHoursStart, prefs.quietHoursEnd);
+      scheduled.push(checkupNotification(person, at, lastCheckupAt));
+      continue;
     }
 
-    if (!at) continue;
-    const days = Math.round((at.getTime() - lastCheckupAt) / CHECKUP_DAY_MS);
-    const checkupBody = pickTemplate('people.checkupBodies', { name: person.name, days: String(days) });
-    scheduled.push({
-      id: checkupNotificationId(person.id),
-      title: i18n.t('people.checkupDueTitle', { name: person.name }),
-      body: checkupBody,
-      largeBody: checkupBody,
-      schedule: { at, allowWhileIdle: true },
-      extra: { kind: 'checkup', personId: person.id },
-    });
+    // Keep tracking either way: dropping the entry would re-announce this cycle on the next pass.
+    nextNotified[person.id] = person.lastCheckupAt;
+    if (notified[person.id] !== person.lastCheckupAt) overdue.push({ person, lastCheckupAt });
+  }
+
+  if (overdue.length) {
+    const at = nextWakingTime(
+      new Date(now + CATCH_UP_DELAY_MS),
+      prefs.quietHoursStart,
+      prefs.quietHoursEnd,
+    );
+    if (overdue.length <= CHECKUP_DIGEST_THRESHOLD) {
+      for (const { person, lastCheckupAt } of overdue) {
+        scheduled.push(checkupNotification(person, at, lastCheckupAt));
+      }
+    } else {
+      scheduled.push(checkupDigest(overdue.map(({ person }) => person.name), at));
+    }
   }
 
   await setMeta('notifiedCheckups', nextNotified);
   return scheduled;
+}
+
+function checkupNotification(
+  person: LocalPerson,
+  at: Date,
+  lastCheckupAt: number,
+): LocalNotificationSchema {
+  const days = Math.round((at.getTime() - lastCheckupAt) / CHECKUP_DAY_MS);
+  const body = pickTemplate('people.checkupBodies', { name: person.name, days: String(days) });
+  return {
+    id: checkupNotificationId(person.id),
+    title: i18n.t('people.checkupDueTitle', { name: person.name }),
+    body,
+    largeBody: body,
+    schedule: { at, allowWhileIdle: true },
+    extra: { kind: 'checkup', personId: person.id },
+  };
+}
+
+/** One notification standing in for a whole backlog. Taps through to the people list, which
+    already hoists overdue checkups to the top. */
+function checkupDigest(names: string[], at: Date): LocalNotificationSchema {
+  // 'conjunction' so the body reads as a sentence ("Ana, Bea and Chris"), not as a bare list.
+  const listed = new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(
+    names.slice(0, CHECKUP_DIGEST_NAMES),
+  );
+  const body = i18n.t('people.checkupDigestBody', { names: listed });
+  return {
+    id: CHECKUP_DIGEST_ID,
+    title: i18n.t('people.checkupDigestTitle', { count: names.length }),
+    body,
+    largeBody: body,
+    schedule: { at, allowWhileIdle: true },
+    extra: { kind: 'checkupDigest' },
+  };
 }
 
 /**
@@ -119,7 +171,12 @@ async function collectCheckupNotifications(people: LocalPeople): Promise<LocalNo
  * `db.meta.notifiedBirthdays` records the occurrence already handled, keyed by date, so a
  * mutation at noon doesn't re-announce a birthday that was announced at 09:00.
  */
-async function collectBirthdayNotifications(people: LocalPeople): Promise<LocalNotificationSchema[]> {
+async function collectBirthdayNotifications(
+  people: LocalPeople,
+  prefs: Preferences,
+): Promise<LocalNotificationSchema[]> {
+  if (!prefs.birthdayReminders) return [];
+
   const notified = (await getMeta<NotifiedCheckups>('notifiedBirthdays')) ?? {};
   const nextNotified: NotifiedCheckups = {};
   const scheduled: LocalNotificationSchema[] = [];
@@ -127,17 +184,19 @@ async function collectBirthdayNotifications(people: LocalPeople): Promise<LocalN
 
   for (const person of people) {
     if (!person.birthday) continue;
-    const occurrence = nextOccurrence(person.birthday, now, BIRTHDAY_HOUR);
+    const occurrence = nextOccurrence(person.birthday, now);
     const daysAway = daysUntilBirthday(person.birthday, now);
     if (!occurrence || daysAway === null || daysAway > BIRTHDAY_LOOKAHEAD_DAYS) continue;
 
     const key = toDateKey(occurrence);
-    const isToday = daysAway === 0;
-    // Only today's occurrence needs guarding; a future one can't have fired yet.
-    if (isToday) nextNotified[person.id] = key;
+    const fireAt = birthdayFireAt(occurrence, prefs.birthdayReminderTime);
+    /* Guard on the moment it was due to fire, not on "is it today": on the birthday itself, before
+       the chosen time, nothing has been announced yet and a mutation must not consume the alarm. */
+    const passed = fireAt.getTime() <= now.getTime();
+    if (passed) nextNotified[person.id] = key;
 
-    let at = occurrence;
-    if (occurrence.getTime() <= now.getTime()) {
+    let at = fireAt;
+    if (passed) {
       if (notified[person.id] === key) continue; // already announced this year
       at = new Date(Date.now() + CATCH_UP_DELAY_MS);
     }
@@ -162,16 +221,18 @@ async function collectBirthdayNotifications(people: LocalPeople): Promise<LocalN
 }
 
 /**
- * The fixed-id 23:45 nudge for the next candidate day (today if that time hasn't passed yet,
+ * The fixed-id nudge for the next candidate day (today if the chosen time hasn't passed yet,
  * otherwise tomorrow). Returns nothing once that day already has an entry, which lets the
  * reconcile cancel it. Idempotent by design — no overdue-cycle tracking needed since the id's
  * meaning simply shifts forward each day.
+ *
+ * Quiet hours deliberately don't apply: this is a time the user picked, and deferring it with a
+ * window they also picked would be one setting overruling another.
  */
-async function collectDailyReminder(): Promise<LocalNotificationSchema[]> {
-  const now = new Date();
-  let candidate = set(now, { hours: 23, minutes: 45, seconds: 0, milliseconds: 0 });
-  if (candidate <= now) candidate = addDays(candidate, 1);
+async function collectDailyReminder(prefs: Preferences): Promise<LocalNotificationSchema[]> {
+  if (!prefs.dailyReminder) return [];
 
+  const candidate = nextDailyReminderAt(new Date(), prefs.dailyReminderTime);
   const count = await db.entries.where('dateKey').equals(toDateKey(candidate)).count();
   if (count > 0) return [];
 
@@ -191,10 +252,12 @@ async function collectDailyReminder(): Promise<LocalNotificationSchema[]> {
 /** Schedule everything that should exist right now, and cancel everything pending that shouldn't. */
 async function reconcileNotifications(): Promise<void> {
   const people = await db.people.toArray();
+  // Read once, so all three collectors see the same snapshot even if a preference changes mid-pass.
+  const prefs = getPreferences();
   const [checkups, birthdays, daily] = await Promise.all([
-    collectCheckupNotifications(people),
-    collectBirthdayNotifications(people),
-    collectDailyReminder(),
+    collectCheckupNotifications(people, prefs),
+    collectBirthdayNotifications(people, prefs),
+    collectDailyReminder(prefs),
   ]);
 
   const desired = [...checkups, ...birthdays, ...daily];
@@ -234,26 +297,51 @@ export function refreshNotifications(): void {
   void refreshNotificationsNow();
 }
 
-/** Call once at app bootstrap. Requests both the notification display permission
-    (POST_NOTIFICATIONS on Android 13+) and, if needed, prompts the user to enable
-    exact alarms (SCHEDULE_EXACT_ALARM, denied by default on Android 14+). Without
-    exact alarm permission the plugin falls back to inexact non-wakeup alarms that
-    Android can defer indefinitely. */
+/** Call once at app bootstrap. Requests the notification display permission (POST_NOTIFICATIONS on
+    Android 13+) — a fresh install that never asks gets no reminders at all, so bootstrap is the
+    right place for it.
+    Exact alarms are deliberately *not* requested here: that opens an Android system settings
+    screen, and doing so unannounced on first launch, before the user has seen a diary let alone a
+    reminder, is startling. Settings offers it as a button instead. Without the permission the
+    plugin falls back to inexact non-wakeup alarms that Android may defer. */
 export async function initLocalNotifications(): Promise<void> {
   if (!isNative) return;
   await LocalNotifications.requestPermissions();
+  refreshNotifications();
+}
 
-  // On Android 12+ exact alarms require an explicit user opt-in via system settings.
-  // If the permission is missing or revoked, open the system screen so the user can
-  // grant it. This is a no-op on older Android versions.
+/* The Settings page asks about permissions through these rather than importing the plugin itself —
+   this module owns every call into it, which is what keeps the web build free of it entirely. */
+
+export async function getNotificationPermission(): Promise<'granted' | 'denied' | 'prompt'> {
+  if (!isNative) return 'granted';
+  const { display } = await LocalNotifications.checkPermissions();
+  return display === 'granted' ? 'granted' : display === 'denied' ? 'denied' : 'prompt';
+}
+
+export async function requestNotificationPermission(): Promise<void> {
+  if (!isNative) return;
+  await LocalNotifications.requestPermissions();
+}
+
+/** 'unsupported' covers pre-Android-12 and plugin builds without the exact-alarm API, where there
+    is nothing for the user to grant and so nothing worth showing them. */
+export async function getExactAlarmStatus(): Promise<'granted' | 'denied' | 'unsupported'> {
+  if (!isNative) return 'unsupported';
   try {
     const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting();
-    if (exact_alarm !== 'granted') {
-      await LocalNotifications.changeExactNotificationSetting();
-    }
+    return exact_alarm === 'granted' ? 'granted' : 'denied';
   } catch {
-    // Pre-Android-12 or plugin version without exact-alarm API — safe to ignore.
+    return 'unsupported';
   }
+}
 
-  refreshNotifications();
+/** Opens the Android exact-alarm settings screen. Only ever called from a button press. */
+export async function requestExactAlarms(): Promise<void> {
+  if (!isNative) return;
+  try {
+    await LocalNotifications.changeExactNotificationSetting();
+  } catch {
+    // Nothing to open on this Android version; the caller's status check already said so.
+  }
 }

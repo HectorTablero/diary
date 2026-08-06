@@ -14,6 +14,7 @@ import { initLiveUpdate } from './lib/liveUpdate';
 import { isNative } from './lib/native';
 import { notifySuccess } from './lib/notify';
 import { initLocalNotifications, refreshNotifications } from './lib/notifications';
+import { subscribePreferences } from './lib/preferences';
 import { queryClient } from './lib/queryClient';
 import { initTelemetry } from './lib/telemetry';
 import { logVersion } from './lib/version';
@@ -56,6 +57,9 @@ onSyncApplied(() => queryClient.invalidateQueries());
 // Remote-origin changes (another device) can affect who's due for a checkup
 // or whether today already has an entry, so re-arm reminders too.
 onSyncApplied(() => refreshNotifications());
+// Turning a reminder off has to cancel the alarm that's already armed for tonight, and changing a
+// time has to move it — neither happens until a reconcile runs.
+subscribePreferences(() => refreshNotifications());
 onReconnected(() => notifySuccess(i18n.t('sync.reconnected')));
 
 async function bootstrap() {

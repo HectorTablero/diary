@@ -32,6 +32,11 @@ const userSettingsSchema = new Schema(
     cerebrasApiKey: { type: String, default: DEFAULT_SETTINGS.cerebrasApiKey },
     forceEnglishAIEvents: { type: Boolean, default: DEFAULT_SETTINGS.forceEnglishAIEvents },
     quietNotifications: { type: Boolean, default: DEFAULT_SETTINGS.quietNotifications },
+    // `null` is meaningful ("reuse the last one"), so this must be nullable rather than merely
+    // optional — Mongoose would otherwise drop it and the default would come back.
+    defaultImportance: { type: Number, default: DEFAULT_SETTINGS.defaultImportance },
+    autoSaidOnMention: { type: Boolean, default: DEFAULT_SETTINGS.autoSaidOnMention },
+    maxSubEntryDepth: { type: Number, default: DEFAULT_SETTINGS.maxSubEntryDepth },
   },
   { timestamps: true },
 );

@@ -76,10 +76,13 @@ if (isNative) {
   void LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
     const extra = notification.extra as
       | { kind: 'checkup' | 'birthday'; personId: string }
+      | { kind: 'checkupDigest' }
       | { kind: 'daily' };
     if (extra.kind === 'checkup' || extra.kind === 'birthday') {
       void router.navigate(`/people/${extra.personId}`);
-    } else void router.navigate('/diary');
+      // The digest stands for several people at once; the list already hoists overdue ones to the top.
+    } else if (extra.kind === 'checkupDigest') void router.navigate('/people');
+    else void router.navigate('/diary');
   });
 
   // Resuming the app is the main way we notice a day has rolled over (there's

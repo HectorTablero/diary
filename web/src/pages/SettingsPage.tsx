@@ -1,6 +1,6 @@
 import type { SettingsDto, SettingsInput } from '@diary/shared';
-import { DEFAULT_SETTINGS } from '@diary/shared';
-import { Download, FileText, Hash, LogOut, Moon, RotateCcw, Sun, SunMoon, Upload } from 'lucide-react';
+import { DEFAULT_SETTINGS, MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { BellRing, ChevronDown, Download, FileText, Hash, LogOut, Moon, RotateCcw, Sun, SunMoon, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { TimePicker } from '@/components/ui/time-picker';
 import { clearLocalData } from '@/db/db';
 import { closeLiveChannel } from '@/db/sync';
 import { LANGUAGES, resolveLanguage } from '@/i18n';
@@ -38,19 +39,73 @@ import { backupEnvelopeSchema } from '@/lib/backup/schema';
 import { saveTextFile } from '@/lib/fileSave';
 import { googleSignIn } from '@/lib/googleSignIn';
 import { setLocalOnly } from '@/lib/localOnly';
+import { isNative } from '@/lib/native';
+import {
+  getExactAlarmStatus,
+  getNotificationPermission,
+  requestExactAlarms,
+  requestNotificationPermission,
+} from '@/lib/notifications';
 import { capitalize, localeWeekStart, weekdayName, type WeekStart } from '@/lib/dates';
-import { setPreference, usePreferences } from '@/lib/preferences';
+import {
+  resolveHour12,
+  setPreference,
+  usePreferences,
+  type Preferences,
+} from '@/lib/preferences';
 import { cacheUser } from '@/lib/sessionCache';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { getVersionInfo, type VersionInfo } from '@/lib/version';
 
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+/**
+ * One titled block of settings, with an optional second tier behind an "Advanced" disclosure.
+ *
+ * That tier used to be a section of its own at the bottom of the page, which meant a setting was
+ * filed by how obscure it is rather than by what it belongs to — "how deep sub-entries nest" sat
+ * two screens away from the rest of the entry defaults. Keeping the split *inside* each block
+ * gives both: nothing rare is in the way, and everything about entries is in the entries block.
+ *
+ * Collapsed on every visit, and per-section rather than one page-wide switch, so opening one
+ * doesn't quietly unfold the rest of the page.
+ */
+function Section({
+  title,
+  description,
+  children,
+  advanced,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  advanced?: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   return (
     <section className="rounded-xl border bg-card p-4 shadow-xs">
       <h2 className="text-sm font-semibold">{title}</h2>
       {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
       <div className="mt-3">{children}</div>
+      {advanced && (
+        <>
+          <button
+            type="button"
+            aria-expanded={showAdvanced}
+            onClick={() => setShowAdvanced((open) => !open)}
+            className="mt-3 flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronDown
+              className={cn('size-3.5 transition-transform', showAdvanced && 'rotate-180')}
+            />
+            {t('settings.advanced.title')}
+          </button>
+          {showAdvanced && (
+            <div className="mt-3 flex flex-col gap-4 border-t pt-4">{advanced}</div>
+          )}
+        </>
+      )}
     </section>
   );
 }
@@ -100,37 +155,241 @@ function WeekStartSetting() {
   );
 }
 
-/** Silences the success toasts for everyday actions. Errors are never affected — the point is to
-    stop the app narrating things the user can already see, not to hide problems.
-
-    Unlike its neighbours in this section it is an account setting rather than a device one, so
-    it rides the page's draft and its normal save path. */
-function QuietNotificationsSetting({
+/** Label, optional explanation, and a switch on the right — the shape every on/off setting on this
+    page had been repeating. `children` hangs an extra control under the row when one is on. */
+function ToggleRow({
+  id,
+  label,
+  description,
   checked,
   onCheckedChange,
   disabled,
+  children,
 }: {
+  id: string;
+  label: string;
+  description?: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
+  children?: React.ReactNode;
 }) {
-  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Label htmlFor={id}>{label}</Label>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </div>
+        <Switch id={id} disabled={disabled} checked={checked} onCheckedChange={onCheckedChange} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Whether times read as 09:00 or 9 AM. Same shape as the week start: 'auto' follows the language,
+    which is right for almost everyone, and is why it's the default. */
+function HourCycleSetting() {
+  const { t, i18n } = useTranslation();
+  const { hourCycle } = usePreferences();
+  /* Named rather than shown as a sample time. "21:00" and "9:00 PM" are the same clock reading in
+     two notations, so as a pair of options they ask the user to spot the difference between them;
+     "24-hour" and "12-hour (AM/PM)" is the distinction itself. Written out per branch rather than
+     built from a template key, so checkI18n can see both keys are used. */
+  const label = (cycle: '12' | '24') =>
+    cycle === '12' ? t('settings.general.timeFormat12') : t('settings.general.timeFormat24');
 
   return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex flex-col gap-0.5">
-        <Label htmlFor="quiet-notifications">{t('settings.general.quietNotifications')}</Label>
-        <p className="text-xs text-muted-foreground">
-          {t('settings.general.quietNotificationsDescription')}
-        </p>
-      </div>
-      <Switch
-        id="quiet-notifications"
-        disabled={disabled}
-        checked={checked}
-        onCheckedChange={onCheckedChange}
+    <div className="flex flex-col gap-1.5">
+      <Label>{t('settings.general.timeFormat')}</Label>
+      <Select
+        value={hourCycle}
+        onValueChange={(value) => {
+          setPreference('hourCycle', value as Preferences['hourCycle']);
+          notifyDeviceSaved(t('settings.general.savedOnDevice'));
+        }}
+      >
+        <SelectTrigger className="w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="auto">
+            {t('settings.general.timeFormatAuto', {
+              format: label(resolveHour12('auto', i18n.language) ? '12' : '24'),
+            })}
+          </SelectItem>
+          <SelectItem value="24">{label('24')}</SelectItem>
+          <SelectItem value="12">{label('12')}</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/**
+ * The time a reminder fires, under the switch that turns it on.
+ *
+ * Indented behind a rule, and led by a word rather than standing alone. A bare picker sitting
+ * full-width below a row whose switch is at the far right reads as the next setting down rather
+ * than as part of the one above it — the two are the same distance apart as any two settings in
+ * the section, so nothing says they belong together.
+ */
+function ReminderTime({
+  value,
+  onChange,
+  minHour,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  minHour?: number;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="ml-1 flex items-center gap-2 border-l pl-3">
+      <span className="text-xs text-muted-foreground">{t('settings.reminders.sendAt')}</span>
+      <TimePicker
+        value={value}
+        minHour={minHour}
+        aria-label={t('settings.reminders.sendAt')}
+        onChange={onChange}
       />
     </div>
+  );
+}
+
+/**
+ * Every alarm this device sends. Rendered only on the phone build — a switch that cannot do
+ * anything is worse than an absent one, and the web has no local notifications at all.
+ *
+ * All device-local, so none of this touches the page's draft or its save path. The reason is
+ * blunter than it looks: signing out wipes the account settings back to their defaults, and a
+ * synced "off" would quietly become "on" again — a phone buzzing at a time the user turned off.
+ */
+function RemindersSection() {
+  const { t } = useTranslation();
+  const prefs = usePreferences();
+  const [permission, setPermission] = useState<'granted' | 'denied' | 'prompt'>('granted');
+  const [exactAlarms, setExactAlarms] = useState<'granted' | 'denied' | 'unsupported'>('unsupported');
+
+  // Both are changed from outside the app, so re-read whenever the user comes back to it.
+  useEffect(() => {
+    const check = () => {
+      void getNotificationPermission().then(setPermission);
+      void getExactAlarmStatus().then(setExactAlarms);
+    };
+    check();
+    const onVisible = () => document.visibilityState === 'visible' && check();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  const set = <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
+    setPreference(key, value);
+    notifyDeviceSaved(t('settings.general.savedOnDevice'));
+  };
+
+  return (
+    <Section title={t('settings.reminders.title')} description={t('settings.reminders.description')}>
+      <div className="flex flex-col gap-5">
+        {permission === 'denied' && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">{t('settings.reminders.blocked')}</p>
+        )}
+        {/* Full width and in the primary colour, unlike every other button on this page. Nothing
+            below it can do anything until it has been pressed, so it is not one option among the
+            settings — it is the door in front of them. */}
+        {permission === 'prompt' && (
+          <Button
+            className="w-full gap-1.5"
+            onClick={() =>
+              void requestNotificationPermission().then(() =>
+                getNotificationPermission().then(setPermission),
+              )
+            }
+          >
+            <BellRing className="size-4" />
+            {t('settings.reminders.allow')}
+          </Button>
+        )}
+
+        {/* Ordered by how much of the diary each one knows about, which is also roughly how often
+            it fires: checkups watch every person, birthdays a date each, the daily nudge only
+            whether today is empty — and quiet hours last, since it is the rule over the other
+            three rather than a reminder of its own. */}
+        <ToggleRow
+          id="checkup-reminders"
+          label={t('settings.reminders.checkups')}
+          description={t('settings.reminders.checkupsDescription')}
+          checked={prefs.checkupReminders}
+          onCheckedChange={(checked) => set('checkupReminders', checked)}
+        />
+
+        <ToggleRow
+          id="birthday-reminders"
+          label={t('settings.reminders.birthdays')}
+          description={t('settings.reminders.birthdaysDescription')}
+          checked={prefs.birthdayReminders}
+          onCheckedChange={(checked) => set('birthdayReminders', checked)}
+        >
+          {prefs.birthdayReminders && (
+            <ReminderTime
+              value={prefs.birthdayReminderTime}
+              onChange={(value) => set('birthdayReminderTime', value)}
+            />
+          )}
+        </ToggleRow>
+
+        <ToggleRow
+          id="daily-reminder"
+          label={t('settings.reminders.daily')}
+          description={t('settings.reminders.dailyDescription')}
+          checked={prefs.dailyReminder}
+          onCheckedChange={(checked) => set('dailyReminder', checked)}
+        >
+          {prefs.dailyReminder && (
+            /* Afternoon onwards only: at 08:00 "you haven't written today" is trivially true, so
+               an unrestricted picker would invite a setting that guarantees a useless daily nudge. */
+            <ReminderTime
+              value={prefs.dailyReminderTime}
+              minHour={12}
+              onChange={(value) => set('dailyReminderTime', value)}
+            />
+          )}
+        </ToggleRow>
+
+        <div className="flex flex-col gap-2">
+          <Label>{t('settings.reminders.quietHours')}</Label>
+          <p className="text-xs text-muted-foreground">
+            {t('settings.reminders.quietHoursDescription')}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t('settings.reminders.quietFrom')}</span>
+            <TimePicker
+              aria-label={t('settings.reminders.quietFrom')}
+              value={prefs.quietHoursStart}
+              onChange={(value) => set('quietHoursStart', value)}
+            />
+            <span className="text-xs text-muted-foreground">{t('settings.reminders.quietUntil')}</span>
+            <TimePicker
+              aria-label={t('settings.reminders.quietUntil')}
+              value={prefs.quietHoursEnd}
+              onChange={(value) => set('quietHoursEnd', value)}
+            />
+          </div>
+        </div>
+
+        {exactAlarms === 'denied' && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs text-muted-foreground">
+              {t('settings.reminders.exactAlarmsDescription')}
+            </p>
+            <Button variant="outline" size="sm" className="w-fit" onClick={() => void requestExactAlarms()}>
+              {t('settings.reminders.exactAlarms')}
+            </Button>
+          </div>
+        )}
+      </div>
+    </Section>
   );
 }
 
@@ -194,6 +453,9 @@ function buildPayload(
     broadcastTagIds: draft.broadcastTagIds,
     forceEnglishAIEvents: draft.forceEnglishAIEvents,
     quietNotifications: draft.quietNotifications,
+    defaultImportance: draft.defaultImportance,
+    autoSaidOnMention: draft.autoSaidOnMention,
+    maxSubEntryDepth: Math.min(MAX_SUB_ENTRY_DEPTH, Math.max(1, Math.round(draft.maxSubEntryDepth))),
     defaultCheckupIntervalDays: checkupsEnabled ? clampDays(checkupIntervalDays, 1) : null,
     groqApiKey: draft.groqApiKey,
     openRouterApiKey: draft.openRouterApiKey,
@@ -209,6 +471,7 @@ export default function SettingsPage() {
   const { data: allTags = [] } = useTags();
   const saveSettings = useSaveSettings();
 
+  const prefs = usePreferences();
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [draft, setDraft] = useState<SettingsDto | null>(null);
   const [checkupsEnabled, setCheckupsEnabled] = useState(false);
@@ -391,69 +654,212 @@ export default function SettingsPage() {
     <PageContainer>
       <PageHeader title={t('settings.title')} />
       <div className="flex flex-col gap-4">
-        <Section title={t('settings.general.title')}>
-          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
-            <div className="flex flex-col gap-1.5">
-              <Label>{t('settings.general.theme')}</Label>
-              <div className="flex gap-1">
-                {(
-                  [
-                    ['light', Sun, t('settings.general.themeLight')],
-                    ['dark', Moon, t('settings.general.themeDark')],
-                    ['auto', SunMoon, t('settings.general.themeAuto')],
-                  ] as const
-                ).map(([value, Icon, label]) => (
-                  <Button
-                    key={value}
-                    variant={theme === value ? 'secondary' : 'outline'}
-                    size="sm"
-                    className={cn('gap-1.5', theme === value && 'ring-1 ring-ring')}
-                    onClick={() => changeTheme(value)}
-                  >
-                    <Icon className="size-4" />
-                    {label}
-                  </Button>
-                ))}
+        <Section
+          title={t('settings.general.title')}
+          advanced={
+            /* Guarded rather than always rendered: on the web, before the settings land, there is
+               nothing in here — and an Advanced button that opens onto an empty box is worse than
+               one that appears a moment later. */
+            (draft || isNative) && (
+              <>
+                {draft && (
+                  <ToggleRow
+                    id="quiet-notifications"
+                    label={t('settings.general.quietNotifications')}
+                    description={t('settings.general.quietNotificationsDescription')}
+                    checked={draft.quietNotifications}
+                    onCheckedChange={(checked) => {
+                      setDraft({ ...draft, quietNotifications: checked });
+                      requestCommit();
+                    }}
+                  />
+                )}
+                {isNative && (
+                  <>
+                    <ToggleRow
+                      id="haptics"
+                      label={t('settings.general.haptics')}
+                      description={t('settings.general.hapticsDescription')}
+                      checked={prefs.haptics}
+                      onCheckedChange={(checked) => {
+                        setPreference('haptics', checked);
+                        notifyDeviceSaved(t('settings.general.savedOnDevice'));
+                      }}
+                    />
+                    <ToggleRow
+                      id="sync-wifi-only"
+                      label={t('settings.advanced.wifiOnly')}
+                      description={t('settings.advanced.wifiOnlyDescription')}
+                      checked={prefs.syncOnWifiOnly}
+                      onCheckedChange={(checked) => {
+                        setPreference('syncOnWifiOnly', checked);
+                        notifyDeviceSaved(t('settings.general.savedOnDevice'));
+                      }}
+                    />
+                  </>
+                )}
+              </>
+            )
+          }
+        >
+          <div className="flex flex-col gap-4 sm:flex-wrap sm:items-baseline">
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-8">
+              <div className="flex flex-col gap-1.5">
+                <Label>{t('settings.general.theme')}</Label>
+                <div className="flex gap-1">
+                  {(
+                    [
+                      ['light', Sun, t('settings.general.themeLight')],
+                      ['dark', Moon, t('settings.general.themeDark')],
+                      ['auto', SunMoon, t('settings.general.themeAuto')],
+                    ] as const
+                  ).map(([value, Icon, label]) => (
+                    <Button
+                      key={value}
+                      variant={theme === value ? 'secondary' : 'outline'}
+                      size="sm"
+                      className={cn('gap-1.5 h-8', theme === value && 'ring-[1.5px] ring-inset ring-ring')}
+                      onClick={() => changeTheme(value)}
+                    >
+                      <Icon className="size-4" />
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>{t('settings.general.language')}</Label>
+                <Select
+                  value={resolveLanguage(i18n.language)}
+                  onValueChange={(lng) => {
+                    void i18n.changeLanguage(lng);
+                    // Read after the switch, so the confirmation arrives in the new language.
+                    notifyDeviceSaved(i18n.t('settings.general.savedOnDevice'));
+                  }}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LANGUAGES.map((language) => (
+                      <SelectItem key={language.code} value={language.code}>
+                        {language.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>{t('settings.general.language')}</Label>
-              <Select
-                value={resolveLanguage(i18n.language)}
-                onValueChange={(lng) => {
-                  void i18n.changeLanguage(lng);
-                  // Read after the switch, so the confirmation arrives in the new language.
-                  notifyDeviceSaved(i18n.t('settings.general.savedOnDevice'));
-                }}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LANGUAGES.map((language) => (
-                    <SelectItem key={language.code} value={language.code}>
-                      {language.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-8">
+              <WeekStartSetting />
+              <HourCycleSetting />
             </div>
-            <WeekStartSetting />
           </div>
+        </Section>
+
+        {isNative && <RemindersSection />}
+
+        <Section
+          title={t('settings.entries.title')}
+          advanced={
+            <>
+              <ToggleRow
+                id="entries-expanded"
+                label={t('settings.entries.expanded')}
+                description={t('settings.entries.expandedDescription')}
+                checked={prefs.entriesExpanded}
+                onCheckedChange={(checked) => {
+                  setPreference('entriesExpanded', checked);
+                  notifyDeviceSaved(t('settings.general.savedOnDevice'));
+                }}
+              />
+              {draft && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t('settings.advanced.nestingDepth')}</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.advanced.nestingDepthDescription')}
+                  </p>
+                  <NumberInput
+                    min={1}
+                    max={MAX_SUB_ENTRY_DEPTH}
+                    aria-label={t('settings.advanced.nestingDepth')}
+                    stepDownLabel={t('settings.stepDown')}
+                    stepUpLabel={t('settings.stepUp')}
+                    value={draft.maxSubEntryDepth}
+                    onCommit={requestCommit}
+                    onChange={(value) => setDraft({ ...draft, maxSubEntryDepth: value })}
+                  />
+                </div>
+              )}
+            </>
+          }
+        >
           {isLoading || !draft ? (
-            <Skeleton className="h-10" />
+            <Skeleton className="h-24" />
           ) : (
-            <QuietNotificationsSetting
-              checked={draft.quietNotifications}
-              onCheckedChange={(checked) => {
-                setDraft({ ...draft, quietNotifications: checked });
-                requestCommit();
-              }}
-            />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label>{t('settings.entries.defaultImportance')}</Label>
+                <Select
+                  value={draft.defaultImportance === null ? 'last' : String(draft.defaultImportance)}
+                  onValueChange={(value) => {
+                    setDraft({
+                      ...draft,
+                      defaultImportance: value === 'last' ? null : Number(value),
+                    });
+                    requestCommit();
+                  }}
+                >
+                  <SelectTrigger className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LEVELS.map((level) => (
+                      <SelectItem key={level} value={level}>
+                        <span className={cn('mr-1 inline-block size-2.5 rounded-full', importanceDotClass(Number(level)))} />
+                        {t(`importance.levels.${level}`)}
+                      </SelectItem>
+                    ))}
+                    {/* Kept last: it's the one option that isn't a level. */}
+                    <SelectItem value="last">{t('settings.entries.importanceLastUsed')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <ToggleRow
+                id="auto-said-on-mention"
+                label={t('settings.entries.autoSaid')}
+                description={t('settings.entries.autoSaidDescription')}
+                checked={draft.autoSaidOnMention}
+                onCheckedChange={(checked) => {
+                  setDraft({ ...draft, autoSaidOnMention: checked });
+                  requestCommit();
+                }}
+              />
+            </div>
           )}
         </Section>
 
-        <Section title={t('settings.decay.title')} description={t('settings.decay.description')}>
+        <Section
+          title={t('settings.decay.title')}
+          description={t('settings.decay.description')}
+          advanced={
+            draft && (
+              <div className="flex items-center gap-3">
+                <span className="w-36 flex-1 text-sm sm:flex-none">{t('settings.decay.limit')}</span>
+                <NumberInput
+                  min={1}
+                  max={200}
+                  aria-label={t('settings.decay.limit')}
+                  stepDownLabel={t('settings.stepDown')}
+                  stepUpLabel={t('settings.stepUp')}
+                  value={draft.talkingPointsLimit}
+                  onCommit={requestCommit}
+                  onChange={(value) => setDraft({ ...draft, talkingPointsLimit: value })}
+                />
+              </div>
+            )
+          }
+        >
           {isLoading || !draft ? (
             <Skeleton className="h-40" />
           ) : (
@@ -488,7 +894,7 @@ export default function SettingsPage() {
           {isLoading || !draft ? (
             <Skeleton className="h-20" />
           ) : (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline sm:gap-8">
               <div className="flex flex-col gap-1.5">
                 <Label>{t('settings.memories.threshold')}</Label>
                 <Select
@@ -744,7 +1150,7 @@ export default function SettingsPage() {
                   <p className="truncate text-xs text-muted-foreground">{session.user.email}</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void handleSignOut()}>
+              <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => void handleSignOut()}>
                 <LogOut className="size-3.5" />
                 {t('auth.signOut')}
               </Button>
@@ -754,7 +1160,7 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">{t('settings.accountLocalOnlyDescription')}</p>
               <Button
                 size="sm"
-                className="gap-1.5"
+                className="gap-1.5 h-8"
                 disabled={linkingAccount}
                 onClick={() => void handleLinkAccount()}
               >
@@ -772,7 +1178,7 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 h-8"
                   disabled={exportingBackup}
                   onClick={() => void handleExportBackup()}
                 >
@@ -782,7 +1188,7 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 h-8"
                   onClick={() => importFileRef.current?.click()}
                 >
                   <Upload className="size-3.5" />
@@ -809,7 +1215,7 @@ export default function SettingsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="w-fit gap-1.5"
+                className="w-fit gap-1.5 h-8"
                 onClick={() => setMarkdownDialogOpen(true)}
               >
                 <FileText className="size-3.5" />

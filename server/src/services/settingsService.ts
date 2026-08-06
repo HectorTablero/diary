@@ -1,4 +1,5 @@
 import type { SettingsDto } from '@diary/shared';
+import { DEFAULT_SETTINGS } from '@diary/shared';
 import { Types } from 'mongoose';
 import { UserSettings } from '../models/userSettings';
 
@@ -19,6 +20,9 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     broadcastTagIds: (doc.broadcastTagIds as Types.ObjectId[]).map((id) => id.toString()),
     forceEnglishAIEvents: doc.forceEnglishAIEvents,
     quietNotifications: doc.quietNotifications,
+    defaultImportance: doc.defaultImportance ?? null,
+    autoSaidOnMention: doc.autoSaidOnMention,
+    maxSubEntryDepth: doc.maxSubEntryDepth ?? DEFAULT_SETTINGS.maxSubEntryDepth,
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
     groqApiKey: doc.groqApiKey ?? '',
     openRouterApiKey: doc.openRouterApiKey ?? '',

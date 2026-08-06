@@ -76,7 +76,9 @@
     "more": "Altro",
     "back": "Indietro",
     "remove": "Rimuovi",
-    "selectDate": "Scegli una data"
+    "selectDate": "Scegli una data",
+    "hour": "Ora",
+    "minute": "Minuto"
   },
   "importance": {
     "label": "Importanza",
@@ -261,7 +263,10 @@
     "eventDays": "{{count}} giorno",
     "eventDays_other": "{{count}} giorni",
     "eventEndedDaysAgo": "Finito ieri",
-    "eventEndedDaysAgo_other": "Finito {{count}} giorni fa"
+    "eventEndedDaysAgo_other": "Finito {{count}} giorni fa",
+    "checkupDigestTitle": "{{count}} persona con cui aggiornarti",
+    "checkupDigestTitle_other": "{{count}} persone con cui aggiornarti",
+    "checkupDigestBody": "È passato un po' con {{names}}."
   },
   "tags": {
     "title": "Etichette",
@@ -346,14 +351,49 @@
       "language": "Lingua",
       "weekStart": "Primo giorno della settimana",
       "weekStartAuto": "Automatico ({{day}})",
-      "quietNotifications": "Nascondi gli avvisi di routine",
-      "quietNotificationsDescription": "Non conferma più le azioni quotidiane come salvare una voce. Gli errori e le conferme di impostazioni, backup e importazioni restano.",
-      "savedOnDevice": "Salvato su questo dispositivo"
+      "quietNotifications": "Nascondi i messaggi di routine nell'app",
+      "quietNotificationsDescription": "Non conferma più le azioni quotidiane come salvare una voce. Gli errori e le conferme di impostazioni, backup e importazioni restano. Non riguarda i promemoria che invia il telefono.",
+      "savedOnDevice": "Salvato su questo dispositivo",
+      "timeFormat": "Formato dell'ora",
+      "timeFormatAuto": "Automatico ({{format}})",
+      "timeFormat24": "24 ore",
+      "timeFormat12": "12 ore (AM/PM)",
+      "haptics": "Vibrazione al tocco",
+      "hapticsDescription": "Un colpetto leggero quando premi qualcosa."
+    },
+    "reminders": {
+      "title": "Promemoria",
+      "description": "Le notifiche che invia questo dispositivo. Restano qui, e i loro orari sono i suoi.",
+      "blocked": "Le notifiche di Diary sono disattivate nelle impostazioni del telefono, quindi non se ne può inviare nessuna.",
+      "allow": "Consenti le notifiche",
+      "daily": "Promemoria quotidiano",
+      "dailyDescription": "Solo nei giorni in cui non hai scritto nulla.",
+      "birthdays": "Promemoria dei compleanni",
+      "birthdaysDescription": "La mattina del giorno stesso, per tutte le persone con una data di nascita salvata.",
+      "sendAt": "Alle",
+"checkups": "Promemoria di contatto",
+      "checkupsDescription": "Quando è passato un po' dall'ultima volta che hai raccontato qualcosa a qualcuno. Se sono in più, arrivano in uno solo.",
+      "quietHours": "Ore di silenzio",
+      "quietHoursDescription": "I promemoria senza un orario proprio aspettano il mattino invece di arrivare nel cuore della notte. Gli orari scelti qui sopra non vengono mai rimandati.",
+      "quietFrom": "Da",
+      "quietUntil": "A",
+      "exactAlarms": "Consenti le sveglie esatte",
+      "exactAlarmsDescription": "Senza questo, Android può consegnare i promemoria in ritardo, a volte di ore."
+    },
+    "entries": {
+      "title": "Voci nuove",
+      "defaultImportance": "Importanza di partenza",
+      "importanceLastUsed": "L'ultima che ho usato",
+      "autoSaid": "Menzionare qualcuno la segna come raccontata",
+      "autoSaidDescription": "Decide solo come parte la casella; puoi sempre cambiarla prima di salvare.",
+      "expanded": "Apri le sotto-voci per impostazione predefinita",
+      "expandedDescription": "Se le sotto-voci di una voce partono aperte."
     },
     "decay": {
       "title": "Decadimento degli spunti",
       "description": "Per quanto tempo le voci di ciascuna importanza restano rilevanti come spunti. Il valore è un'emivita in giorni: passati quei giorni una voce ha metà del punteggio iniziale, e scompare quando il punteggio scende sotto la soglia.",
-      "halfLifeDays": "Emivita (giorni)"
+      "halfLifeDays": "Emivita (giorni)",
+      "limit": "Massimo di spunti per persona"
     },
     "memories": {
       "title": "Ricordi",
@@ -441,7 +481,14 @@
     "resetDefaultsConfirmDescription": "Le impostazioni di decadimento, ricordi, diffusione, promemoria di contatto e IA tornano ai valori predefiniti. Le tue voci, le persone e le etichette non vengono toccate.",
     "settingsSaved": "Impostazioni salvate",
     "stepDown": "Diminuisci",
-    "stepUp": "Aumenta"
+    "stepUp": "Aumenta",
+    "advanced": {
+      "title": "Avanzate",
+      "wifiOnly": "Sincronizza solo con il Wi-Fi",
+      "wifiOnlyDescription": "Le modifiche continuano a salvarsi su questo dispositivo e salgono al prossimo Wi-Fi. Il diario è testo, quindi si risparmia poco.",
+      "nestingDepth": "Livelli di sotto-voci",
+      "nestingDepthDescription": "Quanto si può annidare sotto una voce principale. Abbassarlo non tocca le voci già più in basso."
+    }
   },
   "errors": {
     "unauthorized": "Devi accedere",

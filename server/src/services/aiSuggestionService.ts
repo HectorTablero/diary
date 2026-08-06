@@ -8,7 +8,6 @@ import {
   GROQ_API_BASE,
   GROQ_CHAT_MODEL,
   MAX_CONTENT_LENGTH,
-  MAX_SUB_ENTRY_DEPTH,
   OPENROUTER_API_BASE,
   OPENROUTER_CHAT_MODEL,
 } from '@diary/shared';
@@ -31,12 +30,12 @@ interface TagRef {
 
 /**
  * How many levels of `children` the model may still nest, given the depth the suggested roots
- * will be created at. A top-level recording gets the full MAX_SUB_ENTRY_DEPTH; a recording made
- * from an entry's ⋯ menu spends one level per ancestor, so an entry already at the deepest
+ * will be created at. A top-level recording gets the user's whole nesting allowance; a recording
+ * made from an entry's ⋯ menu spends one level per ancestor, so an entry already at the deepest
  * allowed level yields 0 and the model is handed a schema with no `children` at all.
  */
-function availableDepthFor(parentPath: string[]): number {
-  return Math.max(0, MAX_SUB_ENTRY_DEPTH - parentPath.length);
+function availableDepthFor(parentPath: string[], maxDepth: number): number {
+  return Math.max(0, maxDepth - parentPath.length);
 }
 
 function buildEntryNodeSchema(remainingDepth: number): Record<string, unknown> {
@@ -308,7 +307,7 @@ export async function generateSuggestions(
   const settings = await getSettings(userId);
   const provider = pickProvider(settings);
   const aiLanguage = settings.forceEnglishAIEvents ? 'en' : language;
-  const availableDepth = availableDepthFor(parentPath);
+  const availableDepth = availableDepthFor(parentPath, settings.maxSubEntryDepth);
 
   const [tagDocs, personDocs] = await Promise.all([
     Tag.find({ userId }, 'name').lean(),

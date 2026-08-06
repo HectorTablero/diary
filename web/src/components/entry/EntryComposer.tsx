@@ -25,6 +25,7 @@ import { useSyncStatus } from '@/db/useSyncStatus';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { useSession } from '@/lib/authClient';
+import { setPreference, usePreferences } from '@/lib/preferences';
 import { isNative } from '@/lib/native';
 
 interface EntryComposerProps {
@@ -52,13 +53,18 @@ export function EntryComposer({
   const { data: settings } = useSettings();
   const { data: session } = useSession();
   const { offline } = useSyncStatus();
+  const prefs = usePreferences();
   const createTag = useCreateTag();
   const createThread = useCreateThread();
   const createEntry = useCreateEntry();
   const updateEntry = useUpdateEntry();
 
+  /* A new entry starts at the account's default importance, or — when that is null — at
+     whatever was saved last on this device, which is what makes writing five important entries
+     in a row not mean picking level 1 five times. */
+  const startingImportance = settings?.defaultImportance ?? prefs.lastImportance;
   const [content, setContent] = useState(entry?.content ?? '');
-  const [importance, setImportance] = useState(entry?.importance ?? 3);
+  const [importance, setImportance] = useState(entry?.importance ?? startingImportance);
   const [date, setDate] = useState(entry?.dateKey ?? dateKey);
   const [tags, setTags] = useState<TagDto[]>(entry?.tags ?? []);
   const [threads, setThreads] = useState<ThreadDto[]>(entry?.threads ?? []);
@@ -71,8 +77,11 @@ export function EntryComposer({
 
   const addPerson = (person: PersonRefDto) => {
     setPeople((prev) => (prev.some((p) => p.id === person.id) ? prev : [...prev, person]));
-    // Auto-said: mentioning someone pre-marks the entry as said to them (untickable).
-    if (!isEditing) setSaidTo((prev) => (prev.includes(person.id) ? prev : [...prev, person.id]));
+    /* Auto-said only decides how the checkbox below *starts*; it is always offered either way,
+       and only on a new entry — on an edit the said-marks already mean something the user set. */
+    if (!isEditing && settings?.autoSaidOnMention !== false) {
+      setSaidTo((prev) => (prev.includes(person.id) ? prev : [...prev, person.id]));
+    }
   };
 
   const removePerson = (id: string) => {
@@ -107,7 +116,7 @@ export function EntryComposer({
 
   const reset = () => {
     setContent('');
-    setImportance(3);
+    setImportance(settings?.defaultImportance ?? importance);
     setTags([]);
     setPeople([]);
     setSaidTo([]);
@@ -133,6 +142,9 @@ export function EntryComposer({
         await updateEntry.mutateAsync({ id: entry.id, input: payload });
       } else {
         await createEntry.mutateAsync({ ...payload, parentId });
+        // Recorded even when a fixed default is set, so switching to "last used" later starts
+        // from something real rather than from the shipped 3.
+        setPreference('lastImportance', importance);
         reset();
       }
       notifySuccess(t('diary.entrySaved'));
