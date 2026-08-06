@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '@/components/ui/date-picker';
 import { ApiError } from '@/lib/apiClient';
 import { todayKey } from '@/lib/dates';
 
@@ -74,12 +75,11 @@ export function EventForm({ personId, event = null, onDone }: EventFormProps) {
       <div className="flex gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <Label htmlFor="event-start">{t('people.eventStart')}</Label>
-          <Input
+          <DatePicker
             id="event-start"
-            type="date"
             value={startDate}
-            className="w-full min-w-0"
-            onChange={(e) => setStartDate(e.target.value)}
+            rangeAnchor={endDate}
+            onChange={setStartDate}
           />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -87,14 +87,15 @@ export function EventForm({ personId, event = null, onDone }: EventFormProps) {
             {t('people.eventEnd')}{' '}
             <span className="font-normal text-muted-foreground">({t('common.optional')})</span>
           </Label>
-          <Input
+          <DatePicker
             id="event-end"
-            type="date"
             value={endDate}
             min={startDate}
+            rangeAnchor={startDate}
+            clearable
             aria-invalid={endBeforeStart}
-            className="w-full min-w-0"
-            onChange={(e) => setEndDate(e.target.value)}
+            placeholder={t('people.eventEndPlaceholder')}
+            onChange={setEndDate}
           />
         </div>
       </div>

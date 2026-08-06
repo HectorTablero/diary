@@ -135,8 +135,9 @@
       }
     },
     "calendar": {
-      "where": "The month calendar and its day summaries.",
+      "where": "The month calendar and its day summaries, and the shared date picker that replaced every native date input.",
       "keys": {
+        "previous": "Screen-reader label on the month arrows, shared by the Calendar page and the date picker. \"Month\", not \"page\".",
         "onThisDay": "Entries written on this same date in previous years — any year, not specifically last year. Most languages have a set media phrase for this: Italian Accadde oggi, Chinese 那年今日, Japanese 過去の今日."
       }
     },
@@ -150,6 +151,7 @@
     "settings": {
       "where": "The Settings page. The one place where precision beats warmth: several strings explain the scoring model, and a vague translation makes the controls unusable.",
       "keys": {
+        "general": "Device-wide preferences that don't sync: theme, language, and the first day of the week. weekStartAuto's {{day}} is a weekday name already translated by date-fns, so it arrives in the target language and in that language's own casing — don't force a capital on it in the string.",
         "decay": "Explains half-life decay of talking points. \"Half-life\" is the literal physics term and should use the language's established one (emivita, 半減期, 半衰期) — the mechanic really is exponential decay.",
         "memories": "Old entries about a person resurfacing as shared memories after a threshold age.",
         "broadcast": "Suggesting an entry to everyone rather than only to matching people.",

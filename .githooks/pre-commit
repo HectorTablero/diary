@@ -2,7 +2,12 @@
 # Ask which part of the version to bump, and stage the change into this commit.
 # Git detaches stdin from hooks, so reattach the terminal to make the prompt interactive.
 # When there is no terminal (GUI client, rebase, CI) the script keeps the version as-is.
-if [ -e /dev/tty ]; then
+#
+# The open is probed in a subshell first: /dev/tty exists as a path even where nothing can be
+# opened from it (Git Bash under a GUI client or an agent), and a failed exec redirection kills
+# a non-interactive shell outright — which aborted the commit instead of falling through to the
+# non-interactive path this hook always meant to have.
+if ( exec < /dev/tty ) 2>/dev/null; then
   exec < /dev/tty
 fi
 

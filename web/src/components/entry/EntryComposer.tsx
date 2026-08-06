@@ -1,5 +1,5 @@
 import type { EntryDto, PersonRefDto, TagDto, ThreadDto } from '@diary/shared';
-import { AtSign, CalendarIcon, GitBranch, Hash, Send } from 'lucide-react';
+import { AtSign, GitBranch, Hash, Send } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ import { ImportancePicker } from '@/components/entry/ImportanceDot';
 import { TokenTextarea } from '@/components/entry/TokenTextarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Spinner } from '@/components/common/Spinner';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { ApiError } from '@/lib/apiClient';
@@ -275,15 +276,13 @@ export function EntryComposer({
           />
         </div>
         {showDateInput && (
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <CalendarIcon className="size-3.5" />
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => e.target.value && setDate(e.target.value)}
-              className="rounded-md border bg-transparent px-1.5 py-1 text-xs"
-            />
-          </label>
+          <DatePicker
+            value={date}
+            onChange={(value) => value && setDate(value)}
+            aria-label={t('diary.entryDate')}
+            size="sm"
+            className="w-auto"
+          />
         )}
         <div className="ml-auto flex items-center gap-1">
           {showMic && <VoiceEntryButton dateKey={date} disabled={!session?.user} />}
