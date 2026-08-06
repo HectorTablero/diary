@@ -19,7 +19,6 @@ import {
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { toast } from 'sonner';
 import { useMarkCheckup, usePeople, useTags } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { HintTooltip } from '@/components/common/HintTooltip';
@@ -39,6 +38,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { isCheckupDue } from '@/lib/checkup';
 import { canImportContacts } from '@/lib/contacts';
 import { todayKey } from '@/lib/dates';
@@ -273,8 +273,8 @@ function PersonRow({
                 onClick={(e) => {
                   e.preventDefault();
                   markCheckup.mutate(person.id, {
-                    onSuccess: () => toast.success(t('people.checkupMarkedDone')),
-                    onError: () => toast.error(t('errors.unknown')),
+                    onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+                    onError: () => notifyError(t('errors.unknown')),
                   });
                 }}
               >

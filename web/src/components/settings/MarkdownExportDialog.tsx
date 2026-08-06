@@ -2,7 +2,6 @@ import JSZip from 'jszip';
 import { Hash, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { usePeople, useTags } from '@/api/hooks';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
@@ -22,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/common/Spinner';
 import { getEntriesInRange, getPerson, getTalkingPoints, getUnsaidCount } from '@/db/repo';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { saveBinaryFile, saveTextFile } from '@/lib/fileSave';
 import { buildEntriesMarkdown } from '@/lib/markdownExport/entries';
 import { buildPeopleMarkdown, buildPersonMarkdown, type PersonMarkdownOptions } from '@/lib/markdownExport/person';
@@ -160,10 +160,10 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
           await saveBinaryFile(`briefings-${Date.now()}.zip`, base64, 'application/zip');
         }
       }
-      toast.success(t('settings.markdownExport.done'));
+      notifySuccess(t('settings.markdownExport.done'), { important: true });
       onOpenChange(false);
     } catch {
-      toast.error(t('errors.unknown'));
+      notifyError(t('errors.unknown'));
     } finally {
       setExporting(false);
     }

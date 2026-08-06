@@ -32,6 +32,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       // offset={{ top: 'var(--inset-top, 0px)' }}
       closeButton
+      /* Toasts land top-center, so sonner would only accept an upward flick to dismiss — a long
+         reach one-handed on a phone. Either sideways flick works from wherever the thumb
+         already is, whichever hand is holding the device. */
+      swipeDirections={['top', 'left', 'right']}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,

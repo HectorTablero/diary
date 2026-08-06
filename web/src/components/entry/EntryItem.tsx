@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { useDeleteEntry } from '@/api/hooks';
 import { VoiceSubEntryDialog } from '@/components/ai/VoiceSubEntryDialog';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -36,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { fuzzyEquals } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
@@ -294,8 +294,8 @@ export function EntryItem({
         confirmLabel={t('common.delete')}
         onConfirm={() =>
           deleteEntry.mutate(entry.id, {
-            onSuccess: () => toast.success(t('diary.entryDeleted')),
-            onError: () => toast.error(t('errors.unknown')),
+            onSuccess: () => notifySuccess(t('diary.entryDeleted')),
+            onError: () => notifyError(t('errors.unknown')),
           })
         }
       />

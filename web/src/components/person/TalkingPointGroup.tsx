@@ -2,6 +2,7 @@ import type { TalkingPointNode, ThreadDto } from '@diary/shared';
 import { Check, GitBranch } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { notifyError } from '@/lib/notify';
 import { useSetSaidBulk } from '@/api/hooks';
 import { TalkingPointItem } from '@/components/person/TalkingPointItem';
 import { Button } from '@/components/ui/button';
@@ -46,7 +47,7 @@ export function TalkingPointGroup({
               onClick: () => setSaidBulk.mutate({ entryIds: ids, personId, said: false }),
             },
           }),
-        onError: () => toast.error(t('errors.unknown')),
+        onError: () => notifyError(t('errors.unknown')),
       },
     );
   };

@@ -3,7 +3,6 @@ import { newObjectId } from '@diary/shared';
 import { AtSign, GripVertical, Hash, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { useCreateEntry, usePeople, useTags } from '@/api/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import { PersonChip, TagChip } from '@/components/entry/chips';
@@ -21,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { applyMove } from '@/lib/sortableTree';
 import { cn } from '@/lib/utils';
@@ -342,10 +342,10 @@ export function SuggestionReviewDialog({
         }
       };
       await walk(draft, parentId);
-      toast.success(t('ai.entriesCreated', { count: created }));
+      notifySuccess(t('ai.entriesCreated', { count: created }));
       onOpenChange(false);
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     } finally {
       setAccepting(false);
     }

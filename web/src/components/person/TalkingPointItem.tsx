@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 
 function countSubtree(node: TalkingPointNode): number {
@@ -73,7 +74,7 @@ export function TalkingPointItem({
               onClick: () => setSaid.mutate({ entryId: node.id, personId, said: false }),
             },
           }),
-        onError: () => toast.error(t('errors.unknown')),
+        onError: () => notifyError(t('errors.unknown')),
       },
     );
   };
@@ -89,7 +90,7 @@ export function TalkingPointItem({
               onClick: () => setHidden.mutate({ entryId: node.id, personId, hidden: false }),
             },
           }),
-        onError: () => toast.error(t('errors.unknown')),
+        onError: () => notifyError(t('errors.unknown')),
       },
     );
   };

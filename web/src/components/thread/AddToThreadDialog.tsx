@@ -3,13 +3,13 @@ import { MAX_THREADS_PER_ENTRY } from '@diary/shared';
 import { GitBranch, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { useCreateThread, useSetEntryThreads, useThreads } from '@/api/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { notifyError } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 
 /**
@@ -41,7 +41,7 @@ export function AddToThreadDialog({
   const commit = (threadIds: string[]) =>
     setEntryThreads.mutate(
       { entryId: entry.id, threadIds },
-      { onError: () => toast.error(t('errors.unknown')) },
+      { onError: () => notifyError(t('errors.unknown')) },
     );
 
   const toggle = (thread: ThreadDto) => {
@@ -57,7 +57,7 @@ export function AddToThreadDialog({
       commit([...selected, thread.id]);
       setNewName('');
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }
   };
 

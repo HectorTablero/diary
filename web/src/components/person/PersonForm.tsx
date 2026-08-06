@@ -3,7 +3,6 @@ import { MAX_ALIASES } from '@diary/shared';
 import { Hash, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import {
   useCreatePerson,
   useCreateTag,
@@ -27,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { formatBirthdayValue, parseBirthday } from '@/lib/birthday';
 import { normalizePhone, toE164 } from '@/lib/phone';
@@ -218,10 +218,10 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
     try {
       if (person) await updatePerson.mutateAsync({ id: person.id, input });
       else await createPerson.mutateAsync(input);
-      toast.success(t('people.personSaved'));
+      notifySuccess(t('people.personSaved'));
       onDone();
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }
   };
 
@@ -264,7 +264,7 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
               void createTag
                 .mutateAsync({ name: tagName })
                 .then((tag) => setTags((prev) => [...prev, tag]))
-                .catch((err) => toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown')))
+                .catch((err) => notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown')))
             }
             placeholder={t('tags.namePlaceholder')}
           />

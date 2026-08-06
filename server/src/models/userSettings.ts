@@ -31,6 +31,7 @@ const userSettingsSchema = new Schema(
     openRouterApiKey: { type: String, default: DEFAULT_SETTINGS.openRouterApiKey },
     cerebrasApiKey: { type: String, default: DEFAULT_SETTINGS.cerebrasApiKey },
     forceEnglishAIEvents: { type: Boolean, default: DEFAULT_SETTINGS.forceEnglishAIEvents },
+    quietNotifications: { type: Boolean, default: DEFAULT_SETTINGS.quietNotifications },
   },
   { timestamps: true },
 );

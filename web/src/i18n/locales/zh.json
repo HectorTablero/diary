@@ -324,7 +324,10 @@
       "themeAuto": "跟随系统",
       "language": "语言",
       "weekStart": "每周第一天",
-      "weekStartAuto": "自动（{{day}}）"
+      "weekStartAuto": "自动（{{day}}）",
+      "quietNotifications": "隐藏日常提示",
+      "quietNotificationsDescription": "不再为保存记录这类日常操作弹出确认。错误提示，以及设置、备份和导入的确认仍会显示。",
+      "savedOnDevice": "已保存到此设备"
     },
     "decay": {
       "title": "谈资的衰减",

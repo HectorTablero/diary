@@ -346,7 +346,10 @@
       "themeAuto": "Sistema",
       "language": "Idioma",
       "weekStart": "Primer día de la semana",
-      "weekStartAuto": "Automático ({{day}})"
+      "weekStartAuto": "Automático ({{day}})",
+      "quietNotifications": "Ocultar los avisos rutinarios",
+      "quietNotificationsDescription": "Deja de confirmar acciones cotidianas como guardar una entrada. Los errores y las confirmaciones de ajustes, copias de seguridad e importaciones se siguen mostrando.",
+      "savedOnDevice": "Guardado en este dispositivo"
     },
     "decay": {
       "title": "Caducidad de los temas de conversación",
