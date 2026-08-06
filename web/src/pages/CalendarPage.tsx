@@ -11,7 +11,8 @@ import { EntryRow } from '@/components/person/EntryRow';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
 import { ageOn, birthdaysOn } from '@/lib/birthday';
-import { dateFnsLocale, parseDateKey, todayKey } from '@/lib/dates';
+import { capitalize, dateFnsLocale, parseDateKey, todayKey, weekdayName } from '@/lib/dates';
+import { useWeekStart } from '@/lib/preferences';
 import { cn } from '@/lib/utils';
 
 function useIsDark(): boolean {
@@ -61,6 +62,7 @@ export default function CalendarPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const isDark = useIsDark();
+  const weekStart = useWeekStart();
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
 
   const year = cursor.getFullYear();
@@ -76,20 +78,19 @@ export default function CalendarPage() {
   const cells = useMemo(() => {
     const first = startOfMonth(cursor);
     const last = endOfMonth(cursor);
-    const leading = (getDay(first) + 6) % 7;
+    const leading = (getDay(first) - weekStart + 7) % 7;
     const result: (string | null)[] = Array(leading).fill(null);
     for (let d = 1; d <= last.getDate(); d++) {
       result.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
     }
     while (result.length % 7 !== 0) result.push(null);
     return result;
-  }, [cursor, year, month]);
+  }, [cursor, year, month, weekStart]);
 
-  const weekdays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) =>
-      format(new Date(2024, 0, 1 + i), 'EEEEEE', { locale }),
-    );
-  }, [locale]);
+  const weekdays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => weekdayName((weekStart + i) % 7, i18n.language, 'EEEEEE')),
+    [i18n.language, weekStart],
+  );
 
   // Anniversaries for the visible month only — birthdaysOn ignores the stored year, so a
   // birthday recorded as `--07-13` lands on 13 July of whichever year is on screen.
@@ -115,19 +116,19 @@ export default function CalendarPage() {
               size="icon"
               className="size-7"
               onClick={() => setCursor((c) => addMonths(c, -1))}
-              aria-label="‹"
+              aria-label={t('calendar.previous')}
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <span className="text-center text-sm font-medium first-letter:uppercase">
-              {format(cursor, 'LLLL yyyy', { locale })}
+            <span className="text-center text-sm font-medium">
+              {capitalize(format(cursor, 'LLLL yyyy', { locale }))}
             </span>
             <Button
               variant="ghost"
               size="icon"
               className="size-7"
               onClick={() => setCursor((c) => addMonths(c, 1))}
-              aria-label="›"
+              aria-label={t('calendar.next')}
             >
               <ChevronRight className="size-4" />
             </Button>

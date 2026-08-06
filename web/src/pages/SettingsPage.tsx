@@ -36,6 +36,8 @@ import { backupEnvelopeSchema } from '@/lib/backup/schema';
 import { saveTextFile } from '@/lib/fileSave';
 import { googleSignIn } from '@/lib/googleSignIn';
 import { setLocalOnly } from '@/lib/localOnly';
+import { capitalize, localeWeekStart, weekdayName, type WeekStart } from '@/lib/dates';
+import { setPreference, usePreferences } from '@/lib/preferences';
 import { cacheUser } from '@/lib/sessionCache';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -48,6 +50,45 @@ function Section({ title, description, children }: { title: string; description?
       {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
       <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+/** Which day every month grid starts on: Monday, Sunday, or whatever the chosen language does —
+    which is right for almost everyone, and is why it's the default. */
+function WeekStartSetting() {
+  const { t, i18n } = useTranslation();
+  const { weekStartsOn } = usePreferences();
+
+  /* Weekday names come from date-fns rather than the locale files: they are already translated
+     for every shipped language, so this control needs no strings of its own beyond its label.
+     They arrive lowercase in Spanish and Italian, which is what "automático (lunes)" wants but
+     not what an option standing on its own does — hence capitalize() on one and not the other. */
+  const dayName = (day: number) => weekdayName(day, i18n.language);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{t('settings.general.weekStart')}</Label>
+      <Select
+        value={String(weekStartsOn)}
+        onValueChange={(value) =>
+          setPreference('weekStartsOn', value === 'auto' ? 'auto' : (Number(value) as WeekStart))
+        }
+      >
+        <SelectTrigger className="w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="auto">
+            {t('settings.general.weekStartAuto', { day: dayName(localeWeekStart(i18n.language)) })}
+          </SelectItem>
+          {([1, 0] as const).map((day) => (
+            <SelectItem key={day} value={String(day)}>
+              {capitalize(dayName(day))}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 
@@ -225,16 +266,16 @@ export default function SettingsPage() {
     <PageContainer>
       <PageHeader title={t('settings.title')} />
       <div className="flex flex-col gap-4">
-        <Section title={t('settings.appearance')}>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
+        <Section title={t('settings.general.title')}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
             <div className="flex flex-col gap-1.5">
-              <Label>{t('settings.theme')}</Label>
+              <Label>{t('settings.general.theme')}</Label>
               <div className="flex gap-1">
                 {(
                   [
-                    ['light', Sun, t('settings.themeLight')],
-                    ['dark', Moon, t('settings.themeDark')],
-                    ['auto', SunMoon, t('settings.themeAuto')],
+                    ['light', Sun, t('settings.general.themeLight')],
+                    ['dark', Moon, t('settings.general.themeDark')],
+                    ['auto', SunMoon, t('settings.general.themeAuto')],
                   ] as const
                 ).map(([value, Icon, label]) => (
                   <Button
@@ -251,7 +292,7 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>{t('settings.language')}</Label>
+              <Label>{t('settings.general.language')}</Label>
               <Select
                 value={resolveLanguage(i18n.language)}
                 onValueChange={(lng) => void i18n.changeLanguage(lng)}
@@ -268,6 +309,7 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <WeekStartSetting />
           </div>
         </Section>
 

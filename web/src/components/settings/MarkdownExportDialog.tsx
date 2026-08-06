@@ -8,6 +8,7 @@ import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
@@ -196,11 +197,11 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                 <div className="flex gap-2">
                   <div className="flex flex-1 flex-col gap-1.5">
                     <Label htmlFor="md-from">{t('settings.markdownExport.from')}</Label>
-                    <Input id="md-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                    <DatePicker id="md-from" value={from} max={to || undefined} rangeAnchor={to} onChange={setFrom} />
                   </div>
                   <div className="flex flex-1 flex-col gap-1.5">
                     <Label htmlFor="md-to">{t('settings.markdownExport.to')}</Label>
-                    <Input id="md-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                    <DatePicker id="md-to" value={to} min={from || undefined} rangeAnchor={from} onChange={setTo} />
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5">

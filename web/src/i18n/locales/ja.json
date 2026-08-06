@@ -40,7 +40,7 @@
       "三日坊主を回避！「今日も息をした」だけでも立派な日記です。",
       "連続記録が命綱一本でつながっています。プレッシャーじゃないですよ？",
       "今日のオートセーブはまだありません。"
-      ],
+    ],
     "birthdayTitle": "🎂 今日は{{name}}さんの誕生日です",
     "birthdayTitleWithAge": "🎂 {{name}}さんは今日{{age}}歳になりました",
     "birthdayBodies": [
@@ -63,6 +63,7 @@
     "add": "追加",
     "create": "作成",
     "close": "閉じる",
+    "clear": "クリア",
     "confirm": "確認",
     "loading": "読み込み中…",
     "today": "今日",
@@ -77,7 +78,8 @@
     "less": "たたむ",
     "more": "もっと",
     "back": "戻る",
-    "remove": "外す"
+    "remove": "外す",
+    "selectDate": "日付を選択"
   },
   "importance": {
     "label": "重要度",
@@ -120,7 +122,8 @@
     "dragHandle": "ドラッグで並べ替え・移動",
     "birthdays": "誕生日",
     "birthdayLine": "<mention>@{{name}}</mention>さんの誕生日",
-    "birthdayLineWithAge": "<mention>@{{name}}</mention>さんの誕生日（{{age}}）"
+    "birthdayLineWithAge": "<mention>@{{name}}</mention>さんの誕生日（{{age}}）",
+    "entryDate": "記録の日付"
   },
   "people": {
     "title": "人物",
@@ -233,6 +236,7 @@
     "eventStart": "開始",
     "eventEnd": "終了",
     "eventEndHint": "一日で終わる出来事なら、終了日は空欄のままで大丈夫です。",
+    "eventEndPlaceholder": "一日のみ",
     "eventEndBeforeStart": "終了日は開始日より前にできません。",
     "eventNotesPlaceholder": "あとで聞きたいことがあれば…",
     "eventAsked": "聞いた",
@@ -295,6 +299,8 @@
   },
   "calendar": {
     "title": "カレンダー",
+    "previous": "前の月",
+    "next": "次の月",
     "onThisDay": "過去の今日",
     "entriesCount": "記録{{count}}件",
     "birthdayOf": "{{name}}さんの誕生日",
@@ -316,12 +322,16 @@
   },
   "settings": {
     "title": "設定",
-    "appearance": "外観",
-    "theme": "テーマ",
-    "themeLight": "ライト",
-    "themeDark": "ダーク",
-    "themeAuto": "システム",
-    "language": "言語",
+    "general": {
+      "title": "一般",
+      "theme": "テーマ",
+      "themeLight": "ライト",
+      "themeDark": "ダーク",
+      "themeAuto": "システム",
+      "language": "言語",
+      "weekStart": "週の始まり",
+      "weekStartAuto": "自動（{{day}}）"
+    },
     "decay": {
       "title": "話のネタの減衰",
       "description": "重要度ごとに、記録が話のネタとしてどれくらい残るかを決めます。値は日数で表した半減期です。その日数が過ぎると点数は半分になり、下限を下回ると消えます。",

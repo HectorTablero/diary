@@ -66,6 +66,7 @@
     "add": "Add",
     "create": "Create",
     "close": "Close",
+    "clear": "Clear",
     "confirm": "Confirm",
     "loading": "Loading…",
     "today": "Today",
@@ -80,7 +81,8 @@
     "less": "Less",
     "more": "More",
     "back": "Back",
-    "remove": "Remove"
+    "remove": "Remove",
+    "selectDate": "Select a date"
   },
   "importance": {
     "label": "Importance",
@@ -124,7 +126,8 @@
     "dragHandle": "Drag to reorder or move",
     "birthdays": "Birthdays",
     "birthdayLine": "<mention>@{{name}}</mention>'s birthday",
-    "birthdayLineWithAge": "<mention>@{{name}}</mention>'s birthday ({{age}})"
+    "birthdayLineWithAge": "<mention>@{{name}}</mention>'s birthday ({{age}})",
+    "entryDate": "Entry date"
   },
   "people": {
     "title": "People",
@@ -243,6 +246,7 @@
     "eventStart": "Starts",
     "eventEnd": "Ends",
     "eventEndHint": "Leave the end date blank for a single-day event.",
+    "eventEndPlaceholder": "Single day",
     "eventEndBeforeStart": "The end date cannot be before the start date.",
     "eventNotesPlaceholder": "Anything worth remembering to ask about…",
     "eventAsked": "Asked",
@@ -314,6 +318,8 @@
   },
   "calendar": {
     "title": "Calendar",
+    "previous": "Previous month",
+    "next": "Next month",
     "onThisDay": "On this day",
     "entriesCount": "{{count}} entry",
     "entriesCount_other": "{{count}} entries",
@@ -337,12 +343,16 @@
   },
   "settings": {
     "title": "Settings",
-    "appearance": "Appearance",
-    "theme": "Theme",
-    "themeLight": "Light",
-    "themeDark": "Dark",
-    "themeAuto": "System",
-    "language": "Language",
+    "general": {
+      "title": "General",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeAuto": "System",
+      "language": "Language",
+      "weekStart": "First day of the week",
+      "weekStartAuto": "Automatic ({{day}})"
+    },
     "decay": {
       "title": "Talking point decay",
       "description": "How long entries of each importance stay relevant as talking points. The value is a half-life in days: after that many days an entry has half its initial score, and it disappears once the score falls below the cutoff.",

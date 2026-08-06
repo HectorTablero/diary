@@ -61,6 +61,7 @@
     "add": "添加",
     "create": "新建",
     "close": "关闭",
+    "clear": "清除",
     "confirm": "确认",
     "loading": "加载中…",
     "today": "今天",
@@ -75,7 +76,8 @@
     "less": "收起",
     "more": "更多",
     "back": "返回",
-    "remove": "移除"
+    "remove": "移除",
+    "selectDate": "选择日期"
   },
   "importance": {
     "label": "重要程度",
@@ -118,7 +120,8 @@
     "dragHandle": "拖动以排序或移动",
     "birthdays": "生日",
     "birthdayLine": "<mention>@{{name}}</mention>的生日",
-    "birthdayLineWithAge": "<mention>@{{name}}</mention>的生日（{{age}}）"
+    "birthdayLineWithAge": "<mention>@{{name}}</mention>的生日（{{age}}）",
+    "entryDate": "记录日期"
   },
   "people": {
     "title": "人物",
@@ -227,6 +230,7 @@
     "eventStart": "开始",
     "eventEnd": "结束",
     "eventEndHint": "只持续一天的话，结束日期留空即可。",
+    "eventEndPlaceholder": "仅一天",
     "eventEndBeforeStart": "结束日期不能早于开始日期。",
     "eventNotesPlaceholder": "有什么值得之后问起的…",
     "eventAsked": "已问过",
@@ -289,6 +293,8 @@
   },
   "calendar": {
     "title": "日历",
+    "previous": "上个月",
+    "next": "下个月",
     "onThisDay": "那年今日",
     "entriesCount": "{{count}} 条记录",
     "birthdayOf": "{{name}}的生日",
@@ -310,12 +316,16 @@
   },
   "settings": {
     "title": "设置",
-    "appearance": "外观",
-    "theme": "主题",
-    "themeLight": "浅色",
-    "themeDark": "深色",
-    "themeAuto": "跟随系统",
-    "language": "语言",
+    "general": {
+      "title": "常规",
+      "theme": "主题",
+      "themeLight": "浅色",
+      "themeDark": "深色",
+      "themeAuto": "跟随系统",
+      "language": "语言",
+      "weekStart": "每周第一天",
+      "weekStartAuto": "自动（{{day}}）"
+    },
     "decay": {
       "title": "谈资的衰减",
       "description": "各个重要程度的记录能作为谈资保持多久。数值是以天为单位的半衰期：过了这些天，记录的分数只剩一半；分数低于下限后就不再出现。",

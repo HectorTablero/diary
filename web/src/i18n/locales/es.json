@@ -64,6 +64,7 @@
     "add": "Añadir",
     "create": "Crear",
     "close": "Cerrar",
+    "clear": "Borrar",
     "confirm": "Confirmar",
     "loading": "Cargando…",
     "today": "Hoy",
@@ -78,7 +79,8 @@
     "less": "Menos",
     "more": "Más",
     "back": "Volver",
-    "remove": "Quitar"
+    "remove": "Quitar",
+    "selectDate": "Elegir fecha"
   },
   "importance": {
     "label": "Importancia",
@@ -122,7 +124,8 @@
     "dragHandle": "Arrastrar para reordenar o mover",
     "birthdays": "Cumpleaños",
     "birthdayLine": "Cumpleaños de <mention>@{{name}}</mention>",
-    "birthdayLineWithAge": "Cumpleaños de <mention>@{{name}}</mention> ({{age}})"
+    "birthdayLineWithAge": "Cumpleaños de <mention>@{{name}}</mention> ({{age}})",
+    "entryDate": "Fecha de la entrada"
   },
   "people": {
     "title": "Personas",
@@ -238,6 +241,7 @@
     "eventStart": "Empieza",
     "eventEnd": "Termina",
     "eventEndHint": "Deja la fecha de fin en blanco si dura un solo día.",
+    "eventEndPlaceholder": "Un solo día",
     "eventEndBeforeStart": "La fecha de fin no puede ser anterior a la de inicio.",
     "eventNotesPlaceholder": "Algo que merezca la pena recordar para preguntar…",
     "eventAsked": "Preguntado",
@@ -309,6 +313,8 @@
   },
   "calendar": {
     "title": "Calendario",
+    "previous": "Mes anterior",
+    "next": "Mes siguiente",
     "onThisDay": "Tal día como hoy",
     "entriesCount": "{{count}} entrada",
     "entriesCount_other": "{{count}} entradas",
@@ -332,12 +338,16 @@
   },
   "settings": {
     "title": "Ajustes",
-    "appearance": "Apariencia",
-    "theme": "Tema",
-    "themeLight": "Claro",
-    "themeDark": "Oscuro",
-    "themeAuto": "Sistema",
-    "language": "Idioma",
+    "general": {
+      "title": "General",
+      "theme": "Tema",
+      "themeLight": "Claro",
+      "themeDark": "Oscuro",
+      "themeAuto": "Sistema",
+      "language": "Idioma",
+      "weekStart": "Primer día de la semana",
+      "weekStartAuto": "Automático ({{day}})"
+    },
     "decay": {
       "title": "Caducidad de los temas de conversación",
       "description": "Cuánto tiempo siguen siendo relevantes las entradas de cada importancia como temas de conversación. El valor es una semivida en días: pasados esos días la entrada tiene la mitad de su puntuación inicial, y desaparece cuando cae por debajo del umbral.",

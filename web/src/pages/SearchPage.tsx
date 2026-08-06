@@ -11,6 +11,7 @@ import { SIDEBAR_ONLY } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -150,20 +151,28 @@ export default function SearchPage() {
             </Tooltip>
           ))}
         </div>
-        <input
-          type="date"
+        <DatePicker
           value={from}
-          onChange={(e) => update({ from: e.target.value || null })}
+          max={to || undefined}
+          rangeAnchor={to}
+          clearable
+          size="sm"
+          className="w-auto"
+          placeholder={t('search.from')}
           aria-label={t('search.from')}
-          className="h-7 rounded-md border bg-transparent px-1.5 text-xs"
+          onChange={(value) => update({ from: value || null })}
         />
         <span className="text-xs text-muted-foreground">–</span>
-        <input
-          type="date"
+        <DatePicker
           value={to}
-          onChange={(e) => update({ to: e.target.value || null })}
+          min={from || undefined}
+          rangeAnchor={from}
+          clearable
+          size="sm"
+          className="w-auto"
+          placeholder={t('search.to')}
           aria-label={t('search.to')}
-          className="h-7 rounded-md border bg-transparent px-1.5 text-xs"
+          onChange={(value) => update({ to: value || null })}
         />
         {hasFilters && (
           <Button

@@ -60,6 +60,7 @@
     "add": "Aggiungi",
     "create": "Crea",
     "close": "Chiudi",
+    "clear": "Cancella",
     "confirm": "Conferma",
     "loading": "Caricamento…",
     "today": "Oggi",
@@ -74,7 +75,8 @@
     "less": "Meno",
     "more": "Altro",
     "back": "Indietro",
-    "remove": "Rimuovi"
+    "remove": "Rimuovi",
+    "selectDate": "Scegli una data"
   },
   "importance": {
     "label": "Importanza",
@@ -118,7 +120,8 @@
     "dragHandle": "Trascina per riordinare o spostare",
     "birthdays": "Compleanni",
     "birthdayLine": "compleanno di <mention>@{{name}}</mention>",
-    "birthdayLineWithAge": "compleanno di <mention>@{{name}}</mention> ({{age}})"
+    "birthdayLineWithAge": "compleanno di <mention>@{{name}}</mention> ({{age}})",
+    "entryDate": "Data della voce"
   },
   "people": {
     "title": "Persone",
@@ -237,6 +240,7 @@
     "eventStart": "Inizia",
     "eventEnd": "Finisce",
     "eventEndHint": "Lascia vuota la data di fine per un evento di un solo giorno.",
+    "eventEndPlaceholder": "Un solo giorno",
     "eventEndBeforeStart": "La data di fine non può precedere quella di inizio.",
     "eventNotesPlaceholder": "Qualcosa che valga la pena chiedere…",
     "eventAsked": "Chiesto",
@@ -308,6 +312,8 @@
   },
   "calendar": {
     "title": "Calendario",
+    "previous": "Mese precedente",
+    "next": "Mese successivo",
     "onThisDay": "Accadde oggi",
     "entriesCount": "{{count}} voce",
     "entriesCount_other": "{{count}} voci",
@@ -331,12 +337,16 @@
   },
   "settings": {
     "title": "Impostazioni",
-    "appearance": "Aspetto",
-    "theme": "Tema",
-    "themeLight": "Chiaro",
-    "themeDark": "Scuro",
-    "themeAuto": "Sistema",
-    "language": "Lingua",
+    "general": {
+      "title": "Generale",
+      "theme": "Tema",
+      "themeLight": "Chiaro",
+      "themeDark": "Scuro",
+      "themeAuto": "Sistema",
+      "language": "Lingua",
+      "weekStart": "Primo giorno della settimana",
+      "weekStartAuto": "Automatico ({{day}})"
+    },
     "decay": {
       "title": "Decadimento degli spunti",
       "description": "Per quanto tempo le voci di ciascuna importanza restano rilevanti come spunti. Il valore è un'emivita in giorni: passati quei giorni una voce ha metà del punteggio iniziale, e scompare quando il punteggio scende sotto la soglia.",
