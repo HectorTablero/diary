@@ -1,9 +1,9 @@
 import type { SuggestedEntryNode } from '@diary/shared';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { useAiSuggestions, useSettings } from '@/api/hooks';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { notifyError } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { transcribeAudio } from '@/lib/groq';
 
@@ -48,7 +48,7 @@ export function useVoiceToSuggestions({
     try {
       const transcript = await transcribeAudio(apiKey, blob);
       if (!transcript) {
-        toast.error(t('ai.empty'));
+        notifyError(t('ai.empty'));
         setPhase('idle');
         onSettled?.();
         return;
@@ -63,7 +63,7 @@ export function useVoiceToSuggestions({
         parentPath,
       });
       if (!entries.length) {
-        toast.error(t('ai.empty'));
+        notifyError(t('ai.empty'));
         setPhase('idle');
         onSettled?.();
         return;
@@ -71,7 +71,7 @@ export function useVoiceToSuggestions({
       setSuggestions(entries);
       setPhase('idle');
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
       setPhase('idle');
       onSettled?.();
     }
@@ -85,7 +85,7 @@ export function useVoiceToSuggestions({
       await recorder.start();
       return true;
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
       return false;
     }
   }, [recorder, t]);

@@ -1,7 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { toast } from 'sonner';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -13,7 +12,9 @@ import { initBackgroundSync } from './lib/backgroundSync';
 import { initGlobalHaptics } from './lib/haptics';
 import { initLiveUpdate } from './lib/liveUpdate';
 import { isNative } from './lib/native';
+import { notifySuccess } from './lib/notify';
 import { initLocalNotifications, refreshNotifications } from './lib/notifications';
+import { queryClient } from './lib/queryClient';
 import { initTelemetry } from './lib/telemetry';
 import { logVersion } from './lib/version';
 import i18n from './i18n';
@@ -47,16 +48,6 @@ if (!isNative) {
   });
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
 initSync();
 initGlobalHaptics();
 initLocalNotifications();
@@ -65,7 +56,7 @@ onSyncApplied(() => queryClient.invalidateQueries());
 // Remote-origin changes (another device) can affect who's due for a checkup
 // or whether today already has an entry, so re-arm reminders too.
 onSyncApplied(() => refreshNotifications());
-onReconnected(() => toast.success(i18n.t('sync.reconnected')));
+onReconnected(() => notifySuccess(i18n.t('sync.reconnected')));
 
 async function bootstrap() {
   // The bearer token must be in memory before anything talks to the API.

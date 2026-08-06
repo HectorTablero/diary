@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { notifySuccess } from '@/lib/notify';
 import { ageOn, daysUntilBirthday, formatBirthday } from '@/lib/birthday';
 import { qrcodeLoader } from '@/lib/preloaders';
 import {
@@ -143,7 +144,7 @@ function WeChatAction({ wechatId }: { wechatId: string }) {
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
-              void copyId().then((copied) => copied && toast.success(t('people.wechatCopied')))
+              void copyId().then((copied) => copied && notifySuccess(t('people.wechatCopied')))
             }
           >
             <Copy className="size-3.5" /> {t('people.wechatCopyId')}

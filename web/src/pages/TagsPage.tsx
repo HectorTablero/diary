@@ -2,7 +2,6 @@ import type { TagWithStats } from '@diary/shared';
 import { Pencil, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -19,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { cn } from '@/lib/utils';
 
@@ -53,10 +53,10 @@ function TagFormDialog({
     try {
       if (tag) await updateTag.mutateAsync({ id: tag.id, input: { name: name.trim(), color } });
       else await createTag.mutateAsync({ name: name.trim(), color });
-      toast.success(t('tags.tagSaved'));
+      notifySuccess(t('tags.tagSaved'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }
   };
 
@@ -229,8 +229,8 @@ export default function TagsPage() {
         onConfirm={() => {
           if (!deleting) return;
           deleteTag.mutate(deleting.id, {
-            onSuccess: () => toast.success(t('tags.tagDeleted')),
-            onError: () => toast.error(t('errors.unknown')),
+            onSuccess: () => notifySuccess(t('tags.tagDeleted')),
+            onError: () => notifyError(t('errors.unknown')),
           });
         }}
       />

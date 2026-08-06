@@ -2,7 +2,6 @@ import type { EntryDto, PersonRefDto, TagDto, ThreadDto } from '@diary/shared';
 import { AtSign, GitBranch, Hash, Send } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import {
   useCreateEntry,
   useCreateTag,
@@ -23,6 +22,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Spinner } from '@/components/common/Spinner';
 import { useSyncStatus } from '@/db/useSyncStatus';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { useSession } from '@/lib/authClient';
 import { isNative } from '@/lib/native';
@@ -89,7 +89,7 @@ export function EntryComposer({
       addTag(tag);
       return tag;
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
       return null;
     }
   };
@@ -101,7 +101,7 @@ export function EntryComposer({
     try {
       addThread(await createThread.mutateAsync({ name }));
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }
   };
 
@@ -135,10 +135,10 @@ export function EntryComposer({
         await createEntry.mutateAsync({ ...payload, parentId });
         reset();
       }
-      toast.success(t('diary.entrySaved'));
+      notifySuccess(t('diary.entrySaved'));
       onDone?.();
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }
   };
 

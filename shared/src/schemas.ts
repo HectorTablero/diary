@@ -190,6 +190,9 @@ export const settingsSchema = z.object({
   broadcastLifeChangingEvents: z.boolean(),
   broadcastTagIds: z.array(objectIdSchema).max(50),
   forceEnglishAIEvents: z.boolean().optional(),
+  // Optional for the same reason as the keys below: a queued PUT from a client that predates
+  // this field must not reset it on replay.
+  quietNotifications: z.boolean().optional(),
   defaultCheckupIntervalDays: checkupIntervalDaysSchema,
   // Both optional and never defaulted: a queued PUT /settings outbox payload from an older
   // client (that predates these fields) must not wipe the stored keys on replay. An

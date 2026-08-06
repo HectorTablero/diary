@@ -14,7 +14,6 @@ import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
-import { toast } from 'sonner';
 import { usePeople } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
@@ -24,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { importPeople, type ImportItem } from '@/db/mutations';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { canImportContacts, checkContactsPermission, readContacts, requestContactsPermission } from '@/lib/contacts';
 import {
   canKeepBoth,
@@ -324,10 +324,10 @@ export default function ImportContactsPage() {
         resolution: resolutionFor(candidate.contactId) ?? { action: 'create' },
       }));
       const { created, merged } = await importPeople(items);
-      toast.success(t('import.done', { created, merged }));
+      notifySuccess(t('import.done', { created, merged }), { important: true });
       void navigate('/people');
     } catch {
-      toast.error(t('errors.unknown'));
+      notifyError(t('errors.unknown'));
       setImporting(false);
     }
   };

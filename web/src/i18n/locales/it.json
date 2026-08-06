@@ -345,7 +345,10 @@
       "themeAuto": "Sistema",
       "language": "Lingua",
       "weekStart": "Primo giorno della settimana",
-      "weekStartAuto": "Automatico ({{day}})"
+      "weekStartAuto": "Automatico ({{day}})",
+      "quietNotifications": "Nascondi gli avvisi di routine",
+      "quietNotificationsDescription": "Non conferma più le azioni quotidiane come salvare una voce. Gli errori e le conferme di impostazioni, backup e importazioni restano.",
+      "savedOnDevice": "Salvato su questo dispositivo"
     },
     "decay": {
       "title": "Decadimento degli spunti",

@@ -2,7 +2,6 @@ import type { ThreadWithStats } from '@diary/shared';
 import { ChevronDown, GitBranch, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import {
   useCreateThread,
   useDeleteThread,
@@ -22,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { cn } from '@/lib/utils';
 
@@ -54,10 +54,10 @@ function ThreadFormDialog({
     try {
       if (thread) await updateThread.mutateAsync({ id: thread.id, input: { name: name.trim() } });
       else await createThread.mutateAsync({ name: name.trim() });
-      toast.success(t('threads.threadSaved'));
+      notifySuccess(t('threads.threadSaved'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }
   };
 
@@ -274,8 +274,8 @@ export default function ThreadsPage() {
         onConfirm={() => {
           if (!deleting) return;
           deleteThread.mutate(deleting.id, {
-            onSuccess: () => toast.success(t('threads.threadDeleted')),
-            onError: () => toast.error(t('errors.unknown')),
+            onSuccess: () => notifySuccess(t('threads.threadDeleted')),
+            onError: () => notifyError(t('errors.unknown')),
           });
         }}
       />

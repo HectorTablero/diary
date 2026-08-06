@@ -29,7 +29,6 @@ import type { LucideIcon } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router';
-import { toast } from 'sonner';
 import {
   useDeleteEvent,
   useDeletePerson,
@@ -65,6 +64,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { isCheckupDue } from '@/lib/checkup';
 import { formatDateKey, parseDateKey, todayKey } from '@/lib/dates';
 
@@ -360,8 +360,8 @@ function EventRow({
               markAsked.mutate(
                 { personId: person.id, eventId: event.id },
                 {
-                  onSuccess: () => toast.success(t('people.eventMarkedAsked')),
-                  onError: () => toast.error(t('errors.unknown')),
+                  onSuccess: () => notifySuccess(t('people.eventMarkedAsked')),
+                  onError: () => notifyError(t('errors.unknown')),
                 },
               )
             }
@@ -383,8 +383,8 @@ function EventRow({
           deleteEvent.mutate(
             { personId: person.id, eventId: event.id },
             {
-              onSuccess: () => toast.success(t('people.eventDeleted')),
-              onError: () => toast.error(t('errors.unknown')),
+              onSuccess: () => notifySuccess(t('people.eventDeleted')),
+              onError: () => notifyError(t('errors.unknown')),
             },
           );
         }}
@@ -532,8 +532,8 @@ export default function PersonProfilePage() {
               <DropdownMenuItem
                 onClick={() =>
                   markCheckup.mutate(person.id, {
-                    onSuccess: () => toast.success(t('people.checkupMarkedDone')),
-                    onError: () => toast.error(t('errors.unknown')),
+                    onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+                    onError: () => notifyError(t('errors.unknown')),
                   })
                 }
               >
@@ -563,8 +563,8 @@ export default function PersonProfilePage() {
               className="gap-1.5"
               onClick={() =>
                 markCheckup.mutate(person.id, {
-                  onSuccess: () => toast.success(t('people.checkupMarkedDone')),
-                  onError: () => toast.error(t('errors.unknown')),
+                  onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+                  onError: () => notifyError(t('errors.unknown')),
                 })
               }
             >
@@ -579,8 +579,8 @@ export default function PersonProfilePage() {
                 updatePerson.mutate(
                   { id: person.id, input: { checkupIntervalDays: null } },
                   {
-                    onSuccess: () => toast.success(t('people.checkupsDisabled')),
-                    onError: () => toast.error(t('errors.unknown')),
+                    onSuccess: () => notifySuccess(t('people.checkupsDisabled')),
+                    onError: () => notifyError(t('errors.unknown')),
                   },
                 )
               }
@@ -631,8 +631,8 @@ export default function PersonProfilePage() {
                     markEventAsked.mutate(
                       { personId: person.id, eventId: event.id },
                       {
-                        onSuccess: () => toast.success(t('people.eventMarkedAsked')),
-                        onError: () => toast.error(t('errors.unknown')),
+                        onSuccess: () => notifySuccess(t('people.eventMarkedAsked')),
+                        onError: () => notifyError(t('errors.unknown')),
                       },
                     )
                   }
@@ -706,10 +706,10 @@ export default function PersonProfilePage() {
           setConfirmingDelete(false);
           deletePerson.mutate(person.id, {
             onSuccess: () => {
-              toast.success(t('people.personDeleted'));
+              notifySuccess(t('people.personDeleted'));
               navigate('/people');
             },
-            onError: () => toast.error(t('errors.unknown')),
+            onError: () => notifyError(t('errors.unknown')),
           });
         }}
       />

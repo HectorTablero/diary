@@ -51,6 +51,9 @@ export const DEFAULT_SETTINGS = {
   broadcastLifeChangingEvents: false,
   broadcastTagIds: [] as string[],
   forceEnglishAIEvents: false,
+  /** Drop the success toasts for everyday actions, keeping errors and the confirmations the
+      user cannot otherwise verify. See notifySuccess in web/src/lib/notify.ts. */
+  quietNotifications: true,
   /** Default checkup interval inherited by new people. `null` = checkups off by default. */
   defaultCheckupIntervalDays: null as number | null,
   /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text

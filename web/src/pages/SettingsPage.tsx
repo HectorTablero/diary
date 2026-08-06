@@ -4,7 +4,6 @@ import { Download, FileText, Hash, LogOut, Moon, RotateCcw, Sun, SunMoon, Upload
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
-import { toast } from 'sonner';
 import { useSaveSettings, useSettings, useTags } from '@/api/hooks';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -31,6 +30,7 @@ import { Switch } from '@/components/ui/switch';
 import { clearLocalData } from '@/db/db';
 import { closeLiveChannel } from '@/db/sync';
 import { LANGUAGES, resolveLanguage } from '@/i18n';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { signOut, useSession } from '@/lib/authClient';
 import { setAuthToken } from '@/lib/authToken';
 import { buildBackupEnvelope } from '@/lib/backup/export';
@@ -57,6 +57,11 @@ function Section({ title, description, children }: { title: string; description?
 
 /** Which day every month grid starts on: Monday, Sunday, or whatever the chosen language does —
     which is right for almost everyone, and is why it's the default. */
+/* Theme, language and the week start never reach the server — they describe this device, not the
+   diary. Saying so on every change is what stops "why didn't my phone pick this up?" from being
+   a mystery, and it is a confirmation the user asked for, so quiet mode does not drop it. */
+const notifyDeviceSaved = (message: string) => notifySuccess(message, { important: true });
+
 function WeekStartSetting() {
   const { t, i18n } = useTranslation();
   const { weekStartsOn } = usePreferences();
@@ -72,9 +77,10 @@ function WeekStartSetting() {
       <Label>{t('settings.general.weekStart')}</Label>
       <Select
         value={String(weekStartsOn)}
-        onValueChange={(value) =>
-          setPreference('weekStartsOn', value === 'auto' ? 'auto' : (Number(value) as WeekStart))
-        }
+        onValueChange={(value) => {
+          setPreference('weekStartsOn', value === 'auto' ? 'auto' : (Number(value) as WeekStart));
+          notifyDeviceSaved(t('settings.general.savedOnDevice'));
+        }}
       >
         <SelectTrigger className="w-48">
           <SelectValue />
@@ -90,6 +96,40 @@ function WeekStartSetting() {
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+/** Silences the success toasts for everyday actions. Errors are never affected — the point is to
+    stop the app narrating things the user can already see, not to hide problems.
+
+    Unlike its neighbours in this section it is an account setting rather than a device one, so
+    it rides the page's draft and its normal save path. */
+function QuietNotificationsSetting({
+  checked,
+  onCheckedChange,
+  disabled,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-0.5">
+        <Label htmlFor="quiet-notifications">{t('settings.general.quietNotifications')}</Label>
+        <p className="text-xs text-muted-foreground">
+          {t('settings.general.quietNotificationsDescription')}
+        </p>
+      </div>
+      <Switch
+        id="quiet-notifications"
+        disabled={disabled}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+      />
     </div>
   );
 }
@@ -153,6 +193,7 @@ function buildPayload(
     broadcastLifeChangingEvents: draft.broadcastLifeChangingEvents,
     broadcastTagIds: draft.broadcastTagIds,
     forceEnglishAIEvents: draft.forceEnglishAIEvents,
+    quietNotifications: draft.quietNotifications,
     defaultCheckupIntervalDays: checkupsEnabled ? clampDays(checkupIntervalDays, 1) : null,
     groqApiKey: draft.groqApiKey,
     openRouterApiKey: draft.openRouterApiKey,
@@ -197,8 +238,10 @@ export default function SettingsPage() {
   }, [settings, draft]);
 
   const changeTheme = (value: Theme) => {
+    if (value === theme) return; // re-clicking the active button isn't a change to confirm
     setTheme(value);
     applyTheme(value);
+    notifyDeviceSaved(t('settings.general.savedOnDevice'));
   };
 
   /** Writes the current draft if it differs from what was last written. Safe to call freely:
@@ -223,10 +266,10 @@ export default function SettingsPage() {
     lastSaved.current = serialized;
     void saveSettings
       .mutateAsync(payload)
-      .then(() => toast.success(t('settings.settingsSaved')))
+      .then(() => notifySuccess(t('settings.settingsSaved'), { important: true }))
       .catch(() => {
         lastSaved.current = previous;
-        toast.error(t('errors.unknown'));
+        notifyError(t('errors.unknown'));
       });
   };
 
@@ -299,7 +342,7 @@ export default function SettingsPage() {
       // local-only mode and kicks the sync engine, which drains anything queued while offline.
       setLinkingAccount(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('errors.unknown'));
+      notifyError(err instanceof Error ? err.message : t('errors.unknown'));
       setLinkingAccount(false);
     }
   };
@@ -313,9 +356,9 @@ export default function SettingsPage() {
         JSON.stringify(envelope, null, 2),
         'application/json',
       );
-      toast.success(t('settings.data.exportDone'));
+      notifySuccess(t('settings.data.exportDone'), { important: true });
     } catch {
-      toast.error(t('errors.unknown'));
+      notifyError(t('errors.unknown'));
     } finally {
       setExportingBackup(false);
     }
@@ -329,7 +372,7 @@ export default function SettingsPage() {
       const parsed = backupEnvelopeSchema.parse(JSON.parse(await file.text()));
       void navigate('/settings/import-backup', { state: { envelope: parsed } });
     } catch {
-      toast.error(t('settings.data.invalidFile'));
+      notifyError(t('settings.data.invalidFile'));
     }
   };
 
@@ -349,7 +392,7 @@ export default function SettingsPage() {
       <PageHeader title={t('settings.title')} />
       <div className="flex flex-col gap-4">
         <Section title={t('settings.general.title')}>
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
             <div className="flex flex-col gap-1.5">
               <Label>{t('settings.general.theme')}</Label>
               <div className="flex gap-1">
@@ -377,7 +420,11 @@ export default function SettingsPage() {
               <Label>{t('settings.general.language')}</Label>
               <Select
                 value={resolveLanguage(i18n.language)}
-                onValueChange={(lng) => void i18n.changeLanguage(lng)}
+                onValueChange={(lng) => {
+                  void i18n.changeLanguage(lng);
+                  // Read after the switch, so the confirmation arrives in the new language.
+                  notifyDeviceSaved(i18n.t('settings.general.savedOnDevice'));
+                }}
               >
                 <SelectTrigger className="w-40">
                   <SelectValue />
@@ -393,6 +440,17 @@ export default function SettingsPage() {
             </div>
             <WeekStartSetting />
           </div>
+          {isLoading || !draft ? (
+            <Skeleton className="h-10" />
+          ) : (
+            <QuietNotificationsSetting
+              checked={draft.quietNotifications}
+              onCheckedChange={(checked) => {
+                setDraft({ ...draft, quietNotifications: checked });
+                requestCommit();
+              }}
+            />
+          )}
         </Section>
 
         <Section title={t('settings.decay.title')} description={t('settings.decay.description')}>

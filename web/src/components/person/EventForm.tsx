@@ -2,7 +2,6 @@ import type { PersonEventDto } from '@diary/shared';
 import { MAX_EVENT_TITLE_LENGTH, newObjectId } from '@diary/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { useSaveEvent } from '@/api/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/date-picker';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { todayKey } from '@/lib/dates';
 
@@ -50,10 +50,10 @@ export function EventForm({ personId, event = null, onDone }: EventFormProps) {
           createdAt: event?.createdAt ?? new Date().toISOString(),
         },
       });
-      toast.success(t('people.eventSaved'));
+      notifySuccess(t('people.eventSaved'));
       onDone();
     } catch (err) {
-      toast.error(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }
   };
 

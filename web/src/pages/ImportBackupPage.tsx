@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { useEntryIds, usePeople, useTags, useThreads } from '@/api/hooks';
 import { BackupConflictRow, type BackupMergeTarget } from '@/components/backup/BackupConflictRow';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -185,7 +186,7 @@ export default function ImportBackupPage() {
         resolution: entryResolutionFor(row.id),
       }));
       const summary = await importBackup({ tags, threads, people, entries });
-      toast.success(
+      notifySuccess(
         t('importBackup.done', {
           tagsCreated: summary.tags.created,
           tagsMerged: summary.tags.merged,
@@ -196,13 +197,14 @@ export default function ImportBackupPage() {
           entriesCreated: summary.entries.created,
           entriesMerged: summary.entries.merged,
         }),
+        { important: true },
       );
       if (summary.entries.orphaned > 0) {
         toast.info(t('importBackup.orphaned', { count: summary.entries.orphaned }));
       }
       void navigate('/settings');
     } catch {
-      toast.error(t('errors.unknown'));
+      notifyError(t('errors.unknown'));
       setImporting(false);
     }
   };

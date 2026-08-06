@@ -351,7 +351,10 @@
       "themeAuto": "System",
       "language": "Language",
       "weekStart": "First day of the week",
-      "weekStartAuto": "Automatic ({{day}})"
+      "weekStartAuto": "Automatic ({{day}})",
+      "quietNotifications": "Hide routine notifications",
+      "quietNotificationsDescription": "Stop confirming everyday actions like saving an entry. Errors, and confirmations for settings, backups and imports, still appear.",
+      "savedOnDevice": "Saved on this device"
     },
     "decay": {
       "title": "Talking point decay",

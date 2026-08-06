@@ -2,10 +2,10 @@ import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router';
-import { toast } from 'sonner';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { FullScreenSpinner, Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
+import { notifyError } from '@/lib/notify';
 import { useSession } from '@/lib/authClient';
 import { googleSignIn } from '@/lib/googleSignIn';
 import { setLocalOnly } from '@/lib/localOnly';
@@ -27,7 +27,7 @@ export default function LoginPage() {
       // flow has already navigated away by the time this resolves.
       setSigningIn(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('errors.unknown'));
+      notifyError(err instanceof Error ? err.message : t('errors.unknown'));
       setSigningIn(false);
     }
   };

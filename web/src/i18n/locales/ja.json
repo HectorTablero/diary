@@ -330,7 +330,10 @@
       "themeAuto": "システム",
       "language": "言語",
       "weekStart": "週の始まり",
-      "weekStartAuto": "自動（{{day}}）"
+      "weekStartAuto": "自動（{{day}}）",
+      "quietNotifications": "日常的な通知を隠す",
+      "quietNotificationsDescription": "記録の保存など、ふだんの操作の確認を表示しなくなります。エラーと、設定・バックアップ・読み込みの確認はそのまま表示されます。",
+      "savedOnDevice": "この端末に保存しました"
     },
     "decay": {
       "title": "話のネタの減衰",
