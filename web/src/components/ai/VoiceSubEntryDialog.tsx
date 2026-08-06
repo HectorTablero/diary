@@ -1,7 +1,8 @@
-import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { DEFAULT_SUB_ENTRY_DEPTH } from '@diary/shared';
 import { Square, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSettings } from '@/api/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +43,7 @@ export function VoiceSubEntryDialog({
   parentPath,
 }: VoiceSubEntryDialogProps) {
   const { t } = useTranslation();
+  const { data: settings } = useSettings();
   const { phase, recorder, start, suggestions, clearSuggestions } = useVoiceToSuggestions({
     dateKey,
     parentPath,
@@ -135,7 +137,7 @@ export function VoiceSubEntryDialog({
         parentId={parentId}
         // Roots of this draft are created at parentPath.length, so the tree the user can drag
         // together in the review dialog has exactly the depth the server was willing to generate.
-        maxDepth={MAX_SUB_ENTRY_DEPTH - parentPath.length}
+        maxDepth={(settings?.maxSubEntryDepth ?? DEFAULT_SUB_ENTRY_DEPTH) - parentPath.length}
         parentContent={parentContent}
         onOpenChange={(next) => {
           if (next) return;

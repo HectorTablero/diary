@@ -17,10 +17,61 @@ import { resolveWeekStart, type WeekStart } from './dates';
 export interface Preferences {
   /** Which day the month grids start on. 'auto' follows the active language's own convention. */
   weekStartsOn: WeekStart | 'auto';
+  /** Whether times read as 09:00 or 9 AM. 'auto' follows the active language, like weekStartsOn. */
+  hourCycle: '12' | '24' | 'auto';
+
+  /* --- Reminders ---------------------------------------------------------------------------
+     Every alarm this device schedules. These are here rather than in the synced SettingsDto for
+     a reason worth stating: signing out runs clearLocalData(), which wipes db.meta and drops the
+     account settings back to DEFAULT_SETTINGS — so a synced `dailyReminder: false` would quietly
+     become true again and the phone would resume buzzing at a time the user had turned off. A
+     wrong default for a toast is invisible; for an alarm it is the bug this whole block exists to
+     remove. localStorage survives sign-out. The times are also meaningless without a timezone,
+     and none is stored anywhere: every schedule is built in this device's local time.
+
+     Keys are flat rather than nested under one `notifications` object because load() below
+     shallow-merges — a nested blob written by an older build would shadow the defaults whole and
+     any sub-key added later would read undefined. */
+
+  /** The "you haven't written today" nudge. */
+  dailyReminder: boolean;
+  /** `HH:mm` local. */
+  dailyReminderTime: string;
+  birthdayReminders: boolean;
+  birthdayReminderTime: string;
+  checkupReminders: boolean;
+  /** Defers reminders that have no time of their own — see notificationSchedule.ts. */
+  quietHoursStart: string;
+  quietHoursEnd: string;
+
+  /** The light tick on every button press. Native only; a no-op on the web either way. */
+  haptics: boolean;
+  /** Whether an entry's sub-entries start open. Collapsing is still per-entry and per-visit. */
+  entriesExpanded: boolean;
+  /** Last importance actually saved, for when defaultImportance is null ("remember last used"). */
+  lastImportance: number;
+  /** Advanced: hold back sync until the device is on wi-fi. Off by default — the diary is text, so
+      a month of syncing costs less than one photo, and the failure mode of this being on by
+      mistake is a diary that silently stops backing itself up. */
+  syncOnWifiOnly: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   weekStartsOn: 'auto',
+  hourCycle: 'auto',
+  // Every default below reproduces the behaviour that used to be hardcoded, so upgrading changes
+  // nothing until the user touches something.
+  dailyReminder: true,
+  dailyReminderTime: '23:45',
+  birthdayReminders: true,
+  birthdayReminderTime: '09:00',
+  checkupReminders: true,
+  quietHoursStart: '22:30',
+  quietHoursEnd: '08:00',
+  haptics: true,
+  entriesExpanded: true,
+  lastImportance: 3,
+  syncOnWifiOnly: false,
 };
 
 const STORAGE_KEY = 'preferences';
@@ -83,8 +134,25 @@ window.addEventListener('storage', (event) => {
   emit();
 });
 
+/** Subscribe from outside React — used to re-arm the alarms when a reminder preference changes. */
+export const subscribePreferences = (listener: () => void) => subscribe(listener);
+
 export function usePreferences(): Preferences {
   return useSyncExternalStore(subscribe, getPreferences, getPreferences);
+}
+
+/** True when the active language (or the user's override) writes times as 9 AM rather than 09:00. */
+export function resolveHour12(hourCycle: Preferences['hourCycle'], lng: string): boolean {
+  if (hourCycle !== 'auto') return hourCycle === '12';
+  // Intl is the authority on what a locale actually does; en-US is 12h, es/it/ja/zh are 24h.
+  return new Intl.DateTimeFormat(lng, { hour: 'numeric' }).resolvedOptions().hour12 ?? false;
+}
+
+/** Whether to render times as 12- or 24-hour, with 'auto' already resolved against the language. */
+export function useHour12(): boolean {
+  const { i18n } = useTranslation();
+  const { hourCycle } = usePreferences();
+  return resolveHour12(hourCycle, i18n.language);
 }
 
 /** The first column of every month grid, with 'auto' already resolved against the language. */

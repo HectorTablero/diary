@@ -79,25 +79,25 @@ export function ageOn(birthday: string | null, on: Date = new Date()): number | 
 }
 
 /**
- * The next date this birthday falls on, at `hour` local time. **Today counts** — day granularity,
- * not hour — so a birthday discovered at 10:00 still reports as today rather than jumping a year;
- * scheduling the (past) 09:00 alarm is the caller's problem to catch up on, exactly as
- * refreshCheckupNotifications does.
+ * The next date this birthday falls on, at local midnight. **Today counts** — day granularity, not
+ * hour — so a birthday discovered at 10:00 still reports as today rather than jumping a year;
+ * deciding what clock time to fire at, and catching up when that time has passed, is the caller's
+ * problem, exactly as refreshCheckupNotifications does.
  *
  * Feb 29 in a non-leap year falls back to Feb 28, so the reminder doesn't silently vanish for
  * three years at a time.
+ *
+ * Returns a *day*, deliberately carrying no hour: the reminder hour is a user preference now, and
+ * a default here would be a second place for it to live — which is exactly what it used to be, with
+ * daysUntilBirthday silently depending on a 9 that also existed in notifications.ts.
  */
-export function nextOccurrence(
-  birthday: string | null,
-  from: Date = new Date(),
-  hour = 9,
-): Date | null {
+export function nextOccurrence(birthday: string | null, from: Date = new Date()): Date | null {
   const parsed = parseBirthday(birthday);
   if (!parsed) return null;
 
   const at = (year: number): Date => {
     const day = parsed.month === 2 && parsed.day === 29 && !isLeapYear(year) ? 28 : parsed.day;
-    return new Date(year, parsed.month - 1, day, hour, 0, 0, 0);
+    return new Date(year, parsed.month - 1, day, 0, 0, 0, 0);
   };
 
   const thisYear = at(from.getFullYear());

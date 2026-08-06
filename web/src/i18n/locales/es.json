@@ -80,7 +80,9 @@
     "more": "Más",
     "back": "Volver",
     "remove": "Quitar",
-    "selectDate": "Elegir fecha"
+    "selectDate": "Elegir fecha",
+    "hour": "Hora",
+    "minute": "Minuto"
   },
   "importance": {
     "label": "Importancia",
@@ -262,7 +264,10 @@
     "eventDays": "{{count}} día",
     "eventDays_other": "{{count}} días",
     "eventEndedDaysAgo": "Terminó ayer",
-    "eventEndedDaysAgo_other": "Terminó hace {{count}} días"
+    "eventEndedDaysAgo_other": "Terminó hace {{count}} días",
+    "checkupDigestTitle": "{{count}} persona con quien ponerte al día",
+    "checkupDigestTitle_other": "{{count}} personas con quienes ponerte al día",
+    "checkupDigestBody": "Hace tiempo con {{names}}."
   },
   "tags": {
     "title": "Etiquetas",
@@ -347,14 +352,49 @@
       "language": "Idioma",
       "weekStart": "Primer día de la semana",
       "weekStartAuto": "Automático ({{day}})",
-      "quietNotifications": "Ocultar los avisos rutinarios",
-      "quietNotificationsDescription": "Deja de confirmar acciones cotidianas como guardar una entrada. Los errores y las confirmaciones de ajustes, copias de seguridad e importaciones se siguen mostrando.",
-      "savedOnDevice": "Guardado en este dispositivo"
+      "quietNotifications": "Ocultar los mensajes rutinarios de la app",
+      "quietNotificationsDescription": "Deja de confirmar acciones cotidianas como guardar una entrada. Los errores y las confirmaciones de ajustes, copias de seguridad e importaciones se siguen mostrando. No afecta a los recordatorios que envía el móvil.",
+      "savedOnDevice": "Guardado en este dispositivo",
+      "timeFormat": "Formato de hora",
+      "timeFormatAuto": "Automático ({{format}})",
+      "timeFormat24": "24 h",
+      "timeFormat12": "12 h (a. m./p. m.)",
+      "haptics": "Vibración al pulsar",
+      "hapticsDescription": "Un toque suave al pulsar algo."
+    },
+    "reminders": {
+      "title": "Recordatorios",
+      "description": "Las notificaciones que envía este dispositivo. Se quedan en él, y sus horas son las suyas.",
+      "blocked": "Las notificaciones de Diary están desactivadas en los ajustes del móvil, así que no se puede enviar ninguna.",
+      "allow": "Permitir notificaciones",
+      "daily": "Recordatorio diario",
+      "dailyDescription": "Solo los días en los que no has escrito nada.",
+      "birthdays": "Recordatorios de cumpleaños",
+      "birthdaysDescription": "La mañana del mismo día, para todas las personas con cumpleaños guardado.",
+      "sendAt": "A las",
+"checkups": "Recordatorios de contacto",
+      "checkupsDescription": "Cuando hace tiempo que no le cuentas nada a alguien. Si coinciden varios, llegan en uno solo.",
+      "quietHours": "Horas de silencio",
+      "quietHoursDescription": "Los recordatorios que no tienen hora propia esperan a la mañana en vez de llegar de madrugada. Las horas que eliges arriba nunca se retrasan.",
+      "quietFrom": "Desde",
+      "quietUntil": "Hasta",
+      "exactAlarms": "Permitir alarmas exactas",
+      "exactAlarmsDescription": "Sin esto, Android puede entregar los recordatorios tarde, a veces con horas de retraso."
+    },
+    "entries": {
+      "title": "Entradas nuevas",
+      "defaultImportance": "Importancia inicial",
+      "importanceLastUsed": "La última que usé",
+      "autoSaid": "Mencionar a alguien lo marca como contado",
+      "autoSaidDescription": "Solo decide cómo empieza la casilla; siempre puedes cambiarla antes de guardar.",
+      "expanded": "Abrir las subentradas por defecto",
+      "expandedDescription": "Si las subentradas de una entrada empiezan desplegadas."
     },
     "decay": {
       "title": "Caducidad de los temas de conversación",
       "description": "Cuánto tiempo siguen siendo relevantes las entradas de cada importancia como temas de conversación. El valor es una semivida en días: pasados esos días la entrada tiene la mitad de su puntuación inicial, y desaparece cuando cae por debajo del umbral.",
-      "halfLifeDays": "Semivida (días)"
+      "halfLifeDays": "Semivida (días)",
+      "limit": "Máximo de temas por persona"
     },
     "memories": {
       "title": "Recuerdos",
@@ -442,7 +482,14 @@
     "resetDefaultsConfirmDescription": "Los ajustes de decaimiento, recuerdos, difusión, seguimiento e IA vuelven a sus valores por defecto. Tus entradas, personas y etiquetas no se ven afectadas.",
     "settingsSaved": "Ajustes guardados",
     "stepDown": "Disminuir",
-    "stepUp": "Aumentar"
+    "stepUp": "Aumentar",
+    "advanced": {
+      "title": "Avanzado",
+      "wifiOnly": "Sincronizar solo con wifi",
+      "wifiOnlyDescription": "Los cambios se siguen guardando en este dispositivo y suben la próxima vez que haya wifi. El diario es texto, así que esto ahorra poco.",
+      "nestingDepth": "Niveles de subentradas",
+      "nestingDepthDescription": "Cuánto se puede anidar por debajo de una entrada principal. Bajarlo no toca las entradas que ya están más abajo."
+    }
   },
   "errors": {
     "unauthorized": "Necesitas iniciar sesión",

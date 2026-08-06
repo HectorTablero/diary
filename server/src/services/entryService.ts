@@ -8,6 +8,7 @@ import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
 import { Thread } from '../models/thread';
+import { getSettings } from './settingsService';
 import { ENTRY_POPULATE, entryToDto, type LeanEntry } from '../dto';
 
 const toObjectIds = (ids: string[]) => ids.map((id) => new Types.ObjectId(id));
@@ -59,8 +60,15 @@ async function ancestorDepth(userId: string, id: string): Promise<number> {
   return depth;
 }
 
+/** How deep this user allows nesting. Read per call rather than cached: it is one indexed lookup
+    on a row this request has usually touched already, and a stale copy would reject a legal edit. */
+async function maxDepthFor(userId: string): Promise<number> {
+  return (await getSettings(userId)).maxSubEntryDepth;
+}
+
 async function assertDepthAllowed(userId: string, parentId: string) {
-  if (wouldExceedMaxDepth(await ancestorDepth(userId, parentId), 1)) throw badRequest('entry.max_depth');
+  const [depth, maxDepth] = await Promise.all([ancestorDepth(userId, parentId), maxDepthFor(userId)]);
+  if (wouldExceedMaxDepth(depth, 1, maxDepth)) throw badRequest('entry.max_depth');
 }
 
 /** Height of movedId's own subtree (BFS down, same frontier-walk shape as cascadeDateKey/
@@ -224,7 +232,9 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
     if (await isMovingIntoOwnSubtree(userId, entryId, input.parentId)) throw badRequest('entry.cycle');
     const targetParentDepth = await ancestorDepth(userId, input.parentId);
     const movedHeight = await measureSubtreeHeight(userId, entryId);
-    if (wouldExceedMaxDepth(targetParentDepth, movedHeight)) throw badRequest('entry.max_depth');
+    if (wouldExceedMaxDepth(targetParentDepth, movedHeight, await maxDepthFor(userId))) {
+      throw badRequest('entry.max_depth');
+    }
   }
   if (parentChanging) entry.parentId = input.parentId ? new Types.ObjectId(input.parentId) : null;
 

@@ -193,6 +193,11 @@ export const settingsSchema = z.object({
   // Optional for the same reason as the keys below: a queued PUT from a client that predates
   // this field must not reset it on replay.
   quietNotifications: z.boolean().optional(),
+  // Nullable rather than optional: null is a real value here ("reuse the last one"), so it has to
+  // survive the round trip, while absence still means "an older client didn't know about this".
+  defaultImportance: importanceSchema.nullable().optional(),
+  autoSaidOnMention: z.boolean().optional(),
+  maxSubEntryDepth: z.number().int().min(1).max(MAX_SUB_ENTRY_DEPTH).optional(),
   defaultCheckupIntervalDays: checkupIntervalDaysSchema,
   // Both optional and never defaulted: a queued PUT /settings outbox payload from an older
   // client (that predates these fields) must not wipe the stored keys on replay. An

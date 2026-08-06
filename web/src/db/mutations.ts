@@ -209,7 +209,8 @@ export async function moveEntry(
       const kids = childrenByParent.get(id) ?? [];
       return kids.length === 0 ? 1 : 1 + Math.max(...kids.map(heightOf));
     };
-    if (wouldExceedMaxDepth(depthOf(newParentId), heightOf(entryId))) {
+    const { maxSubEntryDepth } = await getSettings();
+    if (wouldExceedMaxDepth(depthOf(newParentId), heightOf(entryId), maxSubEntryDepth)) {
       throw new ApiError(400, 'entry.max_depth');
     }
   }

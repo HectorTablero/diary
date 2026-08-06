@@ -77,7 +77,9 @@
     "more": "更多",
     "back": "返回",
     "remove": "移除",
-    "selectDate": "选择日期"
+    "selectDate": "选择日期",
+    "hour": "小时",
+    "minute": "分钟"
   },
   "importance": {
     "label": "重要程度",
@@ -247,7 +249,9 @@
     "eventDeleteConfirmTitle": "删除「{{title}}」？",
     "eventDeleteConfirmDescription": "这会移除该经历和它的提醒。此操作无法撤销。",
     "eventDays": "{{count}} 天",
-    "eventEndedDaysAgo": "{{count}} 天前结束"
+    "eventEndedDaysAgo": "{{count}} 天前结束",
+    "checkupDigestTitle": "有 {{count}} 人可以联系一下",
+    "checkupDigestBody": "和{{names}}已经有一阵子没聊了。"
   },
   "tags": {
     "title": "标签",
@@ -325,14 +329,49 @@
       "language": "语言",
       "weekStart": "每周第一天",
       "weekStartAuto": "自动（{{day}}）",
-      "quietNotifications": "隐藏日常提示",
-      "quietNotificationsDescription": "不再为保存记录这类日常操作弹出确认。错误提示，以及设置、备份和导入的确认仍会显示。",
-      "savedOnDevice": "已保存到此设备"
+      "quietNotifications": "隐藏应用内的日常提示",
+      "quietNotificationsDescription": "不再为保存记录这类日常操作弹出确认。错误提示，以及设置、备份和导入的确认仍会显示。这与手机发送的提醒无关。",
+      "savedOnDevice": "已保存到此设备",
+      "timeFormat": "时间格式",
+      "timeFormatAuto": "自动（{{format}}）",
+      "timeFormat24": "24 小时制",
+      "timeFormat12": "12 小时制（上午/下午）",
+      "haptics": "点按振动",
+      "hapticsDescription": "按下时轻微振动一下。"
+    },
+    "reminders": {
+      "title": "提醒",
+      "description": "本设备发送的通知。设置只保存在本设备，时间也按本设备的时钟。",
+      "blocked": "手机设置里已关闭 Diary 的通知，因此这些都无法发送。",
+      "allow": "允许通知",
+      "daily": "每日记录提醒",
+      "dailyDescription": "只在当天还没写任何内容时提醒。",
+      "birthdays": "生日提醒",
+      "birthdaysDescription": "在当天早上通知，涵盖所有存了生日的人。",
+      "sendAt": "通知时间",
+"checkups": "联系提醒",
+      "checkupsDescription": "距离上次跟某人说点什么已经有一阵子了。多个同时到期时会合并成一条。",
+      "quietHours": "免打扰时段",
+      "quietHoursDescription": "没有固定时间的提醒会等到早上，而不是在半夜送达。你在上面设定的时间永远不会被推迟。",
+      "quietFrom": "从",
+      "quietUntil": "到",
+      "exactAlarms": "允许精确闹钟",
+      "exactAlarmsDescription": "不允许的话，Android 可能会延迟送达提醒，有时会晚几个小时。"
+    },
+    "entries": {
+      "title": "新记录",
+      "defaultImportance": "初始重要度",
+      "importanceLastUsed": "上次用的那个",
+      "autoSaid": "提到某人就标记为已告诉",
+      "autoSaidDescription": "只决定复选框的初始状态，保存前随时可以改。",
+      "expanded": "默认展开子记录",
+      "expandedDescription": "记录的子记录是否一开始就展开。"
     },
     "decay": {
       "title": "谈资的衰减",
       "description": "各个重要程度的记录能作为谈资保持多久。数值是以天为单位的半衰期：过了这些天，记录的分数只剩一半；分数低于下限后就不再出现。",
-      "halfLifeDays": "半衰期（天）"
+      "halfLifeDays": "半衰期（天）",
+      "limit": "每人最多谈资条数"
     },
     "memories": {
       "title": "回忆",
@@ -420,7 +459,14 @@
     "resetDefaultsConfirmDescription": "衰减、回忆、广播、联系提醒和 AI 设置都会恢复默认值。你的记录、人物和标签不受影响。",
     "settingsSaved": "设置已保存",
     "stepDown": "减少",
-    "stepUp": "增加"
+    "stepUp": "增加",
+    "advanced": {
+      "title": "高级",
+      "wifiOnly": "仅在 Wi-Fi 下同步",
+      "wifiOnlyDescription": "改动仍会保存在本设备上，等下次连上 Wi-Fi 再上传。日记是纯文字，这样省下的流量很有限。",
+      "nestingDepth": "子记录的嵌套层数",
+      "nestingDepthDescription": "顶层记录下面最多能嵌套几层。调低不会影响已经更深的记录。"
+    }
   },
   "errors": {
     "unauthorized": "需要先登录",

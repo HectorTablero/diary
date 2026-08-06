@@ -6,8 +6,9 @@ interface NumberInputProps {
   value: number;
   /** Fires on every edit, including the NaN a field briefly holds while it is empty. */
   onChange: (value: number) => void;
-  /** Fires when the value is settled: a step, or the field losing focus. */
-  onCommit?: () => void;
+  /** Fires when the value is settled: a step, or the field losing focus. Receives the settled
+      value, because a handler cannot read state that `onChange` set in the same tick. */
+  onCommit?: (value: number) => void;
   min?: number;
   max?: number;
   step?: number;
@@ -52,8 +53,9 @@ export function NumberInput({
   const clamp = (next: number) => Math.min(max ?? Infinity, Math.max(min, Math.round(next)));
 
   const stepBy = (delta: number) => {
-    onChange(clamp((Number.isFinite(value) ? value : lastValid.current) + delta));
-    onCommit?.();
+    const next = clamp((Number.isFinite(value) ? value : lastValid.current) + delta);
+    onChange(next);
+    onCommit?.(next);
   };
 
   const atMin = Number.isFinite(value) && value <= min;
@@ -88,9 +90,15 @@ export function NumberInput({
         step={step}
         value={Number.isFinite(value) ? value : ''}
         onChange={(event) => onChange(event.target.valueAsNumber)}
+        /* Leaving the field is where an out-of-range number is answered, not while it's being
+           typed: `9` on the way to `90` would otherwise be shoved up to the minimum the instant
+           it appeared. On the way out there is nothing left to type, so a value past either end
+           snaps to that end — the same number the save would have clamped to anyway, except the
+           field now says so instead of showing a figure the app isn't using. */
         onBlur={() => {
-          if (!Number.isFinite(value)) onChange(lastValid.current);
-          onCommit?.();
+          const settled = clamp(Number.isFinite(value) ? value : lastValid.current);
+          if (settled !== value) onChange(settled);
+          onCommit?.(settled);
         }}
         /* The spinners are hidden rather than merely covered: left visible they'd sit inside the
            field next to our own buttons. */

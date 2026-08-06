@@ -1,5 +1,5 @@
 import type { EntryNode } from '@diary/shared';
-import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { DEFAULT_SUB_ENTRY_DEPTH } from '@diary/shared';
 import {
   ChevronRight,
   CornerDownRight,
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDeleteEntry } from '@/api/hooks';
+import { useDeleteEntry, useSettings } from '@/api/hooks';
 import { VoiceSubEntryDialog } from '@/components/ai/VoiceSubEntryDialog';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { usePreferences } from '@/lib/preferences';
 import { fuzzyEquals } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
@@ -68,7 +69,10 @@ export function EntryItem({
   voiceEnabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(true);
+  const { data: settings } = useSettings();
+  const { entriesExpanded } = usePreferences();
+  // Only the starting state: collapsing stays per-entry and per-visit, as it always did.
+  const [expanded, setExpanded] = useState(entriesExpanded);
   const [editing, setEditing] = useState(false);
   const [addingSub, setAddingSub] = useState(false);
   const [recordingSub, setRecordingSub] = useState(false);
@@ -93,7 +97,10 @@ export function EntryItem({
     };
   }, [entry]);
 
-  const canAddSub = depth + 1 < MAX_SUB_ENTRY_DEPTH + 1; // root(0) + up to 3 nested levels
+  // The user's own nesting limit, not the shared ceiling: a root sits at depth 0, so an entry can
+  // take a child while its own depth is still below it.
+  const maxDepth = settings?.maxSubEntryDepth ?? DEFAULT_SUB_ENTRY_DEPTH;
+  const canAddSub = depth < maxDepth;
 
   return (
     <div

@@ -2,7 +2,12 @@
 export const IMPORTANCE_LEVELS = [1, 2, 3, 4, 5] as const;
 export type ImportanceLevel = (typeof IMPORTANCE_LEVELS)[number];
 
-export const MAX_SUB_ENTRY_DEPTH = 2; // root(0) + up to 2 nested levels
+/** Hard ceiling on nesting, not the everyday limit — that is `maxSubEntryDepth` in the user's
+    settings, which defaults to 2 and cannot be raised past this. The constant stays the bound for
+    static validation (the AI parentPath cap) and the default for tree helpers called without one. */
+export const MAX_SUB_ENTRY_DEPTH = 5; // root(0) + up to 5 nested levels
+/** What a new account gets, and what the app behaved as before nesting depth was configurable. */
+export const DEFAULT_SUB_ENTRY_DEPTH = 2;
 
 export const MAX_CONTENT_LENGTH = 2000;
 export const MAX_NOTES_LENGTH = 5000;
@@ -54,6 +59,13 @@ export const DEFAULT_SETTINGS = {
   /** Drop the success toasts for everyday actions, keeping errors and the confirmations the
       user cannot otherwise verify. See notifySuccess in web/src/lib/notify.ts. */
   quietNotifications: true,
+  /** Importance a fresh entry starts at. `null` = reuse whatever was saved last. */
+  defaultImportance: 3 as number | null,
+  /** Whether the "already told them" box is pre-ticked when an entry mentions someone. The box is
+      always offered either way; this only decides which way it starts. */
+  autoSaidOnMention: true,
+  /** How deep sub-entries may nest, up to MAX_SUB_ENTRY_DEPTH. */
+  maxSubEntryDepth: DEFAULT_SUB_ENTRY_DEPTH,
   /** Default checkup interval inherited by new people. `null` = checkups off by default. */
   defaultCheckupIntervalDays: null as number | null,
   /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text

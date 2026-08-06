@@ -1,4 +1,5 @@
 import type { EntryNode } from '@diary/shared';
+import { DEFAULT_SUB_ENTRY_DEPTH } from '@diary/shared';
 import { generateKeyBetween } from 'fractional-indexing';
 import { useEffect, useState } from 'react';
 import { useMoveEntry, useSettings } from '@/api/hooks';
@@ -63,6 +64,9 @@ export function EntryTree({ entries }: { entries: EntryNode[] }) {
       renderRow={(node, depth) => <EntryItem entry={node} depth={depth} flat />}
       indentWidth={ENTRY_INDENT_WIDTH}
       listClassName={LIST_CLASS_NAME}
+      // Not the shared constant: that is only the ceiling now, and the everyday limit is the
+      // user's. Passing it is what makes a too-deep drop render as an invalid shadow.
+      maxDepth={settings?.maxSubEntryDepth ?? DEFAULT_SUB_ENTRY_DEPTH}
       denseRows
     >
       <div className={LIST_CLASS_NAME}>

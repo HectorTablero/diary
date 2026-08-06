@@ -176,6 +176,12 @@ export interface SettingsDto {
   forceEnglishAIEvents: boolean;
   /** Drop the success toasts for everyday actions. Errors and unverifiable confirmations stay. */
   quietNotifications: boolean;
+  /** Importance a fresh entry starts at; `null` reuses the last one saved on this device. */
+  defaultImportance: number | null;
+  /** Whether the "already told them" box starts ticked when an entry mentions someone. */
+  autoSaidOnMention: boolean;
+  /** How deep sub-entries may nest, 1..MAX_SUB_ENTRY_DEPTH. */
+  maxSubEntryDepth: number;
   /** Default `checkupIntervalDays` inherited by newly created people. `null` = off by default. */
   defaultCheckupIntervalDays: number | null;
   /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text

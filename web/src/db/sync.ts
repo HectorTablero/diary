@@ -1,5 +1,7 @@
 import type { SyncResponse } from '@diary/shared';
 import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
+import { isMeteredConnection } from '@/lib/network';
+import { getPreferences } from '@/lib/preferences';
 import { getCachedUser } from '@/lib/sessionCache';
 import { db, entryFromDto, getMeta, personFromDto, setMeta, type OutboxOp } from './db';
 
@@ -283,6 +285,11 @@ export function syncNow(): Promise<void> {
   // Mutations still queue in db.outbox unconditionally; the moment an account is linked,
   // getCachedUser() becomes non-null and the very next kick() drains the whole queue in order.
   if (!getCachedUser()) return Promise.resolve();
+  /* Wi-fi-only is enforced here rather than in the BackgroundFetch config, so one guard covers the
+     foreground timer, the resume kick and the background wake alike, and so toggling it takes
+     effect immediately instead of at the next launch. Nothing is lost by waiting: writes keep
+     queueing in db.outbox exactly as they do offline, and the next kick on wi-fi drains them. */
+  if (getPreferences().syncOnWifiOnly && isMeteredConnection()) return Promise.resolve();
   ensureLiveChannel();
   if (running) {
     rerun = true; // something changed mid-sync: go again right after

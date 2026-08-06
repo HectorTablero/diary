@@ -79,7 +79,9 @@
     "more": "もっと",
     "back": "戻る",
     "remove": "外す",
-    "selectDate": "日付を選択"
+    "selectDate": "日付を選択",
+    "hour": "時",
+    "minute": "分"
   },
   "importance": {
     "label": "重要度",
@@ -253,7 +255,9 @@
     "eventDeleteConfirmTitle": "「{{title}}」を削除しますか？",
     "eventDeleteConfirmDescription": "この出来事とそのリマインダーが消えます。この操作は取り消せません。",
     "eventDays": "{{count}}日間",
-    "eventEndedDaysAgo": "{{count}}日前に終了"
+    "eventEndedDaysAgo": "{{count}}日前に終了",
+    "checkupDigestTitle": "連絡したい人が{{count}}人います",
+    "checkupDigestBody": "{{names}}とはしばらく間が空いています。"
   },
   "tags": {
     "title": "タグ",
@@ -331,14 +335,49 @@
       "language": "言語",
       "weekStart": "週の始まり",
       "weekStartAuto": "自動（{{day}}）",
-      "quietNotifications": "日常的な通知を隠す",
-      "quietNotificationsDescription": "記録の保存など、ふだんの操作の確認を表示しなくなります。エラーと、設定・バックアップ・読み込みの確認はそのまま表示されます。",
-      "savedOnDevice": "この端末に保存しました"
+      "quietNotifications": "アプリ内の日常的なメッセージを隠す",
+      "quietNotificationsDescription": "記録の保存など、ふだんの操作の確認を表示しなくなります。エラーと、設定・バックアップ・読み込みの確認はそのまま表示されます。スマホが送る通知には影響しません。",
+      "savedOnDevice": "この端末に保存しました",
+      "timeFormat": "時刻の表示",
+      "timeFormatAuto": "自動（{{format}}）",
+      "timeFormat24": "24時間制",
+      "timeFormat12": "12時間制（午前/午後）",
+      "haptics": "タップ時の振動",
+      "hapticsDescription": "何かを押したときに軽く振動します。"
+    },
+    "reminders": {
+      "title": "リマインダー",
+      "description": "この端末が送る通知です。設定はこの端末に残り、時刻もこの端末のものです。",
+      "blocked": "スマホの設定で Diary の通知がオフになっているため、どれも送れません。",
+      "allow": "通知を許可する",
+      "daily": "毎日の記録リマインダー",
+      "dailyDescription": "その日にまだ何も書いていないときだけ届きます。",
+      "birthdays": "誕生日のリマインダー",
+      "birthdaysDescription": "誕生日を登録しているすべての人について、当日の朝に届きます。",
+      "sendAt": "通知時刻",
+"checkups": "連絡リマインダー",
+      "checkupsDescription": "しばらく誰かに何も伝えていないときに届きます。重なった場合はまとめて 1 件になります。",
+      "quietHours": "静かな時間",
+      "quietHoursDescription": "時刻の決まっていないリマインダーは、深夜に届かず朝まで待ちます。上で設定した時刻が遅れることはありません。",
+      "quietFrom": "開始",
+      "quietUntil": "終了",
+      "exactAlarms": "正確なアラームを許可する",
+      "exactAlarmsDescription": "許可しないと、Android がリマインダーを数時間遅らせることがあります。"
+    },
+    "entries": {
+      "title": "新しい記録",
+      "defaultImportance": "最初の重要度",
+      "importanceLastUsed": "前回使ったもの",
+      "autoSaid": "人物に触れたら「伝えた」にする",
+      "autoSaidDescription": "チェックの初期状態を決めるだけです。保存前にいつでも変えられます。",
+      "expanded": "サブ記録を最初から開く",
+      "expandedDescription": "記録のサブ記録を開いた状態で表示するかどうか。"
     },
     "decay": {
       "title": "話のネタの減衰",
       "description": "重要度ごとに、記録が話のネタとしてどれくらい残るかを決めます。値は日数で表した半減期です。その日数が過ぎると点数は半分になり、下限を下回ると消えます。",
-      "halfLifeDays": "半減期（日）"
+      "halfLifeDays": "半減期（日）",
+      "limit": "1 人あたりの話のネタの上限"
     },
     "memories": {
       "title": "思い出",
@@ -426,7 +465,14 @@
     "resetDefaultsConfirmDescription": "減衰・思い出・全員への提案・連絡リマインダー・AI の設定がすべて初期値に戻ります。記録や人物、タグはそのままです。",
     "settingsSaved": "設定を保存しました",
     "stepDown": "減らす",
-    "stepUp": "増やす"
+    "stepUp": "増やす",
+    "advanced": {
+      "title": "詳細設定",
+      "wifiOnly": "Wi-Fi のときだけ同期する",
+      "wifiOnlyDescription": "変更はこの端末に保存され続け、次に Wi-Fi につながったときに送られます。日記は文字なので、節約できる量はわずかです。",
+      "nestingDepth": "サブ記録の階層数",
+      "nestingDepthDescription": "トップレベルの記録の下に何段まで入れられるか。下げても、すでに深いところにある記録はそのままです。"
+    }
   },
   "errors": {
     "unauthorized": "ログインが必要です",

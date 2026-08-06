@@ -82,7 +82,9 @@
     "more": "More",
     "back": "Back",
     "remove": "Remove",
-    "selectDate": "Select a date"
+    "selectDate": "Select a date",
+    "hour": "Hour",
+    "minute": "Minute"
   },
   "importance": {
     "label": "Importance",
@@ -267,7 +269,10 @@
     "eventDays": "{{count}} day",
     "eventDays_other": "{{count}} days",
     "eventEndedDaysAgo": "Ended yesterday",
-    "eventEndedDaysAgo_other": "Ended {{count}} days ago"
+    "eventEndedDaysAgo_other": "Ended {{count}} days ago",
+    "checkupDigestTitle": "{{count}} person to catch up with",
+    "checkupDigestTitle_other": "{{count}} people to catch up with",
+    "checkupDigestBody": "It's been a while with {{names}}."
   },
   "tags": {
     "title": "Tags",
@@ -352,14 +357,49 @@
       "language": "Language",
       "weekStart": "First day of the week",
       "weekStartAuto": "Automatic ({{day}})",
-      "quietNotifications": "Hide routine notifications",
-      "quietNotificationsDescription": "Stop confirming everyday actions like saving an entry. Errors, and confirmations for settings, backups and imports, still appear.",
-      "savedOnDevice": "Saved on this device"
+      "quietNotifications": "Hide routine in-app messages",
+      "quietNotificationsDescription": "Stop confirming everyday actions like saving an entry. Errors, and confirmations for settings, backups and imports, still appear. This is not about the reminders your phone sends.",
+      "savedOnDevice": "Saved on this device",
+      "timeFormat": "Time format",
+      "timeFormatAuto": "Automatic ({{format}})",
+      "timeFormat24": "24-hour",
+      "timeFormat12": "AM/PM",
+      "haptics": "Vibration on tap",
+      "hapticsDescription": "A light tick when you press something."
+    },
+    "reminders": {
+      "title": "Reminders",
+      "description": "The notifications this device sends. They stay on this device, and their times are local to it.",
+      "blocked": "Notifications are turned off for Diary in your phone's settings, so none of these can be sent.",
+      "allow": "Allow notifications",
+      "daily": "Daily diary reminder",
+      "dailyDescription": "Only on days you haven't written anything.",
+      "birthdays": "Birthday reminders",
+      "birthdaysDescription": "On the morning of the day itself, for everyone with a birthday saved.",
+      "sendAt": "At",
+"checkups": "Checkup reminders",
+      "checkupsDescription": "When it's been a while since you last told someone anything. Several at once arrive as one.",
+      "quietHours": "Quiet hours",
+      "quietHoursDescription": "Reminders that have no time of their own wait until the morning instead of arriving overnight. The times you set above are never delayed.",
+      "quietFrom": "From",
+      "quietUntil": "Until",
+      "exactAlarms": "Allow exact alarms",
+      "exactAlarmsDescription": "Without this, Android may deliver reminders late — sometimes hours late."
+    },
+    "entries": {
+      "title": "New entries",
+      "defaultImportance": "Importance to start at",
+      "importanceLastUsed": "Whatever I used last",
+      "autoSaid": "Mentioning someone marks it as told",
+      "autoSaidDescription": "Only sets how the tick box starts; you can always change it before saving.",
+      "expanded": "Open sub-entries by default",
+      "expandedDescription": "Whether an entry's sub-entries start unfolded."
     },
     "decay": {
       "title": "Talking point decay",
       "description": "How long entries of each importance stay relevant as talking points. The value is a half-life in days: after that many days an entry has half its initial score, and it disappears once the score falls below the cutoff.",
-      "halfLifeDays": "Half-life (days)"
+      "halfLifeDays": "Half-life (days)",
+      "limit": "Most talking points per person"
     },
     "memories": {
       "title": "Memories",
@@ -447,7 +487,14 @@
     "resetDefaultsConfirmDescription": "The decay, memory, broadcast, checkup and AI settings all go back to their default values. Your entries, people and tags are not affected.",
     "settingsSaved": "Settings saved",
     "stepDown": "Decrease",
-    "stepUp": "Increase"
+    "stepUp": "Increase",
+    "advanced": {
+      "title": "Advanced",
+      "wifiOnly": "Sync on Wi-Fi only",
+      "wifiOnlyDescription": "Changes keep saving on this device and go up the next time you're on Wi-Fi. The diary is text, so this rarely saves much.",
+      "nestingDepth": "How deep sub-entries can nest",
+      "nestingDepthDescription": "Levels below a top-level entry. Lowering it doesn't touch entries that are already deeper."
+    }
   },
   "errors": {
     "unauthorized": "You need to sign in",
