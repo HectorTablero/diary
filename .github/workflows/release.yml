@@ -1,0 +1,309 @@
+name: Release
+
+# One gate, two publishers.
+#
+# This was two workflows (android-release.yml, docker-publish.yml), each calling a shared
+# `verify` via workflow_call. That had two problems, and merging them fixes both:
+#
+#   - a push to main touching the app triggered both workflows, so the same 201 tests ran twice
+#     against the same commit, and
+#   - the two publishers were gated independently, so a commit could ship an APK while the server
+#     image failed, or the reverse. There was no single answer to "did this commit pass?".
+#
+# As one workflow, `verify` is a plain job that both publishers declare `needs:` on. It runs once,
+# and it appears as a top-level check rather than nested under a caller (a reusable workflow always
+# renders as `caller / callee`, which is where the `verify / verify` came from).
+
+on:
+  push:
+    branches: [ "main" ]
+    # Publishing versioned images from a manually pushed tag. Note that the tag the Android job
+    # pushes below does NOT land here: GitHub does not trigger workflows from pushes made with the
+    # default GITHUB_TOKEN, which is what keeps this from looping.
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      # Whether this commit touched anything the Android app is built from. Replaces the
+      # workflow-level `paths:` filter the Android workflow used to carry, which cannot be
+      # expressed per-job.
+      app-changed: ${{ steps.scope.outputs.app }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # The scope step diffs against the commit this push started from, which a shallow
+          # checkout would not contain.
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Three workspaces. In web/ this also runs checkI18n.ts, which fails on a key used but
+      # undefined or present in one locale and not another — load-bearing, because each locale is
+      # a separate chunk and fallbackLng points at a bundle that may not be loaded.
+      #
+      # Runs with no .env, deliberately: config.ts reads its required variables through getters, so
+      # importing a module never demands a credential and this needs no secrets.
+      - name: Test
+        run: npm test
+
+      # Catches a dependency advisory before it ships rather than at the next manual audit.
+      # Production dependencies only: a devDependency finding does not reach users, and failing
+      # the build on one would make this check something people learn to skip.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Decide whether the app needs rebuilding
+        id: scope
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          # A pull request builds nothing and publishes nothing; a manual run always builds.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "app=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Tag pushes publish an image, not an app release.
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "app=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          # A first push to a branch reports an all-zero `before`, and a force-push can name a
+          # commit that no longer exists. Neither can be diffed, so assume the app changed —
+          # an unnecessary build is cheap, a skipped one silently withholds a release.
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "app=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          if git diff --name-only "$BEFORE" "$GITHUB_SHA" \
+             | grep -qE '^(web/|shared/|scripts/|package\.json|package-lock\.json|\.github/workflows/release\.yml)'; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Block scalar, not a plain one: the `: ` inside the message would otherwise be read as a
+      # mapping separator and the file would not parse.
+      - name: Report scope
+        run: |
+          echo "Android release for this commit: ${{ steps.scope.outputs.app }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # Nothing here reaches a phone unless verify passed. That matters more than for an ordinary
+  # release: the OTA bundle published below installs itself onto devices that already have the app,
+  # and the only safety net underneath is Capgo's boot timeout, which catches a bundle that crashes
+  # on launch and nothing subtler.
+  android:
+    needs: verify
+    if: needs.verify.outputs.app-changed == 'true'
+    runs-on: ubuntu-latest
+    environment: android
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The root package.json version is the single source of truth (bumped by the pre-commit
+      # hook). The tag, the APK versionName/versionCode and the OTA bundle name all derive from
+      # it, so the app can never disagree with what was published.
+      - name: Compute version
+        id: version
+        # Called directly rather than through `npm run`, whose banner ("> diary@x.y.z ...") would
+        # land in $GITHUB_OUTPUT, which only accepts key=value lines.
+        run: node scripts/version-info.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Restore signing keystore
+        working-directory: web/android/app
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > diary-release.keystore
+
+      - name: Write keystore.properties
+        working-directory: web/android/app
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cat > keystore.properties <<EOF
+          storeFile=diary-release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Build web assets + sync Capacitor
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_BETTERSTACK_SOURCE_TOKEN: ${{ secrets.BETTERSTACK_CLIENT_SOURCE_TOKEN }}
+          VITE_BETTERSTACK_INGEST_URL: ${{ secrets.BETTERSTACK_CLIENT_INGEST_URL }}
+        run: npm run build:app
+
+      # web/dist is the app-mode build that `cap sync` just copied into the APK — the exact same
+      # web layer, packaged for over-the-air delivery. index.html must sit at the zip root.
+      - name: Package OTA bundle
+        run: |
+          mkdir -p dist
+          cd web/dist
+          zip -qr "../../dist/bundle-${{ steps.version.outputs.version }}-${{ steps.version.outputs.fingerprint }}.zip" .
+
+      - name: Build signed release APK
+        working-directory: web/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -PappVersionCode=${{ steps.version.outputs.code }} \
+            -PappVersionName=${{ steps.version.outputs.version }}
+
+      - name: Prepare release assets
+        run: cp web/android/app/build/outputs/apk/release/app-release.apk dist/diary.apk
+
+      # softprops/action-gh-release will create a tag but never *moves* an existing one, which is
+      # why the old rolling `latest` release kept serving source zips from a stale commit while
+      # its APK was rebuilt. Point the tag at this commit explicitly before publishing.
+      - name: Move version tag to this commit
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$TAG"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body: |
+            Built from ${{ github.sha }}.
+
+            - `diary.apk` — full install. Needed when the native shell changes.
+            - `bundle-*.zip` — web layer, delivered over the air to installed apps
+              (native shell `${{ steps.version.outputs.fingerprint }}`).
+          prerelease: false
+          make_latest: true
+          files: |
+            dist/diary.apk
+            dist/bundle-*.zip
+
+  # This workflow uses actions that are not certified by GitHub. They are provided by a third-party
+  # and are governed by separate terms of service, privacy policy, and support documentation.
+  docker:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: docker
+    env:
+      # Use docker.io for Docker Hub if empty
+      REGISTRY: ghcr.io
+      # github.repository as <account>/<repo>
+      IMAGE_NAME: ${{ github.repository }}
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge with sigstore/fulcio when running
+      # outside of PRs.
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Install the cosign tool except on PR
+      # https://github.com/sigstore/cosign-installer
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
+
+      # Set up BuildKit Docker container builder to be able to build
+      # multi-platform images and export cache
+      # https://github.com/docker/setup-buildx-action
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      # Build and push Docker image with Buildx (don't push on PR)
+      # https://github.com/docker/build-push-action
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Vite inlines these into the web bundle at build time; they cannot be set at runtime.
+          build-args: |
+            VITE_BETTERSTACK_SOURCE_TOKEN=${{ secrets.BETTERSTACK_CLIENT_SOURCE_TOKEN }}
+            VITE_BETTERSTACK_INGEST_URL=${{ secrets.BETTERSTACK_CLIENT_INGEST_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Sign the resulting Docker image digest except on PRs.
+      # This will only write to the public Rekor transparency log when the Docker
+      # repository is public to avoid leaking data.  If you would like to publish
+      # transparency data even for private images, pass --force to cosign below.
+      # https://github.com/sigstore/cosign
+      - name: Sign the published Docker image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        # This step uses the identity token to provision an ephemeral certificate
+        # against the sigstore community Fulcio instance.
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}

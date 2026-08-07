@@ -5,33 +5,12 @@ import { initReactI18next } from 'react-i18next';
 import { isNative } from '@/lib/native';
 import { useOnline } from '@/lib/online';
 
-/**
- * Every shipped language, in the order the picker offers them, labelled with its own endonym —
- * someone looking for their language reads it in that language, not in the current one.
- *
- * This is the single source of truth: `resources`, `supportedLngs` and the Settings picker are all
- * derived from it, so adding a locale means adding one line plus the JSON file (and an entry in
- * translation-context.json, which scripts/checkI18n.ts enforces, and a flag in ./flags, which is
- * picked up by filename and simply absent from the picker if you forget).
- *
- * `zh` is Simplified. With `nonExplicitSupportedLngs` a browser reporting zh-CN, zh-SG or even
- * zh-TW resolves here; a separate `zh-Hant` could be added later without touching anything else.
- */
-export const LANGUAGES = [
-  { code: 'es', label: 'Español' },
-  { code: 'en', label: 'English' },
-  { code: 'it', label: 'Italiano' },
-  { code: 'ja', label: '日本語' },
-  { code: 'zh', label: '中文' },
-] as const;
+/* The language table lives in ./languages, which has no side effects. Imported for use below and
+   re-exported so every existing `from '@/i18n'` import keeps working — and so that wanting the
+   table no longer means booting i18next and registering window listeners to get it. */
+import { DEFAULT_LANGUAGE, LANGUAGES, resolveLanguage, type LanguageCode } from './languages';
 
-export type LanguageCode = (typeof LANGUAGES)[number]['code'];
-
-/** The shipped locale a possibly-regional tag ("zh-CN", "it-CH") belongs to. */
-export function resolveLanguage(lng: string | undefined): LanguageCode {
-  const base = (lng ?? '').toLowerCase().split('-')[0];
-  return LANGUAGES.find((l) => l.code === base)?.code ?? 'es';
-}
+export { DEFAULT_LANGUAGE, LANGUAGES, resolveLanguage, type LanguageCode };
 
 /**
  * One file per language, requested only when it is the one being used.
@@ -70,7 +49,7 @@ i18n
        have, so the fallback has nothing left to resolve. If that check is ever dropped, this
        needs to preload 'en' too. */
     resources: {},
-    fallbackLng: 'en',
+    fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: LANGUAGES.map((l) => l.code),
     nonExplicitSupportedLngs: true,
     interpolation: { escapeValue: false },
@@ -219,6 +198,47 @@ export function useLanguageAvailability(): (code: LanguageCode) => boolean {
 export async function changeLanguage(lng: LanguageCode): Promise<void> {
   await ensureLanguage(lng);
   await i18n.changeLanguage(lng);
+}
+
+/* --- Following the device ---------------------------------------------------------------------
+
+   The detector's own rule is that a stored `lang` key is an explicit choice and its absence means
+   "ask the browser". That is already the behaviour on a first run, but it was previously a state
+   the user could leave and never get back to: picking a language wrote the key, and nothing removed
+   it, so a phone that later changed its system language kept the diary in whatever had been chosen
+   once. These make it a choice you can return to. */
+
+/** i18next's `lookupLocalStorage`, in one place rather than spelled out at each use. */
+const LANGUAGE_KEY = 'lang';
+
+/** The language the device would choose on its own, ignoring anything stored. */
+export const detectedLanguage = (): LanguageCode => resolveLanguage(navigator.language);
+
+/** Whether the language is currently following the device rather than an explicit choice. */
+export function isAutomaticLanguage(): boolean {
+  try {
+    return !localStorage.getItem(LANGUAGE_KEY);
+  } catch {
+    // No storage means nothing can have been chosen, which is exactly what automatic means.
+    return true;
+  }
+}
+
+/**
+ * Hand language selection back to the device.
+ *
+ * The key is removed *after* the switch, not before: `caches: ['localStorage']` means
+ * `i18n.changeLanguage` writes it back, so clearing first would be undone a line later. Clearing
+ * afterwards is also correct when the detected language is the one already active — nothing
+ * changes on screen, but the stored override is gone, which is the whole point of the option.
+ */
+export async function followDeviceLanguage(): Promise<void> {
+  await changeLanguage(detectedLanguage());
+  try {
+    localStorage.removeItem(LANGUAGE_KEY);
+  } catch {
+    /* nothing was stored to begin with */
+  }
 }
 
 i18n.on('languageChanged', (lng) => {

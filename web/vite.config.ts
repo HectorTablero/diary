@@ -3,9 +3,30 @@ import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { DEFAULT_LOCALE, localeCodes } from './scripts/locales.mjs';
 import { computeNativeFingerprint } from './scripts/nativeFingerprint.mjs';
+
+/**
+ * Fills index.html's locale placeholders from the files in src/i18n/locales.
+ *
+ * The pre-hydration script has to know which languages exist before any module has loaded, and
+ * that is the one place the app cannot derive the list at runtime. Injecting it here keeps
+ * "add a language" to dropping in a JSON file, rather than that plus a literal in the HTML that
+ * would go stale silently — the failure being a document labelled with the wrong language, which
+ * nothing would ever surface.
+ */
+function localePlaceholders(): Plugin {
+  return {
+    name: 'diary-locale-placeholders',
+    transformIndexHtml(html) {
+      return html
+        .replace(/__APP_DEFAULT_LOCALE__/g, DEFAULT_LOCALE)
+        .replace(/__APP_LOCALES__/g, JSON.stringify(localeCodes()));
+    },
+  };
+}
 
 // The API port lives in the repo-root .env (shared with the server).
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
@@ -49,6 +70,7 @@ export default defineConfig(({ mode }) => {
     __NATIVE_FINGERPRINT__: JSON.stringify(computeNativeFingerprint()),
   },
   plugins: [
+    localePlaceholders(),
     react(),
     tailwindcss(),
     VitePWA({

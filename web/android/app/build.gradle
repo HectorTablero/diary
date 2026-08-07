@@ -15,6 +15,12 @@ if (keystorePropertiesFile.exists()) {
 def appVersionCode = project.hasProperty('appVersionCode') ? (project.appVersionCode as Integer) : 1
 def appVersionNameValue = project.hasProperty('appVersionName') ? project.appVersionName : "1.0"
 
+/* The host whose https:// links this app opens (see the App Links intent-filter in
+   AndroidManifest.xml). It must match the origin the app talks to — web/.env.app's VITE_API_BASE —
+   because that is the server answering /.well-known/assetlinks.json, and Android will not verify
+   the link against anything else. Overridable with -PappHost for a fork or a staging build. */
+def appHostValue = project.hasProperty('appHost') ? project.appHost : "diary.tablerus.es"
+
 android {
     namespace = "es.tablerus.diary"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -24,6 +30,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
         versionName appVersionNameValue
+        manifestPlaceholders = [appHost: appHostValue]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

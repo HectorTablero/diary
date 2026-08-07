@@ -33,6 +33,9 @@ import { closeLiveChannel } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import i18n, {
   changeLanguage,
+  detectedLanguage,
+  followDeviceLanguage,
+  isAutomaticLanguage,
   LANGUAGES,
   resolveLanguage,
   useLanguageAvailability,
@@ -176,32 +179,75 @@ function WeekStartSetting() {
  * Nothing here can strand the user in a language they can't read: the one currently in use is by
  * definition already loaded, which is the first thing `useLanguageAvailability` checks.
  */
+/** A language's flag, or a same-sized gap so labels don't start at different offsets. */
+function LanguageFlag({ code }: { code: LanguageCode }) {
+  /* Decorative: the language's own name is right beside it, in that language. A flag is a poor
+     name for a language even when it's the right flag.
+
+     The empty branch keeps the box rather than collapsing it — upstream has no flag for every
+     language, and one label starting further left than the rest reads as a bug rather than as an
+     absence. */
+  const src = flag(code);
+  if (!src) return <span aria-hidden className="size-3.5 shrink-0" />;
+  return <img src={src} alt="" aria-hidden className="size-3.5 shrink-0 rounded-full" />;
+}
+
 function LanguageSetting() {
   const { t, i18n: active } = useTranslation();
   const isAvailable = useLanguageAvailability();
   const unavailable = LANGUAGES.filter((language) => !isAvailable(language.code));
 
+  /* Whether the picker is on "Automatic" is the absence of a stored override, which is not
+     something React can subscribe to — so it is read once and then kept in step by the only thing
+     that changes it, which is this control. Another tab could in principle disagree, exactly as it
+     could about the theme. */
+  const [automatic, setAutomatic] = useState(isAutomaticLanguage);
+  const detected = detectedLanguage();
+
+  /* Read after the switch so the confirmation arrives in the new language; the failure is read in
+     the old one, because the language did not change. The download can fail even when the picker
+     offered the language — a network that reaches the router and nothing else. */
+  const announce = (done: Promise<unknown>, onDone: () => void) =>
+    void done
+      .then(() => {
+        onDone();
+        notifyDeviceSaved(i18n.t('settings.general.savedOnDevice'));
+      })
+      .catch(() => notifyError(t('settings.general.languageDownloadFailed')));
+
   return (
     <div className="flex flex-col gap-1.5">
       <Label>{t('settings.general.language')}</Label>
       <Select
-        value={resolveLanguage(active.language)}
+        value={automatic ? 'auto' : resolveLanguage(active.language)}
         onValueChange={(lng) => {
+          if (lng === 'auto') {
+            announce(followDeviceLanguage(), () => setAutomatic(true));
+            return;
+          }
           // changeLanguage from i18n/index, not i18n.changeLanguage: that one fetches
           // the language's strings first, so the switch never lands on an empty bundle.
-          void changeLanguage(lng as LanguageCode)
-            // Read after the switch, so the confirmation arrives in the new language.
-            .then(() => notifyDeviceSaved(i18n.t('settings.general.savedOnDevice')))
-            /* The download can fail even when the picker offered it — a network that reaches the
-               router and nothing else. `t` rather than `i18n.t`: the language did not change, so
-               this has to be read in the one still on screen. */
-            .catch(() => notifyError(t('settings.general.languageDownloadFailed')));
+          announce(changeLanguage(lng as LanguageCode), () => setAutomatic(false));
         }}
       >
-        <SelectTrigger className="w-40">
+        <SelectTrigger className="w-48">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
+          {/* Follows the device instead of pinning a choice, and names what that currently means —
+              the same shape the week-start and clock settings use. Its flag is the *resolved*
+              language's, because that is the one this option would actually give you.
+
+              Never disabled: whatever the device asks for resolves to a shipped language, and if
+              that language's strings can't be fetched the switch reports it like any other. */}
+          <SelectItem value="auto">
+            <span className="inline-flex gap-1 items-center">
+              <LanguageFlag code={detected} />
+              {t('settings.general.languageAuto', {
+                language: LANGUAGES.find((l) => l.code === detected)?.label ?? detected,
+              })}
+            </span>
+          </SelectItem>
           {LANGUAGES.map((language) => {
             const available = isAvailable(language.code);
             return (
@@ -212,22 +258,7 @@ function LanguageSetting() {
                     note is only ever reached by a *disabled* item, which can never become the
                     selected one, so it cannot leak into the trigger the same way. */}
                 <span className="inline-flex gap-1 items-center">
-                  {/* Decorative: the language's own name is right beside it, in that language.
-                      A flag is a poor name for a language even when it's the right flag.
-
-                      The empty branch keeps the box rather than collapsing it — upstream has no
-                      flag for every language, and one label starting further left than the rest
-                      reads as a bug rather than as an absence. */}
-                  {flag(language.code) ? (
-                    <img
-                      src={flag(language.code)}
-                      alt=""
-                      aria-hidden
-                      className="size-3.5 shrink-0 rounded-full"
-                    />
-                  ) : (
-                    <span aria-hidden className="size-3.5 shrink-0" />
-                  )}
+                  <LanguageFlag code={language.code} />
                   {language.label}
                   {!available && (
                     <span className="text-xs text-muted-foreground">
@@ -828,7 +859,28 @@ export default function SettingsPage() {
                         setPreference('syncOnWifiOnly', checked);
                         notifyDeviceSaved(t('settings.general.savedOnDevice'));
                       }}
-                    />
+                    >
+                      {/* Nested under the setting it qualifies, and rendered only while that
+                          setting is on — a switch for hiding a pill that cannot appear would be
+                          a control with no effect. ToggleRow's `children` already stack under the
+                          row, so this reads as belonging to it.
+
+                          Deliberately narrow: it hides the "waiting for Wi-Fi" pill and nothing
+                          else. Going offline and the server being unreachable are failures rather
+                          than a setting working as asked, and they keep announcing themselves. */}
+                      {prefs.syncOnWifiOnly && (
+                        <ToggleRow
+                          id="sync-hide-paused"
+                          label={t('settings.advanced.hidePausedStatus')}
+                          description={t('settings.advanced.hidePausedStatusDescription')}
+                          checked={prefs.hidePausedSyncStatus}
+                          onCheckedChange={(checked) => {
+                            setPreference('hidePausedSyncStatus', checked);
+                            notifyDeviceSaved(t('settings.general.savedOnDevice'));
+                          }}
+                        />
+                      )}
+                    </ToggleRow>
                   </>
                 )}
               </>

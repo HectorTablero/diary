@@ -20,6 +20,7 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react
 import { usePeople } from '@/api/hooks';
 import { FullScreenSpinner } from '@/components/common/Spinner';
 import { EXPLORE_SEGMENTS, isExplorePath } from '@/components/layout/ExploreLayout';
+import { shouldShowBlocker } from '@/components/layout/syncPill';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ import { isCheckupDue } from '@/lib/checkup';
 import { cancelIdle, onIdle } from '@/lib/idle';
 import { isLocalOnly, setLocalOnly } from '@/lib/localOnly';
 import { isNative } from '@/lib/native';
+import { usePreferences } from '@/lib/preferences';
 import { preloadLoaders } from '@/lib/preloaders';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
 import { getUpdateState, subscribeToUpdateState, type UpdateState } from '@/lib/liveUpdate';
@@ -311,6 +313,7 @@ const BLOCKER_ICON: Record<NonNullable<SyncBlocker>, LucideIcon> = {
 /** Session-expired banner + a pill naming whatever is currently stopping sync. */
 function SyncStatusOverlay() {
   const status = useSyncStatus();
+  const { hidePausedSyncStatus } = usePreferences();
   const { t } = useTranslation();
 
   // Nothing to report for a device that was never linked to an account — there's no server
@@ -334,15 +337,20 @@ function SyncStatusOverlay() {
       </div>
     );
   }
-  const Icon = status.blocker ? BLOCKER_ICON[status.blocker] : null;
+  // The rule, and why it is what it is, lives in ./syncPill next to its tests.
+  const showBlocker = shouldShowBlocker(status.blocker, status.pending, hidePausedSyncStatus);
+
+  const Icon = showBlocker && status.blocker ? BLOCKER_ICON[status.blocker] : null;
   /* Written out per branch rather than assembled from a template key, so checkI18n can see that
-     every one of these strings is used — the same reason HourCycleSetting spells its labels out. */
-  const label = !status.blocker
+     every one of these strings is used — the same reason HourCycleSetting spells its labels out.
+
+     `paused` has no zero-pending wording, because showBlocker above never lets it reach the screen
+     with nothing queued. The other two do: being offline with nothing to send is still worth
+     saying, since it is also why nothing is arriving. */
+  const label = !showBlocker || !status.blocker
     ? null
     : status.blocker === 'paused'
-      ? status.pending > 0
-        ? t('sync.pausedPending', { count: status.pending })
-        : t('sync.paused')
+      ? t('sync.pausedPending', { count: status.pending })
       : status.blocker === 'unreachable'
         ? status.pending > 0
           ? t('sync.unreachablePending', { count: status.pending })
