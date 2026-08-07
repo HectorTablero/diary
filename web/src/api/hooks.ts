@@ -59,14 +59,6 @@ export function useDeleteTag() {
   });
 }
 
-export function useRestoreTag() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (deletion: mutations.TagDeletion) => mutations.restoreTag(deletion),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
-
 // --- Threads ---
 
 export const useThreads = () =>
@@ -110,14 +102,6 @@ export function useDeleteThread() {
   });
 }
 
-export function useRestoreThread() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (deletion: mutations.ThreadDeletion) => mutations.restoreThread(deletion),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
-
 // --- People ---
 
 export const usePeople = () =>
@@ -157,15 +141,6 @@ export function useDeletePerson() {
       hapticWarning();
       qc.invalidateQueries();
     },
-  });
-}
-
-export function useRestorePerson() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (deletion: mutations.PersonDeletion) => mutations.restorePerson(deletion),
-    // Restoring a person puts mentions back on entries too, so this reaches past ['people'].
-    onSuccess: () => qc.invalidateQueries(),
   });
 }
 
@@ -215,9 +190,6 @@ export function useDeleteEvent() {
     },
   });
 }
-
-export const useRestoreEvent = () =>
-  usePersonEventMutation((deletion: mutations.EventDeletion) => mutations.restoreEvent(deletion));
 
 export const useMarkEventAsked = () =>
   usePersonEventMutation(({ personId, eventId }: { personId: string; eventId: string }) =>
@@ -288,14 +260,6 @@ export function useDeleteEntry() {
       hapticWarning();
       invalidate();
     },
-  });
-}
-
-export function useRestoreEntries() {
-  const invalidate = useInvalidateEntryData();
-  return useMutation({
-    mutationFn: (deletion: mutations.EntryDeletion) => mutations.restoreEntries(deletion),
-    onSuccess: invalidate,
   });
 }
 
