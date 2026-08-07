@@ -60,7 +60,6 @@ export default function SearchPage() {
       if (input !== q) update({ q: input || null });
     }, 300);
     return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input]);
 
   const apiParams = useMemo(() => {

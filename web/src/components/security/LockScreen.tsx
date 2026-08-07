@@ -39,7 +39,7 @@ export function LockScreen() {
       // and making the user ask for it first would spend the whole convenience of having it.
       if (available) void tryBiometrics();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, on mount
+    // Runs once, on mount.
   }, []);
 
   const submit = async () => {

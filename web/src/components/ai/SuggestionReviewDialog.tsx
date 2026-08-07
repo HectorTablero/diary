@@ -293,7 +293,6 @@ export function SuggestionReviewDialog({
     const peopleById = new Map(allPeople.map((p) => [p.id, { id: p.id, name: p.name }] as const));
     setDraft(buildDraft(entries, tagsById, peopleById));
     // Rebuild only when the dialog opens with a fresh suggestion set, not on every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const updateNode = (id: string, patch: Partial<DraftNode>): void => {
