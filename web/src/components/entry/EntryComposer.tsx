@@ -73,7 +73,7 @@ export function EntryComposer({
 
   const isEditing = entry !== null;
   const pending = createEntry.isPending || updateEntry.isPending;
-  const showMic = !isEditing && parentId === null && !!settings?.groqApiKey?.trim() && !offline;
+  const showMic = !isEditing && parentId === null && !!settings?.hasGroqKey && !offline;
 
   const addPerson = (person: PersonRefDto) => {
     setPeople((prev) => (prev.some((p) => p.id === person.id) ? prev : [...prev, person]));

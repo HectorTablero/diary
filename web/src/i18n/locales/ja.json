@@ -415,7 +415,11 @@
       "openRouterApiKeyHint": "設定すると、文字起こしを記録の提案に変える処理に Groq のかわりに使われます。無料で取得でき、この端末から OpenRouter を呼ぶためだけに使われます。取得はこちら",
       "cerebrasApiKey": "Cerebras API キー（任意）",
       "cerebrasApiKeyPlaceholder": "csk-…",
-      "cerebrasApiKeyHint": "設定すると、文字起こしを記録の提案に変える処理に Groq のかわりに使われます。無料で取得でき、この端末から Cerebras を呼ぶためだけに使われます。取得はこちら"
+      "cerebrasApiKeyHint": "設定すると、文字起こしを記録の提案に変える処理に Groq のかわりに使われます。無料で取得でき、この端末から Cerebras を呼ぶためだけに使われます。取得はこちら",
+      "keySet": "キー設定済み",
+      "replaceKey": "差し替える",
+      "keySaved": "キーを保存しました",
+      "keyRemoved": "キーを削除しました"
     },
     "account": "アカウント",
     "accountLocalOnlyDescription": "データはこの端末の中だけにあります。ログインするとバックアップされ、複数の端末で同期されます。",
@@ -425,11 +429,11 @@
       "description": "すべてをファイルにバックアップする、以前のバックアップから復元する、または日記の一部を Markdown で書き出して AI エージェントに分析させることができます。",
       "export": "バックアップを書き出す",
       "import": "バックアップを読み込む",
-      "includeSensitive": "機密データ（API キー）も含める",
       "exportDone": "バックアップを書き出しました",
       "invalidFile": "このファイルは有効なバックアップではありません",
       "exportMarkdown": "Markdown で書き出す",
-      "exportMarkdownDescription": "記録や人物のまとめを Markdown ファイルで書き出します。AI エージェントに貼り付けて使います。"
+      "exportMarkdownDescription": "記録や人物のまとめを Markdown ファイルで書き出します。AI エージェントに貼り付けて使います。",
+      "exportOmits": "APIキーはサーバーに保存され、この端末には届かないためファイルには含まれません。テーマ、リマインダー、アプリロックはこの端末の設定なので、これらも含まれません。"
     },
     "markdownExport": {
       "title": "Markdown で書き出す",

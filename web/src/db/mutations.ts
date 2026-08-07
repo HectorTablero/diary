@@ -981,10 +981,21 @@ export async function restoreEvent(deletion: EventDeletion): Promise<PersonDto> 
 // --- Settings ---
 
 export async function saveSettings(input: SettingsInput): Promise<SettingsDto> {
-  // Merge over the current settings (not just DEFAULT_SETTINGS) so fields the caller
-  // didn't touch — like an optional groqApiKey — survive instead of being blanked.
+  // Merge over the current settings (not just DEFAULT_SETTINGS) so fields the caller didn't
+  // touch survive instead of being blanked.
   const current = await getSettings();
-  const settings: SettingsDto = { ...current, ...input };
+  /* Provider keys are write-only: they ride the outbox payload up but must never be written into
+     the local mirror, or making a key "server-only" would have achieved nothing — it would just
+     be stored in IndexedDB by a different route. Only the has*Key flags are mirrored, derived
+     from whatever was sent, so the UI reflects the change without waiting for a sync. */
+  const { groqApiKey, openRouterApiKey, cerebrasApiKey, ...rest } = input;
+  const settings: SettingsDto = {
+    ...current,
+    ...rest,
+    ...(groqApiKey !== undefined ? { hasGroqKey: groqApiKey !== '' } : {}),
+    ...(openRouterApiKey !== undefined ? { hasOpenRouterKey: openRouterApiKey !== '' } : {}),
+    ...(cerebrasApiKey !== undefined ? { hasCerebrasKey: cerebrasApiKey !== '' } : {}),
+  };
   await db.meta.put({ key: 'settings', value: settings });
   await enqueue('PUT', '/settings', input);
   return settings;

@@ -19,7 +19,7 @@ import { chatCompletion, type ChatMessage } from '../lib/aiChatClient';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
 import { normalize, searchPeopleCsv, type SearchablePerson } from './personSearch';
-import { getSettings } from './settingsService';
+import { getProviderKeys, getSettings, type ProviderKeys } from './settingsService';
 
 interface TagRef {
   id: string;
@@ -266,33 +266,28 @@ interface Provider {
 }
 
 /** Cerebras and OpenRouter are used for text/tool-calling; Groq is always required for
-    client-side transcription but also works as the text fallback so the assistant still
-    functions with just a Groq key. */
-function pickProvider(settings: {
-  groqApiKey: string;
-  openRouterApiKey: string;
-  cerebrasApiKey: string;
-}): Provider {
-  const cerebrasKey = settings.cerebrasApiKey.trim();
-  if (cerebrasKey) {
+    transcription but also works as the text fallback so the assistant still functions with just
+    a Groq key. */
+function pickProvider(keys: ProviderKeys): Provider {
+  if (keys.cerebrasApiKey) {
     return {
       baseUrl: CEREBRAS_API_BASE,
-      apiKey: cerebrasKey,
+      apiKey: keys.cerebrasApiKey,
       model: CEREBRAS_CHAT_MODEL,
     };
   }
-  const openRouterKey = settings.openRouterApiKey.trim();
-  if (openRouterKey) {
+  if (keys.openRouterApiKey) {
     return {
       baseUrl: OPENROUTER_API_BASE,
-      apiKey: openRouterKey,
+      apiKey: keys.openRouterApiKey,
       model: OPENROUTER_CHAT_MODEL,
       // Optional but recommended by OpenRouter for inclusion in their public rankings.
       headers: { 'HTTP-Referer': config.betterAuthUrl, 'X-Title': 'Diary' },
     };
   }
-  const groqKey = settings.groqApiKey.trim();
-  if (groqKey) return { baseUrl: GROQ_API_BASE, apiKey: groqKey, model: GROQ_CHAT_MODEL };
+  if (keys.groqApiKey) {
+    return { baseUrl: GROQ_API_BASE, apiKey: keys.groqApiKey, model: GROQ_CHAT_MODEL };
+  }
   throw badRequest('ai.no_key');
 }
 
@@ -304,8 +299,10 @@ export async function generateSuggestions(
   /** Ancestor entry contents, outermost first; empty for a normal top-level recording. */
   parentPath: string[] = [],
 ): Promise<SuggestedEntryNode[]> {
-  const settings = await getSettings(userId);
-  const provider = pickProvider(settings);
+  // Two reads rather than one: the keys never travel with the settings any more (see
+  // settingsService), so anything needing one asks for it explicitly.
+  const [settings, keys] = await Promise.all([getSettings(userId), getProviderKeys(userId)]);
+  const provider = pickProvider(keys);
   const aiLanguage = settings.forceEnglishAIEvents ? 'en' : language;
   const availableDepth = availableDepthFor(parentPath, settings.maxSubEntryDepth);
 

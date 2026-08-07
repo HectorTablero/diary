@@ -31,7 +31,7 @@ export function EntryTree({ entries }: { entries: EntryNode[] }) {
   const { offline } = useSyncStatus();
   // Same three conditions as the composer's mic (EntryComposer's `showMic`): a key to transcribe
   // with, a live session for the authenticated suggestions call, and a reachable server.
-  const voiceEnabled = !!settings?.groqApiKey?.trim() && !!session?.user && !offline;
+  const voiceEnabled = !!settings?.hasGroqKey && !!session?.user && !offline;
   // A drop's real effect only shows up once useMoveEntry's Dexie write + query invalidation +
   // refetch round-trips (all local, but still async) — without this, the drag state clearing
   // instantly on drop made every row snap back to the *stale* `entries` for a beat, then jump to

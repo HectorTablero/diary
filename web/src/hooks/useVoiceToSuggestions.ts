@@ -5,12 +5,13 @@ import { useAiSuggestions, useSettings } from '@/api/hooks';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { notifyError } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
-import { transcribeAudio } from '@/lib/groq';
+import { transcribeAudio } from '@/lib/transcribe';
 
-/* The whole voice-to-entries pipeline in one place: record → transcribe with Groq Whisper (the
-   user's own key) → ask the server to turn the transcript into entry suggestions → hand them back
-   for review. Both entry points share it — the composer's inline mic button and the ⋯ menu's
-   sub-entry recorder — so the two only differ in how they render the phases, never in what they do.
+/* The whole voice-to-entries pipeline in one place: record → send the audio to our API, which
+   transcribes it with the user's own Groq key → ask it to turn the transcript into entry
+   suggestions → hand them back for review. Both entry points share it — the composer's inline mic
+   button and the ⋯ menu's sub-entry recorder — so the two only differ in how they render the
+   phases, never in what they do.
 
    `parentPath` is what makes a recording a *sub*-entry one: the ancestor contents, outermost
    first. The server derives the remaining nesting depth from its length and quotes its contents to
@@ -38,15 +39,14 @@ export function useVoiceToSuggestions({
   const [suggestions, setSuggestions] = useState<SuggestedEntryNode[] | null>(null);
 
   const handleStop = async (blob: Blob | null) => {
-    const apiKey = settings?.groqApiKey?.trim();
-    if (!blob || !apiKey) {
+    if (!blob || !settings?.hasGroqKey) {
       setPhase('idle');
       onSettled?.();
       return;
     }
     setPhase('transcribing');
     try {
-      const transcript = await transcribeAudio(apiKey, blob);
+      const transcript = await transcribeAudio(blob);
       if (!transcript) {
         notifyError(t('ai.empty'));
         setPhase('idle');

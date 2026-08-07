@@ -2,10 +2,17 @@ import { db } from '@/db/db';
 import { getSettings } from '@/db/repo';
 import { BACKUP_VERSION, type BackupEnvelope } from './schema';
 
-/** Snapshot of everything local. `includeSensitive` controls whether the three AI provider API
-    keys are present at all in the output — they're omitted entirely (not blanked) so an exported
-    file never even hints at whether a key was set. */
-export async function buildBackupEnvelope(includeSensitive: boolean): Promise<BackupEnvelope> {
+/**
+ * Snapshot of everything local.
+ *
+ * There is no longer an "include sensitive data" choice to make, because there is no longer
+ * anything sensitive here to include: provider API keys are write-only and never reach this
+ * device (see SettingsDto), so a backup file simply cannot contain one. The settings that do get
+ * written are the account's — device preferences like the theme, the reminder times and the app
+ * lock live in localStorage and are deliberately not part of a backup either, since they describe
+ * the device rather than the diary.
+ */
+export async function buildBackupEnvelope(): Promise<BackupEnvelope> {
   const [entries, people, tags, threads, settings] = await Promise.all([
     db.entries.toArray(),
     db.people.toArray(),
@@ -14,8 +21,6 @@ export async function buildBackupEnvelope(includeSensitive: boolean): Promise<Ba
     getSettings(),
   ]);
 
-  const { groqApiKey: _groqApiKey, openRouterApiKey: _openRouterApiKey, cerebrasApiKey: _cerebrasApiKey, ...settingsWithoutKeys } = settings;
-
   return {
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
@@ -23,6 +28,6 @@ export async function buildBackupEnvelope(includeSensitive: boolean): Promise<Ba
     people,
     tags,
     threads,
-    settings: includeSensitive ? settings : settingsWithoutKeys,
+    settings,
   };
 }

@@ -68,15 +68,15 @@ export const DEFAULT_SETTINGS = {
   maxSubEntryDepth: DEFAULT_SUB_ENTRY_DEPTH,
   /** Default checkup interval inherited by new people. `null` = checkups off by default. */
   defaultCheckupIntervalDays: null as number | null,
-  /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text
-      fallback when no OpenRouter/Cerebras key is set). Empty = feature disabled. */
-  groqApiKey: '',
-  /** User's own OpenRouter API key. When set, it's used for text/tool-calling instead of Groq
-      (transcription still always goes through Groq — OpenRouter has no speech-to-text). */
-  openRouterApiKey: '',
-  /** User's own Cerebras API key. When set, it's used for text/tool-calling instead of Groq
-    (transcription still always goes through Groq — Cerebras has no speech-to-text). */
-  cerebrasApiKey: '',
+  /* Whether each provider key is stored — never the keys themselves. See SettingsDto. */
+
+  /** Groq powers transcription, and text generation when neither of the others is set. */
+  hasGroqKey: false,
+  /** When set, handles text/tool-calling instead of Groq (OpenRouter has no speech-to-text, so
+      transcription still goes through Groq either way). */
+  hasOpenRouterKey: false,
+  /** Same as above, and takes precedence over OpenRouter. */
+  hasCerebrasKey: false,
 };
 
 // --- AI voice assistant ---
@@ -98,6 +98,9 @@ export const AI_MAX_SUBMIT_REMINDERS = 2;
 export const AI_MAX_TRANSCRIPT_LENGTH = 20_000;
 export const AI_MAX_SUGGESTION_NODES = 40;
 export const AI_MAX_RECORDING_MS = 5 * 60_000;
+/** Upload ceiling for POST /ai/transcribe. AI_MAX_RECORDING_MS of Opus-in-WebM lands well under
+    5 MB; this only has to reject a request our own recorder could not have produced. */
+export const AI_MAX_RECORDING_BYTES = 25 * 1024 * 1024;
 
 export const LOGO_COLOR = 'rgb(0, 114, 255)';
 export const LOGO_LOCAL_COLOR = 'rgb(220, 70, 70)';

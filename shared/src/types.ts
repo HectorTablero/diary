@@ -184,13 +184,19 @@ export interface SettingsDto {
   maxSubEntryDepth: number;
   /** Default `checkupIntervalDays` inherited by newly created people. `null` = off by default. */
   defaultCheckupIntervalDays: number | null;
-  /** User's own Groq API key for the voice-to-entry assistant (transcription; also the text
-      fallback when no OpenRouter/Cerebras key is set). Empty = feature disabled. */
-  groqApiKey: string;
-  /** User's own OpenRouter API key; when set, used for text/tool-calling instead of Groq. */
-  openRouterApiKey: string;
-    /** User's own Cerebras API key; when set, used for text/tool-calling instead of Groq. */
-    cerebrasApiKey: string;
+  /* Provider keys are write-only: they go up through SettingsInput and are never sent back down.
+     Only *whether* one is stored crosses the wire, which is all any screen needs — to decide
+     whether to show the mic and what the key field should say. The keys themselves stay on the
+     server, so they are not in the settings response, not in the IndexedDB mirror, and not in a
+     backup file. */
+
+  /** A Groq key is stored. Groq powers transcription, and text generation when neither of the
+      others is set. Without one the voice assistant is off. */
+  hasGroqKey: boolean;
+  /** An OpenRouter key is stored; when so, it handles text/tool-calling instead of Groq. */
+  hasOpenRouterKey: boolean;
+  /** A Cerebras key is stored; takes precedence over both of the above for text/tool-calling. */
+  hasCerebrasKey: boolean;
 }
 
 // --- AI voice assistant ---
