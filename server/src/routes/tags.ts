@@ -63,7 +63,7 @@ export const tagsRouter = new Hono<AppEnv>()
       const tag = await Tag.findOneAndUpdate(
         { _id: oid(c.req.param('id')), userId },
         { $set: input },
-        { new: true, runValidators: true },
+        { returnDocument: 'after', runValidators: true },
       ).lean();
       if (!tag) throw notFound('tag.not_found');
       return c.json(tagToDto(tag as unknown as LeanTag));

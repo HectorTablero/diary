@@ -55,7 +55,7 @@ export const threadsRouter = new Hono<AppEnv>()
       const thread = await Thread.findOneAndUpdate(
         { _id: oid(c.req.param('id')), userId },
         { $set: input },
-        { new: true, runValidators: true },
+        { returnDocument: 'after', runValidators: true },
       ).lean();
       if (!thread) throw notFound('thread.not_found');
       return c.json(threadToDto(thread as unknown as LeanThread));
