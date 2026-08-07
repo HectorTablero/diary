@@ -102,8 +102,18 @@ export default defineConfig(({ mode }) => {
         /* Workbox's default list is js,css,html,ico,png,svg — no json, which the locale files
            became the moment they stopped being `import()`ed chunks and started being fetched by
            URL (see src/i18n/index.ts). Without this the app would come up offline with no strings
-           at all, which is a far louder failure than the one that change was fixing. */
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+           at all, which is a far louder failure than the one that change was fixing.
+
+           `woff2` is here for the same reason and was the same oversight: without it the five
+           Geist subsets sit outside the shell cache, so a cold start offline renders the whole UI
+           in the system fallback until the HTTP cache happens to hold them — a typeface change
+           with no explanation attached to it.
+
+           All five subsets are precached, not just the two the shipped languages need. The UI is
+           latin, but the *content* is whatever the user writes, and a Cyrillic name in an entry
+           should not be the one thing on the page in a different font. 84 kB buys that outright;
+           `unicode-range` still means nothing extra is fetched at runtime. */
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,woff2}'],
       },
     }),
   ],
