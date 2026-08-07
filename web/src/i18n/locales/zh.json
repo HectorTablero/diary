@@ -339,7 +339,9 @@
       "timeFormat24": "24 小时制",
       "timeFormat12": "12 小时制（上午/下午）",
       "haptics": "点按振动",
-      "hapticsDescription": "按下时轻微振动一下。"
+      "hapticsDescription": "按下时轻微振动一下。",
+      "importanceShapes": "用形状区分重要程度",
+      "importanceShapesDescription": "为每个级别在颜色之外再加上专属形状，颜色难以分辨时仍能区分。"
     },
     "reminders": {
       "title": "提醒",

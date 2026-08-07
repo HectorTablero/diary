@@ -367,7 +367,9 @@
       "timeFormat24": "24-hour",
       "timeFormat12": "AM/PM",
       "haptics": "Vibration on tap",
-      "hapticsDescription": "A light tick when you press something."
+      "hapticsDescription": "A light tick when you press something.",
+      "importanceShapes": "Distinguish importance by shape",
+      "importanceShapesDescription": "Give each level its own shape as well as its colour, so the dots stay apart when the colours don’t."
     },
     "reminders": {
       "title": "Reminders",

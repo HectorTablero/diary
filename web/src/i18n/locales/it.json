@@ -361,7 +361,9 @@
       "timeFormat24": "24 ore",
       "timeFormat12": "12 ore (AM/PM)",
       "haptics": "Vibrazione al tocco",
-      "hapticsDescription": "Un colpetto leggero quando premi qualcosa."
+      "hapticsDescription": "Un colpetto leggero quando premi qualcosa.",
+      "importanceShapes": "Distingui l’importanza con le forme",
+      "importanceShapesDescription": "Dà a ogni livello una forma oltre al colore, così i punti restano distinguibili anche quando i colori non bastano."
     },
     "reminders": {
       "title": "Promemoria",

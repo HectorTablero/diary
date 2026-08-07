@@ -54,6 +54,9 @@ export interface Preferences {
       a month of syncing costs less than one photo, and the failure mode of this being on by
       mistake is a diary that silently stops backing itself up. */
   syncOnWifiOnly: boolean;
+  /** Give each importance level a distinct shape as well as a colour, so the red-to-green ramp
+      stops being the only thing separating them. See ImportanceDot. */
+  importanceShapes: boolean;
   /** Send crash reports and usage metrics. Whether there is anywhere to send them is decided at
       build time; this is whether to. Device-local like everything else here, and deliberately
       outside the synced settings so opting out on a phone can't be undone by a laptop. */
@@ -76,6 +79,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   entriesExpanded: true,
   lastImportance: 3,
   syncOnWifiOnly: false,
+  // Off by default: the shapes are unmistakable once you know to read them, but they are a
+  // second alphabet for anyone who doesn't need one.
+  importanceShapes: false,
   // On by default: this is the only way a crash on someone else's device is ever seen, and the
   // switch below is one tap away for anyone who would rather it weren't.
   telemetry: true,

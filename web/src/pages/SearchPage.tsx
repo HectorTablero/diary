@@ -6,7 +6,7 @@ import { usePeople, useSearch, useTags } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { PersonChip, TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
-import { importanceDotClass } from '@/components/entry/ImportanceDot';
+import { useImportanceMarkerClass } from '@/components/entry/ImportanceDot';
 import { SIDEBAR_ONLY } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
@@ -24,6 +24,7 @@ const parseCsv = (value: string | null) => (value ? value.split(',').filter(Bool
 export default function SearchPage() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
+  const markerClass = useImportanceMarkerClass();
   const { data: allTags = [] } = useTags();
   const { data: allPeople = [] } = usePeople();
 
@@ -144,7 +145,7 @@ export default function SearchPage() {
                       : 'opacity-50 hover:opacity-100',
                   )}
                 >
-                  <span className={cn('size-2.5 rounded-full', importanceDotClass(level))} />
+                  <span className={cn('size-2.5', markerClass(level))} />
                 </button>
               </TooltipTrigger>
               <TooltipContent>{t(`importance.levels.${level}`)}</TooltipContent>

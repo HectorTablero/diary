@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useCalendarMonth, useOnThisDay, usePeople } from '@/api/hooks';
-import { importanceDotClass } from '@/components/entry/ImportanceDot';
+import { useImportanceMarkerClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
 import { HintTooltip } from '@/components/common/HintTooltip';
@@ -62,6 +62,7 @@ export default function CalendarPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const isDark = useIsDark();
+  const markerClass = useImportanceMarkerClass();
   const weekStart = useWeekStart();
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
 
@@ -174,8 +175,8 @@ export default function CalendarPage() {
               {byDate.has(dateKey) && (
                 <span
                   className={cn(
-                    'absolute top-[3px] right-1 size-1 rounded-full',
-                    importanceDotClass(byDate.get(dateKey)!.maxImportance),
+                    'absolute top-[3px] right-1 size-1.5',
+                    markerClass(byDate.get(dateKey)!.maxImportance),
                   )}
                 />
               )}
@@ -237,7 +238,7 @@ export default function CalendarPage() {
         <div className="flex max-w-3/5 flex-wrap justify-center gap-x-3 gap-y-1">
           {[1, 2, 3, 4, 5].map((level) => (
             <div key={level} className="flex items-center gap-1">
-              <span className={cn('size-1 rounded-full', importanceDotClass(level))} />
+              <span className={cn('size-1.5', markerClass(level))} />
               <span className="text-[10px] text-muted-foreground">{t(`importance.levels.${level}`)}</span>
             </div>
           ))}
