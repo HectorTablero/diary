@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Section } from '@/components/settings/Section';
 import {
   biometryAvailable,
   disableLock,
@@ -197,16 +198,7 @@ function PasscodeDialog({
  * pointedly *not* part of the account: the lock is device-local (see lib/appLock.ts), so it stays
  * on through a sign-out and works with no account at all.
  */
-export function SecuritySection({
-  Section,
-}: {
-  /** The Settings page's own section shell, passed in so this block looks like every other one. */
-  Section: React.ComponentType<{
-    title: string;
-    description?: string;
-    children: React.ReactNode;
-  }>;
-}) {
+export function SecuritySection() {
   const { t } = useTranslation();
   const { config } = useLockState();
   const [dialog, setDialog] = useState<'set' | 'change' | 'disable' | null>(null);
