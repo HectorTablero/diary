@@ -5,6 +5,8 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import AppLayout from './components/layout/AppLayout';
 import ExploreLayout from './components/layout/ExploreLayout';
 import { FullScreenSpinner } from './components/common/Spinner';
+import { LockScreen } from './components/security/LockScreen';
+import { useLockState } from './lib/appLock';
 import { todayKey } from './lib/dates';
 import { isNative } from './lib/native';
 import { refreshNotifications } from './lib/notifications';
@@ -92,6 +94,19 @@ if (isNative) {
   });
 }
 
-export default function App() {
+/**
+ * The app lock, ahead of the router.
+ *
+ * `LockScreen` replaces the router rather than covering it, so while locked there is no route
+ * mounted at all — nothing queries the diary, nothing paints an entry into the DOM behind a
+ * translucent panel, and the Android recents thumbnail is of the lock screen itself.
+ */
+function AppLockGate() {
+  const { locked } = useLockState();
+  if (locked) return <LockScreen />;
   return <RouterProvider router={router} />;
+}
+
+export default function App() {
+  return <AppLockGate />;
 }

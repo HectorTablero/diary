@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Toaster } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { initSync, onReconnected, onSyncApplied } from './db/sync';
+import { initAppLock } from './lib/appLock';
 import { initAuthToken } from './lib/authToken';
 import { initBackgroundSync } from './lib/backgroundSync';
 import { initGlobalHaptics } from './lib/haptics';
@@ -52,6 +53,9 @@ if (!isNative) {
 initSync();
 initGlobalHaptics();
 initLocalNotifications();
+// Starts the background-grace clock. The initial locked state is read synchronously when the
+// module loads, so a cold start is already locked before anything renders.
+initAppLock();
 // Server changes just landed in the local store: refresh everything on screen.
 onSyncApplied(() => queryClient.invalidateQueries());
 // Remote-origin changes (another device) can affect who's due for a checkup

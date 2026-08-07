@@ -12,6 +12,7 @@ import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { importanceDotClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
+import { SecuritySection } from '@/components/security/SecuritySection';
 import { MarkdownExportDialog } from '@/components/settings/MarkdownExportDialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1186,6 +1187,8 @@ export default function SettingsPage() {
             </div>
           )}
         </Section>
+
+        <SecuritySection Section={Section} />
 
         <Section title={t('settings.data.title')} description={t('settings.data.description')}>
           <div className="flex flex-col gap-4">
