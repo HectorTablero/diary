@@ -4,6 +4,7 @@ import {
   CalendarDays,
   CloudOff,
   GitBranch,
+  MoreHorizontal,
   Search,
   Settings,
   Tag,
@@ -11,12 +12,18 @@ import {
 } from 'lucide-react';
 import { AnimatedLogo } from '@/components/icons/AnimatedLogo';
 import type { LucideIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { usePeople } from '@/api/hooks';
 import { FullScreenSpinner } from '@/components/common/Spinner';
-import { EXPLORE_PATHS, exploreSegment } from '@/components/layout/ExploreLayout';
+import { EXPLORE_SEGMENTS, isExplorePath } from '@/components/layout/ExploreLayout';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { kick } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
@@ -35,9 +42,6 @@ interface NavItem {
   to: string;
   icon: LucideIcon;
   labelKey: string;
-  /** Extra paths that should light this item up — set on an item that fronts a group of screens
-      (the tab bar's Explore), where NavLink's own `to`-only matching isn't enough. */
-  activeOn?: readonly string[];
 }
 
 /** Pending-checkups count for the People nav badge; reactive since `usePeople` is
@@ -61,23 +65,26 @@ const SECONDARY_NAV: NavItem[] = [
 ];
 
 /* The phone bar is its own list, not MAIN_NAV + SECONDARY_NAV: seven labels across a 360px screen
-   overlap each other. Search, Tags and Threads share one slot, and ExploreLayout's switcher moves
-   between them. The sidebar has the height for all seven and keeps them flat — a click saved on a
-   surface that was never crowded.
+   overlap each other. The sidebar has the height for all seven and keeps them flat — a click saved
+   on a surface that was never crowded.
 
-   That shared slot is built per render rather than listed here: it wears the icon and label of
-   whichever of the three you are actually on (see `exploreSegment`), so the bar never names a
-   screen you aren't looking at. Off the group entirely it reads "Search", which is where it goes. */
-const tabNav = (pathname: string): NavItem[] => {
-  const segment = exploreSegment(pathname);
-  return [
-    { to: '/diary', icon: BookOpen, labelKey: 'nav.diary' },
-    { to: '/calendar', icon: CalendarDays, labelKey: 'nav.calendar' },
-    { to: '/people', icon: Users, labelKey: 'nav.people' },
-    { to: segment.to, icon: segment.icon, labelKey: segment.labelKey, activeOn: EXPLORE_PATHS },
-    { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
-  ];
-};
+   Search, Tags and Threads share the fourth slot. It is a *menu* rather than a link, and it is
+   called "More", because the two shapes that don't work here both failed on the same point —
+   saying out loud that those three screens exist:
+
+     - a slot labelled "Explore" that opens Search names a screen the app doesn't have, and
+     - a slot that renames itself to whichever of the three you're on says "Search" everywhere
+       else, so from the diary nothing hints that Tags or Threads are there at all.
+
+   A menu costs one tap on three rarely-used screens and buys naming all of them, every time the
+   bar is on screen. ExploreLayout's segmented switcher still handles moving between them once
+   you're there, so the tap is only ever paid on the way in. */
+const TAB_NAV: NavItem[] = [
+  { to: '/diary', icon: BookOpen, labelKey: 'nav.diary' },
+  { to: '/calendar', icon: CalendarDays, labelKey: 'nav.calendar' },
+  { to: '/people', icon: Users, labelKey: 'nav.people' },
+  { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
+];
 
 function SidebarLink({ item, badge = 0 }: { item: NavItem; badge?: number }) {
   const { t } = useTranslation();
@@ -132,13 +139,79 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
   );
 }
 
-function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
+/** The inside of one tab-bar slot. Shared so the More menu's trigger is visually a tab, not a
+    button that merely sits in the row with them. */
+function TabSlotBody({
+  icon: Icon,
+  label,
+  active,
+  badge = 0,
+}: {
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  badge?: number;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <span className="relative flex items-center justify-center rounded-full p-1 transition-colors">
+        <Icon className={cn('size-5 transition-transform', active && 'scale-110')} />
+        {badge > 0 && (
+          <span
+            className={cn(
+              'absolute rounded-full bg-destructive text-white',
+              badge <= 9
+                ? '-top-0.75 right-0 flex h-3.5 min-w-3.5 items-center justify-center px-0.5 text-[9px] leading-none font-bold'
+                : 'top-0 right-0.5 size-2.5',
+            )}
+          >
+            <span className="sr-only">{t('people.checkupsPending', { count: badge })}</span>
+            {badge <= 9 && <span aria-hidden>{badge}</span>}
+          </span>
+        )}
+      </span>
+      <span className="truncate">{label}</span>
+      {active && (
+        <span className="absolute -top-0.5 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-primary" />
+      )}
+    </>
+  );
+}
+
+const TAB_SLOT =
+  'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative';
+
+/** The fourth slot: opens upward over the bar and names Search, Tags and Threads outright. */
+function MoreTabSlot() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const items = tabNav(pathname);
-  /** A group item stays lit on any of its own screens, not just the one it navigates to. */
-  const inGroup = (item: NavItem) =>
-    item.activeOn?.some((path) => pathname === path || pathname.startsWith(`${path}/`)) ?? false;
+  const navigate = useNavigate();
+  const active = isExplorePath(pathname);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={cn(TAB_SLOT, active ? 'text-primary' : 'text-muted-foreground')}
+      >
+        <TabSlotBody icon={MoreHorizontal} label={t('nav.more')} active={active} />
+      </DropdownMenuTrigger>
+      {/* side="top" so it opens over the app rather than off the bottom of the screen, and
+          sideOffset clears the gesture-nav inset the bar grows by. */}
+      <DropdownMenuContent side="top" align="center" sideOffset={8} className="min-w-40">
+        {EXPLORE_SEGMENTS.map((segment) => (
+          <DropdownMenuItem key={segment.to} onSelect={() => void navigate(segment.to)}>
+            <segment.icon className="size-4" />
+            {t(segment.labelKey)}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
+  const { t } = useTranslation();
   return (
     <nav
       className={cn(
@@ -148,53 +221,28 @@ function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
       )}
     >
       <div className="flex items-stretch justify-around pb-[var(--inset-bottom)]">
-        {items.map((item) => {
-          const badge = item.to === '/people' ? pendingCheckups : 0;
-          return (
+        {TAB_NAV.map((item) => (
+          <Fragment key={item.to}>
+            {/* More sits between People and Settings, so it is emitted just before Settings
+                rather than appended after the loop. */}
+            {item.to === '/settings' && <MoreTabSlot />}
             <NavLink
-              key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                cn(
-                  'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative',
-                  isActive || inGroup(item) ? 'text-primary' : 'text-muted-foreground',
-                )
+                cn(TAB_SLOT, isActive ? 'text-primary' : 'text-muted-foreground')
               }
             >
-              {({ isActive: linkActive }) => {
-                const isActive = linkActive || inGroup(item);
-                return (
-                <>
-                  <span
-                    className={cn('relative flex items-center justify-center rounded-full p-1 transition-colors')}
-                  >
-                    <item.icon className={cn('size-5 transition-transform', isActive && 'scale-110')} />
-                    {badge > 0 && (
-                      <span
-                        className={cn(
-                          'absolute rounded-full bg-destructive text-white',
-                          // '-top-0.75 right-0 flex h-3.5 min-w-3.5 items-center justify-center px-0.5 text-[9px] leading-none font-bold'
-                          badge <= 9
-                            ? '-top-0.75 right-0 flex h-3.5 min-w-3.5 items-center justify-center px-0.5 text-[9px] leading-none font-bold'
-                            : 'top-0 right-0.5 size-2.5',
-                        )}
-                      >
-                        <span className="sr-only">{t('people.checkupsPending', { count: badge })}</span>
-                        {/* <span aria-hidden className="px-0.5">{badge}</span> */}
-                        {badge <= 9 && <span aria-hidden>{badge}</span>}
-                      </span>
-                    )}
-                  </span>
-                  <span className="truncate">{t(item.labelKey)}</span>
-                  {isActive && (
-                    <span className="absolute -top-0.5 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-primary" />
-                  )}
-                </>
-                );
-              }}
+              {({ isActive }) => (
+                <TabSlotBody
+                  icon={item.icon}
+                  label={t(item.labelKey)}
+                  active={isActive}
+                  badge={item.to === '/people' ? pendingCheckups : 0}
+                />
+              )}
             </NavLink>
-          );
-        })}
+          </Fragment>
+        ))}
       </div>
     </nav>
   );
