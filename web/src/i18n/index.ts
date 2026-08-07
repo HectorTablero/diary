@@ -53,8 +53,8 @@ i18n
     supportedLngs: LANGUAGES.map((l) => l.code),
     nonExplicitSupportedLngs: true,
     interpolation: { escapeValue: false },
-    // Silences i18next's "made possible by Locize" console advert on every boot.
-    showSupportNotice: false,
+    // (i18next 26 removed the "made possible by Locize" boot advert, and `showSupportNotice`
+    //  along with it. Nothing to silence any more.)
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
