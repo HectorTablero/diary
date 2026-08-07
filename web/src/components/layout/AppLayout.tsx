@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router';
 import { usePeople } from '@/api/hooks';
 import { FullScreenSpinner } from '@/components/common/Spinner';
-import { EXPLORE_PATHS } from '@/components/layout/ExploreLayout';
+import { EXPLORE_PATHS, exploreSegment } from '@/components/layout/ExploreLayout';
 import { kick } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
@@ -61,16 +61,23 @@ const SECONDARY_NAV: NavItem[] = [
 ];
 
 /* The phone bar is its own list, not MAIN_NAV + SECONDARY_NAV: seven labels across a 360px screen
-   overlap each other. Search, Tags and Threads collapse into one Explore item that lands on
-   /search, where ExploreLayout's switcher takes over. The sidebar has the height for all seven and
-   keeps them flat — a click saved on a surface that was never crowded. */
-const TAB_NAV: NavItem[] = [
-  { to: '/diary', icon: BookOpen, labelKey: 'nav.diary' },
-  { to: '/calendar', icon: CalendarDays, labelKey: 'nav.calendar' },
-  { to: '/people', icon: Users, labelKey: 'nav.people' },
-  { to: '/search', icon: Search, labelKey: 'nav.explore', activeOn: EXPLORE_PATHS },
-  { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
-];
+   overlap each other. Search, Tags and Threads share one slot, and ExploreLayout's switcher moves
+   between them. The sidebar has the height for all seven and keeps them flat — a click saved on a
+   surface that was never crowded.
+
+   That shared slot is built per render rather than listed here: it wears the icon and label of
+   whichever of the three you are actually on (see `exploreSegment`), so the bar never names a
+   screen you aren't looking at. Off the group entirely it reads "Search", which is where it goes. */
+const tabNav = (pathname: string): NavItem[] => {
+  const segment = exploreSegment(pathname);
+  return [
+    { to: '/diary', icon: BookOpen, labelKey: 'nav.diary' },
+    { to: '/calendar', icon: CalendarDays, labelKey: 'nav.calendar' },
+    { to: '/people', icon: Users, labelKey: 'nav.people' },
+    { to: segment.to, icon: segment.icon, labelKey: segment.labelKey, activeOn: EXPLORE_PATHS },
+    { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
+  ];
+};
 
 function SidebarLink({ item, badge = 0 }: { item: NavItem; badge?: number }) {
   const { t } = useTranslation();
@@ -128,7 +135,7 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
 function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const items = TAB_NAV;
+  const items = tabNav(pathname);
   /** A group item stays lit on any of its own screens, not just the one it navigates to. */
   const inGroup = (item: NavItem) =>
     item.activeOn?.some((path) => pathname === path || pathname.startsWith(`${path}/`)) ?? false;
