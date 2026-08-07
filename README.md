@@ -248,6 +248,14 @@ publishing jobs declare `needs: verify`, so one commit gets one verdict and noth
 without it. `verify` needs no secrets: `config.ts` reads its required variables through
 getters, so importing a module never demands a credential.
 
+One audit line is expected and permanent for now: GHSA-frvp-7c67-39w9 against
+`@hono/node-server`. The server imports v2, where it is fixed — but `@hono/node-ws` still declares
+a peer range of `^1.19.11`, so npm installs a nested 1.x copy to satisfy it. That copy is never
+loaded (node-ws imports `hono/ws`, `ws` and `node:http`, and nothing from node-server), and npm's
+peer resolution overrules `overrides`, so it cannot be deduped away yet. It is moderate, so it
+does not fail the `--audit-level=high` gate; the path-traversal guard in `server/src/app.ts`
+covers it regardless. Drop this paragraph when node-ws widens its peer range.
+
 The `android` job is skipped when a commit changes nothing it builds from. That used to be a
 workflow-level `paths:` filter, which cannot be expressed per-job, so it is now a diff against
 the pushed range — see the `scope` step. In practice it rarely skips, because the pre-commit
