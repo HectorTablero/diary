@@ -31,7 +31,7 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { clearLocalData } from '@/db/db';
 import { closeLiveChannel } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
-import { LANGUAGES, resolveLanguage } from '@/i18n';
+import i18n, { changeLanguage, LANGUAGES, resolveLanguage, type LanguageCode } from '@/i18n';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { signOut, useSession } from '@/lib/authClient';
 import { setAuthToken } from '@/lib/authToken';
@@ -771,9 +771,12 @@ export default function SettingsPage() {
                 <Select
                   value={resolveLanguage(i18n.language)}
                   onValueChange={(lng) => {
-                    void i18n.changeLanguage(lng);
-                    // Read after the switch, so the confirmation arrives in the new language.
-                    notifyDeviceSaved(i18n.t('settings.general.savedOnDevice'));
+                    // changeLanguage from i18n/index, not i18n.changeLanguage: that one fetches
+                    // the language's strings first, so the switch never lands on an empty bundle.
+                    void changeLanguage(lng as LanguageCode).then(() =>
+                      // Read after the switch, so the confirmation arrives in the new language.
+                      notifyDeviceSaved(i18n.t('settings.general.savedOnDevice')),
+                    );
                   }}
                 >
                   <SelectTrigger className="w-40">
@@ -800,7 +803,7 @@ export default function SettingsPage() {
                 *inside* the left column with the label it illustrates — ToggleRow's `children`
                 stack underneath the whole row, which would leave the switch floating above it
                 instead of level with every other switch on the page. */}
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 w-full">
               <div className="flex min-w-0 flex-col gap-0.5">
                 <Label htmlFor="importance-shapes">{t('settings.general.importanceShapes')}</Label>
                 <p className="text-xs text-muted-foreground">

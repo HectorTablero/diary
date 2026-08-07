@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import { Hash, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -152,6 +151,10 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
               : `briefings-${Date.now()}.md`;
           await saveTextFile(filename, markdown, 'text/markdown');
         } else {
+          /* Loaded here rather than imported at the top: JSZip is ~95 kB and is needed only when
+             exporting more than one person as separate files, which is the rarer half of a screen
+             most users never open. */
+          const { default: JSZip } = await import('jszip');
           const zip = new JSZip();
           for (const { person, said, unsaidCount } of results) {
             zip.file(`${person.name}.md`, buildPersonMarkdown(person, said, unsaidCount, personOptions));
