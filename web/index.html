@@ -11,6 +11,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.svg" />
     <title>Diary</title>
+    <!-- Not translated, and deliberately so: this is read by crawlers and link unfurlers before
+         any locale has been detected, and it describes an app nobody reaches without an account.
+         `robots` restates web/public/robots.txt at the page level, because a URL shared directly
+         is fetched by things that never asked for robots.txt. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta
+      name="description"
+      content="A personal diary crossed with a tiny CRM: write your days as bullet points, and it tells you what to talk about with the people in your life."
+    />
     <script type="module">
       const isLocalDevelopment = import.meta.env.IS_LOCAL_DEVELOPMENT === 'true';
       const favicon = document.querySelector('link[rel="icon"]');
