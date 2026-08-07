@@ -163,7 +163,11 @@ export function EntryItem({
             </div>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-0.5 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+        {/* `has-[:focus-visible]` rather than `focus-within`: the grip handle is keyboard-focusable
+            now (it has to be, to start a move), and a plain mouse click focuses a button too — so
+            focus-within would leave these buttons stuck open after every drag. :focus-visible is
+            exactly the distinction wanted, keyboard focus and not pointer focus. */}
+        <div className="flex shrink-0 items-center gap-0.5 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-has-[:focus-visible]:opacity-100">
           {canAddSub && (
             <Button
               variant="ghost"

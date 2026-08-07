@@ -1,16 +1,20 @@
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   useDraggable,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
   type DragMoveEvent,
   type DragStartEvent,
+  type KeyboardCoordinateGetter,
   type Modifier,
 } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
+import i18n from 'i18next';
 import {
   createContext,
   useContext,
@@ -102,10 +106,13 @@ export function useSortableTreeRow(nodeId: string): SortableTreeRowState {
   const isProjectedParent = ctx?.projectedParentId === nodeId;
   return {
     setNodeRef,
-    // No tabIndex: there's no keyboard sensor wired up, and a *pointer* click still focuses a
-    // <button> in most browsers — leaving the default tabIndex 0 meant dragging a row left its
-    // handle permanently focused, which kept that row's :focus-within action buttons visible.
-    dragHandleProps: { ...attributes, ...listeners, tabIndex: -1 },
+    /* dnd-kit's own attributes now apply in full, tabIndex 0 included, so the handle is reachable
+       by keyboard and Space starts a move (see the KeyboardSensor below). It used to be forced to
+       -1 because a *pointer* click also focuses a <button>, and the row revealed its action
+       buttons on `:focus-within` — so clicking a grip left them stuck open. That is fixed at the
+       other end instead: rows key the reveal off `:focus-visible`, which a mouse click does not
+       match. Taking focusability away was never the right half of that trade. */
+    dragHandleProps: { ...attributes, ...listeners },
     isProjectedParent,
     isProjectedParentInvalid: isProjectedParent && !ctx?.projectionValid,
   };
@@ -167,10 +174,13 @@ export function SortableTreeProvider<T extends TreeNode>({
   maxDepth,
   children,
 }: SortableTreeProviderProps<T>) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [targetIndex, setTargetIndex] = useState(0);
+  /* Mirrors targetIndex. The announcement callbacks are invoked by dnd-kit during the same
+     event as the state update, so reading the state variable there would describe the previous
+     position. */
+  const targetIndexRef = useRef(0);
   const [projection, setProjection] = useState<DropProjection | null>(null);
   const dragDataRef = useRef<DragData<T> | null>(null);
   const projectionRef = useRef<DropProjection | null>(null);
@@ -180,6 +190,65 @@ export function SortableTreeProvider<T extends TreeNode>({
   // pickup/drop taps and the invalid-transition warning buzz below.
   const lastSlotKeyRef = useRef<string | null>(null);
 
+  /**
+   * Arrow keys, in this tree's own units.
+   *
+   * Everything below resolves a drop from coordinates — the target row from the ghost's centre
+   * against the row midpoints captured at drag start, the depth from horizontal delta over
+   * `indentWidth`. So a keyboard move doesn't need a parallel code path, only coordinates that
+   * land where a pointer would have: one row height per up/down, one indent per left/right.
+   * dnd-kit's stock getter steps a flat 25px, which lines up with neither.
+   */
+  const coordinateGetter: KeyboardCoordinateGetter = (event, { currentCoordinates }) => {
+    const rowHeight = dragDataRef.current?.rowHeight ?? 44;
+    switch (event.code) {
+      case 'ArrowDown':
+        return { ...currentCoordinates, y: currentCoordinates.y + rowHeight };
+      case 'ArrowUp':
+        return { ...currentCoordinates, y: currentCoordinates.y - rowHeight };
+      case 'ArrowRight':
+        return { ...currentCoordinates, x: currentCoordinates.x + indentWidth };
+      case 'ArrowLeft':
+        return { ...currentCoordinates, x: currentCoordinates.x - indentWidth };
+      default:
+        return undefined;
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter }),
+  );
+
+  /* Spoken feedback for a move nobody can see happening. The visual language of this drag —
+     a shadow sliding between rows, a ring on the projected parent, red when blocked — conveys
+     position and legality entirely in pixels, so all of it has to be said out loud instead.
+     Positions are 1-based and depth is called a level, because that is what the indentation
+     means to someone who cannot see it. */
+  const describePosition = () => {
+    const current = projectionRef.current;
+    if (!current) return undefined;
+    const values = { position: targetIndexRef.current + 1, level: current.depth + 1 };
+    return current.valid ? i18n.t('dnd.moved', values) : i18n.t('dnd.blocked', values);
+  };
+
+  const announcements: Announcements = {
+    onDragStart: () => i18n.t('dnd.lifted'),
+    onDragMove: describePosition,
+    // Required by the type. This tree resolves its target from coordinates rather than from
+    // droppable collisions, so "over" carries no information move hasn't already announced.
+    onDragOver: describePosition,
+    onDragEnd: () => {
+      const current = projectionRef.current;
+      if (!current?.valid) return i18n.t('dnd.cancelled');
+      return i18n.t('dnd.dropped', {
+        position: targetIndexRef.current + 1,
+        level: current.depth + 1,
+      });
+    },
+    onDragCancel: () => i18n.t('dnd.cancelled'),
+  };
+
   const reset = () => {
     setActiveId(null);
     setProjection(null);
@@ -187,6 +256,7 @@ export function SortableTreeProvider<T extends TreeNode>({
     projectionRef.current = null;
     wasInvalidRef.current = false;
     lastSlotKeyRef.current = null;
+    targetIndexRef.current = 0;
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -222,6 +292,7 @@ export function SortableTreeProvider<T extends TreeNode>({
       rowHeight: rectById.get(id)?.height ?? 44,
     };
     setTargetIndex(initialTarget);
+    targetIndexRef.current = initialTarget;
     setActiveId(id);
     hapticTap();
   };
@@ -241,6 +312,7 @@ export function SortableTreeProvider<T extends TreeNode>({
       }
     }
     setTargetIndex(newTarget);
+    targetIndexRef.current = newTarget;
 
     const result = projectDrop(
       data.visible,
@@ -302,6 +374,7 @@ export function SortableTreeProvider<T extends TreeNode>({
   return (
     <DndContext
       sensors={sensors}
+      accessibility={{ announcements }}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}

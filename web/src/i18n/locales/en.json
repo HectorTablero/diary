@@ -273,7 +273,8 @@
     "eventEndedDaysAgo_other": "Ended {{count}} days ago",
     "checkupDigestTitle": "{{count}} person to catch up with",
     "checkupDigestTitle_other": "{{count}} people to catch up with",
-    "checkupDigestBody": "It's been a while with {{names}}."
+    "checkupDigestBody": "It's been a while with {{names}}.",
+    "personActions": "Actions for {{name}}"
   },
   "tags": {
     "title": "Tags",
@@ -657,5 +658,12 @@
     "lockImmediately": "Immediately",
     "lockAfterMinutes_one": "After {{count}} minute",
     "lockAfterMinutes_other": "After {{count}} minutes"
+  },
+  "dnd": {
+    "lifted": "Picked up. Use the arrow keys to move it, space to drop, escape to cancel.",
+    "moved": "Position {{position}}, level {{level}}.",
+    "blocked": "Position {{position}}, level {{level}} is not allowed.",
+    "dropped": "Dropped at position {{position}}, level {{level}}.",
+    "cancelled": "Move cancelled."
   }
 }

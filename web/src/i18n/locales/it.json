@@ -267,7 +267,8 @@
     "eventEndedDaysAgo_other": "Finito {{count}} giorni fa",
     "checkupDigestTitle": "{{count}} persona con cui aggiornarti",
     "checkupDigestTitle_other": "{{count}} persone con cui aggiornarti",
-    "checkupDigestBody": "È passato un po' con {{names}}."
+    "checkupDigestBody": "È passato un po' con {{names}}.",
+    "personActions": "Azioni per {{name}}"
   },
   "tags": {
     "title": "Etichette",
@@ -655,5 +656,12 @@
     "lockAfterMinutes_one": "Dopo {{count}} minuto",
     "lockAfterMinutes_many": "Dopo {{count}} minuti",
     "lockAfterMinutes_other": "Dopo {{count}} minuti"
+  },
+  "dnd": {
+    "lifted": "Elemento preso. Usa le frecce per spostarlo, spazio per rilasciarlo, escape per annullare.",
+    "moved": "Posizione {{position}}, livello {{level}}.",
+    "blocked": "La posizione {{position}}, livello {{level}} non è consentita.",
+    "dropped": "Rilasciato in posizione {{position}}, livello {{level}}.",
+    "cancelled": "Spostamento annullato."
   }
 }
