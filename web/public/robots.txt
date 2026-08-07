@@ -1,0 +1,9 @@
+# A single-person diary. Nothing here is meant to be found by anyone who was not sent a link.
+#
+# Everything past /login renders client-side behind a session, so a crawler could not read an
+# entry even if it tried — but "unreachable in practice" and "asked not to" are different
+# statements, and only the second one survives a future route that renders something publicly.
+#
+# The login page is the only thing that would otherwise be indexed, and it says nothing useful.
+User-agent: *
+Disallow: /
