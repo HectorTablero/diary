@@ -56,9 +56,9 @@ i18n
        `fallbackLng` therefore points at a bundle that may not be loaded — which is safe only
        because scripts/checkI18n.ts fails the build if any locale is missing a key the others
        have, so the fallback has nothing left to resolve. If that check is ever dropped, this
-       needs to preload 'es' too. */
+       needs to preload 'en' too. */
     resources: {},
-    fallbackLng: 'es',
+    fallbackLng: 'en',
     supportedLngs: LANGUAGES.map((l) => l.code),
     nonExplicitSupportedLngs: true,
     interpolation: { escapeValue: false },
