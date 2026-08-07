@@ -674,7 +674,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (commitSignal > 0) commit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs only when a commit is asked for
+    // Runs only when a commit is asked for.
   }, [commitSignal]);
 
   /* The last save. Leaving the Settings page is the normal way to finish with it, and a field

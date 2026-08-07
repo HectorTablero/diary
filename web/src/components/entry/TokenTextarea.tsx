@@ -73,7 +73,6 @@ export function TokenTextarea({
   // Recompute the active token whenever value or caret changes.
   useEffect(() => {
     refreshToken();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   const insertToken = (text: string) => {
@@ -145,7 +144,6 @@ export function TokenTextarea({
       });
     }
     return matches;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, people, tags]);
 
   useEffect(() => setSelectedIndex(0), [token?.query, token?.type]);

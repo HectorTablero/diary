@@ -66,7 +66,6 @@ export function VoiceSubEntryDialog({
     });
     // `start` is recreated whenever the recorder re-renders (every timer tick); depending on it
     // would re-run this on every tick. The ref guard is what actually keeps this to one call.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const parentContent = parentPath[parentPath.length - 1] ?? '';
