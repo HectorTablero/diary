@@ -38,7 +38,12 @@
 
     --font-heading: var(--font-sans);
 
-    --font-sans: 'Geist Variable', sans-serif;
+    /* Geist first, then whatever the current language needs Geist to hand off to.
+       `--font-cjk` is a variable rather than a literal precisely so `@theme inline` cannot flatten
+       it: inline bakes this value into the `font-sans` utility, but a `var()` inside it is still
+       resolved against the element, so the :lang() rules below reach even markup that sets
+       `font-sans` explicitly (the composer's TokenTextarea does). */
+    --font-sans: 'Geist Variable', var(--font-cjk), sans-serif;
 
     --color-sidebar-ring: var(--sidebar-ring);
 
@@ -247,6 +252,38 @@
     --sidebar-border: oklch(1 0 0 / 10%);
 
     --sidebar-ring: oklch(0.556 0 0);
+}
+
+/*
+ * What Geist hands off to.
+ *
+ * Geist ships latin, latin-ext, cyrillic, cyrillic-ext and vietnamese — no CJK, because it has
+ * none. Two of the five shipped languages are Japanese and Chinese, so without this the entire UI
+ * in those languages fell through to `sans-serif` and the design system quietly did not apply to
+ * them. System CJK is the right rendering; the point of this block is that it is now chosen.
+ *
+ * Scoped by :lang() rather than merged into one list, because Han characters are shared between
+ * the two scripts while several of their shapes are not (直, 骨, 化 among them). A single stack
+ * with a Japanese face ahead of a Chinese one renders Chinese in Japanese letterforms — legible,
+ * and wrong in the way a native reader notices immediately.
+ *
+ * This works before any JavaScript has run: index.html sets documentElement.lang from
+ * localStorage in the pre-paint script, for exactly this class of reason.
+ *
+ * Each stack is ordered Apple, Microsoft, then Noto: the first two are the system UI faces those
+ * platforms already render every other app in, and both are low-contrast modern gothics, which is
+ * as close to Geist's register as CJK gets. Noto catches Android and Linux.
+ */
+:root {
+  --font-cjk: ui-sans-serif;
+}
+
+:root:lang(ja) {
+  --font-cjk: 'Hiragino Sans', 'Yu Gothic UI', 'Noto Sans JP', ui-sans-serif;
+}
+
+:root:lang(zh) {
+  --font-cjk: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', ui-sans-serif;
 }
 
 @layer base {
