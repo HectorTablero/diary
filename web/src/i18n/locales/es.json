@@ -432,7 +432,11 @@
       "openRouterApiKeyHint": "Si la añades, se usa en lugar de Groq para convertir las transcripciones en sugerencias de entradas. Gratis de obtener, se usa solo para llamar a OpenRouter directamente desde este dispositivo. Consíguela en",
       "cerebrasApiKey": "Clave de API de Cerebras (opcional)",
       "cerebrasApiKeyPlaceholder": "csk-…",
-      "cerebrasApiKeyHint": "Si la añades, se usa en lugar de Groq para convertir las transcripciones en sugerencias de entradas. Gratis de obtener, se usa solo para llamar a Cerebras directamente desde este dispositivo. Consíguela en"
+      "cerebrasApiKeyHint": "Si la añades, se usa en lugar de Groq para convertir las transcripciones en sugerencias de entradas. Gratis de obtener, se usa solo para llamar a Cerebras directamente desde este dispositivo. Consíguela en",
+      "keySet": "Clave guardada",
+      "replaceKey": "Sustituir",
+      "keySaved": "Clave guardada",
+      "keyRemoved": "Clave eliminada"
     },
     "account": "Cuenta",
     "accountLocalOnlyDescription": "Tus datos se quedan solo en este dispositivo. Inicia sesión para respaldarlos y sincronizarlos entre dispositivos.",
@@ -442,11 +446,11 @@
       "description": "Haz una copia de seguridad completa, restaura una copia anterior, o exporta parte de tu diario como Markdown para que un agente de IA lo analice.",
       "export": "Exportar copia de seguridad",
       "import": "Importar copia de seguridad",
-      "includeSensitive": "Incluir datos sensibles (claves de API)",
       "exportDone": "Copia de seguridad exportada",
       "invalidFile": "Ese archivo no es una copia de seguridad válida",
       "exportMarkdown": "Exportar como Markdown",
-      "exportMarkdownDescription": "Exporta entradas o el resumen de una persona como archivo Markdown, para pegarlo en un agente de IA."
+      "exportMarkdownDescription": "Exporta entradas o el resumen de una persona como archivo Markdown, para pegarlo en un agente de IA.",
+      "exportOmits": "Las claves de API se guardan en el servidor y nunca llegan a este dispositivo, así que no están en el archivo. El tema, los recordatorios y el bloqueo son ajustes de este dispositivo y tampoco se incluyen."
     },
     "markdownExport": {
       "title": "Exportar como Markdown",

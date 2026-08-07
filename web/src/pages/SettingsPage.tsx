@@ -13,10 +13,9 @@ import { EntityPicker } from '@/components/entry/EntityPicker';
 import { importanceDotClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { SecuritySection } from '@/components/security/SecuritySection';
+import { ApiKeyField } from '@/components/settings/ApiKeyField';
 import { MarkdownExportDialog } from '@/components/settings/MarkdownExportDialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberInput } from '@/components/ui/number-input';
 import {
@@ -459,9 +458,9 @@ function buildPayload(
     autoSaidOnMention: draft.autoSaidOnMention,
     maxSubEntryDepth: Math.min(MAX_SUB_ENTRY_DEPTH, Math.max(1, Math.round(draft.maxSubEntryDepth))),
     defaultCheckupIntervalDays: checkupsEnabled ? clampDays(checkupIntervalDays, 1) : null,
-    groqApiKey: draft.groqApiKey,
-    openRouterApiKey: draft.openRouterApiKey,
-    cerebrasApiKey: draft.cerebrasApiKey,
+    /* No provider keys here on purpose. They are write-only and are not part of the draft at
+       all, so the autosave below has nothing to send — and, more to the point, cannot resend a
+       stale one. Setting a key is its own explicit save; see `saveApiKey`. */
   };
 }
 
@@ -478,7 +477,6 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<SettingsDto | null>(null);
   const [checkupsEnabled, setCheckupsEnabled] = useState(false);
   const [checkupIntervalDays, setCheckupIntervalDays] = useState(30);
-  const [includeSensitiveExport, setIncludeSensitiveExport] = useState(false);
   const [exportingBackup, setExportingBackup] = useState(false);
   const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
   const [linkingAccount, setLinkingAccount] = useState(false);
@@ -572,6 +570,28 @@ export default function SettingsPage() {
     };
   }, []);
 
+  /**
+   * Store or clear one provider key.
+   *
+   * Its own write rather than a field on the draft: the draft is what the autosave resends, and a
+   * key must be sent exactly once, when the user chooses to. The rest of the payload rides along
+   * because PUT /settings replaces the document — sending only the key would blank everything
+   * else. The optimistic local mirror keeps just the has*Key flag (see mutations.saveSettings).
+   */
+  const saveApiKey = (field: 'groqApiKey' | 'openRouterApiKey' | 'cerebrasApiKey', value: string) => {
+    if (!draft) return;
+    const payload = buildPayload(draft, checkupsEnabled, checkupIntervalDays);
+    if (!payload) return;
+    void saveSettings
+      .mutateAsync({ ...payload, [field]: value })
+      .then(() =>
+        notifySuccess(value ? t('settings.ai.keySaved') : t('settings.ai.keyRemoved'), {
+          important: true,
+        }),
+      )
+      .catch(() => notifyError(t('errors.unknown')));
+  };
+
   const resetDefaults = () => {
     if (!draft) return;
     setDraft({
@@ -630,7 +650,7 @@ export default function SettingsPage() {
   const handleExportBackup = async () => {
     setExportingBackup(true);
     try {
-      const envelope = await buildBackupEnvelope(includeSensitiveExport);
+      const envelope = await buildBackupEnvelope();
       await saveTextFile(
         `diary-backup-${envelope.exportedAt.slice(0, 10)}.json`,
         JSON.stringify(envelope, null, 2),
@@ -1048,31 +1068,22 @@ export default function SettingsPage() {
               {aiDisabled && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">{t('settings.ai.signInRequired')}</p>
               )}
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="groq-api-key">{t('settings.ai.apiKey')}</Label>
-                <Input
-                  id="groq-api-key"
-                  type="password"
-                  autoComplete="off"
-                  disabled={aiDisabled}
-                  value={draft.groqApiKey}
-                  onChange={(e) => setDraft({ ...draft, groqApiKey: e.target.value })}
-                  onBlur={requestCommit}
-                  placeholder={t('settings.ai.apiKeyPlaceholder')}
-                  className="max-w-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.ai.apiKeyHint')}{' '}
-                  <a
-                    href="https://console.groq.com/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
-                  >
-                    console.groq.com
-                  </a>
-                </p>
-              </div>
+              <ApiKeyField
+                id="groq-api-key"
+                label={t('settings.ai.apiKey')}
+                placeholder={t('settings.ai.apiKeyPlaceholder')}
+                hasKey={draft.hasGroqKey}
+                disabled={aiDisabled}
+                onSave={(value) => saveApiKey('groqApiKey', value)}
+                hint={
+                  <>
+                    {t('settings.ai.apiKeyHint')}{' '}
+                    <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline">
+                      console.groq.com
+                    </a>
+                  </>
+                }
+              />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex flex-col gap-0.5">
                   <Label htmlFor="force-english-ai-events">{t('settings.ai.forceEnglishAIEvents')}</Label>
@@ -1088,56 +1099,38 @@ export default function SettingsPage() {
                   }}
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="cerebras-api-key">{t('settings.ai.cerebrasApiKey')}</Label>
-                <Input
-                  id="cerebras-api-key"
-                  type="password"
-                  autoComplete="off"
-                  disabled={aiDisabled}
-                  value={draft.cerebrasApiKey}
-                  onChange={(e) => setDraft({ ...draft, cerebrasApiKey: e.target.value })}
-                  onBlur={requestCommit}
-                  placeholder={t('settings.ai.cerebrasApiKeyPlaceholder')}
-                  className="max-w-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.ai.cerebrasApiKeyHint')}{' '}
-                  <a
-                    href="https://cloud.cerebras.ai/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
-                  >
-                    cloud.cerebras.ai
-                  </a>
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="openrouter-api-key">{t('settings.ai.openRouterApiKey')}</Label>
-                <Input
-                  id="openrouter-api-key"
-                  type="password"
-                  autoComplete="off"
-                  disabled={aiDisabled}
-                  value={draft.openRouterApiKey}
-                  onChange={(e) => setDraft({ ...draft, openRouterApiKey: e.target.value })}
-                  onBlur={requestCommit}
-                  placeholder={t('settings.ai.openRouterApiKeyPlaceholder')}
-                  className="max-w-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.ai.openRouterApiKeyHint')}{' '}
-                  <a
-                    href="https://openrouter.ai/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
-                  >
-                    openrouter.ai/keys
-                  </a>
-                </p>
-              </div>
+              <ApiKeyField
+                id="cerebras-api-key"
+                label={t('settings.ai.cerebrasApiKey')}
+                placeholder={t('settings.ai.cerebrasApiKeyPlaceholder')}
+                hasKey={draft.hasCerebrasKey}
+                disabled={aiDisabled}
+                onSave={(value) => saveApiKey('cerebrasApiKey', value)}
+                hint={
+                  <>
+                    {t('settings.ai.cerebrasApiKeyHint')}{' '}
+                    <a href="https://cloud.cerebras.ai/" target="_blank" rel="noreferrer" className="underline">
+                      cloud.cerebras.ai
+                    </a>
+                  </>
+                }
+              />
+              <ApiKeyField
+                id="openrouter-api-key"
+                label={t('settings.ai.openRouterApiKey')}
+                placeholder={t('settings.ai.openRouterApiKeyPlaceholder')}
+                hasKey={draft.hasOpenRouterKey}
+                disabled={aiDisabled}
+                onSave={(value) => saveApiKey('openRouterApiKey', value)}
+                hint={
+                  <>
+                    {t('settings.ai.openRouterApiKeyHint')}{' '}
+                    <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="underline">
+                      openrouter.ai/keys
+                    </a>
+                  </>
+                }
+              />
             </div>
           )}
         </Section>
@@ -1221,13 +1214,10 @@ export default function SettingsPage() {
                   onChange={(e) => void handleImportFile(e)}
                 />
               </div>
-              <label className="flex items-center gap-2.5">
-                <Checkbox
-                  checked={includeSensitiveExport}
-                  onCheckedChange={(checked) => setIncludeSensitiveExport(checked === true)}
-                />
-                <span className="text-xs text-muted-foreground">{t('settings.data.includeSensitive')}</span>
-              </label>
+              {/* Was a "include sensitive data" checkbox. There is nothing left for it to
+                  include: provider keys never reach this device, and device preferences are not
+                  part of a backup — so the honest control is a sentence, not a choice. */}
+              <p className="text-xs text-muted-foreground">{t('settings.data.exportOmits')}</p>
             </div>
 
             <div className="flex flex-col gap-1">

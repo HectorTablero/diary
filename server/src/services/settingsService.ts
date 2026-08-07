@@ -24,8 +24,36 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     autoSaidOnMention: doc.autoSaidOnMention,
     maxSubEntryDepth: doc.maxSubEntryDepth ?? DEFAULT_SETTINGS.maxSubEntryDepth,
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
-    groqApiKey: doc.groqApiKey ?? '',
-    openRouterApiKey: doc.openRouterApiKey ?? '',
-    cerebrasApiKey: doc.cerebrasApiKey ?? '',
+    // Presence only. The keys stay here; see getProviderKeys.
+    hasGroqKey: !!doc.groqApiKey?.trim(),
+    hasOpenRouterKey: !!doc.openRouterApiKey?.trim(),
+    hasCerebrasKey: !!doc.cerebrasApiKey?.trim(),
+  };
+}
+
+/** The stored provider keys, in the clear. */
+export interface ProviderKeys {
+  groqApiKey: string;
+  openRouterApiKey: string;
+  cerebrasApiKey: string;
+}
+
+/**
+ * Read the raw provider keys — server-side callers only.
+ *
+ * Kept apart from `getSettings` so the keys cannot reach a response by accident: `getSettings` is
+ * what the settings route and the sync payload return, and it now has no field that could carry
+ * one. Anything that needs an actual key has to ask for it by this name, which is a grep away
+ * from an audit.
+ */
+export async function getProviderKeys(userId: string): Promise<ProviderKeys> {
+  const doc = await UserSettings.findOne(
+    { userId },
+    'groqApiKey openRouterApiKey cerebrasApiKey',
+  ).lean();
+  return {
+    groqApiKey: doc?.groqApiKey?.trim() ?? '',
+    openRouterApiKey: doc?.openRouterApiKey?.trim() ?? '',
+    cerebrasApiKey: doc?.cerebrasApiKey?.trim() ?? '',
   };
 }

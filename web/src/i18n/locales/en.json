@@ -437,7 +437,11 @@
       "openRouterApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call OpenRouter directly from this device. Get one at",
       "cerebrasApiKey": "Cerebras API key (optional)",
       "cerebrasApiKeyPlaceholder": "csk-…",
-      "cerebrasApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call Cerebras directly from this device. Get one at"
+      "cerebrasApiKeyHint": "When set, used instead of Groq to turn transcripts into entry suggestions. Free to get, used only to call Cerebras directly from this device. Get one at",
+      "keySet": "Key set",
+      "replaceKey": "Replace",
+      "keySaved": "Key saved",
+      "keyRemoved": "Key removed"
     },
     "account": "Account",
     "accountLocalOnlyDescription": "Your data stays on this device only. Sign in to back it up and sync across devices.",
@@ -447,11 +451,11 @@
       "description": "Back up everything to a file, restore from a previous backup, or export part of your diary as Markdown for an AI agent to analyze.",
       "export": "Export backup",
       "import": "Import backup",
-      "includeSensitive": "Include sensitive data (API keys)",
       "exportDone": "Backup exported",
       "invalidFile": "That file isn't a valid backup",
       "exportMarkdown": "Export as Markdown",
-      "exportMarkdownDescription": "Export entries or a person's briefing as a Markdown file, for pasting into an AI agent."
+      "exportMarkdownDescription": "Export entries or a person's briefing as a Markdown file, for pasting into an AI agent.",
+      "exportOmits": "API keys are stored on the server and never reach this device, so they are not in the file. Theme, reminders and the app lock are settings of this device and are not included either."
     },
     "markdownExport": {
       "title": "Export as Markdown",

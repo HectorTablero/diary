@@ -199,9 +199,11 @@ export const settingsSchema = z.object({
   autoSaidOnMention: z.boolean().optional(),
   maxSubEntryDepth: z.number().int().min(1).max(MAX_SUB_ENTRY_DEPTH).optional(),
   defaultCheckupIntervalDays: checkupIntervalDaysSchema,
-  // Both optional and never defaulted: a queued PUT /settings outbox payload from an older
-  // client (that predates these fields) must not wipe the stored keys on replay. An
-  // explicit "" still clears one.
+  /* Provider keys are write-only — the only place they appear in the contract is here, on the way
+     up. SettingsDto reports `hasGroqKey`-style booleans instead, so nothing ever sends one back.
+     Still optional and never defaulted: a queued PUT /settings from an older client (or simply
+     any save that didn't touch the AI section) must not wipe the stored keys on replay. An
+     explicit "" is how one gets cleared. */
   groqApiKey: z.string().trim().max(200).optional(),
   openRouterApiKey: z.string().trim().max(200).optional(),
   cerebrasApiKey: z.string().trim().max(200).optional(),

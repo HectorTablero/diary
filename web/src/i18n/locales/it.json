@@ -431,7 +431,11 @@
       "openRouterApiKeyHint": "Se impostata, viene usata invece di Groq per trasformare le trascrizioni in suggerimenti. Gratuita, usata solo per chiamare OpenRouter direttamente da questo dispositivo. Ottienila su",
       "cerebrasApiKey": "Chiave API Cerebras (facoltativa)",
       "cerebrasApiKeyPlaceholder": "csk-…",
-      "cerebrasApiKeyHint": "Se impostata, viene usata invece di Groq per trasformare le trascrizioni in suggerimenti. Gratuita, usata solo per chiamare Cerebras direttamente da questo dispositivo. Ottienila su"
+      "cerebrasApiKeyHint": "Se impostata, viene usata invece di Groq per trasformare le trascrizioni in suggerimenti. Gratuita, usata solo per chiamare Cerebras direttamente da questo dispositivo. Ottienila su",
+      "keySet": "Chiave impostata",
+      "replaceKey": "Sostituisci",
+      "keySaved": "Chiave salvata",
+      "keyRemoved": "Chiave rimossa"
     },
     "account": "Account",
     "accountLocalOnlyDescription": "I tuoi dati restano solo su questo dispositivo. Accedi per farne un backup e sincronizzarli fra più dispositivi.",
@@ -441,11 +445,11 @@
       "description": "Fai il backup di tutto in un file, ripristina da un backup precedente, oppure esporta una parte del diario in Markdown per farla analizzare da un agente IA.",
       "export": "Esporta backup",
       "import": "Importa backup",
-      "includeSensitive": "Includi i dati sensibili (chiavi API)",
       "exportDone": "Backup esportato",
       "invalidFile": "Questo file non è un backup valido",
       "exportMarkdown": "Esporta in Markdown",
-      "exportMarkdownDescription": "Esporta le voci o il riepilogo di una persona come file Markdown, da incollare in un agente IA."
+      "exportMarkdownDescription": "Esporta le voci o il riepilogo di una persona come file Markdown, da incollare in un agente IA.",
+      "exportOmits": "Le chiavi API sono conservate sul server e non raggiungono mai questo dispositivo, quindi non sono nel file. Tema, promemoria e blocco sono impostazioni di questo dispositivo e non vengono inclusi."
     },
     "markdownExport": {
       "title": "Esporta in Markdown",
