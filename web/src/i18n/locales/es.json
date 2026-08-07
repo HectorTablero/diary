@@ -372,7 +372,7 @@
       "birthdays": "Recordatorios de cumpleaños",
       "birthdaysDescription": "La mañana del mismo día, para todas las personas con cumpleaños guardado.",
       "sendAt": "A las",
-"checkups": "Recordatorios de contacto",
+      "checkups": "Recordatorios de contacto",
       "checkupsDescription": "Cuando hace tiempo que no le cuentas nada a alguien. Si coinciden varios, llegan en uno solo.",
       "quietHours": "Horas de silencio",
       "quietHoursDescription": "Los recordatorios que no tienen hora propia esperan a la mañana en vez de llegar de madrugada. Las horas que eliges arriba nunca se retrasan.",
@@ -489,7 +489,12 @@
       "wifiOnlyDescription": "Los cambios se siguen guardando en este dispositivo y suben la próxima vez que haya wifi. El diario es texto, así que esto ahorra poco.",
       "nestingDepth": "Niveles de subentradas",
       "nestingDepthDescription": "Cuánto se puede anidar por debajo de una entrada principal. Bajarlo no toca las entradas que ya están más abajo."
-    }
+    },
+    "signOutPendingTitle_one": "¿Cerrar sesión con {{count}} cambio sin guardar en tu cuenta?",
+    "signOutPendingTitle_many": "¿Cerrar sesión con {{count}} cambios sin guardar en tu cuenta?",
+    "signOutPendingTitle_other": "¿Cerrar sesión con {{count}} cambios sin guardar en tu cuenta?",
+    "signOutPendingDescription": "Al cerrar sesión se borra este dispositivo. Lo que quede pendiente de sincronizar se perderá para siempre. Vuelve a conectarte y deja que termine si quieres conservarlo.",
+    "signOutDiscard": "Cerrar sesión y descartar"
   },
   "errors": {
     "unauthorized": "Necesitas iniciar sesión",

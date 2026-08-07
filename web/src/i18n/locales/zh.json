@@ -349,7 +349,7 @@
       "birthdays": "生日提醒",
       "birthdaysDescription": "在当天早上通知，涵盖所有存了生日的人。",
       "sendAt": "通知时间",
-"checkups": "联系提醒",
+      "checkups": "联系提醒",
       "checkupsDescription": "距离上次跟某人说点什么已经有一阵子了。多个同时到期时会合并成一条。",
       "quietHours": "免打扰时段",
       "quietHoursDescription": "没有固定时间的提醒会等到早上，而不是在半夜送达。你在上面设定的时间永远不会被推迟。",
@@ -466,7 +466,10 @@
       "wifiOnlyDescription": "改动仍会保存在本设备上，等下次连上 Wi-Fi 再上传。日记是纯文字，这样省下的流量很有限。",
       "nestingDepth": "子记录的嵌套层数",
       "nestingDepthDescription": "顶层记录下面最多能嵌套几层。调低不会影响已经更深的记录。"
-    }
+    },
+    "signOutPendingTitle_other": "还有 {{count}} 项更改尚未保存到账号，确定退出登录吗？",
+    "signOutPendingDescription": "退出登录会清空本设备的数据。仍在等待同步的内容将永久丢失。如需保留，请重新联网并等待同步完成。",
+    "signOutDiscard": "退出并丢弃"
   },
   "errors": {
     "unauthorized": "需要先登录",

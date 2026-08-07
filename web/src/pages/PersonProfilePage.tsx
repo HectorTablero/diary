@@ -37,6 +37,8 @@ import {
   useMemories,
   usePerson,
   usePersonHistory,
+  useRestoreEvent,
+  useRestorePerson,
   useSetSaid,
   useSettings,
   useTalkingPoints,
@@ -65,6 +67,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { notifyDeleted } from '@/lib/undo';
 import { isCheckupDue } from '@/lib/checkup';
 import { formatDateKey, parseDateKey, todayKey } from '@/lib/dates';
 
@@ -297,6 +300,7 @@ function EventRow({
 }) {
   const { t } = useTranslation();
   const deleteEvent = useDeleteEvent();
+  const restoreEvent = useRestoreEvent();
   const markAsked = useMarkEventAsked();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -383,7 +387,8 @@ function EventRow({
           deleteEvent.mutate(
             { personId: person.id, eventId: event.id },
             {
-              onSuccess: () => notifySuccess(t('people.eventDeleted')),
+              onSuccess: (deletion) =>
+                notifyDeleted(t('people.eventDeleted'), () => restoreEvent.mutateAsync(deletion)),
               onError: () => notifyError(t('errors.unknown')),
             },
           );
@@ -484,6 +489,7 @@ export default function PersonProfilePage() {
   const { t } = useTranslation();
   const { data: person, isLoading, isError } = usePerson(id ?? '');
   const deletePerson = useDeletePerson();
+  const restorePerson = useRestorePerson();
   const markCheckup = useMarkCheckup();
   const markEventAsked = useMarkEventAsked();
   const updatePerson = useUpdatePerson();
@@ -705,9 +711,14 @@ export default function PersonProfilePage() {
         onConfirm={() => {
           setConfirmingDelete(false);
           deletePerson.mutate(person.id, {
-            onSuccess: () => {
-              notifySuccess(t('people.personDeleted'));
-              navigate('/people');
+            onSuccess: (deletion) => {
+              // Navigating away doesn't take the toast with it, so the undo stays reachable from
+              // the list the user lands on.
+              notifyDeleted(t('people.personDeleted'), async () => {
+                await restorePerson.mutateAsync(deletion);
+                await navigate(`/people/${person.id}`);
+              });
+              void navigate('/people');
             },
             onError: () => notifyError(t('errors.unknown')),
           });

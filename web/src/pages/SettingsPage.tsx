@@ -30,6 +30,7 @@ import { Switch } from '@/components/ui/switch';
 import { TimePicker } from '@/components/ui/time-picker';
 import { clearLocalData } from '@/db/db';
 import { closeLiveChannel } from '@/db/sync';
+import { useSyncStatus } from '@/db/useSyncStatus';
 import { LANGUAGES, resolveLanguage } from '@/i18n';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { signOut, useSession } from '@/lib/authClient';
@@ -481,6 +482,8 @@ export default function SettingsPage() {
   const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
   const [linkingAccount, setLinkingAccount] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
+  const { pending: pendingOps } = useSyncStatus();
   /* Bumped by every control that considers its change settled. It exists because a handler
      can't save the value it just set — setDraft hasn't been applied yet — so the request rides
      the same render as the change and is picked up by the effect below. */
@@ -595,6 +598,19 @@ export default function SettingsPage() {
     cacheUser(null);
     setLocalOnly(false);
     navigate('/login');
+  };
+
+  /**
+   * Sign-out ends in `clearLocalData()`, which takes the outbox with it — so anything still queued
+   * is not "unsynced", it is gone. Writing offline and then signing out is exactly the sequence
+   * that produces a non-empty queue, so the count is checked rather than assumed to be zero.
+   *
+   * A drained queue signs out with no ceremony, as before: the confirmation only exists to name a
+   * loss that is about to happen.
+   */
+  const requestSignOut = () => {
+    if (pendingOps > 0) setSignOutConfirmOpen(true);
+    else void handleSignOut();
   };
 
   const handleLinkAccount = async () => {
@@ -1150,7 +1166,7 @@ export default function SettingsPage() {
                   <p className="truncate text-xs text-muted-foreground">{session.user.email}</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => void handleSignOut()}>
+              <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={requestSignOut}>
                 <LogOut className="size-3.5" />
                 {t('auth.signOut')}
               </Button>
@@ -1240,6 +1256,15 @@ export default function SettingsPage() {
         description={t('settings.resetDefaultsConfirmDescription')}
         confirmLabel={t('settings.resetDefaults')}
         onConfirm={resetDefaults}
+      />
+
+      <ConfirmDialog
+        open={signOutConfirmOpen}
+        onOpenChange={setSignOutConfirmOpen}
+        title={t('settings.signOutPendingTitle', { count: pendingOps })}
+        description={t('settings.signOutPendingDescription')}
+        confirmLabel={t('settings.signOutDiscard')}
+        onConfirm={() => void handleSignOut()}
       />
     </PageContainer>
   );
