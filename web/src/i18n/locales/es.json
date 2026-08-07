@@ -362,7 +362,9 @@
       "timeFormat24": "24 h",
       "timeFormat12": "12 h (a. m./p. m.)",
       "haptics": "Vibración al pulsar",
-      "hapticsDescription": "Un toque suave al pulsar algo."
+      "hapticsDescription": "Un toque suave al pulsar algo.",
+      "importanceShapes": "Distinguir la importancia por forma",
+      "importanceShapesDescription": "Da a cada nivel una forma propia además del color, para que los puntos se distingan aunque los colores no lo hagan."
     },
     "reminders": {
       "title": "Recordatorios",

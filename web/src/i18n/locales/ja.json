@@ -345,7 +345,9 @@
       "timeFormat24": "24時間制",
       "timeFormat12": "12時間制（午前/午後）",
       "haptics": "タップ時の振動",
-      "hapticsDescription": "何かを押したときに軽く振動します。"
+      "hapticsDescription": "何かを押したときに軽く振動します。",
+      "importanceShapes": "重要度を形でも区別する",
+      "importanceShapesDescription": "各レベルに色だけでなく形も与えて、色で見分けにくいときでも区別できるようにします。"
     },
     "reminders": {
       "title": "リマインダー",

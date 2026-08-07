@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
-import { importanceDotClass } from '@/components/entry/ImportanceDot';
+import { useImportanceMarkerClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { SecuritySection } from '@/components/security/SecuritySection';
 import { ApiKeyField } from '@/components/settings/ApiKeyField';
@@ -474,6 +474,7 @@ export default function SettingsPage() {
   const saveSettings = useSaveSettings();
 
   const prefs = usePreferences();
+  const markerClass = useImportanceMarkerClass();
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [draft, setDraft] = useState<SettingsDto | null>(null);
   const [checkupsEnabled, setCheckupsEnabled] = useState(false);
@@ -792,6 +793,25 @@ export default function SettingsPage() {
               <WeekStartSetting />
               <HourCycleSetting />
             </div>
+            {/* Not behind "Advanced": an accessibility setting that only the people who don't
+                need it can find is no setting at all. The row previews the five shapes, because
+                the description cannot say what they look like. */}
+            <ToggleRow
+              id="importance-shapes"
+              label={t('settings.general.importanceShapes')}
+              description={t('settings.general.importanceShapesDescription')}
+              checked={prefs.importanceShapes}
+              onCheckedChange={(checked) => {
+                setPreference('importanceShapes', checked);
+                notifyDeviceSaved(t('settings.general.savedOnDevice'));
+              }}
+            >
+              <div className="flex items-center gap-2" aria-hidden>
+                {[1, 2, 3, 4, 5].map((importance) => (
+                  <span key={importance} className={cn('size-3', markerClass(importance))} />
+                ))}
+              </div>
+            </ToggleRow>
           </div>
         </Section>
 
@@ -854,7 +874,7 @@ export default function SettingsPage() {
                   <SelectContent>
                     {LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
-                        <span className={cn('mr-1 inline-block size-2.5 rounded-full', importanceDotClass(Number(level)))} />
+                        <span className={cn('mr-1 inline-block size-2.5', markerClass(Number(level)))} />
                         {t(`importance.levels.${level}`)}
                       </SelectItem>
                     ))}
@@ -904,7 +924,7 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-2">
               {LEVELS.map((level) => (
                 <div key={level} className="flex items-center gap-3">
-                  <span className={cn('size-3 shrink-0 rounded-full', importanceDotClass(Number(level)))} />
+                  <span className={cn('size-3 shrink-0', markerClass(Number(level)))} />
                   <span className="w-36 flex-1 text-sm sm:flex-none">{t(`importance.levels.${level}`)}</span>
                   <NumberInput
                     min={1}
@@ -948,7 +968,7 @@ export default function SettingsPage() {
                   <SelectContent>
                     {LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
-                        <span className={cn('mr-1 inline-block size-2.5 rounded-full', importanceDotClass(Number(level)))} />
+                        <span className={cn('mr-1 inline-block size-2.5', markerClass(Number(level)))} />
                         {t(`importance.levels.${level}`)}
                       </SelectItem>
                     ))}
