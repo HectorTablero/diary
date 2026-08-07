@@ -5,10 +5,16 @@ tells you what to talk about with the people in your life.
 
 ## Concepts
 
-- **Entries** — bullet points per day, with nested sub-entries (up to 3 levels) and an
-  **importance** from 1 (life-changing) to 5 (passing thought).
+- **Entries** — bullet points per day, with nested sub-entries (up to 5 levels, configurable)
+  and an **importance** from 1 (life-changing) to 5 (passing thought). Drag or arrow-key the
+  grip handle to reorder and re-nest them.
 - **Tags** — colored labels that connect entries to people.
-- **People** — everyone you talk to. A person has tags and optional notes.
+- **Threads** — a named topic running across days, so one ongoing story can be caught up on in
+  a single action. An entry can belong to several.
+- **People** — everyone you talk to: tags, notes, aliases (`@Mum` → Carmen), contact details,
+  birthday, and a **checkup interval** ("nudge me if I haven't spoken to them in 30 days").
+- **Events** — something happening in a person's life, with dates. When one ends, the profile
+  asks you to follow up until you say you have.
 - **Talking points** — on a person's profile, entries that mention them or share a tag are
   ranked by a decaying score: `importanceWeight · matchStrength · 2^(-age/halfLife)`.
   Important things stay relevant for months; trivia fades in days. Half-lives are
@@ -22,10 +28,42 @@ tells you what to talk about with the people in your life.
 
 ## Views
 
-Diary (day view with `@person` / `#tag` autocomplete composer) · Calendar (month grid +
-"on this day") · People (list + profile with talking points / memories / history) ·
-Search (full text + filters) · Tags · Settings (decay half-lives, memories, theme,
-language es/en).
+Diary (day view with `@person` / `#tag` autocomplete composer, plus voice capture) · Calendar
+(month heatmap + "on this day") · People (list + profile with talking points / events /
+memories / history) · Search (full text + filters) · Tags · Threads · Settings.
+
+## Voice entries
+
+With a provider key set (Settings → AI), the mic in the composer records a note, the server
+transcribes it with Groq Whisper and turns the transcript into a reviewable tree of suggested
+entries — people and tags already linked. The ⋯ menu on any entry does the same thing nested
+underneath it. Keys are stored server-side and never sent to the browser.
+
+## Reminders (Android)
+
+Four device-local alarms, each switchable in Settings: overdue checkups, birthdays, event
+follow-ups, and a nightly "you haven't written today". Quiet hours defer anything that has no
+time of its own. All of it lives in `localStorage` rather than the synced settings, so signing
+out cannot silently switch an alarm back on.
+
+## Security and privacy
+
+- **App lock** — an optional passcode (PBKDF2, device-local) in front of the diary, with the
+  device's biometrics as the fast path and a configurable grace period after backgrounding. It
+  survives sign-out and works with no account at all.
+- **Provider API keys are write-only.** They are stored on the server and never returned; the
+  client is told only whether one exists. Transcription is proxied through the API for the same
+  reason.
+- **Crash reporting is opt-out** in Settings → Data, on top of the build-time env vars below.
+- **Deleting is undoable** — entries (with their whole subtree), people, tags, threads and
+  events all leave an Undo on the toast. Signing out with unsynced changes asks first.
+
+## Accessibility
+
+Reordering works from the keyboard (Space to lift, arrows to move, Space to drop) with spoken
+position/level announcements. Importance can be shown as distinct **shapes** as well as colours,
+for anyone the red-to-green ramp doesn't separate. `prefers-reduced-motion` is honoured
+throughout, including skipping the boot animation.
 
 ## Stack
 
@@ -33,7 +71,7 @@ npm workspaces monorepo:
 
 | Workspace | Stack |
 |---|---|
-| `web/` | React 19 + Vite 7 + TypeScript, Tailwind v4, shadcn/ui, TanStack Query, react-router 7, i18next, Dexie (IndexedDB), PWA (vite-plugin-pwa), Capacitor (Android) |
+| `web/` | React 19 + Vite 7 + TypeScript, Tailwind v4, shadcn/ui, TanStack Query, react-router 7, i18next (es/en/it/ja/zh), Dexie (IndexedDB), dnd-kit, PWA (vite-plugin-pwa), Capacitor (Android) |
 | `server/` | Hono on Node, Mongoose 8 (MongoDB), Better Auth (Google OAuth) |
 | `shared/` | zod schemas, DTO types, constants and the talking-points scoring, shared by both |
 
@@ -76,6 +114,9 @@ One-time Google Cloud Console setup: create an **Android** OAuth client with pac
 `es.tablerus.diary` and the SHA-1 of the debug and release keystores
 (`keytool -list -v -keystore <ks>`). The existing web client id keeps being the one
 referenced in code.
+
+Biometric unlock uses `@aparajita/capacitor-biometric-auth`. Adding it changed the native
+plugin set, so the first APK carrying it has to be installed by hand — see the OTA note below.
 
 ```sh
 npm run build:app   # web build (app mode) + cap sync android
@@ -135,7 +176,9 @@ reconnect); it needs none of the above.
 
 Errors and request/usage metrics go to [Better Stack](https://telemetry.betterstack.com).
 It is entirely optional — with the env vars unset, both the server and the client log to
-the console only.
+the console only. The env vars decide whether reporting is *possible*; the switch in
+Settings → Data decides whether it happens, and is shown only when a build has somewhere to
+report to.
 
 Create **two** sources (Sources → Connect source), because the client token is shipped
 inside the bundle and must not be the server's:
@@ -181,5 +224,19 @@ The **server**'s pair are plain runtime env vars — set `BETTERSTACK_SOURCE_TOK
 - `npm run build` / `npm start` — production build / run
 - `npm run build:app` / `npm run app:open` — Android app build / open in Android Studio
 - `npm run typecheck` — all workspaces
+- `npm test` — every workspace. In `web/` this is three things: `checkI18n.ts` (below), the
+  `logic` vitest project (pure functions, Node) and the `components` one (jsdom + Testing
+  Library, `*.test.tsx`)
 - `npx tsx src/scripts/syncSmoke.ts` (from `server/`) — sync-foundation smoke tests against local MongoDB
 - `npx tsx scripts/dbSmoke.ts` (from `web/`) — local-first data layer smoke tests (Node + fake-indexeddb)
+
+## Translations
+
+Five languages, kept in step by `web/scripts/checkI18n.ts`, which runs as part of `npm test` and
+fails on a key used but undefined, a key present in one locale and not another, a lost or invented
+`{{interpolation}}`, or a namespace missing from `translation-context.json` (the file a translator
+reads for tone and context).
+
+That check is load-bearing beyond tidiness: each locale is a **separate chunk**, fetched only when
+it is the one in use, and `fallbackLng` therefore points at a bundle that may not be loaded. It is
+safe only because no locale can be missing a key.
