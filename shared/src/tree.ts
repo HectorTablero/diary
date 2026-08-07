@@ -48,3 +48,66 @@ export function isSelfOrDescendant(
   }
   return false;
 }
+
+/* The three below complete the same id -> parentId view of a tree, so a caller holding that one map
+   can answer every question the drag rules ask. They exist because the server was answering them
+   with its own walks instead — one database round-trip per level for depth, a breadth-first query
+   per level for height and for descendants — which duplicated the arithmetic above in a second
+   place that no test covered, and made the two halves of one rule free to disagree.
+
+   All three tolerate a cycle in the map. Storage should never contain one (that is what
+   isSelfOrDescendant is for), but a corrupt row must not hang the process. */
+
+/** Number of ancestors above `id`; a root sits at depth 0. */
+export function depthOf(id: string, parentById: ReadonlyMap<string, string | null>): number {
+  let depth = 0;
+  let current = parentById.get(id) ?? null;
+  const seen = new Set<string>([id]);
+  while (current !== null && !seen.has(current)) {
+    seen.add(current);
+    depth += 1;
+    current = parentById.get(current) ?? null;
+  }
+  return depth;
+}
+
+/** Every id below `id`, excluding `id` itself. */
+export function descendantIds(
+  id: string,
+  parentById: ReadonlyMap<string, string | null>,
+): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const [child, parent] of parentById) {
+    if (parent === null) continue;
+    const siblings = childrenByParent.get(parent);
+    if (siblings) siblings.push(child);
+    else childrenByParent.set(parent, [child]);
+  }
+
+  const found = new Set<string>();
+  const frontier = [id];
+  while (frontier.length) {
+    for (const child of childrenByParent.get(frontier.pop()!) ?? []) {
+      if (found.has(child)) continue; // cycle guard
+      found.add(child);
+      frontier.push(child);
+    }
+  }
+  return found;
+}
+
+/** Height of the subtree rooted at `id`, counting `id` itself: a leaf is 1. */
+export function subtreeHeightFrom(
+  id: string,
+  parentById: ReadonlyMap<string, string | null>,
+): number {
+  const descendants = descendantIds(id, parentById);
+  if (descendants.size === 0) return 1;
+  // The tallest descendant's depth, measured from `id` rather than from the root.
+  const base = depthOf(id, parentById);
+  let tallest = 0;
+  for (const descendant of descendants) {
+    tallest = Math.max(tallest, depthOf(descendant, parentById) - base);
+  }
+  return tallest + 1;
+}

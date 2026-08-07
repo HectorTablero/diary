@@ -555,6 +555,9 @@
     "upstream_error": "LLM が処理できませんでした",
     "timeout": "LLM の応答に時間がかかりすぎました",
     "no_key": "先に設定で Groq API キーを追加してください",
+    "no_audio": "録音が受信されませんでした",
+    "recording_too_large": "この録音はアップロードするには長すぎます",
+    "too_many_requests": "AI へのリクエストが多すぎます。少し待ってからお試しください",
     "no_submission": "アシスタントから結果を受け取れませんでした",
     "signInRequiredForVoice": "音声からの記録を使うにはログインしてください。"
   },

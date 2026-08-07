@@ -135,12 +135,13 @@ function PasscodeDialog({
                   autoFocus={!needsCurrent}
                   autoComplete="off"
                   value={next}
+                  aria-describedby="new-passcode-hint"
                   onChange={(e) => {
                     setNext(e.target.value);
                     setError(null);
                   }}
                 />
-                <p className="text-xs text-muted-foreground">
+                <p id="new-passcode-hint" className="text-xs text-muted-foreground">
                   {t('security.passcodeHint', { count: MIN_PASSCODE_LENGTH })}
                 </p>
               </div>

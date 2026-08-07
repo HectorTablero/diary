@@ -578,6 +578,9 @@
     "upstream_error": "L'LLM non è riuscito a elaborare la richiesta",
     "timeout": "L'LLM ha messo troppo tempo a rispondere",
     "no_key": "Aggiungi prima una chiave API Groq nelle impostazioni",
+    "no_audio": "Nessuna registrazione ricevuta",
+    "recording_too_large": "Questa registrazione è troppo lunga per essere caricata",
+    "too_many_requests": "Troppe richieste all’IA: aspetta un minuto",
     "no_submission": "Non è arrivato alcun risultato dall'assistente",
     "signInRequiredForVoice": "Accedi per usare le voci dettate."
   },

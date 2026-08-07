@@ -77,6 +77,7 @@ export function LockScreen() {
           autoComplete="off"
           aria-label={t('security.passcode')}
           aria-invalid={error}
+          aria-describedby="lock-passcode-error"
           value={passcode}
           onChange={(e) => {
             setPasscode(e.target.value);
@@ -88,7 +89,11 @@ export function LockScreen() {
         />
         {/* Reserves its line whether or not it is filled, so a wrong passcode doesn't shift the
             button out from under the thumb that is about to press it again. */}
-        <p className="min-h-4 text-center text-xs text-destructive" role="alert">
+        <p
+          id="lock-passcode-error"
+          className="min-h-4 text-center text-xs text-destructive"
+          role="alert"
+        >
           {error ? t('security.wrongPasscode') : ''}
         </p>
         <Button onClick={() => void submit()} disabled={!passcode || checking}>

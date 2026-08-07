@@ -199,6 +199,57 @@ describe('push: a rejected write', () => {
   });
 });
 
+/* A kick fires on every mutation, every foreground and every minute. run() used to open by
+   clearing the blocker optimistically, so each of those made the pill vanish and come back a
+   second later when the request finally failed — the one status the user most needs to trust,
+   blinking. A blocker now outlives an attempt that hasn't concluded. */
+describe('status: no flicker while retrying', () => {
+  it('keeps reporting an unreachable server for the whole of the next attempt', async () => {
+    apiGet.mockRejectedValue(new ApiErrorMock(0, 'errors.offline'));
+    await syncNow();
+    expect(getSyncStatus().blocker).toBe('unreachable');
+
+    // Hold the retry open: mid-flight is not evidence about its own outcome.
+    let fail!: () => void;
+    apiGet.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          fail = () => reject(new ApiErrorMock(0, 'errors.offline'));
+        }),
+    );
+    const attempt = syncNow();
+    await vi.waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+
+    expect(getSyncStatus().syncing).toBe(true);
+    expect(getSyncStatus().blocker).toBe('unreachable');
+
+    fail();
+    await attempt;
+    expect(getSyncStatus().blocker).toBe('unreachable');
+  });
+
+  it('clears only once a pull has actually completed', async () => {
+    apiGet.mockRejectedValueOnce(new ApiErrorMock(0, 'errors.offline'));
+    await syncNow();
+    expect(getSyncStatus().blocker).toBe('unreachable');
+
+    apiGet.mockResolvedValue(syncResponse({}));
+    await syncNow();
+    expect(getSyncStatus().blocker).toBeNull();
+  });
+
+  it('treats an answer from the server as reachable, even a refusal', async () => {
+    apiGet.mockRejectedValueOnce(new ApiErrorMock(0, 'errors.offline'));
+    await syncNow();
+    expect(getSyncStatus().blocker).toBe('unreachable');
+
+    // 400 means it composed a reply and sent it: whatever is wrong, it is not the connection.
+    apiGet.mockRejectedValueOnce(new ApiErrorMock(400, 'validation'));
+    await syncNow();
+    expect(getSyncStatus().blocker).toBeNull();
+  });
+});
+
 /* "Sync on Wi-Fi only" used to return from syncNow in silence, leaving the status untouched — so
    the app looked fully synced while the outbox grew behind it. */
 describe('wi-fi-only', () => {

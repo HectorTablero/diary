@@ -583,6 +583,9 @@
     "upstream_error": "The LLM couldn't process that",
     "timeout": "The LLM took too long to respond",
     "no_key": "Add a Groq API key in settings first",
+    "no_audio": "No recording was received",
+    "recording_too_large": "That recording is too long to upload",
+    "too_many_requests": "Too many AI requests — give it a minute",
     "no_submission": "Couldn't get a result from the assistant",
     "signInRequiredForVoice": "Sign in to use voice entries."
   },

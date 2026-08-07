@@ -27,6 +27,10 @@ interface DatePickerProps {
   className?: string;
   'aria-label'?: string;
   'aria-invalid'?: boolean;
+  /** Id of the element describing this field — its hint, or the reason it is invalid. Listed
+      explicitly like the two above: this component does not spread arbitrary props, so an aria-*
+      attribute that isn't named here is dropped without warning. */
+  'aria-describedby'?: string;
   /**
    * Opens the same calendar from something that isn't a field — the diary's own date heading.
    * Same escape hatch `EntityPicker` offers, and for the same reason: the popover and its
@@ -60,6 +64,7 @@ export function DatePicker({
   className,
   'aria-label': ariaLabel,
   'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
   trigger,
 }: DatePickerProps) {
   const { t, i18n } = useTranslation();
@@ -90,6 +95,7 @@ export function DatePicker({
           disabled={disabled}
           aria-label={ariaLabel}
           aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedBy}
           className={cn(
             'flex w-full min-w-0 items-center gap-1.5 rounded-lg border border-input bg-transparent text-left transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-expanded:border-ring aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
             size === 'sm' ? 'h-7 gap-1 px-2 text-xs' : 'h-8 px-2.5 text-sm',

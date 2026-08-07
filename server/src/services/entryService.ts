@@ -1,5 +1,11 @@
 import type { EntryCreateInput, EntryUpdateInput } from '@diary/shared';
-import { wouldExceedMaxDepth } from '@diary/shared';
+import {
+  depthOf,
+  descendantIds,
+  isSelfOrDescendant,
+  subtreeHeightFrom,
+  wouldExceedMaxDepth,
+} from '@diary/shared';
 import { generateKeyBetween } from 'fractional-indexing';
 import { Types } from 'mongoose';
 import { badRequest, conflict, isDuplicateKey, notFound } from '../errors';
@@ -34,12 +40,12 @@ async function ownedPersonIds(userId: string, ids: string[]) {
 
 /** A `saidTo` entry is either a bare person id (legacy — server stamps `at` itself) or an
     explicit `{personId, at}` pair (a client restoring history, e.g. a backup import). */
-const saidToIdList = (input: EntryCreateInput['saidTo']): string[] =>
+export const saidToIdList = (input: EntryCreateInput['saidTo']): string[] =>
   (input ?? []).map((item) => (typeof item === 'string' ? item : item.personId));
 
 /** Any explicit historical timestamps supplied, keyed by person id. Plain-id entries contribute
     nothing here, so old clients keep getting the "everyone said just now" fallback unchanged. */
-const saidToProvidedAt = (input: EntryCreateInput['saidTo']): Map<string, Date> => {
+export const saidToProvidedAt = (input: EntryCreateInput['saidTo']): Map<string, Date> => {
   const map = new Map<string, Date>();
   for (const item of input ?? []) {
     if (typeof item !== 'string') map.set(item.personId, new Date(item.at));
@@ -47,17 +53,28 @@ const saidToProvidedAt = (input: EntryCreateInput['saidTo']): Map<string, Date> 
   return map;
 };
 
+/**
+ * Every entry this user owns, as an id -> parentId map.
+ *
+ * One query, then all the tree questions are answered from shared/tree.ts — the same functions the
+ * client validates a drag against, so the two can no longer disagree about whether a drop is legal.
+ * The walks this replaced each cost a round-trip per level: `ancestorDepth` in particular issued a
+ * findOne for every ancestor, so validating a move at depth 4 was five sequential queries.
+ *
+ * Projected to two fields, and a diary is thousands of rows rather than millions.
+ */
+async function parentMap(userId: string): Promise<Map<string, string | null>> {
+  const rows = await Entry.find({ userId }, '_id parentId').lean();
+  return new Map(
+    rows.map((row) => [row._id.toString(), row.parentId ? row.parentId.toString() : null]),
+  );
+}
+
 /** 0-based depth of `id` itself (a root entry is depth 0). Throws if it isn't owned by userId. */
 async function ancestorDepth(userId: string, id: string): Promise<number> {
-  let depth = 0;
-  let current = await Entry.findOne({ _id: id, userId }, 'parentId').lean();
-  if (!current) throw notFound('entry.not_found');
-  while (current.parentId) {
-    depth += 1;
-    current = await Entry.findOne({ _id: current.parentId, userId }, 'parentId').lean();
-    if (!current) break;
-  }
-  return depth;
+  const exists = await Entry.exists({ _id: id, userId });
+  if (!exists) throw notFound('entry.not_found');
+  return depthOf(id, await parentMap(userId));
 }
 
 /** How deep this user allows nesting. Read per call rather than cached: it is one indexed lookup
@@ -69,36 +86,6 @@ async function maxDepthFor(userId: string): Promise<number> {
 async function assertDepthAllowed(userId: string, parentId: string) {
   const [depth, maxDepth] = await Promise.all([ancestorDepth(userId, parentId), maxDepthFor(userId)]);
   if (wouldExceedMaxDepth(depth, 1, maxDepth)) throw badRequest('entry.max_depth');
-}
-
-/** Height of movedId's own subtree (BFS down, same frontier-walk shape as cascadeDateKey/
-    deleteEntry below). A leaf is height 1. */
-async function measureSubtreeHeight(userId: string, movedId: string): Promise<number> {
-  let height = 1;
-  let frontier = [new Types.ObjectId(movedId)];
-  for (;;) {
-    const children = await Entry.find({ userId, parentId: { $in: frontier } }, '_id').lean();
-    if (!children.length) return height;
-    height += 1;
-    frontier = children.map((c) => c._id);
-  }
-}
-
-/** Cycle guard: would `newParentId` make movedId its own ancestor (itself, or one of its
-    descendants)? Same BFS shape as measureSubtreeHeight, checking membership as it goes. */
-async function isMovingIntoOwnSubtree(
-  userId: string,
-  movedId: string,
-  newParentId: string,
-): Promise<boolean> {
-  if (newParentId === movedId) return true;
-  let frontier = [new Types.ObjectId(movedId)];
-  for (;;) {
-    const children = await Entry.find({ userId, parentId: { $in: frontier } }, '_id').lean();
-    if (!children.length) return false;
-    if (children.some((c) => c._id.toString() === newParentId)) return true;
-    frontier = children.map((c) => c._id);
-  }
 }
 
 /** Fractional-index key placing a new/moved entry after the current last sibling. Root-level
@@ -212,14 +199,11 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
 
 /** Moving a parent's date must carry every descendant along with it. */
 async function cascadeDateKey(userId: string, rootId: string, dateKey: string) {
-  let frontier = [new Types.ObjectId(rootId)];
-  while (frontier.length) {
-    const children = await Entry.find({ userId, parentId: { $in: frontier } }, '_id').lean();
-    if (!children.length) break;
-    const ids = children.map((c) => c._id);
-    await Entry.updateMany({ userId, _id: { $in: ids } }, { dateKey, updatedAt: new Date() });
-    frontier = ids;
-  }
+  const ids = [...descendantIds(rootId, await parentMap(userId))];
+  if (!ids.length) return;
+  // One update for the whole subtree rather than one per level, and every row gets the same
+  // updatedAt — so a client's sync cursor cannot land between two levels of the same move.
+  await Entry.updateMany({ userId, _id: { $in: toObjectIds(ids) } }, { dateKey, updatedAt: new Date() });
 }
 
 export async function updateEntry(userId: string, entryId: string, input: EntryUpdateInput) {
@@ -260,9 +244,13 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
   if (parentChanging && input.parentId) {
     const newParent = await Entry.findOne({ _id: input.parentId, userId }, '_id').lean();
     if (!newParent) throw notFound('entry.not_found');
-    if (await isMovingIntoOwnSubtree(userId, entryId, input.parentId)) throw badRequest('entry.cycle');
-    const targetParentDepth = await ancestorDepth(userId, input.parentId);
-    const movedHeight = await measureSubtreeHeight(userId, entryId);
+    /* One read of the tree answers all three questions, where this used to issue a query per level
+       for each of them in turn. The map is taken before the move is applied, which is what makes
+       the cycle check meaningful — it describes where things currently are. */
+    const tree = await parentMap(userId);
+    if (isSelfOrDescendant(input.parentId, entryId, tree)) throw badRequest('entry.cycle');
+    const targetParentDepth = depthOf(input.parentId, tree);
+    const movedHeight = subtreeHeightFrom(entryId, tree);
     if (wouldExceedMaxDepth(targetParentDepth, movedHeight, await maxDepthFor(userId))) {
       throw badRequest('entry.max_depth');
     }
@@ -298,13 +286,9 @@ export async function deleteEntry(userId: string, entryId: string) {
   const root = await Entry.findOne({ _id: entryId, userId }, '_id').lean();
   if (!root) throw notFound('entry.not_found');
 
-  const toDelete = [root._id];
-  let frontier = [root._id];
-  while (frontier.length) {
-    const children = await Entry.find({ userId, parentId: { $in: frontier } }, '_id').lean();
-    frontier = children.map((c) => c._id);
-    toDelete.push(...frontier);
-  }
+  // The entry plus everything under it — a tombstone has to be recorded for each, or the subtree
+  // would come back on the next sync of a client that still has it.
+  const toDelete = toObjectIds([entryId, ...descendantIds(entryId, await parentMap(userId))]);
   await Entry.deleteMany({ userId, _id: { $in: toDelete } });
   await recordDeletions(userId, 'entry', toDelete);
   return toDelete.length;

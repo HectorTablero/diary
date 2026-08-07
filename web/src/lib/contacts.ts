@@ -107,6 +107,5 @@ export async function readContacts(): Promise<ContactCandidate[]> {
       console.warn('contacts: skipping unreadable contact', contact?.contactId, err);
     }
   }
-  console.log(`contacts: read ${contacts.length}, usable ${candidates.length}`);
   return candidates.sort((a, b) => a.name.localeCompare(b.name));
 }

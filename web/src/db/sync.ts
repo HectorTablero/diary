@@ -304,7 +304,10 @@ async function pull(): Promise<void> {
     // 10s overlap absorbs clock skew between capture and the queries; upserts are idempotent.
     await setMeta('syncCursor', new Date(Date.parse(res.serverTime) - 10_000).toISOString());
   });
-  setStatus({ needsAuth: false, lastSyncAt: new Date().toISOString() });
+  /* The one place anything is allowed to say the coast is clear, because it is the one place that
+     has proof: a pull that got this far exchanged a request and a response with the server. Every
+     other "it's probably fine" was removed — see the note above run(). */
+  setStatus({ blocker: null, needsAuth: false, lastSyncAt: new Date().toISOString() });
   stopReconnectProbe(); // reached the server through some other trigger
   dataListeners.forEach((cb) => cb());
 }
@@ -315,6 +318,20 @@ let networkFailure = false;
 /** Ops the server refused during this pass; announced once, from run()'s finally. */
 let rejectedThisPass = 0;
 
+/**
+ * One sync pass.
+ *
+ * Nothing in here clears `blocker` on the way *in*. It used to — `{ syncing: true, blocker: null }`
+ * was the first thing it did — and that made the pill flicker off at the start of every attempt and
+ * back on a second or two later when the request finally failed. Since a kick fires on every
+ * mutation, every foreground, every minute and every probe tick, "the server is unreachable"
+ * spent much of its life invisible, and the one state the user most needs to be able to trust
+ * looked intermittent.
+ *
+ * So a blocker now survives until something *conclusive* replaces it: a completed pull, an answer
+ * from the server (even an error one — it proves reachability), the health probe, or a fresh
+ * failure. An attempt in flight is not evidence about its own outcome.
+ */
 async function run(): Promise<void> {
   await refreshPending();
   if (!navigator.onLine) {
@@ -322,7 +339,7 @@ async function run(): Promise<void> {
     startReconnectProbe();
     return;
   }
-  setStatus({ syncing: true, blocker: null });
+  setStatus({ syncing: true });
   networkFailure = false;
   rejectedThisPass = 0;
   try {
@@ -333,14 +350,17 @@ async function run(): Promise<void> {
       if (err.status === 0) {
         setStatus({ blocker: networkBlocker() });
         networkFailure = true;
-      } else if (err.status === 401) {
-        setStatus({ needsAuth: true });
-      } else {
-        if (err.status >= 500) {
-          setStatus({ blocker: 'unreachable' });
-          networkFailure = true;
-        }
+      } else if (err.status >= 500) {
+        setStatus({ blocker: 'unreachable' });
+        networkFailure = true;
         console.warn('sync failed', err.code);
+      } else {
+        /* Any other status means the server composed a reply and sent it, so whatever went wrong
+           here, it is not that we couldn't reach it — clearing is as conclusive as a success. 401
+           rides this path too; needsAuth is what the UI shows for it, and it is a statement about
+           the session rather than about the connection. */
+        setStatus({ blocker: null, needsAuth: err.status === 401 });
+        if (err.status !== 401) console.warn('sync failed', err.code);
       }
     } else {
       console.warn('sync failed', err);
@@ -420,8 +440,13 @@ let initialized = false;
 export function initSync(): void {
   if (initialized) return;
   initialized = true;
+  /* Only `offline` is conclusive. The browser saying the network is back says nothing about the
+     server being back — a captive portal is "online" — so this no longer clears the pill and
+     leaves it to the sync it triggers. What it *can* do is stop claiming the device has no
+     network, which is now demonstrably false: 'offline' becomes 'unreachable', the weaker and
+     still-true statement, and the kick settles it either way within a request. */
   window.addEventListener('online', () => {
-    setStatus({ blocker: null });
+    if (getSyncStatus().blocker === 'offline') setStatus({ blocker: 'unreachable' });
     kick();
   });
   window.addEventListener('offline', () => setStatus({ blocker: 'offline' }));
