@@ -20,7 +20,7 @@ import { subscribePreferences } from './lib/preferences';
 import { queryClient } from './lib/queryClient';
 import { initTelemetry } from './lib/telemetry';
 import { logVersion } from './lib/version';
-import i18n from './i18n';
+import i18n, { ensureLanguage } from './i18n';
 import './index.css';
 
 // First, so that anything failing below is reported.
@@ -70,6 +70,9 @@ onReconnected(() => notifySuccess(i18n.t('sync.reconnected')));
 async function bootstrap() {
   // The bearer token must be in memory before anything talks to the API.
   await initAuthToken();
+  // Only the detected language's strings are bundled separately now (see i18n/index.ts), so they
+  // have to arrive before the first render or the UI would paint raw keys.
+  await ensureLanguage(i18n.language);
   // Registered before the first render, and only after the token is loaded: Android can launch the
   // app directly into a background-fetch event, so the handler has to exist — and be able to
   // authenticate — by the time anything else runs.

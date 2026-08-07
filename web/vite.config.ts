@@ -94,15 +94,23 @@ export default defineConfig(({ mode }) => {
   build: {
     rollupOptions: {
       output: {
+        /* Heavy libraries split out of the entry chunk. Two reasons, in this order: a release
+           that only changes app code leaves these chunks byte-identical, so a returning user
+           re-downloads none of them; and the entry chunk stops being the place everything lands
+           by default. */
         manualChunks: {
-          // Heavy libraries that are used across the app but not needed for first paint
-          'db-vendor': ['dexie', 'fake-indexeddb'],
+          'db-vendor': ['dexie'],
           'date-vendor': ['date-fns'],
           'radix-vendor': ['radix-ui'],
           'icons-vendor': ['lucide-react'],
           'auth-vendor': ['better-auth', '@capgo/capacitor-social-login'],
           'capacitor': ['@capacitor/core', '@capacitor/app', '@capacitor/haptics', '@capacitor/keyboard', '@capacitor/preferences', '@capacitor/splash-screen', '@capacitor/status-bar', '@capgo/capacitor-updater'],
           'telemetry-vendor': ['@logtail/browser'],
+          // Only the entry tree and the suggestion review dialog drag anything, but both are
+          // reached from lazy routes — so this rides along with them rather than the shell.
+          'dnd-vendor': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities', 'framer-motion'],
+          'query-vendor': ['@tanstack/react-query'],
+          'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
         },
       },
     },

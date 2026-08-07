@@ -1,11 +1,6 @@
 import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { initReactI18next } from 'react-i18next';
-import en from './locales/en.json';
-import es from './locales/es.json';
-import it from './locales/it.json';
-import ja from './locales/ja.json';
-import zh from './locales/zh.json';
 
 /**
  * Every shipped language, in the order the picker offers them, labelled with its own endonym —
@@ -34,17 +29,35 @@ export function resolveLanguage(lng: string | undefined): LanguageCode {
   return LANGUAGES.find((l) => l.code === base)?.code ?? 'es';
 }
 
+/**
+ * One chunk per language, fetched only when it is the one being used.
+ *
+ * All five used to be static imports, which put every string of every language — around 150 kB of
+ * JSON — into the main bundle, so each user downloaded four translations they will never read.
+ * These are `import()` calls, so Rollup emits five separate chunks and only the active one is
+ * ever requested.
+ *
+ * Written out one per line rather than built from LANGUAGES: the bundler has to see a literal
+ * path in each `import()` to statically know what to emit.
+ */
+const LOADERS: Record<LanguageCode, () => Promise<{ default: Record<string, unknown> }>> = {
+  en: () => import('./locales/en.json'),
+  es: () => import('./locales/es.json'),
+  it: () => import('./locales/it.json'),
+  ja: () => import('./locales/ja.json'),
+  zh: () => import('./locales/zh.json'),
+};
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    resources: {
-      en: { translation: en },
-      es: { translation: es },
-      it: { translation: it },
-      ja: { translation: ja },
-      zh: { translation: zh },
-    },
+    /* Empty: `ensureLanguage` fills in the detected one before the app renders (see main.tsx).
+       `fallbackLng` therefore points at a bundle that may not be loaded — which is safe only
+       because scripts/checkI18n.ts fails the build if any locale is missing a key the others
+       have, so the fallback has nothing left to resolve. If that check is ever dropped, this
+       needs to preload 'es' too. */
+    resources: {},
     fallbackLng: 'es',
     supportedLngs: LANGUAGES.map((l) => l.code),
     nonExplicitSupportedLngs: true,
@@ -57,6 +70,25 @@ i18n
       lookupLocalStorage: 'lang',
     },
   });
+
+/** Load a language's strings if they aren't in memory yet. Idempotent and safe to call freely. */
+export async function ensureLanguage(lng: string): Promise<void> {
+  const code = resolveLanguage(lng);
+  if (i18n.hasResourceBundle(code, 'translation')) return;
+  const { default: strings } = await LOADERS[code]();
+  i18n.addResourceBundle(code, 'translation', strings, true, true);
+}
+
+/**
+ * Switch language, strings first.
+ *
+ * The load has to finish *before* `changeLanguage`, or i18next would emit `languageChanged`
+ * against an empty bundle and every label on screen would flash its raw key for a frame.
+ */
+export async function changeLanguage(lng: LanguageCode): Promise<void> {
+  await ensureLanguage(lng);
+  await i18n.changeLanguage(lng);
+}
 
 i18n.on('languageChanged', (lng) => {
   document.documentElement.lang = lng;
