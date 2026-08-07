@@ -21,7 +21,12 @@ env:
 
 
 jobs:
+  # The image is not built, let alone pushed, until the type checker and the test suites pass.
+  verify:
+    uses: ./.github/workflows/verify.yml
+
   build:
+    needs: verify
     runs-on: ubuntu-latest
     environment: docker
     permissions:

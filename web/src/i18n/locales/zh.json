@@ -549,6 +549,9 @@
     "upstream_error": "LLM 无法处理这个请求",
     "timeout": "LLM 响应超时",
     "no_key": "请先在设置里添加 Groq API 密钥",
+    "no_audio": "未收到录音",
+    "recording_too_large": "该录音过长，无法上传",
+    "too_many_requests": "AI 请求过于频繁，请稍等片刻",
     "no_submission": "没能从助手那里得到结果",
     "signInRequiredForVoice": "使用语音记录需要先登录。"
   },

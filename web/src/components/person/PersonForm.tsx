@@ -297,6 +297,7 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
           value={phone}
           placeholder={t('people.phonePlaceholder')}
           aria-invalid={showPhoneError}
+          aria-describedby="person-phone-hint"
           onChange={(e) => setPhone(e.target.value)}
           onFocus={() => setPhoneFocused(true)}
           onBlur={() => {
@@ -304,7 +305,16 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
             if (phone.trim()) setPhone(normalizePhone(phone));
           }}
         />
-        <p className={'text-xs ' + (showPhoneError ? 'text-destructive' : 'text-muted-foreground')}>
+        {/* One element for both the hint and the error, referenced by aria-describedby, so the
+            field is read out with the reason attached instead of a bare "invalid". Swapping the
+            text inside a node that is always present — rather than mounting an error node next to
+            the hint — is also what makes the change announced: a live region that appears at the
+            same moment its content does is announced only sometimes. */}
+        <p
+          id="person-phone-hint"
+          role={showPhoneError ? 'alert' : undefined}
+          className={'text-xs ' + (showPhoneError ? 'text-destructive' : 'text-muted-foreground')}
+        >
           {showPhoneError ? t('people.phoneIncomplete') : t('people.phoneInternationalHint')}
         </p>
       </div>

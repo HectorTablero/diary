@@ -34,6 +34,16 @@ describe('ApiKeyField', () => {
     expect(screen.queryByText('Key set')).not.toBeInTheDocument();
   });
 
+  /* The hint says where to get a key and what it is spent on. Rendering it next to the field makes
+     it available to anyone who can see it; describing the field with it makes it available to
+     anyone who cannot. `toHaveAccessibleDescription` asserts the resolved text rather than the
+     id wiring, so it fails the same way a screen reader would — including if the id ever stops
+     matching. */
+  it('describes the field with its hint', () => {
+    setup(false);
+    expect(screen.getByLabelText('Groq key')).toHaveAccessibleDescription('Get one at example.com');
+  });
+
   it('reports a stored key instead of showing a filled-looking input', () => {
     setup(true);
     expect(screen.getByText('Key set')).toBeInTheDocument();

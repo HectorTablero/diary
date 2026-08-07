@@ -94,12 +94,19 @@ export function EventForm({ personId, event = null, onDone }: EventFormProps) {
             rangeAnchor={startDate}
             clearable
             aria-invalid={endBeforeStart}
+            aria-describedby="event-end-hint"
             placeholder={t('people.eventEndPlaceholder')}
             onChange={setEndDate}
           />
         </div>
       </div>
-      <p className={'text-xs ' + (endBeforeStart ? 'text-destructive' : 'text-muted-foreground')}>
+      {/* Describes the end date specifically — it is the field that can be wrong and the one
+          carrying aria-invalid — even though it sits under both pickers. */}
+      <p
+        id="event-end-hint"
+        role={endBeforeStart ? 'alert' : undefined}
+        className={'text-xs ' + (endBeforeStart ? 'text-destructive' : 'text-muted-foreground')}
+      >
         {endBeforeStart ? t('people.eventEndBeforeStart') : t('people.eventEndHint')}
       </p>
 

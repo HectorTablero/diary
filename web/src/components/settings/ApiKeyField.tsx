@@ -112,6 +112,7 @@ export function ApiKeyField({
             autoFocus={editing}
             disabled={disabled}
             value={value}
+            aria-describedby={`${id}-hint`}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && value.trim()) commit();
@@ -131,7 +132,11 @@ export function ApiKeyField({
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">{hint}</p>
+      {/* Carries where to get a key and what it is used for — which is exactly what someone
+          landing on an empty password field needs read out to them, not just its label. */}
+      <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+        {hint}
+      </p>
     </div>
   );
 }

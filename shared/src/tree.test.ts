@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_SUB_ENTRY_DEPTH } from './constants';
-import { isSelfOrDescendant, subtreeHeight, wouldExceedMaxDepth } from './tree';
+import {
+  depthOf,
+  descendantIds,
+  isSelfOrDescendant,
+  subtreeHeight,
+  subtreeHeightFrom,
+  wouldExceedMaxDepth,
+} from './tree';
 
 describe('subtreeHeight', () => {
   it('is 1 for a leaf', () => {
@@ -83,5 +90,99 @@ describe('isSelfOrDescendant', () => {
 
   it('is false for an id absent from the map', () => {
     expect(isSelfOrDescendant('missing', 'a', parentById)).toBe(false);
+  });
+});
+
+/*
+ *  a ─┬─ b ─── c ─── e
+ *     └─ d
+ *  z            (a second root, unrelated)
+ *
+ * The shape the server asks about when an entry is dragged: it needs a's depth, how tall the thing
+ * being moved is, and everything that has to be carried along with it.
+ */
+const tree = new Map<string, string | null>([
+  ['a', null],
+  ['b', 'a'],
+  ['c', 'b'],
+  ['e', 'c'],
+  ['d', 'a'],
+  ['z', null],
+]);
+
+describe('depthOf', () => {
+  it('is 0 for a root', () => {
+    expect(depthOf('a', tree)).toBe(0);
+    expect(depthOf('z', tree)).toBe(0);
+  });
+
+  it('counts ancestors', () => {
+    expect(depthOf('b', tree)).toBe(1);
+    expect(depthOf('c', tree)).toBe(2);
+    expect(depthOf('e', tree)).toBe(3);
+  });
+
+  it('treats an unknown id as a root rather than throwing', () => {
+    expect(depthOf('missing', tree)).toBe(0);
+  });
+
+  it('terminates on a cycle instead of hanging', () => {
+    // Storage should never hold this; a corrupt row must not take the process down with it.
+    const cyclic = new Map<string, string | null>([
+      ['x', 'y'],
+      ['y', 'x'],
+    ]);
+    expect(depthOf('x', cyclic)).toBe(1);
+  });
+});
+
+describe('descendantIds', () => {
+  it('collects every level below, not just the immediate children', () => {
+    expect([...descendantIds('a', tree)].sort()).toEqual(['b', 'c', 'd', 'e']);
+    expect([...descendantIds('b', tree)].sort()).toEqual(['c', 'e']);
+  });
+
+  it('is empty for a leaf, and excludes the node itself', () => {
+    expect(descendantIds('e', tree).size).toBe(0);
+    expect(descendantIds('a', tree).has('a')).toBe(false);
+  });
+
+  it('does not cross into an unrelated root', () => {
+    expect(descendantIds('a', tree).has('z')).toBe(false);
+  });
+
+  it('terminates on a cycle', () => {
+    const cyclic = new Map<string, string | null>([
+      ['x', 'y'],
+      ['y', 'x'],
+    ]);
+    expect(() => descendantIds('x', cyclic)).not.toThrow();
+  });
+});
+
+describe('subtreeHeightFrom', () => {
+  it('is 1 for a leaf', () => {
+    expect(subtreeHeightFrom('e', tree)).toBe(1);
+    expect(subtreeHeightFrom('d', tree)).toBe(1);
+  });
+
+  it('counts the node itself plus its tallest branch', () => {
+    expect(subtreeHeightFrom('c', tree)).toBe(2);
+    expect(subtreeHeightFrom('b', tree)).toBe(3);
+    expect(subtreeHeightFrom('a', tree)).toBe(4);
+  });
+
+  it('measures the tallest branch, not the first or the widest', () => {
+    // a's children are b (2 levels below it) and d (a leaf); the answer must come from b.
+    expect(subtreeHeightFrom('a', tree)).toBe(4);
+  });
+
+  it('agrees with the in-memory subtreeHeight for the same shape', () => {
+    // The two exist because the data arrives in two shapes — nested nodes on the client's drag
+    // projection, a flat parent map on the server. They must never disagree about a legal drop.
+    const nested = {
+      children: [{ children: [{ children: [{ children: [] }] }] }, { children: [] }],
+    };
+    expect(subtreeHeight(nested)).toBe(subtreeHeightFrom('a', tree));
   });
 });

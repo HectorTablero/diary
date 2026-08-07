@@ -16,7 +16,15 @@ permissions:
   contents: write
 
 jobs:
+  # Nothing here reaches a phone unless the type checker and every test suite pass first. This
+  # matters more than for an ordinary release: the OTA bundle published below installs itself onto
+  # devices that already have the app, and the only safety net underneath is Capgo's boot timeout,
+  # which catches a bundle that crashes on launch and nothing subtler.
+  verify:
+    uses: ./.github/workflows/verify.yml
+
   build:
+    needs: verify
     runs-on: ubuntu-latest
     environment: android
     steps:

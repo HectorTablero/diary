@@ -1,0 +1,47 @@
+name: Verify
+
+# The gate every publish depends on.
+#
+# Both release workflows call this before they build anything, so nothing reaches a phone or a
+# registry without the type checker and the test suites having run. It is also a normal PR check.
+#
+# `workflow_call` rather than duplicating the steps into each publisher: one definition, and adding
+# a check here covers every path to production at once.
+#
+# Called, never triggered directly. docker-publish.yml already runs on every pull request to main
+# and now depends on this, so pull requests are covered through it — adding a `pull_request`
+# trigger here as well would run the whole suite twice and show two identical checks on the PR.
+
+on:
+  workflow_call:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Three workspaces. In web/ this also runs checkI18n.ts, which fails on a key used but
+      # undefined or present in one locale and not another — load-bearing, because each locale is
+      # a separate chunk and fallbackLng points at a bundle that may not be loaded.
+      - name: Test
+        run: npm test
+
+      # Catches a dependency advisory before it ships rather than at the next manual audit.
+      # Production dependencies only: a devDependency finding does not reach users, and failing
+      # the build on one would make this check something people learn to skip.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

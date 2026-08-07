@@ -102,6 +102,12 @@ export const AI_MAX_RECORDING_MS = 5 * 60_000;
     5 MB; this only has to reject a request our own recorder could not have produced. */
 export const AI_MAX_RECORDING_BYTES = 25 * 1024 * 1024;
 
+/** Requests per user per window across both AI routes, together. Sized for the way the feature is
+    actually used — a handful of voice notes in a sitting, each costing one transcribe and one
+    suggestions call — so it is invisible in normal use and stops a retry loop within a minute. */
+export const AI_RATE_LIMIT = 30;
+export const AI_RATE_WINDOW_MS = 5 * 60_000;
+
 export const LOGO_COLOR = 'rgb(0, 114, 255)';
 export const LOGO_LOCAL_COLOR = 'rgb(220, 70, 70)';
 export const LOGO_STROKE_WIDTH = 50;

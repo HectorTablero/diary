@@ -43,8 +43,18 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            /* R8, on. The web layer is the part of this app that changes; the native shell is
+               mostly other people's libraries, and shrinking it is the difference between an APK
+               that is mostly Play Services and one that is mostly this app.
+
+               proguard-android-optimize.txt rather than proguard-android.txt: the plain variant
+               exists specifically to disable the optimisation passes, and there is nothing here
+               that needs them off. See proguard-rules.pro for what has to be kept — Capacitor
+               resolves its plugins by name at runtime, so most of the native code has no static
+               reference pointing at it. */
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }

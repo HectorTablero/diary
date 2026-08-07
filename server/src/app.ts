@@ -2,12 +2,14 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { secureHeaders } from 'hono/secure-headers';
 import type { UpgradeWebSocket } from 'hono/ws';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Auth } from './auth';
 import { config } from './config';
 import { handleError } from './errors';
+import { buildCsp } from './lib/csp';
 import { requestTelemetry } from './lib/telemetry';
 import {
   addLiveClient,
@@ -55,6 +57,27 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   app.use(logger());
   app.use(requestTelemetry());
   app.onError(handleError);
+
+  /* Security headers, on every response including the API's.
+
+     The CSP is built once at startup rather than per request — it reads the built index.html to
+     hash its inline scripts (see lib/csp.ts), which must not happen on the hot path.
+
+     `crossOriginEmbedderPolicy` stays off: it would require every cross-origin subresource to opt
+     in via CORP, and the signed-in user's Google profile picture does not. Nothing here needs the
+     cross-origin isolation it buys. `xFrameOptions` is left to the CSP's frame-ancestors, which
+     supersedes it everywhere the app runs. */
+  app.use(
+    secureHeaders({
+      contentSecurityPolicy: buildCsp(`${WEB_DIST}/index.html`),
+      crossOriginEmbedderPolicy: false,
+      referrerPolicy: 'strict-origin-when-cross-origin',
+      xContentTypeOptions: 'nosniff',
+      // HSTS is only meaningful over TLS, and the dev server is plain http on localhost.
+      strictTransportSecurity:
+        config.betterAuthUrl.startsWith('https://') ? 'max-age=31536000; includeSubDomains' : false,
+    }),
+  );
 
   // The Capacitor app calls the API cross-origin from the native webview.
   app.use(
@@ -112,6 +135,27 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
 
   // Unknown API paths must 404 as JSON, never fall through to the SPA.
   app.all('/api/*', (c) => c.json({ error: 'errors.not_found' }, 404));
+
+  /* Backslashes never reach serveStatic.
+
+     GHSA-frvp-7c67-39w9: on Windows, @hono/node-server's serve-static treats an encoded backslash
+     as a path separator, so `%5C..%5C` escapes the static root and reads arbitrary files. There is
+     no fixed version to upgrade to — it is the one advisory `npm audit fix` cannot clear.
+
+     Production runs on Alpine, where the vector does not apply, but `npm start` on a Windows
+     machine is a documented way to run this app and the exposure there is real. No legitimate URL
+     in this app contains a backslash in any form: Vite emits `/assets/<name>-<hash>.<ext>` and
+     every route is a plain path, so rejecting them outright costs nothing.
+
+     Placed here rather than in a global middleware so it sits directly in front of the thing it
+     protects, and so the API's own 404 above still answers in JSON. */
+  app.use('*', async (c, next) => {
+    const path = c.req.path;
+    if (path.includes('\\') || /%5c/i.test(c.req.url)) {
+      return c.text('Bad Request', 400);
+    }
+    await next();
+  });
 
   app.use('*', serveStatic({ root: WEB_DIST, onFound: setCacheHeaders }));
   app.get('*', serveStatic({ path: `${WEB_DIST}/index.html`, onFound: setCacheHeaders }));
