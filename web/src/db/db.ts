@@ -53,6 +53,26 @@ export interface OutboxOp {
   body?: unknown;
 }
 
+/**
+ * An op the server refused, kept after it left the queue.
+ *
+ * The queue has to drop a write the server answers with an unhandled 4xx — retrying it forever
+ * would jam every later write behind it. But the local Dexie copy still holds the change, so the
+ * UI goes on showing it as saved, and the divergence surfaces only on a second device or after a
+ * sign-out. Landing here is what makes that loss a fact the app can report rather than a line in
+ * a console nobody reads.
+ */
+export interface DeadLetterOp {
+  id?: number;
+  method: OutboxOp['method'];
+  path: string;
+  body?: unknown;
+  /** HTTP status and error code the server answered with. */
+  status: number;
+  code: string;
+  failedAt: string;
+}
+
 interface MetaRow {
   key: string;
   value: unknown;
@@ -64,6 +84,7 @@ export const db = new Dexie('diary') as Dexie & {
   tags: EntityTable<TagDto, 'id'>;
   threads: EntityTable<ThreadDto, 'id'>;
   outbox: EntityTable<OutboxOp, 'seq'>;
+  deadLetter: EntityTable<DeadLetterOp, 'id'>;
   meta: EntityTable<MetaRow, 'key'>;
 };
 
@@ -161,6 +182,19 @@ db.version(4)
       }),
   );
 
+/* v5 adds the dead-letter table. No `.upgrade()`: it starts empty by definition — it only ever
+   holds ops this build's pushOutbox has since refused, and there is nothing in an older database
+   to backfill it from. */
+db.version(5).stores({
+  entries: 'id, dateKey, parentId, *tagIds, *peopleIds, *threadIds',
+  people: 'id, name, *aliases, contactId',
+  tags: 'id, name',
+  threads: 'id, name',
+  outbox: '++seq',
+  deadLetter: '++id, failedAt',
+  meta: 'key',
+});
+
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
   content: dto.content,
@@ -211,7 +245,7 @@ export async function setMeta(key: string, value: unknown): Promise<void> {
 export async function clearLocalData(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.entries, db.people, db.tags, db.threads, db.outbox, db.meta],
+    [db.entries, db.people, db.tags, db.threads, db.outbox, db.deadLetter, db.meta],
     async () => {
       await Promise.all([
         db.entries.clear(),
@@ -219,6 +253,7 @@ export async function clearLocalData(): Promise<void> {
         db.tags.clear(),
         db.threads.clear(),
         db.outbox.clear(),
+        db.deadLetter.clear(),
         db.meta.clear(),
       ]);
     },

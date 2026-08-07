@@ -1,6 +1,6 @@
 import type { PersonRefDto, TagDto } from '@diary/shared';
 import { Plus, Tag as TagIcon, User } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { detectActiveToken, fuzzyEquals, fuzzyIncludes, segmentContent, type ActiveToken } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,7 @@ export function TokenTextarea({
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
   const [token, setToken] = useState<ActiveToken | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -180,13 +181,23 @@ export function TokenTextarea({
 
   const segments = useMemo(
     () =>
-      segmentContent(
-        value,
-        linkedPeople.map((p) => p.name),
-        linkedTags.map((tag) => tag.name),
-      ),
+      segmentContent(value, linkedPeople, linkedTags),
     [value, linkedPeople, linkedTags],
   );
+
+  /* The suggestion list is a combobox popup, and the only cue a screen reader gets about which row
+     ArrowDown just landed on is aria-activedescendant — focus never leaves the textarea, so the
+     highlighted row has to be *named* rather than merely tinted. Everything the pattern needs is
+     already in state; these three lines just expose it.
+
+     `role="combobox"` on a <textarea> is the one liberty taken here: ARIA-in-HTML allows a textarea
+     no role but its implicit textbox. A textbox does support aria-activedescendant and
+     aria-autocomplete, but not aria-expanded — and without "expanded" nothing announces that a
+     popup opened at all, which is the whole finding. The element stays a real textarea, so multi-
+     line editing and the caret behave as before. */
+  const expanded = suggestions.length > 0;
+  const optionId = (key: string) => `${listboxId}-${key}`;
+  const activeKey = suggestions[selectedIndex]?.key;
 
   return (
     <div className="relative">
@@ -229,6 +240,11 @@ export function TokenTextarea({
           rows={1}
           autoFocus={autoFocus}
           placeholder={placeholder}
+          role="combobox"
+          aria-expanded={expanded}
+          aria-controls={expanded ? listboxId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={activeKey ? optionId(activeKey) : undefined}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onClick={refreshToken}
@@ -248,31 +264,42 @@ export function TokenTextarea({
         />
       </div>
 
-      {suggestions.length > 0 && (
-        <ul className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md">
+      {expanded && (
+        <ul
+          id={listboxId}
+          role="listbox"
+          aria-label={t('diary.suggestions')}
+          className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md"
+        >
           {suggestions.map((s, i) => (
-            <li key={s.key}>
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  s.apply();
-                }}
-                onMouseEnter={() => setSelectedIndex(i)}
-                className={cn(
-                  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                  i === selectedIndex && 'bg-accent text-accent-foreground',
-                )}
-              >
-                {s.icon === 'person' && <User className="size-3.5 text-muted-foreground" />}
-                {s.icon === 'tag' && <TagIcon className="size-3.5 text-muted-foreground" />}
-                {s.icon === 'create' && <Plus className="size-3.5 text-muted-foreground" />}
-                {s.icon === 'create' ? (
-                  <span>{t('diary.createTag', { name: s.label })}</span>
-                ) : (
-                  <span>{s.label}</span>
-                )}
-              </button>
+            /* The row is the option itself — the <button> it used to wrap was both invalid inside
+               role="option" (an option may not hold a focusable descendant) and pointless, since
+               every keystroke is handled on the textarea. onMouseDown/preventDefault stays where it
+               was: it stops the textarea losing focus, which would fire the blur that clears the
+               token before the click could apply it. */
+            <li
+              key={s.key}
+              id={optionId(s.key)}
+              role="option"
+              aria-selected={i === selectedIndex}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                s.apply();
+              }}
+              onMouseEnter={() => setSelectedIndex(i)}
+              className={cn(
+                'flex cursor-pointer items-center gap-2 px-3 py-2 text-sm',
+                i === selectedIndex && 'bg-accent text-accent-foreground',
+              )}
+            >
+              {s.icon === 'person' && <User aria-hidden className="size-3.5 text-muted-foreground" />}
+              {s.icon === 'tag' && <TagIcon aria-hidden className="size-3.5 text-muted-foreground" />}
+              {s.icon === 'create' && <Plus aria-hidden className="size-3.5 text-muted-foreground" />}
+              {s.icon === 'create' ? (
+                <span>{t('diary.createTag', { name: s.label })}</span>
+              ) : (
+                <span>{s.label}</span>
+              )}
             </li>
           ))}
         </ul>

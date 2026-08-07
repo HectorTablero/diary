@@ -22,6 +22,12 @@
   "sync": {
     "offline": "离线",
     "offlinePending": "离线 — {{count}} 项更改待同步",
+    "unreachable": "无法连接服务器",
+    "unreachablePending": "无法连接服务器 — {{count}} 项更改待同步",
+    "paused": "等待 Wi-Fi",
+    "pausedPending": "等待 Wi-Fi · {{count}} 项更改",
+    "syncAnyway": "立即同步",
+    "rejected": "{{count}} 项更改未能保存",
     "sessionExpired": "登录状态已过期。",
     "reconnected": "已重新连接 — 正在同步…"
   },
@@ -80,7 +86,8 @@
     "remove": "移除",
     "selectDate": "选择日期",
     "hour": "小时",
-    "minute": "分钟"
+    "minute": "分钟",
+    "skipToContent": "跳到主要内容"
   },
   "importance": {
     "label": "重要程度",
@@ -124,7 +131,9 @@
     "birthdays": "生日",
     "birthdayLine": "<mention>@{{name}}</mention>的生日",
     "birthdayLineWithAge": "<mention>@{{name}}</mention>的生日（{{age}}）",
-    "entryDate": "记录日期"
+    "entryDate": "记录日期",
+    "entryActions": "「{{text}}」的操作",
+    "suggestions": "建议"
   },
   "people": {
     "title": "人物",
@@ -159,6 +168,7 @@
     "noMemories": "还没有共同的回忆",
     "noMemoriesDescription": "提到{{name}}的重要记录会在 {{months}} 个月后回到这里。",
     "noHistory": "还没有记录提到{{name}}",
+    "loadFailedDescription": "无法加载这个人物。数据没有丢失，请重试。",
     "matchMention": "直接提到",
     "matchTag": "共享标签",
     "matchBroadcast": "对所有人共享",
@@ -205,6 +215,7 @@
     "aliases": "其他称呼",
     "aliasesDescription": "这个人也会应的昵称。用于 @提及 和语音输入。",
     "aliasPlaceholder": "昵称",
+    "addAlias": "添加昵称",
     "alsoKnownAs": "又名",
     "birthday": "生日",
     "birthdayToday": "就是今天！",
@@ -329,6 +340,9 @@
       "themeDark": "深色",
       "themeAuto": "跟随系统",
       "language": "语言",
+      "languageNeedsConnection": "（需要联网）",
+      "languageOfflineHint": "在本设备上还没用过的语言，第一次需要联网下载。",
+      "languageDownloadFailed": "无法下载该语言。请在联网后重试。",
       "weekStart": "每周第一天",
       "weekStartAuto": "自动（{{day}}）",
       "quietNotifications": "隐藏应用内的日常提示",
@@ -369,7 +383,9 @@
       "autoSaid": "提到某人就标记为已告诉",
       "autoSaidDescription": "只决定复选框的初始状态，保存前随时可以改。",
       "expanded": "默认展开子记录",
-      "expandedDescription": "记录的子记录是否一开始就展开。"
+      "expandedDescription": "记录的子记录是否一开始就展开。",
+      "entityLinks": "可点击的名字和标签",
+      "entityLinksDescription": "记录中的 @提及和 #标签可以打开对应的人，或带该标签的记录。关闭后它们只是高亮文字。"
     },
     "decay": {
       "title": "谈资的衰减",

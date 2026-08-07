@@ -7,14 +7,14 @@ import App from './App';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Toaster } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
-import { initSync, onReconnected, onSyncApplied } from './db/sync';
+import { initSync, onReconnected, onRejected, onSyncApplied } from './db/sync';
 import { initAppLock } from './lib/appLock';
 import { initAuthToken } from './lib/authToken';
 import { initBackgroundSync } from './lib/backgroundSync';
 import { initGlobalHaptics } from './lib/haptics';
 import { initLiveUpdate } from './lib/liveUpdate';
 import { isNative } from './lib/native';
-import { notifySuccess } from './lib/notify';
+import { notifyError, notifySuccess } from './lib/notify';
 import { initLocalNotifications, refreshNotifications } from './lib/notifications';
 import { subscribePreferences } from './lib/preferences';
 import { queryClient } from './lib/queryClient';
@@ -69,6 +69,10 @@ onSyncApplied(() => refreshNotifications());
 // time has to move it — neither happens until a reconcile runs.
 subscribePreferences(() => refreshNotifications());
 onReconnected(() => notifySuccess(i18n.t('sync.reconnected')));
+/* The server refused a write outright and the queue moved on without it (db.deadLetter). The
+   local copy still shows the change as saved, so this toast is the only moment a person is ever
+   told — an error, never suppressed, rather than a console.warn nobody reads. */
+onRejected((count) => notifyError(i18n.t('sync.rejected', { count })));
 
 /**
  * Framer Motion animates in JavaScript, so the reduced-motion rules in index.css can't reach it.
@@ -88,9 +92,20 @@ function Motion({ children }: { children: ReactNode }) {
 async function bootstrap() {
   // The bearer token must be in memory before anything talks to the API.
   await initAuthToken();
-  // Only the detected language's strings are bundled separately now (see i18n/index.ts), so they
-  // have to arrive before the first render or the UI would paint raw keys.
-  await ensureLanguage(i18n.language);
+  /* Only the detected language's strings are bundled separately now (see i18n/index.ts), so they
+     have to arrive before the first render or the UI would paint raw keys.
+
+     Both awaits are guarded because this one call could otherwise take the whole app down: a
+     rejected `import()` — a returning user, offline, whose service-worker cache no longer holds
+     that chunk — used to throw straight out of bootstrap(), so nothing rendered at all and the
+     boot splash sat there forever. English is worth trying second because `fallbackLng` is 'en'
+     and checkI18n guarantees it defines every key, so its bundle alone renders the entire UI
+     readably; and if even that fails, raw keys on a working diary beat a blank screen. */
+  try {
+    await ensureLanguage(i18n.language);
+  } catch {
+    await ensureLanguage('en').catch(() => {});
+  }
   // Registered before the first render, and only after the token is loaded: Android can launch the
   // app directly into a background-fetch event, so the handler has to exist — and be able to
   // authenticate — by the time anything else runs.

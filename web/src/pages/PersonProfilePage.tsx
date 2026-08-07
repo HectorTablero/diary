@@ -1,4 +1,4 @@
-import type { PersonDto, PersonEventDto } from '@diary/shared';
+import type { PersonDto, PersonEventDto, PersonListItem, TagDto } from '@diary/shared';
 import {
   eventEndKey,
   eventLengthDays,
@@ -23,18 +23,21 @@ import {
   Plus,
   Sparkles,
   Trash2,
+  TriangleAlert,
   Undo2,
+  UserX,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import {
   useDeleteEvent,
   useDeletePerson,
   useMarkCheckup,
   useMarkEventAsked,
   useMemories,
+  usePeople,
   usePerson,
   usePersonHistory,
   useSetSaid,
@@ -44,7 +47,6 @@ import {
 } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
-import { FullScreenSpinner } from '@/components/common/Spinner';
 import { TagChip } from '@/components/entry/chips';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { ContactInfo } from '@/components/person/ContactInfo';
@@ -66,8 +68,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { notifyDeleted } from '@/lib/undo';
+import { ApiError } from '@/lib/apiClient';
 import { isCheckupDue } from '@/lib/checkup';
 import { formatDateKey, parseDateKey, todayKey } from '@/lib/dates';
+import { useEntityLinks } from '@/lib/entityLinks';
 
 /** Shared by all four profile tabs — see the note at the TabsList below for why it un-sets
     `whitespace-nowrap` and lets the trigger grow, but only up to the `sm` breakpoint. */
@@ -93,6 +97,112 @@ function TabLabel({ icon: Icon, children }: { icon: LucideIcon; children: ReactN
       <Icon className="mr-1.5 inline size-4 align-[-0.2em]" />
       {children}
     </span>
+  );
+}
+
+/**
+ * Avatar, name and tags — everything the profile can show about a person before its own query has
+ * resolved, and the only part of the header the People list cache can supply.
+ *
+ * Shared by the loaded header and the pending one so the two are the same object rather than two
+ * that happen to match: when the full person lands, the name doesn't move.
+ */
+function PersonIdentity({
+  name,
+  tags,
+  children,
+  actions,
+}: {
+  name: string;
+  tags: TagDto[];
+  children?: ReactNode;
+  actions?: ReactNode;
+}) {
+  const { tagTo } = useEntityLinks();
+  return (
+    <div className="mb-6 flex items-start gap-4">
+      <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary uppercase">
+        {name.slice(0, 2)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-xl font-semibold tracking-tight">{name}</h1>
+        {tags.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <TagChip key={tag.id} tag={tag} to={tagTo(tag.id)} />
+            ))}
+          </div>
+        )}
+        {children}
+      </div>
+      {actions}
+    </div>
+  );
+}
+
+/**
+ * The profile before its query has answered, or after the query has failed.
+ *
+ * Every other screen in the app loads with skeletons that keep the page chrome in place. This one
+ * blanked the whole viewport and then, on *any* error, redirected to the list without a word — so
+ * a transient read failure and "this person was deleted" were the same experience: you tapped a
+ * name and ended up back where you started, with nothing to retry and nothing to read.
+ *
+ * The name and tags come from the People list cache, which almost always holds them already (you
+ * arrived by tapping a row that rendered them), so in practice the header is real from the first
+ * frame and only the tabs are skeletons.
+ */
+function ProfileFallback({
+  cached,
+  state,
+  onRetry,
+}: {
+  cached: PersonListItem | undefined;
+  state: 'loading' | 'error' | 'not-found';
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <PageContainer>
+      {cached ? (
+        <PersonIdentity name={cached.name} tags={cached.tags} />
+      ) : (
+        <div className="mb-6 flex items-start gap-4">
+          <Skeleton className="size-14 shrink-0 rounded-full" />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        </div>
+      )}
+
+      {state === 'loading' ? (
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-8 w-full sm:w-80" />
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+        </div>
+      ) : (
+        /* Reported here rather than by navigating away. "Deleted" and "couldn't read it" are
+           genuinely different facts and only one of them is worth leaving the page over — so
+           neither does, and the one that can be retried says so. */
+        <EmptyState
+          icon={state === 'not-found' ? UserX : TriangleAlert}
+          title={state === 'not-found' ? t('person.not_found') : t('errors.unknown')}
+          description={state === 'not-found' ? undefined : t('people.loadFailedDescription')}
+        >
+          {state === 'error' ? (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              {t('common.retry')}
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/people">{t('nav.people')}</Link>
+            </Button>
+          )}
+        </EmptyState>
+      )}
+    </PageContainer>
   );
 }
 
@@ -212,7 +322,9 @@ function MemoriesTab({ personId, personName }: { personId: string; personName: s
     <div className="flex flex-col gap-6">
       {[...byYear.entries()].map(([year, entries]) => (
         <div key={year}>
-          <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{year}</h3>
+          {/* h2, not h3: the person's name is the page's h1 and there is nothing between them, so
+              an h3 here would leave heading navigation reporting a gap. */}
+          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">{year}</h2>
           <ul className="flex flex-col gap-3 border-l-2 border-border/70 pl-4">
             {entries.map((entry) => (
               <li key={entry.id}>
@@ -440,7 +552,7 @@ function EventsTab({ person, today }: { person: PersonDto; today: string }) {
           .filter(([, events]) => events.length > 0)
           .map(([heading, events]) => (
             <div key={heading} className="flex flex-col gap-2">
-              <h3 className="px-1 text-xs font-medium text-muted-foreground">{t(heading)}</h3>
+              <h2 className="px-1 text-xs font-medium text-muted-foreground">{t(heading)}</h2>
               <ul className="flex flex-col gap-2">
                 {events.map((event) => (
                   <EventRow
@@ -483,7 +595,8 @@ export default function PersonProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { data: person, isLoading, isError } = usePerson(id ?? '');
+  const { data: person, isLoading, isError, error, refetch } = usePerson(id ?? '');
+  const { data: people } = usePeople();
   const deletePerson = useDeletePerson();
   const markCheckup = useMarkCheckup();
   const markEventAsked = useMarkEventAsked();
@@ -491,9 +604,24 @@ export default function PersonProfilePage() {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  /* The list this profile was almost certainly opened from. It already holds the name and the
+     tags, so the header can be real from the first frame instead of a blank viewport. */
+  const cached = useMemo(() => people?.find((p) => p.id === id), [people, id]);
+
   if (!id) return <Navigate to="/people" replace />;
-  if (isLoading) return <FullScreenSpinner />;
-  if (isError || !person) return <Navigate to="/people" replace />;
+  if (!person) {
+    /* A 404 out of repo.getPerson means the row genuinely isn't in the local store — deleted, or
+       never synced to this device. Anything else is a read that failed, which is a different fact
+       and gets a different screen. Both used to be a silent redirect to /people. */
+    const notFound = isError && error instanceof ApiError && error.status === 404;
+    return (
+      <ProfileFallback
+        cached={cached}
+        state={isLoading ? 'loading' : notFound ? 'not-found' : 'error'}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
   const checkupDue = isCheckupDue(person);
   const today = todayKey();
@@ -501,52 +629,49 @@ export default function PersonProfilePage() {
 
   return (
     <PageContainer>
-      <div className="mb-6 flex items-start gap-4">
-        <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary uppercase">
-          {person.name.slice(0, 2)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">{person.name}</h1>
-          {person.tags.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {person.tags.map((tag) => (
-                <TagChip key={tag.id} tag={tag} />
-              ))}
-            </div>
-          )}
-          {person.notes && (
-            <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">{person.notes}</p>
-          )}
-          <ContactInfo person={person} onEdit={() => setEditing(true)} />
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setEditing(true)}>
-              <Pencil className="size-3.5" /> {t('people.editPerson')}
-            </DropdownMenuItem>
-            {person.checkupIntervalDays != null && (
-              <DropdownMenuItem
-                onClick={() =>
-                  markCheckup.mutate(person.id, {
-                    onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
-                    onError: () => notifyError(t('errors.unknown')),
-                  })
-                }
+      <PersonIdentity
+        name={person.name}
+        tags={person.tags}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground"
+                aria-label={t('people.personActions', { name: person.name })}
               >
-                <Check className="size-3.5" /> {t('people.markCheckupNow')}
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditing(true)}>
+                <Pencil className="size-3.5" /> {t('people.editPerson')}
               </DropdownMenuItem>
-            )}
-            <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-              <Trash2 className="size-3.5" /> {t('people.deletePerson')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              {person.checkupIntervalDays != null && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    markCheckup.mutate(person.id, {
+                      onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+                      onError: () => notifyError(t('errors.unknown')),
+                    })
+                  }
+                >
+                  <Check className="size-3.5" /> {t('people.markCheckupNow')}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+                <Trash2 className="size-3.5" /> {t('people.deletePerson')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      >
+        {person.notes && (
+          <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">{person.notes}</p>
+        )}
+        <ContactInfo person={person} onEdit={() => setEditing(true)} />
+      </PersonIdentity>
 
       {checkupDue && (
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">

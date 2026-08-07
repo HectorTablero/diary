@@ -131,12 +131,20 @@ export default function SearchPage() {
           onToggle={(id) => toggleCsvParam('people', personIds, id)}
           placeholder={t('people.namePlaceholder')}
         />
-        <div className="flex items-center gap-0.5" aria-label={t('search.byImportance')}>
+        {/* role="group" is what makes the aria-label stick: a bare <div> is a generic element, and
+            a generic element's accessible name is discarded, so this label was being dropped
+            entirely. With the role it names the set, and each dot names and states itself. */}
+        <div role="group" className="flex items-center gap-0.5" aria-label={t('search.byImportance')}>
           {[1, 2, 3, 4, 5].map((level) => (
             <Tooltip key={level}>
               <TooltipTrigger asChild>
                 <button
                   type="button"
+                  // The tooltip is the sighted affordance; a coloured dot has no text of its own, so
+                  // the same string has to be the button's name. Toggles, hence aria-pressed —
+                  // `bg-accent ring-1` is otherwise the only thing saying which levels are on.
+                  aria-label={t(`importance.levels.${level}`)}
+                  aria-pressed={importances.includes(String(level))}
                   onClick={() => toggleCsvParam('importance', importances, String(level))}
                   className={cn(
                     'flex size-6 items-center justify-center rounded-full transition-all',

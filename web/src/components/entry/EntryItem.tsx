@@ -35,6 +35,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
+import { useEntityLinks } from '@/lib/entityLinks';
+import { entrySummary } from '@/lib/entryLabel';
 import { notifyError } from '@/lib/notify';
 import { notifyDeleted } from '@/lib/undo';
 import { usePreferences } from '@/lib/preferences';
@@ -72,6 +74,7 @@ export function EntryItem({
   const { t } = useTranslation();
   const { data: settings } = useSettings();
   const { entriesExpanded } = usePreferences();
+  const { personTo, tagTo } = useEntityLinks();
   // Only the starting state: collapsing stays per-entry and per-visit, as it always did.
   const [expanded, setExpanded] = useState(entriesExpanded);
   const [editing, setEditing] = useState(false);
@@ -150,7 +153,7 @@ export function EntryItem({
           {(chipTags.length > 0 || chipPeople.length > 0 || entry.threads.length > 0) && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {chipTags.map((tag) => (
-                <TagChip key={tag.id} tag={tag} />
+                <TagChip key={tag.id} tag={tag} to={tagTo(tag.id)} />
               ))}
               {/* Always shown, unlike tags and people: a thread is never a token in the text, so
                   there's no inline copy for a chip to duplicate. */}
@@ -158,7 +161,7 @@ export function EntryItem({
                 <ThreadChip key={thread.id} thread={thread} />
               ))}
               {chipPeople.map((person) => (
-                <PersonChip key={person.id} person={person} />
+                <PersonChip key={person.id} person={person} to={personTo(person.id)} />
               ))}
             </div>
           )}
@@ -181,7 +184,12 @@ export function EntryItem({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground"
+                aria-label={t('diary.entryActions', { text: entrySummary(entry.content) })}
+              >
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>

@@ -29,6 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { ApiError } from '@/lib/apiClient';
 import { formatBirthdayValue, parseBirthday } from '@/lib/birthday';
+import { requestPermissionFor } from '@/lib/notifications';
 import { normalizePhone, toE164 } from '@/lib/phone';
 import { fuzzyEquals } from '@/lib/tokens';
 
@@ -121,7 +122,14 @@ function AliasEditor({
               }
             }}
           />
-          <Button type="button" variant="outline" size="icon" disabled={!draft.trim()} onClick={add}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={!draft.trim()}
+            onClick={add}
+            aria-label={t('people.addAlias')}
+          >
             <Plus className="size-4" />
           </Button>
         </div>
@@ -220,6 +228,12 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
       else await createPerson.mutateAsync(input);
       notifySuccess(t('people.personSaved'));
       onDone();
+      /* The first moment this app has anything to notify about, and so the first moment it is
+         entitled to ask. Checkups take priority when both apply: they recur, where a birthday
+         fires once a year. Deliberately after onDone() — the permission dialog is modal, and it
+         should land on the saved person, not on top of the form that saved them. */
+      if (input.checkupIntervalDays !== null) void requestPermissionFor('checkup');
+      else if (input.birthday !== null) void requestPermissionFor('birthday');
     } catch (err) {
       notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
     }

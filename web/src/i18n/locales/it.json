@@ -24,6 +24,15 @@
     "offlinePending_one": "Offline — {{count}} modifica da sincronizzare",
     "offlinePending_many": "Offline — {{count}} modifiche da sincronizzare",
     "offlinePending_other": "Offline — {{count}} modifiche da sincronizzare",
+    "unreachable": "Server irraggiungibile",
+    "unreachablePending_one": "Server irraggiungibile — {{count}} modifica da sincronizzare",
+    "unreachablePending_other": "Server irraggiungibile — {{count}} modifiche da sincronizzare",
+    "paused": "In attesa del Wi-Fi",
+    "pausedPending_one": "In attesa del Wi-Fi · {{count}} modifica",
+    "pausedPending_other": "In attesa del Wi-Fi · {{count}} modifiche",
+    "syncAnyway": "Sincronizza ora",
+    "rejected_one": "{{count}} modifica non è stata salvata",
+    "rejected_other": "{{count}} modifiche non sono state salvate",
     "sessionExpired": "La tua sessione è scaduta.",
     "reconnected": "Connessione ripristinata — sincronizzazione in corso…"
   },
@@ -79,7 +88,8 @@
     "remove": "Rimuovi",
     "selectDate": "Scegli una data",
     "hour": "Ora",
-    "minute": "Minuto"
+    "minute": "Minuto",
+    "skipToContent": "Vai al contenuto"
   },
   "importance": {
     "label": "Importanza",
@@ -124,7 +134,9 @@
     "birthdays": "Compleanni",
     "birthdayLine": "compleanno di <mention>@{{name}}</mention>",
     "birthdayLineWithAge": "compleanno di <mention>@{{name}}</mention> ({{age}})",
-    "entryDate": "Data della voce"
+    "entryDate": "Data della voce",
+    "entryActions": "Azioni per «{{text}}»",
+    "suggestions": "Suggerimenti"
   },
   "people": {
     "title": "Persone",
@@ -161,6 +173,7 @@
     "noMemories": "Ancora nessun ricordo condiviso",
     "noMemoriesDescription": "Le voci importanti che menzionano {{name}} riemergeranno qui dopo {{months}} mesi.",
     "noHistory": "Nessuna voce menziona ancora {{name}}",
+    "loadFailedDescription": "Non è stato possibile caricare questa persona. Non è andato perso nulla: riprova.",
     "matchMention": "Menzione diretta",
     "matchTag": "Etichetta in comune",
     "matchBroadcast": "Condiviso con tutti",
@@ -213,6 +226,7 @@
     "aliases": "Altri nomi",
     "aliasesDescription": "Soprannomi a cui questa persona risponde. Usati dalle @menzioni e dalla dettatura vocale.",
     "aliasPlaceholder": "Soprannome",
+    "addAlias": "Aggiungi soprannome",
     "alsoKnownAs": "alias",
     "birthday": "Compleanno",
     "birthdayToday": "oggi!",
@@ -351,6 +365,9 @@
       "themeDark": "Scuro",
       "themeAuto": "Sistema",
       "language": "Lingua",
+      "languageNeedsConnection": "(serve una connessione)",
+      "languageOfflineHint": "Le lingue che non hai ancora usato su questo dispositivo richiedono una connessione la prima volta.",
+      "languageDownloadFailed": "Non è stato possibile scaricare quella lingua. Riprova quando sei connesso.",
       "weekStart": "Primo giorno della settimana",
       "weekStartAuto": "Automatico ({{day}})",
       "quietNotifications": "Nascondi i messaggi di routine nell'app",
@@ -391,7 +408,9 @@
       "autoSaid": "Menzionare qualcuno la segna come raccontata",
       "autoSaidDescription": "Decide solo come parte la casella; puoi sempre cambiarla prima di salvare.",
       "expanded": "Apri le sotto-voci per impostazione predefinita",
-      "expandedDescription": "Se le sotto-voci di una voce partono aperte."
+      "expandedDescription": "Se le sotto-voci di una voce partono aperte.",
+      "entityLinks": "Nomi ed etichette cliccabili",
+      "entityLinksDescription": "Le menzioni @ e le etichette # dentro una voce aprono quella persona o le voci con quell’etichetta. Se disattivato restano testo evidenziato."
     },
     "decay": {
       "title": "Decadimento degli spunti",

@@ -226,7 +226,7 @@ ${
 2. Significant: Highly memorable achievements or major experiences that define a given year (e.g., Graduation, taking a long international trip, or hitting a massive project goal).
 3. Notable: Meaningful moments and solid milestones that make a week special (e.g., A short weekend getaway, great progress on a project you care about, or solid feature additions like bundling an app).
 4. Minor: Small deviations from the norm or practical skill-building (e.g., Learning to drive, going out to a nice dinner, attending a local event, or nice project improvements).
-5. Routinary: Standard, everyday happenings, necessary daily tasks, and basic maintenance (e.g., Going grocery shopping, doing household chores, standard bug fixes, or updating dependencies).
+5. Routine: Standard, everyday happenings, necessary daily tasks, and basic maintenance (e.g., Going grocery shopping, doing household chores, standard bug fixes, or updating dependencies).
 
 ### 3. Tagging Convention
 Existing tags (id: name) — you may ONLY reference these ids/names, never invent a new one:

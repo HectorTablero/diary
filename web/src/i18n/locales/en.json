@@ -23,6 +23,15 @@
     "offline": "Offline",
     "offlinePending_one": "Offline — {{count}} change to sync",
     "offlinePending_other": "Offline — {{count}} changes to sync",
+    "unreachable": "Can't reach the server",
+    "unreachablePending_one": "Can't reach the server — {{count}} change to sync",
+    "unreachablePending_other": "Can't reach the server — {{count}} changes to sync",
+    "paused": "Waiting for Wi-Fi",
+    "pausedPending_one": "Waiting for Wi-Fi · {{count}} change",
+    "pausedPending_other": "Waiting for Wi-Fi · {{count}} changes",
+    "syncAnyway": "Sync now",
+    "rejected_one": "{{count}} change couldn't be saved",
+    "rejected_other": "{{count}} changes couldn't be saved",
     "sessionExpired": "Your session has expired.",
     "reconnected": "Connection restored — syncing…"
   },
@@ -85,7 +94,8 @@
     "remove": "Remove",
     "selectDate": "Select a date",
     "hour": "Hour",
-    "minute": "Minute"
+    "minute": "Minute",
+    "skipToContent": "Skip to content"
   },
   "importance": {
     "label": "Importance",
@@ -94,7 +104,7 @@
       "2": "Significant",
       "3": "Notable",
       "4": "Minor",
-      "5": "Routinary"
+      "5": "Routine"
     },
     "descriptions": {
       "1": "Life-changing events like getting married, a new job, moving abroad",
@@ -130,7 +140,9 @@
     "birthdays": "Birthdays",
     "birthdayLine": "<mention>@{{name}}</mention>'s birthday",
     "birthdayLineWithAge": "<mention>@{{name}}</mention>'s birthday ({{age}})",
-    "entryDate": "Entry date"
+    "entryDate": "Entry date",
+    "entryActions": "Actions for “{{text}}”",
+    "suggestions": "Suggestions"
   },
   "people": {
     "title": "People",
@@ -167,6 +179,7 @@
     "noMemories": "No shared memories yet",
     "noMemoriesDescription": "Important entries that mention {{name}} will resurface here after {{months}} months.",
     "noHistory": "No entries mention {{name}} yet",
+    "loadFailedDescription": "This person couldn't be loaded. Nothing has been lost — try again.",
     "matchMention": "Mentions them",
     "matchTag": "Shared tag",
     "matchBroadcast": "Shared with everyone",
@@ -219,6 +232,7 @@
     "aliases": "Other names",
     "aliasesDescription": "Nicknames this person also answers to. Used by @mentions and voice dictation.",
     "aliasPlaceholder": "Nickname",
+    "addAlias": "Add nickname",
     "alsoKnownAs": "aka",
     "birthday": "Birthday",
     "birthdayToday": "today!",
@@ -357,6 +371,9 @@
       "themeDark": "Dark",
       "themeAuto": "System",
       "language": "Language",
+      "languageNeedsConnection": "(needs a connection)",
+      "languageOfflineHint": "Languages you haven't used on this device yet need a connection the first time.",
+      "languageDownloadFailed": "Couldn't download that language. Try again when you're connected.",
       "weekStart": "First day of the week",
       "weekStartAuto": "Automatic ({{day}})",
       "quietNotifications": "Hide routine in-app messages",
@@ -397,7 +414,9 @@
       "autoSaid": "Mentioning someone marks it as told",
       "autoSaidDescription": "Only sets how the tick box starts; you can always change it before saving.",
       "expanded": "Open sub-entries by default",
-      "expandedDescription": "Whether an entry's sub-entries start unfolded."
+      "expandedDescription": "Whether an entry's sub-entries start unfolded.",
+      "entityLinks": "Tappable names and tags",
+      "entityLinksDescription": "@mentions and #tags inside an entry open that person, or the entries carrying that tag. Off leaves them as highlighted text."
     },
     "decay": {
       "title": "Talking point decay",

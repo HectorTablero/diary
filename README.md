@@ -68,6 +68,11 @@ position/level announcements. Importance can be shown as distinct **shapes** as 
 for anyone the red-to-green ramp doesn't separate. `prefers-reduced-motion` is honoured
 throughout, including skipping the boot animation.
 
+The composer's `@person` / `#tag` autocomplete is a real combobox, so arrowing through the
+suggestions announces the one about to be inserted; each row's ⋯ menu is named after the row it
+belongs to rather than being one of many identical "button"s; loading and going offline announce
+themselves; and a skip link (web only) jumps past the sidebar's seven stops.
+
 ## Stack
 
 npm workspaces monorepo:
@@ -243,3 +248,7 @@ reads for tone and context).
 That check is load-bearing beyond tidiness: each locale is a **separate chunk**, fetched only when
 it is the one in use, and `fallbackLng` therefore points at a bundle that may not be loaded. It is
 safe only because no locale can be missing a key.
+
+Its one blind spot is a string that never passes through `t()`: a literal in JSX is invisible to it
+by construction. That is how the shadcn dialog's hardcoded "Close" stayed English in all five
+languages, so vendored primitives dropped into `components/ui` are worth a read for bare strings.

@@ -1,8 +1,25 @@
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
-export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn('size-5 animate-spin text-muted-foreground', className)} />;
+/* A spinning icon says "wait" to an eye and nothing at all to a screen reader, so the wrapper is
+   the point: role="status" makes it a polite live region, and the sr-only text gives it something
+   to announce the moment it mounts. Every call site inherits that — including the ones that render
+   a spinner inside a button while a mutation is in flight, where "Loading…" joining the button's
+   name for the duration is exactly the intended reading.
+
+   The wrapper is inline-flex rather than display:contents: contents would keep the layout byte-for-
+   byte identical, but browsers have a history of dropping display:contents elements out of the
+   accessibility tree, which would quietly undo the whole fix. `className` still lands on the icon,
+   so the sizes call sites pass keep working. */
+export function Spinner({ className, label }: { className?: string; label?: string }) {
+  const { t } = useTranslation();
+  return (
+    <span role="status" className="inline-flex shrink-0 items-center">
+      <Loader2 aria-hidden className={cn('size-5 animate-spin text-muted-foreground', className)} />
+      <span className="sr-only">{label ?? t('common.loading')}</span>
+    </span>
+  );
 }
 
 export function FullScreenSpinner() {

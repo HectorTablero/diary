@@ -23,6 +23,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Spinner } from '@/components/common/Spinner';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { requestPermissionFor } from '@/lib/notifications';
 import { ApiError } from '@/lib/apiClient';
 import { useSession } from '@/lib/authClient';
 import { setPreference, usePreferences } from '@/lib/preferences';
@@ -52,7 +53,7 @@ export function EntryComposer({
   const { data: allThreads = [] } = useThreads();
   const { data: settings } = useSettings();
   const { data: session } = useSession();
-  const { offline } = useSyncStatus();
+  const { blocker } = useSyncStatus();
   const prefs = usePreferences();
   const createTag = useCreateTag();
   const createThread = useCreateThread();
@@ -73,7 +74,9 @@ export function EntryComposer({
 
   const isEditing = entry !== null;
   const pending = createEntry.isPending || updateEntry.isPending;
-  const showMic = !isEditing && parentId === null && !!settings?.hasGroqKey && !offline;
+  // `!blocker` rather than a plain offline check: a paused (Wi-Fi-only) sync can't reach the
+  // transcription endpoint either, and audio is the last thing to push over cellular anyway.
+  const showMic = !isEditing && parentId === null && !!settings?.hasGroqKey && !blocker;
 
   const addPerson = (person: PersonRefDto) => {
     setPeople((prev) => (prev.some((p) => p.id === person.id) ? prev : [...prev, person]));
@@ -146,6 +149,9 @@ export function EntryComposer({
         // from something real rather than from the shipped 3.
         setPreference('lastImportance', importance);
         reset();
+        // Only once the diary has enough in it for a nudge to be interrupting a habit rather than
+        // announcing itself to someone who has never written anything — see requestPermissionFor.
+        void requestPermissionFor('daily');
       }
       notifySuccess(t('diary.entrySaved'));
       onDone?.();

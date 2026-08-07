@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { entrySummary } from '@/lib/entryLabel';
 import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 
@@ -131,7 +132,12 @@ export function TalkingPointItem({
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-7 text-muted-foreground mt-1.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 text-muted-foreground mt-1.5"
+                    aria-label={t('diary.entryActions', { text: entrySummary(node.content) })}
+                  >
                     <MoreHorizontal className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>

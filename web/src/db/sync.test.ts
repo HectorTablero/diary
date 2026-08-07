@@ -20,13 +20,12 @@ Object.defineProperty(globalThis, 'navigator', {
   writable: true,
 });
 
-const apiGet = vi.fn();
-vi.mock('@/lib/apiClient', () => ({
-  API_BASE: '',
-  CLIENT_ID: 'test-client',
-  api: vi.fn(),
-  apiGet: (path: string) => apiGet(path) as unknown,
-  ApiError: class ApiError extends Error {
+/* Hoisted so the tests can drive the same objects the mocks hand to the module under test —
+   `vi.mock` factories are lifted above the imports, so they cannot close over ordinary consts. */
+const { apiGet, apiCall, ApiErrorMock, prefs, network } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiCall: vi.fn(),
+  ApiErrorMock: class ApiError extends Error {
     constructor(
       public status: number,
       public code: string,
@@ -34,13 +33,26 @@ vi.mock('@/lib/apiClient', () => ({
       super(code);
     }
   },
+  prefs: { syncOnWifiOnly: false },
+  network: { metered: false },
+}));
+
+vi.mock('@/lib/apiClient', () => ({
+  API_BASE: '',
+  CLIENT_ID: 'test-client',
+  api: (path: string, init: unknown) => apiCall(path, init) as unknown,
+  apiGet: (path: string) => apiGet(path) as unknown,
+  ApiError: ApiErrorMock,
 }));
 vi.mock('@/lib/sessionCache', () => ({ getCachedUser: () => ({ id: 'u1' }) }));
-vi.mock('@/lib/preferences', () => ({ getPreferences: () => ({ syncOnWifiOnly: false }) }));
-vi.mock('@/lib/network', () => ({ isMeteredConnection: () => false }));
+vi.mock('@/lib/preferences', () => ({
+  getPreferences: () => prefs,
+  subscribePreferences: () => () => {},
+}));
+vi.mock('@/lib/network', () => ({ isMeteredConnection: () => network.metered }));
 
 const { db } = await import('./db');
-const { syncNow } = await import('./sync');
+const { forceSyncNow, getSyncStatus, onRejected, syncNow } = await import('./sync');
 
 const DELETED_AT = '2026-08-07T10:00:00.000Z';
 const RESTORED_AT = '2026-08-07T10:00:03.000Z';
@@ -74,7 +86,16 @@ const syncResponse = (patch: Partial<SyncResponse>): SyncResponse => ({
 
 beforeEach(async () => {
   apiGet.mockReset();
-  await Promise.all([db.entries.clear(), db.tags.clear(), db.outbox.clear(), db.meta.clear()]);
+  apiCall.mockReset();
+  prefs.syncOnWifiOnly = false;
+  network.metered = false;
+  await Promise.all([
+    db.entries.clear(),
+    db.tags.clear(),
+    db.outbox.clear(),
+    db.deadLetter.clear(),
+    db.meta.clear(),
+  ]);
 });
 
 describe('pull: tombstones', () => {
@@ -142,5 +163,67 @@ describe('pull: tombstones', () => {
     await syncNow();
 
     expect(await db.tags.get('t1')).toBeUndefined();
+  });
+});
+
+/* A write the server refuses outright has to leave the queue — leaving it there would jam every
+   later write behind it forever. What it must not do is leave without a trace: the local copy
+   still shows the change as saved, so a silent drop is a divergence the user cannot discover. */
+describe('push: a rejected write', () => {
+  it('drains from the queue but is kept, and announced once', async () => {
+    await db.outbox.add({ method: 'PATCH', path: '/entries/e1', body: { id: 'e1' } });
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(422, 'validation'));
+    apiGet.mockResolvedValue(syncResponse({}));
+    const announced: number[] = [];
+    const off = onRejected((count) => announced.push(count));
+
+    await syncNow();
+    off();
+
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.deadLetter.toArray()).toMatchObject([
+      { method: 'PATCH', path: '/entries/e1', status: 422, code: 'validation' },
+    ]);
+    expect(announced).toEqual([1]);
+  });
+
+  it('leaves a 404 on a PATCH alone — already gone is not a loss', async () => {
+    await db.outbox.add({ method: 'PATCH', path: '/entries/e2', body: { id: 'e2' } });
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(404, 'entry.not_found'));
+    apiGet.mockResolvedValue(syncResponse({}));
+
+    await syncNow();
+
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.deadLetter.count()).toBe(0);
+  });
+});
+
+/* "Sync on Wi-Fi only" used to return from syncNow in silence, leaving the status untouched — so
+   the app looked fully synced while the outbox grew behind it. */
+describe('wi-fi-only', () => {
+  it('says it is waiting, and keeps the pending count live', async () => {
+    await db.outbox.add({ method: 'POST', path: '/entries', body: { id: 'e3' } });
+    prefs.syncOnWifiOnly = true;
+    network.metered = true;
+
+    await syncNow();
+
+    expect(getSyncStatus().blocker).toBe('paused');
+    expect(apiCall).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(getSyncStatus().pending).toBe(1));
+  });
+
+  it('syncs anyway when the user asks it to', async () => {
+    await db.outbox.add({ method: 'POST', path: '/entries', body: { id: 'e4' } });
+    prefs.syncOnWifiOnly = true;
+    network.metered = true;
+    apiGet.mockResolvedValue(syncResponse({}));
+
+    await forceSyncNow();
+
+    expect(apiCall).toHaveBeenCalledOnce();
+    expect(await db.outbox.count()).toBe(0);
+    expect(getSyncStatus().blocker).toBeNull();
   });
 });

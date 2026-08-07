@@ -24,6 +24,15 @@
     "offlinePending_one": "Sin conexión — {{count}} cambio por sincronizar",
     "offlinePending_many": "Sin conexión — {{count}} cambios por sincronizar",
     "offlinePending_other": "Sin conexión — {{count}} cambios por sincronizar",
+    "unreachable": "No se puede conectar con el servidor",
+    "unreachablePending_one": "No se puede conectar con el servidor — {{count}} cambio por sincronizar",
+    "unreachablePending_other": "No se puede conectar con el servidor — {{count}} cambios por sincronizar",
+    "paused": "Esperando al wifi",
+    "pausedPending_one": "Esperando al wifi · {{count}} cambio",
+    "pausedPending_other": "Esperando al wifi · {{count}} cambios",
+    "syncAnyway": "Sincronizar ahora",
+    "rejected_one": "No se pudo guardar {{count}} cambio",
+    "rejected_other": "No se pudieron guardar {{count}} cambios",
     "sessionExpired": "Tu sesión ha caducado.",
     "reconnected": "Conexión restablecida — sincronizando…"
   },
@@ -83,7 +92,8 @@
     "remove": "Quitar",
     "selectDate": "Elegir fecha",
     "hour": "Hora",
-    "minute": "Minuto"
+    "minute": "Minuto",
+    "skipToContent": "Saltar al contenido"
   },
   "importance": {
     "label": "Importancia",
@@ -128,7 +138,9 @@
     "birthdays": "Cumpleaños",
     "birthdayLine": "Cumpleaños de <mention>@{{name}}</mention>",
     "birthdayLineWithAge": "Cumpleaños de <mention>@{{name}}</mention> ({{age}})",
-    "entryDate": "Fecha de la entrada"
+    "entryDate": "Fecha de la entrada",
+    "entryActions": "Acciones para «{{text}}»",
+    "suggestions": "Sugerencias"
   },
   "people": {
     "title": "Personas",
@@ -165,6 +177,7 @@
     "noMemories": "Aún no hay recuerdos compartidos",
     "noMemoriesDescription": "Las entradas importantes que mencionen a {{name}} reaparecerán aquí después de {{months}} meses.",
     "noHistory": "Ninguna entrada menciona a {{name}} todavía",
+    "loadFailedDescription": "No se ha podido cargar esta persona. No se ha perdido nada: inténtalo de nuevo.",
     "matchMention": "Le menciona",
     "matchTag": "Etiqueta compartida",
     "matchBroadcast": "Compartido con todos",
@@ -214,6 +227,7 @@
     "aliases": "Otros nombres",
     "aliasesDescription": "Apodos por los que también responde. Se usan en las menciones @ y en el dictado por voz.",
     "aliasPlaceholder": "Apodo",
+    "addAlias": "Añadir apodo",
     "alsoKnownAs": "alias",
     "birthday": "Cumpleaños",
     "birthdayToday": "¡hoy!",
@@ -352,6 +366,9 @@
       "themeDark": "Oscuro",
       "themeAuto": "Sistema",
       "language": "Idioma",
+      "languageNeedsConnection": "(necesita conexión)",
+      "languageOfflineHint": "Los idiomas que aún no has usado en este dispositivo necesitan conexión la primera vez.",
+      "languageDownloadFailed": "No se ha podido descargar ese idioma. Inténtalo con conexión.",
       "weekStart": "Primer día de la semana",
       "weekStartAuto": "Automático ({{day}})",
       "quietNotifications": "Ocultar los mensajes rutinarios de la app",
@@ -392,7 +409,9 @@
       "autoSaid": "Mencionar a alguien lo marca como contado",
       "autoSaidDescription": "Solo decide cómo empieza la casilla; siempre puedes cambiarla antes de guardar.",
       "expanded": "Abrir las subentradas por defecto",
-      "expandedDescription": "Si las subentradas de una entrada empiezan desplegadas."
+      "expandedDescription": "Si las subentradas de una entrada empiezan desplegadas.",
+      "entityLinks": "Nombres y etiquetas pulsables",
+      "entityLinksDescription": "Las menciones @ y las etiquetas # dentro de una entrada abren a esa persona o las entradas con esa etiqueta. Si lo desactivas, se quedan como texto resaltado."
     },
     "decay": {
       "title": "Caducidad de los temas de conversación",

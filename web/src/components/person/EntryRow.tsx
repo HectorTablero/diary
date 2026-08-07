@@ -5,6 +5,7 @@ import { PersonChip, TagChip } from '@/components/entry/chips';
 import { EntryContent } from '@/components/entry/EntryContent';
 import { ImportanceDot } from '@/components/entry/ImportanceDot';
 import { formatDateKey } from '@/lib/dates';
+import { useEntityLinks } from '@/lib/entityLinks';
 import { cn } from '@/lib/utils';
 
 /** Compact read-only entry row used in profiles, search results and memories. */
@@ -23,6 +24,7 @@ export function EntryRow({
   children?: React.ReactNode;
 }) {
   const { i18n } = useTranslation();
+  const { personTo, tagTo } = useEntityLinks();
   const hasChips = showChips && (entry.tags.length > 0 || entry.people.length > 0);
   return (
     <div className="flex items-start gap-2.5">
@@ -55,8 +57,10 @@ export function EntryRow({
                 {formatDateKey(entry.dateKey, i18n.language, 'd MMM yyyy')}
               </Link>
             )}
-            {showChips && entry.tags.map((tag) => <TagChip key={tag.id} tag={tag} />)}
-            {showChips && entry.people.map((p) => <PersonChip key={p.id} person={p} />)}
+            {showChips &&
+              entry.tags.map((tag) => <TagChip key={tag.id} tag={tag} to={tagTo(tag.id)} />)}
+            {showChips &&
+              entry.people.map((p) => <PersonChip key={p.id} person={p} to={personTo(p.id)} />)}
           </div>
         )}
       </div>

@@ -1,37 +1,52 @@
 import type { PersonRefDto, TagDto, ThreadDto } from '@diary/shared';
 import { GitBranch, X } from 'lucide-react';
+import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 
+/**
+ * A chip is a `span`, a `button` or a `Link` depending on what it was given.
+ *
+ * `to` and `onClick` are not interchangeable and the distinction matters: a chip that *goes*
+ * somewhere has to be an anchor, or middle-click, ctrl-click and "open in new tab" all silently
+ * do nothing, and a screen reader announces a button where the user is about to change page.
+ * `onClick` stays for the chips that act on the page they're already on (toggling a filter).
+ */
 function ChipShell({
   children,
   onRemove,
   onClick,
+  to,
   className,
   style,
 }: {
   children: React.ReactNode;
   onRemove?: () => void;
   onClick?: () => void;
+  /** Route to navigate to. Takes precedence over `onClick` if both are somehow passed. */
+  to?: string;
   className?: string;
   style?: React.CSSProperties;
 }) {
-  const Tag = onClick ? 'button' : 'span';
-  return (
-    <Tag
-      type={onClick ? 'button' : undefined}
-      onClick={onClick}
-      style={style}
-      className={cn(
-        'inline-flex max-w-40 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-        onClick && 'cursor-pointer transition-opacity hover:opacity-80',
-        className,
-      )}
-    >
+  /* A removable chip is never a link, whatever it was passed. The remove button lives *inside* the
+     chip, and a <button> inside an <a> is invalid — browsers recover from it unpredictably, which
+     for a destructive control is the wrong place to find out. No current call site asks for both;
+     this is what keeps it that way. */
+  const linkTo = onRemove ? undefined : to;
+  const interactive = linkTo !== undefined || onClick !== undefined;
+  const shell = cn(
+    'inline-flex max-w-40 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+    interactive && 'cursor-pointer transition-opacity hover:opacity-80',
+    className,
+  );
+  const inner = (
+    <>
       <span className="truncate">{children}</span>
       {onRemove && (
         <button
           type="button"
           onClick={(e) => {
+            // The chip around this may be a button of its own (a filter toggle); removing must
+            // not also fire whatever that does.
             e.stopPropagation();
             onRemove();
           }}
@@ -41,7 +56,27 @@ function ChipShell({
           <X className="size-3" />
         </button>
       )}
-    </Tag>
+    </>
+  );
+
+  if (linkTo !== undefined) {
+    return (
+      <Link to={linkTo} style={style} className={shell}>
+        {inner}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} style={style} className={shell}>
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <span style={style} className={shell}>
+      {inner}
+    </span>
   );
 }
 
@@ -56,11 +91,13 @@ export function TagChip({
   tag,
   onRemove,
   onClick,
+  to,
   className,
 }: {
   tag: TagDto;
   onRemove?: () => void;
   onClick?: () => void;
+  to?: string;
   /** Callers use this to de-emphasise a chip — e.g. tags that don't match an active filter. */
   className?: string;
 }) {
@@ -68,6 +105,7 @@ export function TagChip({
     <ChipShell
       onRemove={onRemove}
       onClick={onClick}
+      to={to}
       className={className}
       style={{ backgroundColor: tag.color, color: contrastColor(tag.color) }}
     >
@@ -113,15 +151,18 @@ export function PersonChip({
   person,
   onRemove,
   onClick,
+  to,
 }: {
   person: PersonRefDto;
   onRemove?: () => void;
   onClick?: () => void;
+  to?: string;
 }) {
   return (
     <ChipShell
       onRemove={onRemove}
       onClick={onClick}
+      to={to}
       className="bg-secondary text-secondary-foreground ring-1 ring-inset ring-border"
     >
       @{person.name}
