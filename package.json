@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "6.19.0",
+  "version": "6.20.0",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -31,5 +31,13 @@
     "concurrently": "^10.0.4",
     "prettier": "^3.5.3",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "tsup": {
+      "esbuild": "^0.28.1"
+    },
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
   }
 }
