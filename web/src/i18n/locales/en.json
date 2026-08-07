@@ -455,7 +455,9 @@
       "invalidFile": "That file isn't a valid backup",
       "exportMarkdown": "Export as Markdown",
       "exportMarkdownDescription": "Export entries or a person's briefing as a Markdown file, for pasting into an AI agent.",
-      "exportOmits": "API keys are stored on the server and never reach this device, so they are not in the file. Theme, reminders and the app lock are settings of this device and are not included either."
+      "exportOmits": "API keys are stored on the server and never reach this device, so they are not in the file. Theme, reminders and the app lock are settings of this device and are not included either.",
+      "telemetry": "Send crash reports",
+      "telemetryDescription": "Anonymous errors and usage counts, so problems on this device can be found and fixed. Never entry text, names or notes."
     },
     "markdownExport": {
       "title": "Export as Markdown",

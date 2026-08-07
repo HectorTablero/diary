@@ -450,7 +450,9 @@
       "invalidFile": "Ese archivo no es una copia de seguridad válida",
       "exportMarkdown": "Exportar como Markdown",
       "exportMarkdownDescription": "Exporta entradas o el resumen de una persona como archivo Markdown, para pegarlo en un agente de IA.",
-      "exportOmits": "Las claves de API se guardan en el servidor y nunca llegan a este dispositivo, así que no están en el archivo. El tema, los recordatorios y el bloqueo son ajustes de este dispositivo y tampoco se incluyen."
+      "exportOmits": "Las claves de API se guardan en el servidor y nunca llegan a este dispositivo, así que no están en el archivo. El tema, los recordatorios y el bloqueo son ajustes de este dispositivo y tampoco se incluyen.",
+      "telemetry": "Enviar informes de fallos",
+      "telemetryDescription": "Errores y recuentos de uso anónimos, para poder encontrar y corregir problemas en este dispositivo. Nunca el texto de las entradas, ni nombres ni notas."
     },
     "markdownExport": {
       "title": "Exportar como Markdown",
