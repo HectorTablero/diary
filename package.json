@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "6.17.0",
+  "version": "6.18.0",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -28,6 +28,6 @@
   "devDependencies": {
     "concurrently": "^10.0.4",
     "prettier": "^3.5.3",
-    "typescript": "^5.8.3"
+    "typescript": "^7.0.2"
   }
 }
