@@ -311,3 +311,29 @@ html body[data-scroll-locked] {
     background: transparent;
   }
 }
+/*
+ * Reduced motion.
+ *
+ * Everything that moves in this app is decoration on top of something that already works: the
+ * chevron that rotates as sub-entries open, the tab icon that scales when selected, the FLIP
+ * reflow while an entry is dragged, the logo that morphs on hover. None of it carries meaning
+ * that the layout doesn't also carry, so honouring the OS preference costs nothing.
+ *
+ * Near-zero rather than `none`: a duration of 0 cancels the transitionend/animationend events
+ * some libraries wait on before cleaning up, which leaves elements stuck mid-state. 0.01ms fires
+ * them on the next frame while being imperceptible.
+ *
+ * Framer Motion is handled separately, by MotionConfig reducedMotion="user" in main.tsx — its
+ * animations run in JavaScript and never touch these declarations. Smooth scrolling is included
+ * because it is the one piece of motion here that can genuinely cause nausea.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

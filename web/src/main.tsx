@@ -1,4 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
+import { MotionConfig } from 'framer-motion';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
@@ -77,10 +78,15 @@ async function bootstrap() {
     <StrictMode>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider delayDuration={300}>
-            <App />
-            <Toaster position="top-center" />
-          </TooltipProvider>
+          {/* Framer Motion animates in JavaScript, so the reduced-motion rules in index.css can't
+              reach it. "user" follows the OS setting: transforms are dropped, opacity and colour
+              still cross-fade — which keeps the drag reflow legible rather than teleporting rows. */}
+          <MotionConfig reducedMotion="user">
+            <TooltipProvider delayDuration={300}>
+              <App />
+              <Toaster position="top-center" />
+            </TooltipProvider>
+          </MotionConfig>
         </QueryClientProvider>
       </ErrorBoundary>
     </StrictMode>,

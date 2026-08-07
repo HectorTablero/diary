@@ -62,6 +62,11 @@
       #boot-splash.morph .bs-c { d: path('M 175 100 L 400 250 L 175 400'); }
       #boot-splash.morph .bs-v { d: path('M 100 100 L 100 400'); }
       #boot-splash.fade { opacity: 0; pointer-events: none; }
+      /* The morph is the thing being asked about; the fade stays, since a cross-fade is what
+         "no animation" usually still means and cutting it would flash. */
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash path { transition: none; }
+      }
     </style>
 
     <div id="boot-splash" aria-hidden="true" style="display: flex;">
@@ -78,24 +83,31 @@
         var isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
         if (!isNative) { el.remove(); return; }
 
+        // Asked for calm: no logo morph, and — more to the point — none of the 1150 ms the app
+        // otherwise spends *waiting* for that morph to finish. The splash then lasts exactly as
+        // long as the app takes to render, and leaves on a plain fade.
+        var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
         el.style.display = 'flex';
         var start = Date.now();
 
         // 350 ms base-state wait before starting the morph
-        setTimeout(function () {
-          requestAnimationFrame(function () {
+        if (!reduceMotion) {
+          setTimeout(function () {
             requestAnimationFrame(function () {
-              el.classList.add('morph');
+              requestAnimationFrame(function () {
+                el.classList.add('morph');
+              });
             });
-          });
-        }, 350);
+          }, 350);
+        }
 
         // Called from main.tsx once React has rendered
         window.__bootSplashHide = function () {
           var now = Date.now();
           // 350 ms delay + 600 ms morph + 200 ms after = 1150 ms from start
           var fadeStart = start + 1150;
-          var wait = Math.max(0, fadeStart - now);
+          var wait = reduceMotion ? 0 : Math.max(0, fadeStart - now);
           setTimeout(function () {
             el.classList.add('fade');
             setTimeout(function () { el.remove(); }, 300);
