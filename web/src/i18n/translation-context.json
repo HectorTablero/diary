@@ -220,6 +220,9 @@
         "done": "Eight counts in one sentence. Feel free to restructure into clauses that read naturally; keep every placeholder.",
         "orphaned": "Counted. An imported sub-entry whose parent wasn't imported gets promoted to the top level."
       }
+    },
+    "security": {
+      "where": "Settings > Security, and the full-screen lock that replaces the whole app when a passcode is set. \"Passcode\" is the code the user chooses for this app, never the device PIN; \"biometrics\" is the phone fingerprint/face unlock."
     }
   },
   "languageNotes": {
