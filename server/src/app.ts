@@ -163,14 +163,20 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
 
   /* Backslashes never reach serveStatic.
 
-     GHSA-frvp-7c67-39w9: on Windows, @hono/node-server's serve-static treats an encoded backslash
-     as a path separator, so `%5C..%5C` escapes the static root and reads arbitrary files. There is
-     no fixed version to upgrade to — it is the one advisory `npm audit fix` cannot clear.
+     GHSA-frvp-7c67-39w9: on Windows, @hono/node-server's serve-static treated an encoded backslash
+     as a path separator, so `%5C..%5C` escaped the static root and read arbitrary files. That is
+     fixed upstream in 2.0.5, and the version this imports is now v2 — so this middleware is
+     defence in depth rather than the only thing standing in the way. It stays for two reasons:
 
-     Production runs on Alpine, where the vector does not apply, but `npm start` on a Windows
-     machine is a documented way to run this app and the exposure there is real. No legitimate URL
-     in this app contains a backslash in any form: Vite emits `/assets/<name>-<hash>.<ext>` and
-     every route is a plain path, so rejecting them outright costs nothing.
+       - `npm audit` still reports the advisory, and will keep reporting it, because
+         @hono/node-ws's peer range is still `^1.19.11` and npm satisfies it by nesting its own
+         copy of node-server 1.x. That copy is never loaded — node-ws imports `hono/ws`, `ws` and
+         `node:http`, and nothing from node-server — but npm's peer resolution wins over
+         `overrides`, so it cannot be deduped away today. The audit line is noise; this guard is
+         what makes it unambiguously noise.
+       - A path-traversal guard in front of a static root is worth having on its own terms, and it
+         costs nothing here. No legitimate URL in this app contains a backslash in any form: Vite
+         emits `/assets/<name>-<hash>.<ext>` and every route is a plain path.
 
      Placed here rather than in a global middleware so it sits directly in front of the thing it
      protects, and so the API's own 404 above still answers in JSON. */
