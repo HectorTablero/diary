@@ -427,7 +427,9 @@
       "invalidFile": "这个文件不是有效的备份",
       "exportMarkdown": "导出为 Markdown",
       "exportMarkdownDescription": "把记录或某个人的摘要导出成 Markdown 文件，粘贴给 AI 助手用。",
-      "exportOmits": "API 密钥保存在服务器上，从不下发到本设备，因此不会出现在文件里。主题、提醒和应用锁属于本设备的设置，同样不会包含在内。"
+      "exportOmits": "API 密钥保存在服务器上，从不下发到本设备，因此不会出现在文件里。主题、提醒和应用锁属于本设备的设置，同样不会包含在内。",
+      "telemetry": "发送崩溃报告",
+      "telemetryDescription": "仅发送匿名的错误与使用次数，用于发现并修复本设备上的问题。绝不发送条目正文、人名或备注。"
     },
     "markdownExport": {
       "title": "导出为 Markdown",

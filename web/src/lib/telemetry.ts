@@ -1,5 +1,6 @@
 import { Logtail } from '@logtail/browser';
 import { isNative } from './native';
+import { getPreferences } from './preferences';
 
 /* Error + metrics reporting to Better Stack.
 
@@ -31,6 +32,20 @@ interface QueuedEvent {
 const logtail = SOURCE_TOKEN && INGEST_URL ? new Logtail(SOURCE_TOKEN, { endpoint: INGEST_URL }) : null;
 const queue: QueuedEvent[] = [];
 
+/** Whether this build has somewhere to report to at all. Used by Settings to decide whether the
+    opt-out is worth showing: a switch that cannot change anything is worse than an absent one. */
+export const isTelemetryConfigured = (): boolean => logtail !== null;
+
+/**
+ * Whether to report right now.
+ *
+ * Read per event rather than captured once, so turning the switch off takes effect immediately
+ * instead of at the next launch. The build-time env vars decide whether reporting is *possible*;
+ * this preference is what decides whether it *happens*, which is the part that belongs to the
+ * person using the app rather than to whoever produced the build.
+ */
+const reportingAllowed = (): boolean => logtail !== null && getPreferences().telemetry;
+
 /** Attached to every event so logs can be filtered by release and platform in Better Stack. */
 function baseContext(): Fields {
   return {
@@ -41,7 +56,7 @@ function baseContext(): Fields {
 }
 
 function send({ level, message, fields }: QueuedEvent): void {
-  if (!logtail) return;
+  if (!logtail || !reportingAllowed()) return;
   // Logtail rejects when the network is gone; that must not surface as an unhandled rejection.
   void logtail[level](message, fields).catch(() => {
     /* dropped */
@@ -51,7 +66,9 @@ function send({ level, message, fields }: QueuedEvent): void {
 function emit(level: Level, message: string, fields: Fields): void {
   const event: QueuedEvent = { level, message, fields: { ...baseContext(), ...fields } };
 
-  if (!logtail) return;
+  // Checked before the queue, not just before the send: opted out, nothing should accumulate in
+  // memory waiting for a reconnect that would then ship it.
+  if (!reportingAllowed()) return;
 
   if (!navigator.onLine) {
     if (queue.length >= MAX_QUEUED) queue.shift();

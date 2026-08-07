@@ -449,7 +449,9 @@
       "invalidFile": "Questo file non è un backup valido",
       "exportMarkdown": "Esporta in Markdown",
       "exportMarkdownDescription": "Esporta le voci o il riepilogo di una persona come file Markdown, da incollare in un agente IA.",
-      "exportOmits": "Le chiavi API sono conservate sul server e non raggiungono mai questo dispositivo, quindi non sono nel file. Tema, promemoria e blocco sono impostazioni di questo dispositivo e non vengono inclusi."
+      "exportOmits": "Le chiavi API sono conservate sul server e non raggiungono mai questo dispositivo, quindi non sono nel file. Tema, promemoria e blocco sono impostazioni di questo dispositivo e non vengono inclusi.",
+      "telemetry": "Invia i rapporti sugli errori",
+      "telemetryDescription": "Errori e conteggi d’uso anonimi, per trovare e correggere i problemi su questo dispositivo. Mai il testo delle voci, i nomi o le note."
     },
     "markdownExport": {
       "title": "Esporta in Markdown",

@@ -54,6 +54,10 @@ export interface Preferences {
       a month of syncing costs less than one photo, and the failure mode of this being on by
       mistake is a diary that silently stops backing itself up. */
   syncOnWifiOnly: boolean;
+  /** Send crash reports and usage metrics. Whether there is anywhere to send them is decided at
+      build time; this is whether to. Device-local like everything else here, and deliberately
+      outside the synced settings so opting out on a phone can't be undone by a laptop. */
+  telemetry: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -72,6 +76,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   entriesExpanded: true,
   lastImportance: 3,
   syncOnWifiOnly: false,
+  // On by default: this is the only way a crash on someone else's device is ever seen, and the
+  // switch below is one tap away for anyone who would rather it weren't.
+  telemetry: true,
 };
 
 const STORAGE_KEY = 'preferences';

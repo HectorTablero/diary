@@ -55,6 +55,7 @@ import {
   type Preferences,
 } from '@/lib/preferences';
 import { cacheUser } from '@/lib/sessionCache';
+import { isTelemetryConfigured } from '@/lib/telemetry';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { getVersionInfo, type VersionInfo } from '@/lib/version';
@@ -1232,6 +1233,24 @@ export default function SettingsPage() {
               </Button>
               <p className="text-xs text-muted-foreground">{t('settings.data.exportMarkdownDescription')}</p>
             </div>
+
+            {/* Only where the build actually reports somewhere. Telemetry used to be a decision
+                made once, by whoever produced the bundle, with no way for the person running it
+                to change their mind — this is that switch. */}
+            {isTelemetryConfigured() && (
+              <div className="border-t pt-4">
+                <ToggleRow
+                  id="telemetry"
+                  label={t('settings.data.telemetry')}
+                  description={t('settings.data.telemetryDescription')}
+                  checked={prefs.telemetry}
+                  onCheckedChange={(checked) => {
+                    setPreference('telemetry', checked);
+                    notifyDeviceSaved(t('settings.general.savedOnDevice'));
+                  }}
+                />
+              </div>
+            )}
           </div>
         </Section>
       </div>
