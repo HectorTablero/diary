@@ -131,10 +131,16 @@ function PersonRow({
   // without the tag that put them there. See lib/tags.ts.
   const { shown: shownTags, hidden: hiddenTagCount } = visibleTags(person.tags, tagFilter);
   return (
-    <li>
+    /* The row's link and its ⋯ menu are siblings, not nested. The menu trigger used to sit inside
+       the <Link>, which is invalid HTML — interactive content inside an anchor — and left screen
+       readers to guess what the control was; the `e.preventDefault()` on every menu item patched
+       the mouse behaviour only, never the semantics. Now the anchor stretches over the row via
+       `before:absolute inset-0` and the menu sits above it on the z-axis, so the whole row is
+       still one click target while the button is a genuine sibling with its own accessible name. */
+    <li className="group/row relative flex items-center gap-3 rounded-xl border bg-card p-4 shadow-xs transition-colors hover:bg-accent/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
       <Link
         to={`/people/${person.id}`}
-        className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-xs transition-colors hover:bg-accent/40"
+        className="flex min-w-0 flex-1 items-center gap-3 outline-none before:absolute before:inset-0 before:rounded-xl before:content-['']"
       >
         <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase">
           {person.name.slice(0, 2)}
@@ -227,63 +233,63 @@ function PersonRow({
             </div>
           )}
         </div>
-        {/* Same destructive tint the row already uses for an overdue checkup — an unanswered
-            "how did it go?" is the same kind of debt. */}
-        {pending > 0 && (
-          <Badge variant="outline" className="shrink-0 gap-1 border-destructive/40 text-destructive">
-            <MessageCircleQuestion className="size-3" />
-            {pending}
-          </Badge>
-        )}
-        {person.checkupIntervalDays != null && (
-          <span className={"hidden shrink-0 items-center gap-1 text-xs sm:flex" + (checkupPending ? ' text-destructive' : ' text-muted-foreground')}>
-            <BellRing className="size-3" />
-            {t('people.checkupEvery')} {person.checkupIntervalDays} {t('settings.memories.days')}
-          </span>
-        )}
-        {person.talkingPointCount > 0 && (
-          <Badge variant="secondary" className="gap-1">
-            <MessageCircle className="size-3" />
-            {person.talkingPointCount}
-          </Badge>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0 text-muted-foreground"
-              aria-label={t('people.editPerson')}
-              onClick={(e) => e.preventDefault()}
-            >
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.preventDefault();
-                onEdit(person);
-              }}
-            >
-              <Pencil className="size-3.5" /> {t('people.editPerson')}
-            </DropdownMenuItem>
-            {person.checkupIntervalDays != null && (
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.preventDefault();
-                  markCheckup.mutate(person.id, {
-                    onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
-                    onError: () => notifyError(t('errors.unknown')),
-                  });
-                }}
-              >
-                <Check className="size-3.5" /> {t('people.markCheckupNow')}
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </Link>
+
+      {/* Outside the link but under its stretched ::before, so these still read as part of the
+          row and clicking one still opens the profile. */}
+      {/* Same destructive tint the row already uses for an overdue checkup — an unanswered
+          "how did it go?" is the same kind of debt. */}
+      {pending > 0 && (
+        <Badge variant="outline" className="shrink-0 gap-1 border-destructive/40 text-destructive">
+          <MessageCircleQuestion className="size-3" />
+          {pending}
+        </Badge>
+      )}
+      {person.checkupIntervalDays != null && (
+        <span className={"hidden shrink-0 items-center gap-1 text-xs sm:flex" + (checkupPending ? ' text-destructive' : ' text-muted-foreground')}>
+          <BellRing className="size-3" />
+          {t('people.checkupEvery')} {person.checkupIntervalDays} {t('settings.memories.days')}
+        </span>
+      )}
+      {person.talkingPointCount > 0 && (
+        <Badge variant="secondary" className="gap-1">
+          <MessageCircle className="size-3" />
+          {person.talkingPointCount}
+        </Badge>
+      )}
+
+      {/* `relative z-10` lifts the menu above the link's overlay — without it the anchor would
+          swallow the click and navigate instead of opening the menu. No preventDefault anywhere
+          now: nothing is inside the anchor to bubble to. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative z-10 size-8 shrink-0 text-muted-foreground"
+            aria-label={t('people.personActions', { name: person.name })}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onEdit(person)}>
+            <Pencil className="size-3.5" /> {t('people.editPerson')}
+          </DropdownMenuItem>
+          {person.checkupIntervalDays != null && (
+            <DropdownMenuItem
+              onClick={() =>
+                markCheckup.mutate(person.id, {
+                  onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+                  onError: () => notifyError(t('errors.unknown')),
+                })
+              }
+            >
+              <Check className="size-3.5" /> {t('people.markCheckupNow')}
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </li>
   );
 }

@@ -223,6 +223,9 @@
     },
     "security": {
       "where": "Settings > Security, and the full-screen lock that replaces the whole app when a passcode is set. \"Passcode\" is the code the user chooses for this app, never the device PIN; \"biometrics\" is the phone fingerprint/face unlock."
+    },
+    "dnd": {
+      "where": "Screen-reader announcements while an entry is being reordered with the keyboard. Never shown visually. \"Position\" is the 1-based row number in the flattened list; \"level\" is the 1-based nesting depth (level 1 = a top-level entry)."
     }
   },
   "languageNotes": {

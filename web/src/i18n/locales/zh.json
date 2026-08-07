@@ -252,7 +252,8 @@
     "eventDays": "{{count}} 天",
     "eventEndedDaysAgo": "{{count}} 天前结束",
     "checkupDigestTitle": "有 {{count}} 人可以联系一下",
-    "checkupDigestBody": "和{{names}}已经有一阵子没聊了。"
+    "checkupDigestBody": "和{{names}}已经有一阵子没聊了。",
+    "personActions": "{{name}} 的操作"
   },
   "tags": {
     "title": "标签",
@@ -616,5 +617,12 @@
     "lockAfter": "关闭后锁定",
     "lockImmediately": "立即",
     "lockAfterMinutes_other": "{{count}} 分钟后"
+  },
+  "dnd": {
+    "lifted": "已拾起。用方向键移动，空格放下，Esc 取消。",
+    "moved": "第 {{position}} 位，第 {{level}} 层。",
+    "blocked": "第 {{position}} 位，第 {{level}} 层不允许放置。",
+    "dropped": "已放到第 {{position}} 位，第 {{level}} 层。",
+    "cancelled": "已取消移动。"
   }
 }

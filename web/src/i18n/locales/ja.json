@@ -258,7 +258,8 @@
     "eventDays": "{{count}}日間",
     "eventEndedDaysAgo": "{{count}}日前に終了",
     "checkupDigestTitle": "連絡したい人が{{count}}人います",
-    "checkupDigestBody": "{{names}}とはしばらく間が空いています。"
+    "checkupDigestBody": "{{names}}とはしばらく間が空いています。",
+    "personActions": "{{name}}の操作"
   },
   "tags": {
     "title": "タグ",
@@ -622,5 +623,12 @@
     "lockAfter": "閉じたときにロック",
     "lockImmediately": "すぐに",
     "lockAfterMinutes_other": "{{count}}分後"
+  },
+  "dnd": {
+    "lifted": "つかみました。矢印キーで移動、スペースで配置、エスケープで取り消します。",
+    "moved": "{{position}}番目、レベル{{level}}。",
+    "blocked": "{{position}}番目、レベル{{level}}には配置できません。",
+    "dropped": "{{position}}番目、レベル{{level}}に配置しました。",
+    "cancelled": "移動を取り消しました。"
   }
 }

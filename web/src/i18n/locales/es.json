@@ -268,7 +268,8 @@
     "eventEndedDaysAgo_other": "Terminó hace {{count}} días",
     "checkupDigestTitle": "{{count}} persona con quien ponerte al día",
     "checkupDigestTitle_other": "{{count}} personas con quienes ponerte al día",
-    "checkupDigestBody": "Hace tiempo con {{names}}."
+    "checkupDigestBody": "Hace tiempo con {{names}}.",
+    "personActions": "Acciones para {{name}}"
   },
   "tags": {
     "title": "Etiquetas",
@@ -656,5 +657,12 @@
     "lockAfterMinutes_one": "Tras {{count}} minuto",
     "lockAfterMinutes_many": "Tras {{count}} minutos",
     "lockAfterMinutes_other": "Tras {{count}} minutos"
+  },
+  "dnd": {
+    "lifted": "Elemento tomado. Usa las flechas para moverlo, espacio para soltarlo y escape para cancelar.",
+    "moved": "Posición {{position}}, nivel {{level}}.",
+    "blocked": "La posición {{position}}, nivel {{level}} no está permitida.",
+    "dropped": "Soltado en la posición {{position}}, nivel {{level}}.",
+    "cancelled": "Movimiento cancelado."
   }
 }
