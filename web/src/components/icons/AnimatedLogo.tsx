@@ -36,6 +36,11 @@ export function AnimatedLogo({ strokeColor = LOGO_COLOR, className, onClick }: A
         svg:hover .vertical-bar { d: path("${BRAND_LOGO_PATHS[2].d}"); }
         svg:hover .chevron      { d: path("${BRAND_LOGO_PATHS[1].d}"); }
         svg:hover .horiz-line   { d: path("${BRAND_LOGO_PATHS[0].d}"); }
+        /* The morph is the whole point of this component, so reduced motion doesn't remove it —
+           it just stops it being a movement. The shapes still swap on hover, instantly. */
+        @media (prefers-reduced-motion: reduce) {
+          .animated-d-path { transition: none; }
+        }
       `}</style>
       <g>
         <path className="animated-d-path horiz-line" />
