@@ -355,7 +355,7 @@
       "birthdays": "誕生日のリマインダー",
       "birthdaysDescription": "誕生日を登録しているすべての人について、当日の朝に届きます。",
       "sendAt": "通知時刻",
-"checkups": "連絡リマインダー",
+      "checkups": "連絡リマインダー",
       "checkupsDescription": "しばらく誰かに何も伝えていないときに届きます。重なった場合はまとめて 1 件になります。",
       "quietHours": "静かな時間",
       "quietHoursDescription": "時刻の決まっていないリマインダーは、深夜に届かず朝まで待ちます。上で設定した時刻が遅れることはありません。",
@@ -472,7 +472,10 @@
       "wifiOnlyDescription": "変更はこの端末に保存され続け、次に Wi-Fi につながったときに送られます。日記は文字なので、節約できる量はわずかです。",
       "nestingDepth": "サブ記録の階層数",
       "nestingDepthDescription": "トップレベルの記録の下に何段まで入れられるか。下げても、すでに深いところにある記録はそのままです。"
-    }
+    },
+    "signOutPendingTitle_other": "アカウントに未保存の変更が{{count}}件ありますが、ログアウトしますか？",
+    "signOutPendingDescription": "ログアウトするとこの端末のデータは消去されます。同期待ちの内容は完全に失われます。残したい場合は再接続して同期の完了を待ってください。",
+    "signOutDiscard": "破棄してログアウト"
   },
   "errors": {
     "unauthorized": "ログインが必要です",

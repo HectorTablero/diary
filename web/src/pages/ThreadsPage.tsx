@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   useCreateThread,
   useDeleteThread,
+  useRestoreThread,
   useThreadEntries,
   useThreads,
   useUpdateThread,
@@ -22,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { notifyDeleted } from '@/lib/undo';
 import { ApiError } from '@/lib/apiClient';
 import { cn } from '@/lib/utils';
 
@@ -184,6 +186,7 @@ export default function ThreadsPage() {
   const { t } = useTranslation();
   const { data: threads, isLoading } = useThreads();
   const deleteThread = useDeleteThread();
+  const restoreThread = useRestoreThread();
   const [editing, setEditing] = useState<ThreadWithStats | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<ThreadWithStats | null>(null);
@@ -274,7 +277,8 @@ export default function ThreadsPage() {
         onConfirm={() => {
           if (!deleting) return;
           deleteThread.mutate(deleting.id, {
-            onSuccess: () => notifySuccess(t('threads.threadDeleted')),
+            onSuccess: (deletion) =>
+              notifyDeleted(t('threads.threadDeleted'), () => restoreThread.mutateAsync(deletion)),
             onError: () => notifyError(t('errors.unknown')),
           });
         }}

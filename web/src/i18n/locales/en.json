@@ -377,7 +377,7 @@
       "birthdays": "Birthday reminders",
       "birthdaysDescription": "On the morning of the day itself, for everyone with a birthday saved.",
       "sendAt": "At",
-"checkups": "Checkup reminders",
+      "checkups": "Checkup reminders",
       "checkupsDescription": "When it's been a while since you last told someone anything. Several at once arrive as one.",
       "quietHours": "Quiet hours",
       "quietHoursDescription": "Reminders that have no time of their own wait until the morning instead of arriving overnight. The times you set above are never delayed.",
@@ -494,7 +494,11 @@
       "wifiOnlyDescription": "Changes keep saving on this device and go up the next time you're on Wi-Fi. The diary is text, so this rarely saves much.",
       "nestingDepth": "How deep sub-entries can nest",
       "nestingDepthDescription": "Levels below a top-level entry. Lowering it doesn't touch entries that are already deeper."
-    }
+    },
+    "signOutPendingTitle_one": "Sign out with {{count}} change not yet saved to your account?",
+    "signOutPendingTitle_other": "Sign out with {{count}} changes not yet saved to your account?",
+    "signOutPendingDescription": "Signing out clears this device. Anything still waiting to sync will be lost for good. Reconnect and let it finish first if you want to keep it.",
+    "signOutDiscard": "Sign out and discard"
   },
   "errors": {
     "unauthorized": "You need to sign in",

@@ -371,7 +371,7 @@
       "birthdays": "Promemoria dei compleanni",
       "birthdaysDescription": "La mattina del giorno stesso, per tutte le persone con una data di nascita salvata.",
       "sendAt": "Alle",
-"checkups": "Promemoria di contatto",
+      "checkups": "Promemoria di contatto",
       "checkupsDescription": "Quando è passato un po' dall'ultima volta che hai raccontato qualcosa a qualcuno. Se sono in più, arrivano in uno solo.",
       "quietHours": "Ore di silenzio",
       "quietHoursDescription": "I promemoria senza un orario proprio aspettano il mattino invece di arrivare nel cuore della notte. Gli orari scelti qui sopra non vengono mai rimandati.",
@@ -488,7 +488,12 @@
       "wifiOnlyDescription": "Le modifiche continuano a salvarsi su questo dispositivo e salgono al prossimo Wi-Fi. Il diario è testo, quindi si risparmia poco.",
       "nestingDepth": "Livelli di sotto-voci",
       "nestingDepthDescription": "Quanto si può annidare sotto una voce principale. Abbassarlo non tocca le voci già più in basso."
-    }
+    },
+    "signOutPendingTitle_one": "Uscire con {{count}} modifica non ancora salvata sul tuo account?",
+    "signOutPendingTitle_many": "Uscire con {{count}} modifiche non ancora salvate sul tuo account?",
+    "signOutPendingTitle_other": "Uscire con {{count}} modifiche non ancora salvate sul tuo account?",
+    "signOutPendingDescription": "Uscendo si cancella questo dispositivo. Tutto ciò che è in attesa di sincronizzazione andrà perso definitivamente. Riconnettiti e lascia che finisca se vuoi conservarlo.",
+    "signOutDiscard": "Esci e scarta"
   },
   "errors": {
     "unauthorized": "Devi accedere",

@@ -59,6 +59,14 @@ export function useDeleteTag() {
   });
 }
 
+export function useRestoreTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (deletion: mutations.TagDeletion) => mutations.restoreTag(deletion),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 // --- Threads ---
 
 export const useThreads = () =>
@@ -99,6 +107,14 @@ export function useDeleteThread() {
       hapticWarning();
       qc.invalidateQueries();
     },
+  });
+}
+
+export function useRestoreThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (deletion: mutations.ThreadDeletion) => mutations.restoreThread(deletion),
+    onSuccess: () => qc.invalidateQueries(),
   });
 }
 
@@ -144,6 +160,15 @@ export function useDeletePerson() {
   });
 }
 
+export function useRestorePerson() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (deletion: mutations.PersonDeletion) => mutations.restorePerson(deletion),
+    // Restoring a person puts mentions back on entries too, so this reaches past ['people'].
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export function useMarkCheckup() {
   const qc = useQueryClient();
   return useMutation({
@@ -174,12 +199,25 @@ export const useSaveEvent = () =>
     mutations.saveEvent(personId, event),
   );
 
-export const useDeleteEvent = () =>
-  usePersonEventMutation(({ personId, eventId }: { personId: string; eventId: string }) => {
+/* Not usePersonEventMutation: this one resolves to the deletion snapshot rather than the person,
+   so the toast can offer an undo. The person still rides along on it, so the cache seeding is
+   the same two lines. */
+export function useDeleteEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ personId, eventId }: { personId: string; eventId: string }) => {
       hapticWarning();
       return mutations.deleteEvent(personId, eventId);
-    }
-  );
+    },
+    onSuccess: ({ person }) => {
+      qc.setQueryData(['people', person.id], person);
+      qc.invalidateQueries({ queryKey: ['people'] });
+    },
+  });
+}
+
+export const useRestoreEvent = () =>
+  usePersonEventMutation((deletion: mutations.EventDeletion) => mutations.restoreEvent(deletion));
 
 export const useMarkEventAsked = () =>
   usePersonEventMutation(({ personId, eventId }: { personId: string; eventId: string }) =>
@@ -250,6 +288,14 @@ export function useDeleteEntry() {
       hapticWarning();
       invalidate();
     },
+  });
+}
+
+export function useRestoreEntries() {
+  const invalidate = useInvalidateEntryData();
+  return useMutation({
+    mutationFn: (deletion: mutations.EntryDeletion) => mutations.restoreEntries(deletion),
+    onSuccess: invalidate,
   });
 }
 

@@ -4,6 +4,7 @@ import type {
   EntryUpdateInput,
   PersonCreateInput,
   PersonDto,
+  PersonEventDto,
   PersonEventInput,
   PersonUpdateInput,
   SaidMark,
@@ -43,6 +44,61 @@ import { getDayEntries, getPerson, getSettings } from './repo';
    The rules here mirror the server services so both sides converge. */
 
 const nowIso = () => new Date().toISOString();
+
+/* --- Undoable deletions -----------------------------------------------------------------------
+
+   Every delete returns a snapshot of exactly what it removed, and has a matching `restore*` that
+   puts it back. Two things make this cheap rather than a soft-delete rewrite:
+
+   - a delete already reads everything it is about to remove (the cascades below need the rows to
+     know what to touch), so the snapshot is that read kept instead of thrown away, and
+   - the create endpoints accept client-generated ids, so a restore re-creates the *same* rows
+     rather than copies. The outbox is FIFO, so a queued DELETE followed by the restore's POST
+     replays as delete-then-recreate and converges on "exists" either way — which means undo is
+     correct whether or not the delete already reached the server.
+
+   The snapshot lives in the toast's closure and dies with it. Nothing is persisted, so undo is
+   deliberately only available for as long as the toast is on screen. */
+
+/** An entry and all of its descendants, parents first. */
+export interface EntryDeletion {
+  kind: 'entry';
+  entries: LocalEntry[];
+}
+
+/** The mention/said/hidden marks one entry carried for a person, as they were before the cascade. */
+export interface EntryPersonLink {
+  entryId: string;
+  peopleIds: string[];
+  hiddenFor: string[];
+  saidTo: SaidMark[];
+}
+
+export interface PersonDeletion {
+  kind: 'person';
+  person: LocalPerson;
+  links: EntryPersonLink[];
+}
+
+export interface TagDeletion {
+  kind: 'tag';
+  tag: TagDto;
+  entryIds: string[];
+  peopleIds: string[];
+}
+
+export interface ThreadDeletion {
+  kind: 'thread';
+  thread: ThreadDto;
+  entryIds: string[];
+}
+
+export interface EventDeletion {
+  kind: 'event';
+  personId: string;
+  event: PersonEventDto;
+  person: PersonDto;
+}
 
 /** A saidTo entry is either a bare person id or an explicit `{personId, at}` pair (see shared's
     saidToInputSchema — the wider shape exists so importEntries can preserve historical
@@ -221,18 +277,25 @@ export async function moveEntry(
   return entryDto(entryId, entry.dateKey);
 }
 
-/** Delete an entry and all of its descendants (the server cascades the same way). */
-export async function deleteEntry(entryId: string): Promise<{ deleted: number }> {
-  const toDelete = [entryId];
+/**
+ * Delete an entry and all of its descendants (the server cascades the same way).
+ *
+ * Returns the rows it removed, parents first, so `restoreEntries` can put the whole subtree back.
+ * Collecting them costs nothing: the cascade already has to read every descendant to know what
+ * to delete, so the snapshot is the same query with its result kept instead of discarded.
+ */
+export async function deleteEntry(entryId: string): Promise<EntryDeletion> {
+  const root = await db.entries.get(entryId);
+  const removed: LocalEntry[] = root ? [root] : [];
   let frontier = [entryId];
   while (frontier.length) {
     const children = await db.entries.where('parentId').anyOf(frontier).toArray();
     frontier = children.map((c) => c.id);
-    toDelete.push(...frontier);
+    removed.push(...children);
   }
-  await db.entries.bulkDelete(toDelete);
+  await db.entries.bulkDelete(removed.map((e) => e.id));
   await enqueue('DELETE', `/entries/${entryId}`);
-  return { deleted: toDelete.length };
+  return { kind: 'entry', entries: removed };
 }
 
 export async function setSaid(entryId: string, personId: string, said: boolean): Promise<void> {
@@ -393,22 +456,37 @@ export async function updatePerson(personId: string, input: PersonUpdateInput): 
   return getPerson(personId);
 }
 
-export async function deletePerson(personId: string): Promise<void> {
-  await db.people.delete(personId);
-  // Mirror the server cascade: pull the person out of every entry.
-  await db.entries
+export async function deletePerson(personId: string): Promise<PersonDeletion> {
+  const person = await requireLocalPerson(personId);
+  // Read the entries the cascade is about to rewrite *before* rewriting them: the mention,
+  // said and hidden marks it strips are not recoverable from the person row alone.
+  const touched = await db.entries
     .filter(
       (e) =>
         e.peopleIds.includes(personId) ||
         e.hiddenFor.includes(personId) ||
         e.saidTo.some((s) => s.personId === personId),
     )
+    .toArray();
+  const links: EntryPersonLink[] = touched.map((e) => ({
+    entryId: e.id,
+    peopleIds: e.peopleIds,
+    hiddenFor: e.hiddenFor,
+    saidTo: e.saidTo,
+  }));
+
+  await db.people.delete(personId);
+  // Mirror the server cascade: pull the person out of every entry.
+  await db.entries
+    .where('id')
+    .anyOf(touched.map((e) => e.id))
     .modify((e) => {
       e.peopleIds = e.peopleIds.filter((id) => id !== personId);
       e.hiddenFor = e.hiddenFor.filter((id) => id !== personId);
       e.saidTo = e.saidTo.filter((s) => s.personId !== personId);
     });
   await enqueue('DELETE', `/people/${personId}`);
+  return { kind: 'person', person, links };
 }
 
 /** Fields a merge may fill in, plus the aliases it may learn. */
@@ -553,10 +631,13 @@ export async function saveEvent(personId: string, event: PersonEventInput): Prom
   return updatePerson(personId, { events });
 }
 
-export async function deleteEvent(personId: string, eventId: string): Promise<PersonDto> {
-  const person = await requireLocalPerson(personId);
-  const events = (person.events ?? []).filter((event) => event.id !== eventId);
-  return updatePerson(personId, { events });
+export async function deleteEvent(personId: string, eventId: string): Promise<EventDeletion> {
+  const local = await requireLocalPerson(personId);
+  const removed = (local.events ?? []).find((event) => event.id === eventId);
+  if (!removed) throw new ApiError(404, 'person.not_found');
+  const events = (local.events ?? []).filter((event) => event.id !== eventId);
+  const person = await updatePerson(personId, { events });
+  return { kind: 'event', personId, event: removed, person };
 }
 
 /**
@@ -661,20 +742,31 @@ export async function updateTag(tagId: string, input: TagUpdateInput): Promise<T
   return (await db.tags.get(tagId))!;
 }
 
-export async function deleteTag(tagId: string): Promise<void> {
+export async function deleteTag(tagId: string): Promise<TagDeletion> {
+  const tag = await db.tags.get(tagId);
+  if (!tag) throw new ApiError(404, 'tag.not_found');
+  // Which entries and people carried the tag is the only part of a tag deletion that isn't
+  // reconstructible afterwards, so it is captured before the cascade runs.
+  const entryIds = (await db.entries.where('tagIds').equals(tagId).toArray()).map((e) => e.id);
+  const peopleIds = (await db.people.toArray())
+    .filter((p) => p.tagIds.includes(tagId))
+    .map((p) => p.id);
+
   await db.tags.delete(tagId);
   await db.entries
-    .where('tagIds')
-    .equals(tagId)
+    .where('id')
+    .anyOf(entryIds)
     .modify((e) => {
       e.tagIds = e.tagIds.filter((id) => id !== tagId);
     });
   await db.people
-    .filter((p) => p.tagIds.includes(tagId))
+    .where('id')
+    .anyOf(peopleIds)
     .modify((p) => {
       p.tagIds = p.tagIds.filter((id) => id !== tagId);
     });
   await enqueue('DELETE', `/tags/${tagId}`);
+  return { kind: 'tag', tag, entryIds, peopleIds };
 }
 
 // --- Threads ---
@@ -715,17 +807,22 @@ export async function updateThread(threadId: string, input: ThreadUpdateInput): 
 
 /** Deleting a thread only ungroups its entries. Every saidTo mark a "mark all" ever wrote lives on
     the entries themselves and is untouched, so the history stays accurate. */
-export async function deleteThread(threadId: string): Promise<void> {
+export async function deleteThread(threadId: string): Promise<ThreadDeletion> {
+  const thread = await db.threads.get(threadId);
+  if (!thread) throw new ApiError(404, 'thread.not_found');
+  const entryIds = (await db.entries.where('threadIds').equals(threadId).toArray()).map((e) => e.id);
+
   await db.threads.delete(threadId);
   const now = nowIso();
   await db.entries
-    .where('threadIds')
-    .equals(threadId)
+    .where('id')
+    .anyOf(entryIds)
     .modify((e) => {
       e.threadIds = e.threadIds.filter((id) => id !== threadId);
       e.updatedAt = now;
     });
   await enqueue('DELETE', `/threads/${threadId}`);
+  return { kind: 'thread', thread, entryIds };
 }
 
 /** Add or remove one entry's membership of one thread — the "Add to thread…" menu action, which is
@@ -737,6 +834,148 @@ export async function setEntryThreads(entryId: string, threadIds: string[]): Pro
   await db.entries.update(entryId, { threadIds, updatedAt: now });
   await enqueue('PATCH', `/entries/${entryId}`, { threads: threadIds });
   return entryDto(entryId, entry.dateKey);
+}
+
+// --- Restoring a deletion (undo) ---
+
+/** The create body for one entry, shaped for `POST /entries`. Shared with importEntries' idea of
+    a round-trip: everything except `hiddenFor`, which isn't part of entryCreateSchema. */
+const entryCreateBody = (entry: LocalEntry) => ({
+  id: entry.id,
+  createdAt: entry.createdAt,
+  content: entry.content,
+  dateKey: entry.dateKey,
+  importance: entry.importance,
+  tags: entry.tagIds,
+  people: entry.peopleIds,
+  threads: entry.threadIds,
+  saidTo: entry.saidTo,
+  parentId: entry.parentId,
+  orderKey: entry.orderKey,
+});
+
+/**
+ * Put back an entry subtree removed by `deleteEntry`.
+ *
+ * The rows go back in parent-first order — the same order the cascade collected them — because
+ * the server validates a create's depth against its parent, which therefore has to exist first.
+ */
+export async function restoreEntries(deletion: EntryDeletion): Promise<void> {
+  const { entries } = deletion;
+  if (!entries.length) return;
+  await db.entries.bulkPut(entries);
+  await enqueueBatch(
+    entries.flatMap((entry): OutboxOp[] => [
+      { method: 'POST', path: '/entries', body: entryCreateBody(entry) },
+      // hiddenFor rides its own call per person, exactly as it does in importEntries.
+      ...entry.hiddenFor.map(
+        (personId): OutboxOp => ({ method: 'PUT', path: `/entries/${entry.id}/hidden/${personId}` }),
+      ),
+    ]),
+  );
+}
+
+/** Put back a deleted person, along with every mention, said mark and hidden mark that named them. */
+export async function restorePerson(deletion: PersonDeletion): Promise<void> {
+  const { person, links } = deletion;
+  await db.people.put(person);
+
+  const byId = new Map(links.map((link) => [link.entryId, link]));
+  // Only entries that still exist: one may have been deleted while the toast was up, and putting
+  // a bare link row back would resurrect it as a half-formed entry.
+  const present = await db.entries.where('id').anyOf([...byId.keys()]).toArray();
+  await db.entries.bulkPut(
+    present.map((entry) => {
+      const link = byId.get(entry.id)!;
+      return { ...entry, peopleIds: link.peopleIds, hiddenFor: link.hiddenFor, saidTo: link.saidTo };
+    }),
+  );
+
+  await enqueueBatch([
+    {
+      method: 'POST',
+      path: '/people',
+      body: {
+        id: person.id,
+        createdAt: person.createdAt,
+        name: person.name,
+        aliases: person.aliases,
+        phone: person.phone,
+        email: person.email,
+        wechatId: person.wechatId,
+        birthday: person.birthday,
+        company: person.company,
+        jobTitle: person.jobTitle,
+        contactId: person.contactId,
+        events: person.events,
+        tags: person.tagIds,
+        notes: person.notes,
+        checkupIntervalDays: person.checkupIntervalDays,
+      },
+    },
+    ...present.map((entry): OutboxOp => {
+      const link = byId.get(entry.id)!;
+      return {
+        method: 'PATCH',
+        path: `/entries/${entry.id}`,
+        body: { people: link.peopleIds, saidTo: link.saidTo, hiddenFor: link.hiddenFor },
+      };
+    }),
+  ]);
+}
+
+/** Put back a deleted tag and re-attach it to the entries and people that carried it. */
+export async function restoreTag(deletion: TagDeletion): Promise<void> {
+  const { tag, entryIds, peopleIds } = deletion;
+  await db.tags.put(tag);
+  const readdTag = (row: { tagIds: string[] }) => {
+    if (!row.tagIds.includes(tag.id)) row.tagIds = [...row.tagIds, tag.id];
+  };
+  await db.entries.where('id').anyOf(entryIds).modify(readdTag);
+  await db.people.where('id').anyOf(peopleIds).modify(readdTag);
+
+  // Re-read rather than trusting the snapshot's tag lists: the entry may have gained or lost
+  // other tags while the toast was up, and the PATCH replaces the whole array.
+  const [entries, people] = await Promise.all([
+    db.entries.where('id').anyOf(entryIds).toArray(),
+    db.people.where('id').anyOf(peopleIds).toArray(),
+  ]);
+  await enqueueBatch([
+    { method: 'POST', path: '/tags', body: { id: tag.id, name: tag.name, color: tag.color } },
+    ...entries.map((e): OutboxOp => ({ method: 'PATCH', path: `/entries/${e.id}`, body: { tags: e.tagIds } })),
+    ...people.map((p): OutboxOp => ({ method: 'PATCH', path: `/people/${p.id}`, body: { tags: p.tagIds } })),
+  ]);
+}
+
+/** Put back a deleted thread and re-group the entries it held. */
+export async function restoreThread(deletion: ThreadDeletion): Promise<void> {
+  const { thread, entryIds } = deletion;
+  await db.threads.put(thread);
+  const now = nowIso();
+  await db.entries
+    .where('id')
+    .anyOf(entryIds)
+    .modify((e) => {
+      if (!e.threadIds.includes(thread.id)) e.threadIds = [...e.threadIds, thread.id];
+      e.updatedAt = now;
+    });
+
+  const entries = await db.entries.where('id').anyOf(entryIds).toArray();
+  await enqueueBatch([
+    {
+      method: 'POST',
+      path: '/threads',
+      body: { id: thread.id, name: thread.name, createdAt: thread.createdAt },
+    },
+    ...entries.map(
+      (e): OutboxOp => ({ method: 'PATCH', path: `/entries/${e.id}`, body: { threads: e.threadIds } }),
+    ),
+  ]);
+}
+
+/** Put back a deleted person event. Just a save — the event carries its own id. */
+export async function restoreEvent(deletion: EventDeletion): Promise<PersonDto> {
+  return saveEvent(deletion.personId, deletion.event);
 }
 
 // --- Settings ---
