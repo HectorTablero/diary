@@ -19,9 +19,6 @@ import { cn } from '@/lib/utils';
    from the tag and thread chips all over the app, and the browser (and Android's back button)
    should treat switching segments as ordinary navigation. */
 
-/** Paths this group owns — the tab bar highlights its Explore item on any of them. */
-export const EXPLORE_PATHS = ['/search', '/tags', '/threads'] as const;
-
 /* Which navigation is on screen. The Android app uses the bottom bar at every width (it has no
    sidebar at all), so `isNative` short-circuits the breakpoint rather than combining with it —
    these must stay exact complements of AppLayout's own `!isNative && 'md:hidden'` on the TabBar.
@@ -50,22 +47,11 @@ export const EXPLORE_SEGMENTS: Segment[] = [
   { to: '/threads', icon: GitBranch, labelKey: 'nav.threads' },
 ];
 
-/**
- * Which segment a path belongs to, defaulting to Search.
- *
- * The tab bar uses this to *become* the section you're in rather than fronting it under a
- * different name. A slot labelled "Explore" that opens Search was wrong in both directions: it
- * named something no screen is called, and it never changed while you moved between the three
- * screens behind it — so nothing on a phone ever said you were on Tags. Now the slot shows
- * Search / Tags / Threads by its own icon and label, and the switcher below moves between them.
- *
- * This costs no extra tap and no new string, which is why it beats the other way out of the same
- * problem (renaming the slot "More" and hanging a menu off it).
- */
-export const exploreSegment = (pathname: string): Segment =>
-  EXPLORE_SEGMENTS.find(
+/** Whether a path belongs to this group — the tab bar lights its More slot on any of them. */
+export const isExplorePath = (pathname: string): boolean =>
+  EXPLORE_SEGMENTS.some(
     (segment) => pathname === segment.to || pathname.startsWith(`${segment.to}/`),
-  ) ?? EXPLORE_SEGMENTS[0];
+  );
 
 export default function ExploreLayout() {
   const { t } = useTranslation();

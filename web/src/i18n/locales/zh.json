@@ -11,7 +11,8 @@
     "explore": "浏览",
     "tags": "标签",
     "threads": "话题",
-    "settings": "设置"
+    "settings": "设置",
+    "more": "更多"
   },
   "auth": {
     "signInWithGoogle": "使用 Google 继续",

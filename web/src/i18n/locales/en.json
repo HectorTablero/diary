@@ -11,7 +11,8 @@
     "explore": "Explore",
     "tags": "Tags",
     "threads": "Threads",
-    "settings": "Settings"
+    "settings": "Settings",
+    "more": "More"
   },
   "auth": {
     "signInWithGoogle": "Continue with Google",

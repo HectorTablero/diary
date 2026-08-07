@@ -11,7 +11,8 @@
     "explore": "Esplora",
     "tags": "Etichette",
     "threads": "Filoni",
-    "settings": "Impostazioni"
+    "settings": "Impostazioni",
+    "more": "Altro"
   },
   "auth": {
     "signInWithGoogle": "Continua con Google",
