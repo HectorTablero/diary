@@ -7,7 +7,8 @@
     "1. Copy locales/en.json to locales/<code>.json and translate it. English is the reference: it's where the source strings are authored, and what checkI18n compares against.",
     "2. Add one line to LANGUAGES in i18n/index.ts, labelled with the language's own endonym (Italiano, 日本語 — not \"Italian\", \"Japanese\"). resources, supportedLngs and the Settings picker are all derived from that array.",
     "3. Add a languageNotes entry below, covering at least the plural shape and the register you chose.",
-    "4. Run `npm run check:i18n -w web`. It verifies key parity, interpolation parity per plural variant, and this file's coverage.",
+    "4. Drop the circular flag for it into i18n/flags/<code>.svg — see the README there for where they come from. It is picked up by filename; a language with no file just shows without one.",
+    "5. Run `npm run check:i18n -w web`. It verifies key parity, interpolation parity per plural variant, and this file's coverage.",
     "Plural shape is the one thing that bites. i18next looks up `key_<category>` for the target language and falls back to the bare `key` when that's absent. So: a language with only `other` (Japanese, Chinese) can use bare keys alone; a language with one/other (English, Italian) needs bare + `_other`, because a `_other`-only key resolves to the raw key name at count 1; and `_many` (Spanish, Italian, ≥1,000,000) falls back to the bare *singular* if omitted, which is why sync.offlinePending spells it out."
   ],
   "conventions": {
@@ -72,7 +73,8 @@
         "cancel": "Dismisses a dialog. In several languages this is the same word as `undo`; that's fine, they never appear together (cancel is in dialogs, undo is in toasts).",
         "undo": "The action button on a toast, reversing what just happened.",
         "less": "Collapses an expanded list. Pairs with `more`; both must fit a small ghost button.",
-        "optional": "Lowercase on purpose — it renders inline beside a field label."
+        "optional": "Lowercase on purpose — it renders inline beside a field label.",
+        "skipToContent": "The first link on the page, visible only while focused: it jumps a keyboard user past the sidebar. Never seen by most people, but read aloud by screen readers, so it must be a plain instruction rather than a clever one."
       }
     },
     "importance": {
@@ -89,7 +91,9 @@
         "willBeSaidTo": "Labels checkboxes over the people an entry mentions. Creating an entry marks it as already told to whoever it mentions, and these let the user untick that.",
         "subEntries": "Counted. Entries nest up to three levels; a sub-entry is a detail hanging off a parent entry.",
         "birthdayLine": "Contains the <mention> element — see conventions.markup. Shown as a synthetic row in the day view on someone's birthday, not a real entry.",
-        "createTag": "Inline \"create this one\" row in the tag picker, with {{name}} being whatever the user has typed so far."
+        "createTag": "Inline \"create this one\" row in the tag picker, with {{name}} being whatever the user has typed so far.",
+        "suggestions": "Names the @mention/#tag autocomplete list for screen readers only — never drawn on screen. One word.",
+        "entryActions": "Invisible label on the ⋯ menu of an entry row, used on the diary and on a person's talking points. {{text}} is the entry's own first line, cut to 40 characters, so that a screen reader hears which row's menu this is. Quote it the way the language quotes titles (see people.eventDeleteConfirmTitle)."
       }
     },
     "people": {
@@ -110,6 +114,8 @@
         "events": "Things that happened *to* this person — a trip, an exam, surgery — which the app later reminds the user to ask about. Not calendar appointments, and not the user's own entries.",
         "eventFollowUpDescription": "Shown when events have just finished. The tone is \"ask them how it went\".",
         "aliases": "Extra names one person answers to, widening @mention autocomplete. \"Other names\" rather than \"aliases\" if that sounds less bureaucratic in the language.",
+        "addAlias": "Invisible label on the \"+\" button beside the nickname field. Imperative, matching common.add's register.",
+        "personActions": "Invisible label on the ⋯ menu of a person, in the list and on the profile header. {{name}} is there so twenty rows read as twenty distinct controls.",
         "alsoKnownAs": "An inline prefix before a nickname list. Very short; a gendered participle (Italian detto/detta) must be avoided here.",
         "phoneInternationalHint": "Teaches the international format. The example number is localised per language — keep the leading + and the country code.",
         "wechatQrDescription": "Explains a WeChat limitation: a chat can't be opened from a link, so the ID has to be pasted into WeChat's own search.",

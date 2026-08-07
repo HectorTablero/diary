@@ -1,6 +1,14 @@
 export interface TokenSegment {
   text: string;
   kind: 'text' | 'person' | 'tag';
+  /** The entity the token matched. Absent on `text` segments, and only on those. */
+  id?: string;
+}
+
+/** The shape both `PersonRefDto` and `TagDto` already satisfy — see segmentContent. */
+export interface MentionEntity {
+  id: string;
+  name: string;
 }
 
 /** NFD, strip diacritics, lowercase. Mirrors `normalize` in server/src/services/personSearch.ts. */
@@ -79,14 +87,19 @@ export function matchWindows(text: string, query: string, contextChars = 24): Ma
 /**
  * Split content into text/person/tag segments by matching linked entity names
  * after @ / # markers (longest name wins, so "Ana María" beats "Ana").
+ *
+ * Entities are passed whole rather than as bare names so each token can carry the id it matched:
+ * the literal text in `content` is a denormalized copy typed by the composer, and resolving it
+ * back to an id here is the only thing that lets a rendered @mention become a link to that person.
  */
 export function segmentContent(
   content: string,
-  personNames: string[],
-  tagNames: string[],
+  personEntities: MentionEntity[],
+  tagEntities: MentionEntity[],
 ): TokenSegment[] {
-  const people = [...personNames].sort((a, b) => b.length - a.length);
-  const tags = [...tagNames].sort((a, b) => b.length - a.length);
+  const byLongestName = (a: MentionEntity, b: MentionEntity) => b.name.length - a.name.length;
+  const people = [...personEntities].sort(byLongestName);
+  const tags = [...tagEntities].sort(byLongestName);
   const segments: TokenSegment[] = [];
   let i = 0;
   let last = 0;
@@ -94,16 +107,17 @@ export function segmentContent(
   while (i < content.length) {
     const ch = content[i];
     if (ch === '@' || ch === '#') {
-      const names = ch === '@' ? people : tags;
+      const entities = ch === '@' ? people : tags;
       const rest = content.slice(i + 1);
-      const match = names.find((n) => fuzzyEquals(rest.slice(0, n.length), n));
+      const match = entities.find((e) => fuzzyEquals(rest.slice(0, e.name.length), e.name));
       if (match) {
         if (last < i) segments.push({ text: content.slice(last, i), kind: 'text' });
         segments.push({
-          text: content.slice(i, i + 1 + match.length),
+          text: content.slice(i, i + 1 + match.name.length),
           kind: ch === '@' ? 'person' : 'tag',
+          id: match.id,
         });
-        i += 1 + match.length;
+        i += 1 + match.name.length;
         last = i;
         continue;
       }

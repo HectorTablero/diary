@@ -31,7 +31,14 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { clearLocalData } from '@/db/db';
 import { closeLiveChannel } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
-import i18n, { changeLanguage, LANGUAGES, resolveLanguage, type LanguageCode } from '@/i18n';
+import i18n, {
+  changeLanguage,
+  LANGUAGES,
+  resolveLanguage,
+  useLanguageAvailability,
+  type LanguageCode,
+} from '@/i18n';
+import { languageFlag as flag } from '@/i18n/flags';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { signOut, useSession } from '@/lib/authClient';
 import { setAuthToken } from '@/lib/authToken';
@@ -153,6 +160,93 @@ function WeekStartSetting() {
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+/**
+ * The language picker, with anything this device can't switch to right now shown as such.
+ *
+ * Each locale is its own lazily-fetched chunk, so a language that has never been used on this
+ * device needs a network the moment it is chosen. That used to be invisible in both directions:
+ * the picker offered all five regardless, and a choice that couldn't be downloaded did nothing at
+ * all — no change, no toast, an unhandled rejection in a console the user never opens. So the
+ * unreachable ones now say why they're greyed out, and any switch that fails anyway says so.
+ *
+ * Nothing here can strand the user in a language they can't read: the one currently in use is by
+ * definition already loaded, which is the first thing `useLanguageAvailability` checks.
+ */
+function LanguageSetting() {
+  const { t, i18n: active } = useTranslation();
+  const isAvailable = useLanguageAvailability();
+  const unavailable = LANGUAGES.filter((language) => !isAvailable(language.code));
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{t('settings.general.language')}</Label>
+      <Select
+        value={resolveLanguage(active.language)}
+        onValueChange={(lng) => {
+          // changeLanguage from i18n/index, not i18n.changeLanguage: that one fetches
+          // the language's strings first, so the switch never lands on an empty bundle.
+          void changeLanguage(lng as LanguageCode)
+            // Read after the switch, so the confirmation arrives in the new language.
+            .then(() => notifyDeviceSaved(i18n.t('settings.general.savedOnDevice')))
+            /* The download can fail even when the picker offered it — a network that reaches the
+               router and nothing else. `t` rather than `i18n.t`: the language did not change, so
+               this has to be read in the one still on screen. */
+            .catch(() => notifyError(t('settings.general.languageDownloadFailed')));
+        }}
+      >
+        <SelectTrigger className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {LANGUAGES.map((language) => {
+            const available = isAvailable(language.code);
+            return (
+              <SelectItem key={language.code} value={language.code} disabled={!available}>
+                {/* One element, because SelectItem puts its children inside ItemText — which is
+                    also what the closed trigger renders. That is why the flag rides in here and
+                    not beside it: the closed picker gets it for free. The "needs a connection"
+                    note is only ever reached by a *disabled* item, which can never become the
+                    selected one, so it cannot leak into the trigger the same way. */}
+                <span className="inline-flex gap-1 items-center">
+                  {/* Decorative: the language's own name is right beside it, in that language.
+                      A flag is a poor name for a language even when it's the right flag.
+
+                      The empty branch keeps the box rather than collapsing it — upstream has no
+                      flag for every language, and one label starting further left than the rest
+                      reads as a bug rather than as an absence. */}
+                  {flag(language.code) ? (
+                    <img
+                      src={flag(language.code)}
+                      alt=""
+                      aria-hidden
+                      className="size-3.5 shrink-0 rounded-full"
+                    />
+                  ) : (
+                    <span aria-hidden className="size-3.5 shrink-0" />
+                  )}
+                  {language.label}
+                  {!available && (
+                    <span className="text-xs text-muted-foreground">
+                      {t('settings.general.languageNeedsConnection')}
+                    </span>
+                  )}
+                </span>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+      {/* Under the closed picker as well as inside it: the greyed-out rows explain themselves only
+          once the list is open, and the reason is worth knowing before going looking. */}
+      {unavailable.length > 0 && (
+        <p className="max-w-64 text-xs text-muted-foreground">
+          {t('settings.general.languageOfflineHint')}
+        </p>
+      )}
     </div>
   );
 }
@@ -766,31 +860,7 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>{t('settings.general.language')}</Label>
-                <Select
-                  value={resolveLanguage(i18n.language)}
-                  onValueChange={(lng) => {
-                    // changeLanguage from i18n/index, not i18n.changeLanguage: that one fetches
-                    // the language's strings first, so the switch never lands on an empty bundle.
-                    void changeLanguage(lng as LanguageCode).then(() =>
-                      // Read after the switch, so the confirmation arrives in the new language.
-                      notifyDeviceSaved(i18n.t('settings.general.savedOnDevice')),
-                    );
-                  }}
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGES.map((language) => (
-                      <SelectItem key={language.code} value={language.code}>
-                        {language.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <LanguageSetting />
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-8">
               <WeekStartSetting />
@@ -825,6 +895,16 @@ export default function SettingsPage() {
                 }}
               />
             </div>
+            <ToggleRow
+              id="entity-links"
+              label={t('settings.entries.entityLinks')}
+              description={t('settings.entries.entityLinksDescription')}
+              checked={prefs.entityLinks}
+              onCheckedChange={(checked) => {
+                setPreference('entityLinks', checked);
+                notifyDeviceSaved(t('settings.general.savedOnDevice'));
+              }}
+            />
           </div>
         </Section>
 

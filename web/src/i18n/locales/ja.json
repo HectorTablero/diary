@@ -22,6 +22,12 @@
   "sync": {
     "offline": "オフライン",
     "offlinePending": "オフライン — 未同期の変更が{{count}}件",
+    "unreachable": "サーバーに接続できません",
+    "unreachablePending": "サーバーに接続できません — 未同期の変更が{{count}}件",
+    "paused": "Wi-Fi を待っています",
+    "pausedPending": "Wi-Fi を待っています · 変更{{count}}件",
+    "syncAnyway": "今すぐ同期",
+    "rejected": "{{count}}件の変更を保存できませんでした",
     "sessionExpired": "セッションの有効期限が切れました。",
     "reconnected": "接続が回復しました — 同期しています…"
   },
@@ -82,7 +88,8 @@
     "remove": "外す",
     "selectDate": "日付を選択",
     "hour": "時",
-    "minute": "分"
+    "minute": "分",
+    "skipToContent": "本文へスキップ"
   },
   "importance": {
     "label": "重要度",
@@ -126,7 +133,9 @@
     "birthdays": "誕生日",
     "birthdayLine": "<mention>@{{name}}</mention>さんの誕生日",
     "birthdayLineWithAge": "<mention>@{{name}}</mention>さんの誕生日（{{age}}）",
-    "entryDate": "記録の日付"
+    "entryDate": "記録の日付",
+    "entryActions": "「{{text}}」の操作",
+    "suggestions": "候補"
   },
   "people": {
     "title": "人物",
@@ -161,6 +170,7 @@
     "noMemories": "共有できる思い出はまだありません",
     "noMemoriesDescription": "{{name}}さんに言及した大切な記録が、{{months}}か月後にここへ戻ってきます。",
     "noHistory": "{{name}}さんに言及した記録はまだありません",
+    "loadFailedDescription": "この人物を読み込めませんでした。データは失われていません。もう一度お試しください。",
     "matchMention": "直接の言及",
     "matchTag": "共通のタグ",
     "matchBroadcast": "全員に共有",
@@ -211,6 +221,7 @@
     "aliases": "別の呼び名",
     "aliasesDescription": "この人が反応するあだ名。@メンションと音声入力で使われます。",
     "aliasPlaceholder": "あだ名",
+    "addAlias": "あだ名を追加",
     "alsoKnownAs": "別名",
     "birthday": "誕生日",
     "birthdayToday": "今日！",
@@ -335,6 +346,9 @@
       "themeDark": "ダーク",
       "themeAuto": "システム",
       "language": "言語",
+      "languageNeedsConnection": "（接続が必要）",
+      "languageOfflineHint": "この端末でまだ使っていない言語は、最初の一度だけ接続が必要です。",
+      "languageDownloadFailed": "その言語をダウンロードできませんでした。接続してからもう一度お試しください。",
       "weekStart": "週の始まり",
       "weekStartAuto": "自動（{{day}}）",
       "quietNotifications": "アプリ内の日常的なメッセージを隠す",
@@ -375,7 +389,9 @@
       "autoSaid": "人物に触れたら「伝えた」にする",
       "autoSaidDescription": "チェックの初期状態を決めるだけです。保存前にいつでも変えられます。",
       "expanded": "サブ記録を最初から開く",
-      "expandedDescription": "記録のサブ記録を開いた状態で表示するかどうか。"
+      "expandedDescription": "記録のサブ記録を開いた状態で表示するかどうか。",
+      "entityLinks": "名前とタグをタップで開く",
+      "entityLinksDescription": "記録のなかの @メンションと #タグから、その人やそのタグが付いた記録を開けます。オフにすると色の付いた文字のままになります。"
     },
     "decay": {
       "title": "話のネタの減衰",

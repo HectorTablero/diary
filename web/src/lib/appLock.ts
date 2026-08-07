@@ -31,6 +31,16 @@ const PBKDF2_ITERATIONS = 210_000;
 export const GRACE_CHOICES = [0, 60, 300, 900] as const;
 export type GraceSeconds = (typeof GRACE_CHOICES)[number];
 
+/**
+ * What a lock starts out as, and what a config missing the field falls back to.
+ *
+ * A minute rather than zero: switching apps to check the address you are writing about, or
+ * answering a notification, is a normal part of using a diary, and a lock that demands a passcode
+ * for every one of those gets turned off — which protects nothing at all. Zero is still one of the
+ * choices for anyone who wants it.
+ */
+export const DEFAULT_GRACE_SECONDS: GraceSeconds = 60;
+
 export interface LockConfig {
   /** Base64 PBKDF2 hash of the passcode. */
   hash: string;
@@ -75,7 +85,7 @@ function read(): LockConfig | null {
       salt: parsed.salt,
       iterations: parsed.iterations,
       biometrics: parsed.biometrics ?? false,
-      graceSeconds: parsed.graceSeconds ?? 0,
+      graceSeconds: parsed.graceSeconds ?? DEFAULT_GRACE_SECONDS,
     };
   } catch {
     return null;
@@ -131,7 +141,7 @@ export async function setPasscode(passcode: string): Promise<void> {
     salt: toBase64(salt),
     iterations: PBKDF2_ITERATIONS,
     biometrics: state.config?.biometrics ?? false,
-    graceSeconds: state.config?.graceSeconds ?? 0,
+    graceSeconds: state.config?.graceSeconds ?? DEFAULT_GRACE_SECONDS,
   });
   setState({ locked: false });
 }
@@ -190,8 +200,9 @@ export async function promptBiometrics(reason: string): Promise<boolean> {
 // --- When to re-lock --------------------------------------------------------------------------
 
 /* Backgrounding starts a clock rather than locking outright: re-authenticating every time a
-   notification is glanced at would make the lock the thing the user turns off. `graceSeconds: 0`
-   is still offered for anyone who wants exactly that. */
+   notification is glanced at would make the lock the thing the user turns off — which is why the
+   clock starts at DEFAULT_GRACE_SECONDS rather than zero. `graceSeconds: 0` is still offered for
+   anyone who wants exactly that. */
 let hiddenAt: number | null = null;
 
 export function initAppLock() {

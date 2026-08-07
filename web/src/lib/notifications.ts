@@ -297,15 +297,55 @@ export function refreshNotifications(): void {
   void refreshNotificationsNow();
 }
 
-/** Call once at app bootstrap. Requests the notification display permission (POST_NOTIFICATIONS on
-    Android 13+) — a fresh install that never asks gets no reminders at all, so bootstrap is the
-    right place for it.
-    Exact alarms are deliberately *not* requested here: that opens an Android system settings
-    screen, and doing so unannounced on first launch, before the user has seen a diary let alone a
-    reminder, is startling. Settings offers it as a button instead. Without the permission the
-    plugin falls back to inexact non-wakeup alarms that Android may defer. */
+/**
+ * Call once at app bootstrap. Arms whatever reminders the data already justifies — and asks for
+ * nothing.
+ *
+ * The display permission (POST_NOTIFICATIONS on Android 13+) used to be requested from right here.
+ * The reasoning that kept exact alarms out of this function applies word for word to it: doing so
+ * unannounced on first launch, before the user has seen a diary let alone a reminder, is
+ * startling. And on a fresh install the dialog cannot even be about anything — all three reminder
+ * kinds need data that doesn't exist yet, since checkups and birthdays need people and the daily
+ * nudge needs a writing habit to interrupt. The denial is stickier than the exact-alarm one, too:
+ * Android stops showing the dialog after two dismissals, after which Settings can only display the
+ * "blocked" copy and hand the user off to system settings.
+ *
+ * So the ask moved to the moments where the reason is on screen — see requestPermissionFor, called
+ * when a person is saved with a checkup interval or a birthday, and when the diary has enough
+ * entries for the daily nudge to be interrupting something. Settings keeps its explicit button for
+ * anyone who wants to turn reminders on before any of that happens.
+ */
 export async function initLocalNotifications(): Promise<void> {
   if (!isNative) return;
+  refreshNotifications();
+}
+
+/** Entries that must already exist before the daily nudge is allowed to ask. The nudge interrupts
+    a habit; below this there is no habit yet, and the prompt would be about nothing. */
+const DAILY_HABIT_ENTRIES = 3;
+
+/**
+ * Ask for the notification permission, but only where it would mean something.
+ *
+ * Silent (and cheap) in every case where the dialog would be noise: not on the web, not when the
+ * user has that kind of reminder switched off, not when the permission has already been decided
+ * either way — and, for the daily nudge, not until the diary is actually being written in.
+ * Fire-and-forget from call sites; the reconcile it ends with picks up whatever was just saved.
+ */
+export async function requestPermissionFor(kind: 'checkup' | 'birthday' | 'daily'): Promise<void> {
+  if (!isNative) return;
+  const prefs = getPreferences();
+  const enabledForKind =
+    kind === 'checkup'
+      ? prefs.checkupReminders
+      : kind === 'birthday'
+        ? prefs.birthdayReminders
+        : prefs.dailyReminder;
+  if (!enabledForKind) return;
+  // 'denied' is as final as 'granted' here: Android stops presenting the dialog, so asking again
+  // spends nothing and tells the user nothing. Settings' own button covers changing their mind.
+  if ((await getNotificationPermission()) !== 'prompt') return;
+  if (kind === 'daily' && (await db.entries.count()) < DAILY_HABIT_ENTRIES) return;
   await LocalNotifications.requestPermissions();
   refreshNotifications();
 }

@@ -1,7 +1,7 @@
 import type { SyncCollection, SyncResponse } from '@diary/shared';
 import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
 import { isMeteredConnection } from '@/lib/network';
-import { getPreferences } from '@/lib/preferences';
+import { getPreferences, subscribePreferences } from '@/lib/preferences';
 import { getCachedUser } from '@/lib/sessionCache';
 import { db, entryFromDto, getMeta, personFromDto, setMeta, type OutboxOp } from './db';
 
@@ -9,10 +9,26 @@ import { db, entryFromDto, getMeta, personFromDto, setMeta, type OutboxOp } from
    pulls everything changed since the last cursor. Pull only runs after a fully
    drained outbox, so server state can never clobber unpushed local edits. */
 
+/**
+ * Why sync isn't getting through right now, or `null` when nothing is in the way.
+ *
+ * Three separate answers rather than one `offline` flag, because they need three different things
+ * from the user and only one of them is "wait":
+ *
+ *  - `offline`     — this device has no network. Nothing to do but wait.
+ *  - `unreachable` — the network is up but the server isn't answering (it's down, or a captive
+ *                    portal is eating the request). navigator.onLine cannot see this, which is
+ *                    why the reconnect probe exists.
+ *  - `paused`      — nothing is broken at all. "Sync on Wi-Fi only" is on and this is a metered
+ *                    connection, so the app is holding writes back *on purpose*. This one has a
+ *                    way out, and the UI offers it: sync anyway.
+ */
+export type SyncBlocker = 'offline' | 'unreachable' | 'paused' | null;
+
 export interface SyncStatus {
   pending: number;
   syncing: boolean;
-  offline: boolean;
+  blocker: SyncBlocker;
   /** The server rejected our session — data stays local until the user signs in again. */
   needsAuth: boolean;
   lastSyncAt: string | null;
@@ -21,10 +37,14 @@ export interface SyncStatus {
 let status: SyncStatus = {
   pending: 0,
   syncing: false,
-  offline: !navigator.onLine,
+  blocker: navigator.onLine ? null : 'offline',
   needsAuth: false,
   lastSyncAt: null,
 };
+
+/** A failed request means "no network" or "server's not there" depending on this, and nothing
+    else can tell the two apart. */
+const networkBlocker = (): SyncBlocker => (navigator.onLine ? 'unreachable' : 'offline');
 
 const statusListeners = new Set<() => void>();
 const dataListeners = new Set<() => void>();
@@ -53,6 +73,19 @@ const reconnectListeners = new Set<() => void>();
 export function onReconnected(cb: () => void): () => void {
   reconnectListeners.add(cb);
   return () => reconnectListeners.delete(cb);
+}
+
+const rejectionListeners = new Set<(count: number) => void>();
+
+/**
+ * Fires once per push pass in which the server refused one or more writes outright.
+ *
+ * A listener rather than a toast from in here: this module deliberately knows nothing about i18n
+ * or the toaster, the same way `onReconnected` doesn't. main.tsx wires both up.
+ */
+export function onRejected(cb: (count: number) => void): () => void {
+  rejectionListeners.add(cb);
+  return () => rejectionListeners.delete(cb);
 }
 
 async function refreshPending() {
@@ -90,7 +123,7 @@ async function pushOutbox(): Promise<boolean> {
     } catch (err) {
       if (!(err instanceof ApiError)) throw err;
       if (err.status === 0) {
-        setStatus({ offline: true });
+        setStatus({ blocker: networkBlocker() });
         networkFailure = true;
         return false;
       }
@@ -99,6 +132,7 @@ async function pushOutbox(): Promise<boolean> {
         return false;
       }
       if (err.status >= 500) {
+        setStatus({ blocker: 'unreachable' });
         networkFailure = true;
         return false; // server hiccup: retry once it answers again
       }
@@ -111,9 +145,21 @@ async function pushOutbox(): Promise<boolean> {
         await db.outbox.delete(op.seq!);
         continue;
       }
-      // Any other 4xx would jam the queue forever — drop it and move on.
-      console.warn('sync: dropping rejected op', op, err.code);
+      /* Any other 4xx would jam the queue forever, so it has to leave the queue — but it must not
+         leave without a trace. The local copy of this change still says "saved", and only the
+         dead-letter row and the toast that follows it stop the user finding out on another device
+         months later, or not at all. */
+      console.warn('sync: rejected op moved to dead letter', op, err.code);
+      await db.deadLetter.add({
+        method: op.method,
+        path: op.path,
+        body: op.body,
+        status: err.status,
+        code: err.code,
+        failedAt: new Date().toISOString(),
+      });
       await db.outbox.delete(op.seq!);
+      rejectedThisPass++;
     }
   }
 }
@@ -202,7 +248,7 @@ function startReconnectProbe() {
       return; // still unreachable
     }
     stopReconnectProbe();
-    setStatus({ offline: false });
+    setStatus({ blocker: null });
     reconnectListeners.forEach((cb) => cb());
     kick();
   }, PROBE_INTERVAL_MS);
@@ -266,28 +312,34 @@ async function pull(): Promise<void> {
 let running: Promise<void> | null = null;
 let rerun = false;
 let networkFailure = false;
+/** Ops the server refused during this pass; announced once, from run()'s finally. */
+let rejectedThisPass = 0;
 
 async function run(): Promise<void> {
   await refreshPending();
   if (!navigator.onLine) {
-    setStatus({ offline: true });
+    setStatus({ blocker: 'offline' });
     startReconnectProbe();
     return;
   }
-  setStatus({ syncing: true, offline: false });
+  setStatus({ syncing: true, blocker: null });
   networkFailure = false;
+  rejectedThisPass = 0;
   try {
     const drained = await pushOutbox();
     if (drained) await pull();
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.status === 0) {
-        setStatus({ offline: true });
+        setStatus({ blocker: networkBlocker() });
         networkFailure = true;
       } else if (err.status === 401) {
         setStatus({ needsAuth: true });
       } else {
-        if (err.status >= 500) networkFailure = true;
+        if (err.status >= 500) {
+          setStatus({ blocker: 'unreachable' });
+          networkFailure = true;
+        }
         console.warn('sync failed', err.code);
       }
     } else {
@@ -297,6 +349,11 @@ async function run(): Promise<void> {
     await refreshPending();
     setStatus({ syncing: false });
     if (networkFailure) startReconnectProbe();
+    if (rejectedThisPass > 0) {
+      const count = rejectedThisPass;
+      rejectedThisPass = 0;
+      rejectionListeners.forEach((cb) => cb(count));
+    }
   }
 }
 
@@ -305,7 +362,19 @@ export function kick(): void {
   void syncNow();
 }
 
-export function syncNow(): Promise<void> {
+/**
+ * Sync this once even though "sync on Wi-Fi only" says not to.
+ *
+ * Only ever called from a button the user pressed, which is what makes it a different thing from
+ * quietly ignoring the setting: the preference still holds for every automatic trigger, and this
+ * costs exactly one sync's worth of cellular data, chosen deliberately. If the server turns out to
+ * be unreachable, the ordinary failure path takes over and the pill says so instead.
+ */
+export function forceSyncNow(): Promise<void> {
+  return syncNow({ ignoreWifiOnly: true });
+}
+
+export function syncNow(options: { ignoreWifiOnly?: boolean } = {}): Promise<void> {
   // Never linked to an account (or explicitly local-only) — nothing to push or pull yet.
   // Mutations still queue in db.outbox unconditionally; the moment an account is linked,
   // getCachedUser() becomes non-null and the very next kick() drains the whole queue in order.
@@ -313,8 +382,23 @@ export function syncNow(): Promise<void> {
   /* Wi-fi-only is enforced here rather than in the BackgroundFetch config, so one guard covers the
      foreground timer, the resume kick and the background wake alike, and so toggling it takes
      effect immediately instead of at the next launch. Nothing is lost by waiting: writes keep
-     queueing in db.outbox exactly as they do offline, and the next kick on wi-fi drains them. */
-  if (getPreferences().syncOnWifiOnly && isMeteredConnection()) return Promise.resolve();
+     queueing in db.outbox exactly as they do offline, and the next kick on wi-fi drains them.
+
+     Saying so is the whole point of the two lines inside. This used to return here in silence,
+     leaving `blocker` null and the pending count frozen at whatever it was — so the app was
+     visually indistinguishable from fully synced while the outbox grew behind it, on a setting the
+     user may have turned on months ago. `navigator.onLine` is checked first so a device with no
+     network at all reports being offline rather than waiting for a Wi-Fi it couldn't use either. */
+  if (
+    !options.ignoreWifiOnly &&
+    navigator.onLine &&
+    getPreferences().syncOnWifiOnly &&
+    isMeteredConnection()
+  ) {
+    setStatus({ blocker: 'paused' });
+    void refreshPending();
+    return Promise.resolve();
+  }
   ensureLiveChannel();
   if (running) {
     rerun = true; // something changed mid-sync: go again right after
@@ -337,13 +421,17 @@ export function initSync(): void {
   if (initialized) return;
   initialized = true;
   window.addEventListener('online', () => {
-    setStatus({ offline: false });
+    setStatus({ blocker: null });
     kick();
   });
-  window.addEventListener('offline', () => setStatus({ offline: true }));
+  window.addEventListener('offline', () => setStatus({ blocker: 'offline' }));
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) kick();
   });
+  /* Turning "sync on Wi-Fi only" off, on a phone that has been holding writes back for hours,
+     should drain them now rather than at the next minute tick — and turning it on should show
+     the paused pill immediately rather than leaving the app looking synced until then. */
+  subscribePreferences(kick);
   setInterval(kick, 60_000);
   void refreshPending();
 }

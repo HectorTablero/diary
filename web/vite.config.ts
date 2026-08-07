@@ -77,6 +77,11 @@ export default defineConfig(({ mode }) => {
         // Data lives in the local Dexie store now; the SW only precaches the app shell.
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
+        /* Workbox's default list is js,css,html,ico,png,svg — no json, which the locale files
+           became the moment they stopped being `import()`ed chunks and started being fetched by
+           URL (see src/i18n/index.ts). Without this the app would come up offline with no strings
+           at all, which is a far louder failure than the one that change was fixing. */
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
       },
     }),
   ],

@@ -28,10 +28,12 @@ export function EntryTree({ entries }: { entries: EntryNode[] }) {
   const moveEntry = useMoveEntry();
   const { data: settings } = useSettings();
   const { data: session } = useSession();
-  const { offline } = useSyncStatus();
-  // Same three conditions as the composer's mic (EntryComposer's `showMic`): a key to transcribe
-  // with, a live session for the authenticated suggestions call, and a reachable server.
-  const voiceEnabled = !!settings?.hasGroqKey && !!session?.user && !offline;
+  const { blocker } = useSyncStatus();
+  /* Same three conditions as the composer's mic (EntryComposer's `showMic`): a key to transcribe
+     with, a live session for the authenticated suggestions call, and a reachable server. Any
+     blocker counts, `paused` included — uploading audio is the one thing in this app that isn't
+     "a few kilobytes of text", so a user who asked to stay off cellular meant this most of all. */
+  const voiceEnabled = !!settings?.hasGroqKey && !!session?.user && !blocker;
   // A drop's real effect only shows up once useMoveEntry's Dexie write + query invalidation +
   // refetch round-trips (all local, but still async) — without this, the drag state clearing
   // instantly on drop made every row snap back to the *stale* `entries` for a beat, then jump to

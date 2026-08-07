@@ -6,9 +6,11 @@ import {
   GitBranch,
   MoreHorizontal,
   Search,
+  ServerOff,
   Settings,
   Tag,
   Users,
+  WifiOff,
 } from 'lucide-react';
 import { AnimatedLogo } from '@/components/icons/AnimatedLogo';
 import type { LucideIcon } from 'lucide-react';
@@ -24,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { kick } from '@/db/sync';
+import { forceSyncNow, kick, type SyncBlocker } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
 import { isCheckupDue } from '@/lib/checkup';
@@ -293,20 +295,38 @@ function UpdateBanner() {
   );
 }
 
-/** Session-expired banner + offline/pending pill fed by the sync engine. */
+/**
+ * What each blocker looks like in the pill: its icon, and (below) its wording.
+ *
+ * `paused` is the reason this is a table rather than a boolean. It is not a failure — nothing is
+ * broken, the app is holding writes back because it was told to — so calling it "Offline" would be
+ * wrong in the other direction, and it is the only one of the three the user can act on from here.
+ */
+const BLOCKER_ICON: Record<NonNullable<SyncBlocker>, LucideIcon> = {
+  offline: CloudOff,
+  unreachable: ServerOff,
+  paused: WifiOff,
+};
+
+/** Session-expired banner + a pill naming whatever is currently stopping sync. */
 function SyncStatusOverlay() {
   const status = useSyncStatus();
   const { t } = useTranslation();
 
   // Nothing to report for a device that was never linked to an account — there's no server
   // relationship to be "offline" from or "reconnected" to. initSync()'s online/offline window
-  // listeners flip SyncStatus.offline directly, independent of the sync engine's own account
+  // listeners flip SyncStatus.blocker directly, independent of the sync engine's own account
   // gate, so this needs its own explicit check rather than trusting SyncStatus to stay quiet.
   if (isLocalOnly()) return null;
 
   if (status.needsAuth) {
     return (
-      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
+      // role="alert", not "status": this is the banner saying writes are no longer reaching the
+      // server, which is worth interrupting for — the same treatment the passcode error gets.
+      <div
+        role="alert"
+        className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-600 dark:text-amber-400"
+      >
         {t('sync.sessionExpired')}
         <Link to="/login" className="font-medium underline underline-offset-2">
           {t('auth.signInWithGoogle')}
@@ -314,26 +334,91 @@ function SyncStatusOverlay() {
       </div>
     );
   }
-  if (status.offline) {
-    return (
-      <div
-        className={cn(
-          // Sit above the tab bar; the bar's height grows by the gesture-nav
-          // safe-area inset, so that inset must be part of the offset.
-          'pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 bottom-[calc(5.5rem+var(--inset-bottom))]',
-          !isNative && 'md:bottom-4',
-        )}
-      >
-        <span className="flex items-center gap-1.5 rounded-full border bg-background/95 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
-          <CloudOff className="size-3.5" />
-          {status.pending > 0
-            ? t('sync.offlinePending', { count: status.pending })
-            : t('sync.offline')}
+  const Icon = status.blocker ? BLOCKER_ICON[status.blocker] : null;
+  /* Written out per branch rather than assembled from a template key, so checkI18n can see that
+     every one of these strings is used — the same reason HourCycleSetting spells its labels out. */
+  const label = !status.blocker
+    ? null
+    : status.blocker === 'paused'
+      ? status.pending > 0
+        ? t('sync.pausedPending', { count: status.pending })
+        : t('sync.paused')
+      : status.blocker === 'unreachable'
+        ? status.pending > 0
+          ? t('sync.unreachablePending', { count: status.pending })
+          : t('sync.unreachable')
+        : status.pending > 0
+          ? t('sync.offlinePending', { count: status.pending })
+          : t('sync.offline');
+
+  /* The wrapper is always mounted and the *pill* is what comes and goes, so that going offline is a
+     text change inside an existing live region rather than a whole region appearing at once — the
+     first is announced reliably, the second only sometimes. Empty and pointer-events-none, it
+     costs nothing while online.
+
+     Polite, not assertive: losing the network shouldn't cut across whatever is being read, and
+     nothing has been lost yet — the writes are queued, which is what the pill says. */
+  return (
+    <div
+      role="status"
+      className={cn(
+        // Sit above the tab bar; the bar's height grows by the gesture-nav
+        // safe-area inset, so that inset must be part of the offset.
+        'pointer-events-none fixed left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 bottom-[calc(5.5rem+var(--inset-bottom))]',
+        !isNative && 'md:bottom-4',
+      )}
+    >
+      {Icon && (
+        <span
+          className={cn(
+            'flex items-center gap-1.5 rounded-full border bg-background/95 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur',
+            // Only the paused pill has anything to click, and the wrapper is click-through so the
+            // others can't swallow a tap meant for whatever is underneath them.
+            status.blocker === 'paused' && 'pointer-events-auto',
+          )}
+        >
+          <Icon aria-hidden className="size-3.5 shrink-0" />
+          <span className="truncate">{label}</span>
+          {/* Offered whatever the pending count is: the pull is being held back too, so this is
+              also how you go and fetch what another device wrote. Nothing about the preference
+              changes — this spends one sync's worth of cellular data, on purpose, once. */}
+          {status.blocker === 'paused' && (
+            <button
+              type="button"
+              disabled={status.syncing}
+              onClick={() => void forceSyncNow()}
+              className="-mr-1.5 shrink-0 rounded-full px-2 py-0.5 font-medium text-foreground underline-offset-2 hover:bg-accent hover:underline disabled:opacity-50"
+            >
+              {t('sync.syncAnyway')}
+            </button>
+          )}
         </span>
-      </div>
-    );
-  }
-  return null;
+      )}
+    </div>
+  );
+}
+
+/** Invisible until focused, first in the tab order: the sidebar is seven links, and on the diary —
+    the screen most often opened — the composer sits at the very bottom of the document, so without
+    this every navigation costs a keyboard user seven stops before any content. */
+function SkipToContentLink() {
+  const { t } = useTranslation();
+  return (
+    <a
+      href="#main"
+      onClick={(e) => {
+        /* The href is what makes this a link worth announcing, but the navigation is done by hand:
+           letting the hash land in the URL means a second activation on the same page is a no-op
+           (the URL doesn't change, so the browser doesn't re-target), and it would leave #main
+           trailing behind router navigations. Focusing <main> directly scrolls it into view too. */
+        e.preventDefault();
+        document.getElementById('main')?.focus();
+      }}
+      className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:border focus:bg-popover focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-popover-foreground focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+    >
+      {t('common.skipToContent')}
+    </a>
+  );
 }
 
 export default function AppLayout() {
@@ -384,8 +469,16 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-dvh">
+      {/* Web only: the native build renders no sidebar, so there are no stops to bypass. Must come
+          before the sidebar in the DOM to be the first thing Tab reaches, and `tabIndex={-1}` on
+          the target is what makes the jump actually move focus rather than only scroll. */}
+      {!isNative && <SkipToContentLink />}
       {!isNative && <Sidebar pendingCheckups={pendingCheckups} />}
-      <main className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]', !isNative && 'md:pb-0')}>
+      <main
+        id="main"
+        tabIndex={-1}
+        className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]', !isNative && 'md:pb-0')}
+      >
         <UpdateBanner />
         <SyncStatusOverlay />
         <Outlet />
