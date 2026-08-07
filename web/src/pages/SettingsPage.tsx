@@ -794,24 +794,34 @@ export default function SettingsPage() {
               <HourCycleSetting />
             </div>
             {/* Not behind "Advanced": an accessibility setting that only the people who don't
-                need it can find is no setting at all. The row previews the five shapes, because
-                the description cannot say what they look like. */}
-            <ToggleRow
-              id="importance-shapes"
-              label={t('settings.general.importanceShapes')}
-              description={t('settings.general.importanceShapesDescription')}
-              checked={prefs.importanceShapes}
-              onCheckedChange={(checked) => {
-                setPreference('importanceShapes', checked);
-                notifyDeviceSaved(t('settings.general.savedOnDevice'));
-              }}
-            >
-              <div className="flex items-center gap-2" aria-hidden>
-                {[1, 2, 3, 4, 5].map((importance) => (
-                  <span key={importance} className={cn('size-3', markerClass(importance))} />
-                ))}
+                need it can find is no setting at all.
+
+                Written out rather than passed to ToggleRow, because the five-shape preview belongs
+                *inside* the left column with the label it illustrates — ToggleRow's `children`
+                stack underneath the whole row, which would leave the switch floating above it
+                instead of level with every other switch on the page. */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <Label htmlFor="importance-shapes">{t('settings.general.importanceShapes')}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.general.importanceShapesDescription')}
+                </p>
+                {/* The description cannot say what the shapes look like, so it shows them. */}
+                <div className="mt-1.5 flex items-center gap-2" aria-hidden>
+                  {[1, 2, 3, 4, 5].map((importance) => (
+                    <span key={importance} className={cn('size-3', markerClass(importance))} />
+                  ))}
+                </div>
               </div>
-            </ToggleRow>
+              <Switch
+                id="importance-shapes"
+                checked={prefs.importanceShapes}
+                onCheckedChange={(checked) => {
+                  setPreference('importanceShapes', checked);
+                  notifyDeviceSaved(t('settings.general.savedOnDevice'));
+                }}
+              />
+            </div>
           </div>
         </Section>
 
