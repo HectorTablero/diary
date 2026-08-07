@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import type { Auth } from './auth';
 import { config } from './config';
 import { handleError } from './errors';
+import { buildAssetLinks } from './lib/assetLinks';
 import { buildCsp } from './lib/csp';
 import { requestTelemetry } from './lib/telemetry';
 import {
@@ -135,6 +136,30 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
 
   // Unknown API paths must 404 as JSON, never fall through to the SPA.
   app.all('/api/*', (c) => c.json({ error: 'errors.not_found' }, 404));
+
+  /* Android App Links verification (see lib/assetLinks.ts).
+
+     A route rather than a static file under web/public: the fingerprints belong to whoever signs
+     the APK, so they are configuration, not a build artefact — a self-hosted deployment signs with
+     its own key and must be able to say so without editing the repo. Serving it from here also
+     keeps it out of the service worker's precache, where a stale copy would be answered to
+     Android's re-verification long after the real one changed.
+
+     404 rather than an empty statement list when nothing is configured: an empty `[]` is a valid
+     document that positively asserts no app may handle these links, which is worse than saying
+     nothing at all. */
+  app.get('/.well-known/assetlinks.json', (c) => {
+    const { statements, malformed } = buildAssetLinks();
+    if (malformed.length) {
+      // Named, not counted — this is almost always a SHA-1 pasted where SHA-256 was meant.
+      console.warn(
+        `[assetlinks] ignoring ${malformed.length} fingerprint(s) that are not 32 colon-separated hex bytes`,
+      );
+    }
+    if (!statements.length) return c.json({ error: 'errors.not_found' }, 404);
+    // Explicit content type: Android rejects the statement file if it is not application/json.
+    return c.json(statements, 200, { 'Cache-Control': 'public, max-age=3600' });
+  });
 
   /* Backslashes never reach serveStatic.
 

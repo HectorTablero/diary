@@ -54,6 +54,10 @@ export interface Preferences {
       a month of syncing costs less than one photo, and the failure mode of this being on by
       mistake is a diary that silently stops backing itself up. */
   syncOnWifiOnly: boolean;
+  /** Keep the "waiting for wi-fi" pill off screen even when writes are queued.
+      Only ever hides *that* pill: going offline and the server being unreachable are failures
+      rather than a setting doing its job, and they keep announcing themselves regardless. */
+  hidePausedSyncStatus: boolean;
   /** Give each importance level a distinct shape as well as a colour, so the red-to-green ramp
       stops being the only thing separating them. See ImportanceDot. */
   importanceShapes: boolean;
@@ -84,6 +88,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   entriesExpanded: true,
   lastImportance: 3,
   syncOnWifiOnly: false,
+  // Off: the pill is the only thing that says writes are piling up on purpose, so hiding it has
+  // to be asked for.
+  hidePausedSyncStatus: false,
   // Off by default: the shapes are unmistakable once you know to read them, but they are a
   // second alphabet for anyone who doesn't need one.
   importanceShapes: false,

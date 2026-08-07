@@ -18,6 +18,36 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- App Links: open diary.tablerus.es URLs in the app instead of the browser.
+                 The host comes from a manifest placeholder (see app/build.gradle) so a fork or a
+                 self-hosted deployment changes it in one place.
+
+                 android:autoVerify makes Android fetch /.well-known/assetlinks.json from that host
+                 at install time and check it names this app's package and signing certificate.
+                 Verification is what lets these links open without a chooser dialog; the server
+                 route that answers it is in server/src/app.ts, and it needs the signing
+                 certificate's SHA-256 in ANDROID_CERT_FINGERPRINTS. With that unset the links still
+                 work, they just prompt.
+
+                 Path prefixes rather than the whole host, deliberately. A bare host filter would
+                 also capture /api/*, which is the app's own REST endpoint — including the OAuth
+                 callback path — so an unrelated request could be answered by launching the app.
+                 Every route here is one the router actually has; anything else stays in the
+                 browser, which is the right answer for a URL this app cannot render. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${appHost}" />
+                <data android:pathPrefix="/diary" />
+                <data android:pathPrefix="/calendar" />
+                <data android:pathPrefix="/people" />
+                <data android:pathPrefix="/search" />
+                <data android:pathPrefix="/tags" />
+                <data android:pathPrefix="/threads" />
+                <data android:pathPrefix="/settings" />
+            </intent-filter>
         </activity>
 
         <provider

@@ -126,6 +126,24 @@ referenced in code.
 Biometric unlock uses `@aparajita/capacitor-biometric-auth`. Adding it changed the native
 plugin set, so the first APK carrying it has to be installed by hand — see the OTA note below.
 
+### Deep links
+
+Links to the production host open in the app rather than the browser: `/diary`, `/calendar`,
+`/people`, `/search`, `/tags`, `/threads` and `/settings`, including everything under them.
+Deliberately not `/api` — that is the app's own REST endpoint, and an app offering to handle
+those URLs could intercept a request meant for the server — and not `/login`.
+
+The host comes from a manifest placeholder (`-PappHost=`, defaulting to `diary.tablerus.es`) and
+must match `VITE_API_BASE` in `web/.env.app`, because that origin is the one serving the
+verification file. Set `ANDROID_CERT_FINGERPRINTS` (see `.env.example`) so the server can answer
+`/.well-known/assetlinks.json`; without it links still work, they just prompt instead of opening
+the app directly. `adb shell pm get-app-links es.tablerus.diary` reports what Android actually
+decided.
+
+The list of prefixes lives in two files that cannot import each other — `AndroidManifest.xml`
+decides which URLs reach the app, `web/src/lib/deepLinks.ts` decides what becomes of them — so a
+test asserts they agree.
+
 ```sh
 npm run build:app   # web build (app mode) + cap sync android
 npm run app:open    # open in Android Studio
@@ -204,10 +222,10 @@ in `.env`. For CI, see below.
 The `VITE_*` pair is **inlined into the bundle at build time**, so it must be available to
 the build, not to the container at runtime.
 
-Two GitHub **environments** hold the secrets, and both workflows declare the one they
-need (`environment: android` / `environment: docker`) — environment secrets are invisible
-to a job that doesn't declare it. The Better Stack pair is therefore **duplicated across
-both**:
+Two GitHub **environments** hold the secrets, and the two publishing jobs in
+`release.yml` declare the one they need (`environment: android` / `environment: docker`) —
+environment secrets are invisible to a job that doesn't declare it. The Better Stack pair is
+therefore **duplicated across both**:
 
 | Environment | Secret | Value |
 | --- | --- | --- |
@@ -219,8 +237,22 @@ reading one through the other yields an empty string with no error. If the bundl
 comes out with telemetry off, that mismatch is the first thing to check: the app logs
 `[telemetry] disabled` to the console when either value is missing.
 
-`android-release.yml` uses them for the APK + OTA bundle; `docker-publish.yml` passes them
-as Docker build args for the web bundle.
+The `android` job uses them for the APK + OTA bundle; the `docker` job passes them as Docker
+build args for the web bundle.
+
+### The release workflow
+
+`.github/workflows/release.yml` is the only workflow. A single `verify` job — typecheck, all
+three test suites, and `npm audit --omit=dev --audit-level=high` — runs first, and both
+publishing jobs declare `needs: verify`, so one commit gets one verdict and nothing publishes
+without it. `verify` needs no secrets: `config.ts` reads its required variables through
+getters, so importing a module never demands a credential.
+
+The `android` job is skipped when a commit changes nothing it builds from. That used to be a
+workflow-level `paths:` filter, which cannot be expressed per-job, so it is now a diff against
+the pushed range — see the `scope` step. In practice it rarely skips, because the pre-commit
+hook touches `package.json` on most commits and `package.json` is in the list (as it was
+before: a version bump *is* a new release).
 
 The **server**'s pair are plain runtime env vars — set `BETTERSTACK_SOURCE_TOKEN` and
 `BETTERSTACK_INGEST_URL` wherever the container's environment is configured, alongside

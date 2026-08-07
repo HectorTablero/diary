@@ -108,6 +108,11 @@ export const AI_MAX_RECORDING_BYTES = 25 * 1024 * 1024;
 export const AI_RATE_LIMIT = 30;
 export const AI_RATE_WINDOW_MS = 5 * 60_000;
 
+/** The Android application id. Must match `applicationId` in web/android/app/build.gradle — it is
+    half of what Android checks when verifying this site's App Links (the other half is the signing
+    certificate), and a mismatch fails silently, as links that simply stop opening the app. */
+export const ANDROID_PACKAGE_NAME = 'es.tablerus.diary';
+
 export const LOGO_COLOR = 'rgb(0, 114, 255)';
 export const LOGO_LOCAL_COLOR = 'rgb(220, 70, 70)';
 export const LOGO_STROKE_WIDTH = 50;

@@ -8,6 +8,7 @@ import { FullScreenSpinner } from './components/common/Spinner';
 import { LockScreen } from './components/security/LockScreen';
 import { useLockState } from './lib/appLock';
 import { todayKey } from './lib/dates';
+import { routeForUrl } from './lib/deepLinks';
 import { isNative } from './lib/native';
 import { refreshNotifications } from './lib/notifications';
 import LoginPage from './pages/LoginPage';
@@ -91,6 +92,22 @@ if (isNative) {
   // no true native background poll), so re-arm reminders on every foreground.
   void CapApp.addListener('appStateChange', ({ isActive }) => {
     if (isActive) refreshNotifications();
+  });
+
+  /* App Links: a diary.tablerus.es URL opens here rather than in the browser.
+     Both halves are needed, and they cover different launches — `appUrlOpen` fires when the app is
+     already running, while a cold start from a link has already happened by the time any listener
+     could be attached, and only `getLaunchUrl` still knows about it. */
+  const openDeepLink = (url: string) => {
+    const route = routeForUrl(url);
+    // Ignored rather than redirected when unrecognised: see routeForUrl. Nothing is lost — the
+    // app simply opens where it would have anyway.
+    if (route) void router.navigate(route);
+  };
+
+  void CapApp.addListener('appUrlOpen', ({ url }) => openDeepLink(url));
+  void CapApp.getLaunchUrl().then((launch) => {
+    if (launch?.url) openDeepLink(launch.url);
   });
 }
 
