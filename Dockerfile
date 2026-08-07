@@ -33,4 +33,20 @@ RUN npm ci --omit=dev --no-audit --no-fund -w server --ignore-scripts
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/web/dist web/dist
 EXPOSE 3000
+
+# The node image ships an unprivileged `node` user; nothing here needs root. The app writes
+# nothing to disk — state is in MongoDB — so read access to the files copied above is all it
+# needs, and those are world-readable.
+USER node
+
+# /api/health is already the client's own reconnect probe (web/src/db/sync.ts), so this reuses
+# the endpoint the app is defined by rather than inventing a second definition of "up".
+#
+# node -e rather than curl or wget: the image has neither, and adding one to answer a healthcheck
+# would put a package in the runtime image purely for this. Node 24 has global fetch.
+# 127.0.0.1 rather than localhost so the check cannot depend on how DNS resolves inside the
+# container, and PORT is read the same way config.ts reads it.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD ["node", "server/dist/index.js"]
