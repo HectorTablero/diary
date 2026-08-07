@@ -17,6 +17,22 @@ export const notFound = (code: string) => new HttpError(404, code);
 export const badRequest = (code: string) => new HttpError(400, code);
 export const conflict = (code: string) => new HttpError(409, code);
 
+/**
+ * Mongo's duplicate-key error (11000), optionally narrowed to the index that raised it.
+ *
+ * The narrowing is what separates the two very different things a create can collide on: a
+ * duplicate *name* is a real conflict the user has to resolve, while a duplicate *_id* means this
+ * exact document already exists — a replayed create, which the caller should treat as success (see
+ * the create routes). `keyPattern` names the offending index; if a driver ever omits it, the
+ * narrowed form answers false and the caller falls back to the conservative conflict path.
+ */
+export const isDuplicateKey = (err: unknown, field?: string): boolean => {
+  if (typeof err !== 'object' || err === null) return false;
+  const { code, keyPattern } = err as { code?: number; keyPattern?: Record<string, unknown> };
+  if (code !== 11000) return false;
+  return field === undefined || (keyPattern !== undefined && field in keyPattern);
+};
+
 export function handleError(err: Error, c: Context) {
   // Expected, client-caused failures. They are part of the API contract, not incidents.
   if (err instanceof HttpError) {

@@ -40,23 +40,22 @@ async function main() {
   const raw = await Entry.findById(id).lean();
   check('updatedAt is server time', !!raw && raw.updatedAt.getTime() > Date.parse(createdAt));
 
-  // 2. Duplicate id create → 11000
-  let dupCode: unknown = null;
-  try {
-    await createEntry(USER, {
-      id,
-      content: 'dup',
-      dateKey: '2026-01-05',
-      importance: 3,
-      tags: [],
-      people: [],
-      threads: [],
-      parentId: null,
-    });
-  } catch (err) {
-    dupCode = (err as { code?: number }).code;
-  }
-  check('duplicate id raises 11000', dupCode === 11000, `code=${String(dupCode)}`);
+  // 2. A create replayed under an id that already exists is idempotent, not a conflict — the
+  //    outbox re-sends an op whose response was lost, and a 409 there would make the client
+  //    delete its local copy as a phantom.
+  const replay = await createEntry(USER, {
+    id,
+    content: 'dup',
+    dateKey: '2026-01-05',
+    importance: 3,
+    tags: [],
+    people: [],
+    threads: [],
+    parentId: null,
+  });
+  check('replayed create returns the existing entry', replay.id === id, `${replay.id}`);
+  check('replayed create does not overwrite', replay.content === 'offline entry', replay.content);
+  check('replayed create adds no second row', (await Entry.countDocuments({ userId: USER })) === 1);
 
   // 3. Sync pull filtering by updatedAt
   const before = new Date(Date.now() - 60_000).toISOString();
@@ -82,6 +81,26 @@ async function main() {
   const tombstones = await Deletion.find({ userId: USER, coll: 'entry' }).lean();
   const ids = new Set(tombstones.map((t) => t.docId.toString()));
   check('tombstones for root + child', ids.has(id) && ids.has(child.id), `${tombstones.length} tombstones`);
+
+  // 5. Undo: re-creating a deleted id retracts its tombstone. Without this the server holds two
+  //    contradictory facts about the id — the entry is back, but a tombstone still says it is
+  //    gone — and every client's next pull deletes the entry the undo had just restored.
+  await createEntry(USER, {
+    id,
+    createdAt,
+    content: 'offline entry',
+    dateKey: '2026-01-05',
+    importance: 3,
+    tags: [],
+    people: [],
+    threads: [],
+    parentId: null,
+  });
+  const afterRestore = await Deletion.find({ userId: USER, coll: 'entry' }).lean();
+  const remaining = new Set(afterRestore.map((t) => t.docId.toString()));
+  check('restore retracts the entry tombstone', !remaining.has(id));
+  // Scoped to the id actually restored: the child is still deleted and must stay tombstoned.
+  check('restore leaves other tombstones alone', remaining.has(child.id));
 
   await Entry.deleteMany({ userId: USER });
   await Deletion.deleteMany({ userId: USER });

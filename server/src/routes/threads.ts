@@ -1,10 +1,10 @@
 import { OBJECT_ID_REGEX, threadCreateSchema, threadUpdateSchema } from '@diary/shared';
 import { Hono } from 'hono';
 import { Types } from 'mongoose';
-import { conflict, notFound } from '../errors';
+import { conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { recordDeletions } from '../models/deletion';
+import { clearDeletions, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Thread } from '../models/thread';
 import { threadToDto, type LeanThread } from '../dto';
@@ -13,9 +13,6 @@ const oid = (value: string) => {
   if (!OBJECT_ID_REGEX.test(value)) throw notFound('thread.not_found');
   return value;
 };
-
-const isDuplicateKey = (err: unknown): boolean =>
-  typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
 
 /* Writes only — the thread list and its entry counts are derived on the client (repo.getThreads). */
 export const threadsRouter = new Hono<AppEnv>()
@@ -37,8 +34,16 @@ export const threadsRouter = new Hono<AppEnv>()
         ],
         { timestamps: false },
       );
+      // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
+      if (input.id) await clearDeletions(userId, 'thread', [thread._id]);
       return c.json(threadToDto(thread.toObject() as unknown as LeanThread), 201);
     } catch (err) {
+      // A collision on _id means this exact thread is already there — a replayed create, which is
+      // a success, not a conflict. See replayedCreate in services/entryService for the full why.
+      if (input.id && isDuplicateKey(err, '_id')) {
+        const existing = await Thread.findOne({ _id: input.id, userId }).lean();
+        if (existing) return c.json(threadToDto(existing as unknown as LeanThread));
+      }
       if (isDuplicateKey(err)) throw conflict('thread.duplicate_name');
       throw err;
     }

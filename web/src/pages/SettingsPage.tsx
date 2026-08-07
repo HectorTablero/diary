@@ -1094,19 +1094,26 @@ export default function SettingsPage() {
           )}
         </Section>
 
+        {/* `settings` is required here, not just `draft`: the has*Key flags below are read from
+            the query rather than the draft, so the section waits for the query to have landed. */}
         <Section title={t('settings.ai.title')} description={t('settings.ai.description')}>
-          {isLoading || !draft ? (
+          {isLoading || !draft || !settings ? (
             <Skeleton className="h-32" />
           ) : (
             <div className="flex flex-col gap-4">
               {aiDisabled && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">{t('settings.ai.signInRequired')}</p>
               )}
+              {/* hasKey comes from the query, never the draft: the draft is seeded once and then
+                  held apart on purpose (see `commit`), so a key saved on this visit would leave it
+                  — and only it — still describing the state the page opened in, until a trip off
+                  the page remounted it. Nothing here is editable text, so there is no in-progress
+                  edit for a fresh value to yank. */}
               <ApiKeyField
                 id="groq-api-key"
                 label={t('settings.ai.apiKey')}
                 placeholder={t('settings.ai.apiKeyPlaceholder')}
-                hasKey={draft.hasGroqKey}
+                hasKey={settings.hasGroqKey}
                 disabled={aiDisabled}
                 onSave={(value) => saveApiKey('groqApiKey', value)}
                 hint={
@@ -1118,26 +1125,11 @@ export default function SettingsPage() {
                   </>
                 }
               />
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <Label htmlFor="force-english-ai-events">{t('settings.ai.forceEnglishAIEvents')}</Label>
-                  <p className="text-xs text-muted-foreground">{t('settings.ai.forceEnglishAIEventsDescription')}</p>
-                </div>
-                <Switch
-                  id="force-english-ai-events"
-                  disabled={aiDisabled}
-                  checked={draft.forceEnglishAIEvents}
-                  onCheckedChange={(checked) => {
-                    setDraft({ ...draft, forceEnglishAIEvents: checked });
-                    requestCommit();
-                  }}
-                />
-              </div>
               <ApiKeyField
                 id="cerebras-api-key"
                 label={t('settings.ai.cerebrasApiKey')}
                 placeholder={t('settings.ai.cerebrasApiKeyPlaceholder')}
-                hasKey={draft.hasCerebrasKey}
+                hasKey={settings.hasCerebrasKey}
                 disabled={aiDisabled}
                 onSave={(value) => saveApiKey('cerebrasApiKey', value)}
                 hint={
@@ -1153,7 +1145,7 @@ export default function SettingsPage() {
                 id="openrouter-api-key"
                 label={t('settings.ai.openRouterApiKey')}
                 placeholder={t('settings.ai.openRouterApiKeyPlaceholder')}
-                hasKey={draft.hasOpenRouterKey}
+                hasKey={settings.hasOpenRouterKey}
                 disabled={aiDisabled}
                 onSave={(value) => saveApiKey('openRouterApiKey', value)}
                 hint={
@@ -1165,6 +1157,23 @@ export default function SettingsPage() {
                   </>
                 }
               />
+              {/* Below the keys rather than wedged between them: it is about what the AI writes,
+                  not about which provider writes it, and it was splitting the three in two. */}
+              <div className="flex items-center justify-between gap-2 border-t pt-4">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="force-english-ai-events">{t('settings.ai.forceEnglishAIEvents')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.ai.forceEnglishAIEventsDescription')}</p>
+                </div>
+                <Switch
+                  id="force-english-ai-events"
+                  disabled={aiDisabled}
+                  checked={draft.forceEnglishAIEvents}
+                  onCheckedChange={(checked) => {
+                    setDraft({ ...draft, forceEnglishAIEvents: checked });
+                    requestCommit();
+                  }}
+                />
+              </div>
             </div>
           )}
         </Section>

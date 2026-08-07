@@ -63,6 +63,87 @@ export interface DropProjection {
   valid: boolean;
 }
 
+/** How deep a drop at `targetIndex` may sit, structurally: no deeper than "child of the previous
+    row", and no shallower than "sibling of the next row" (going shallower than that would skip
+    past it in the list). Shared by the pointer projection and the keyboard stepper so the two can
+    never disagree about which depths a given slot even offers. */
+function structuralDepthBounds<T extends TreeNode>(
+  visible: FlatNode<T>[],
+  targetIndex: number,
+): { min: number; max: number } {
+  const previousItem = visible[targetIndex - 1];
+  const nextItem = visible[targetIndex];
+  return { min: nextItem ? nextItem.depth : 0, max: previousItem ? previousItem.depth + 1 : 0 };
+}
+
+/**
+ * The depths an arrow-key move may select at `targetIndex`: the structural range above, further
+ * capped at the deepest one that doesn't push the dragged subtree past `maxDepth`.
+ *
+ * A pointer drag deliberately projects *past* that cap, so the shadow can sit at the depth the
+ * user is physically reaching for and turn red there (see DropProjection.depth) — the gesture is
+ * continuous, and snapping it back would read as the drag fighting the hand. A keyboard has no
+ * reach to express: each press is one discrete step, so a step onto a depth that can never be
+ * dropped on is simply a key press that does nothing visible but still has to be undone with the
+ * opposite key. Stepping stops at the last droppable depth instead.
+ *
+ * When even `min` is over the cap the range collapses onto it. That slot has no legal depth at
+ * all, and it stays reachable, blocked, rather than becoming a hole in the vertical travel.
+ */
+function keyboardDepthBounds<T extends TreeNode>(
+  visible: FlatNode<T>[],
+  activeNode: T,
+  targetIndex: number,
+  maxDepth?: number,
+): { min: number; max: number } {
+  const { min, max } = structuralDepthBounds(visible, targetIndex);
+  const height = subtreeHeight(activeNode);
+  for (let depth = max; depth > min; depth--) {
+    // Same expression projectDrop validates with, so the cap can't drift from `valid`.
+    if (!wouldExceedMaxDepth(depth - 1, height, maxDepth)) return { min, max: depth };
+  }
+  return { min, max: min };
+}
+
+/** Where a keyboard drag currently sits: the same pair a pointer drag resolves to from pixels. */
+export interface KeyboardSlot {
+  /** 0..visible.length, as projectDrop's `targetIndex`. */
+  targetIndex: number;
+  depth: number;
+}
+
+export type ArrowKey = 'up' | 'down' | 'left' | 'right';
+
+/**
+ * The slot one arrow-key press moves to.
+ *
+ * This is the keyboard's whole model of the drag. A pointer drag carries a position that is free
+ * to wander anywhere, including nowhere legal, and gets clamped only when it is read; stepping
+ * from *slot to slot* instead means the position is never anywhere a drop couldn't happen, so
+ * there is no dead travel to pay back and nothing for the ghost and the shadow to disagree about.
+ * The caller's job is only to convert the returned slot back into coordinates.
+ *
+ * Both axes are clamped on every press, whichever key it was: a vertical move can land somewhere
+ * the current depth isn't on offer, and that has to resolve here rather than in projectDrop, or
+ * the coordinates would stay pointing at a depth the projection quietly drops.
+ */
+export function stepKeyboard<T extends TreeNode>(
+  visible: FlatNode<T>[],
+  activeNode: T,
+  current: KeyboardSlot,
+  key: ArrowKey,
+  maxDepth?: number,
+): KeyboardSlot {
+  const vertical = key === 'up' || key === 'down';
+  const step = key === 'down' || key === 'right' ? 1 : -1;
+  const targetIndex = vertical
+    ? Math.min(Math.max(current.targetIndex + step, 0), visible.length)
+    : current.targetIndex;
+  const { min, max } = keyboardDepthBounds(visible, activeNode, targetIndex, maxDepth);
+  const requestedDepth = vertical ? current.depth : current.depth + step;
+  return { targetIndex, depth: Math.min(Math.max(requestedDepth, min), max) };
+}
+
 /**
  * Where would a drop land, given `targetIndex` (0..visible.length — "insert before this position
  * in `visible`") and the pointer's horizontal offset from where the drag started (positive =
@@ -86,15 +167,30 @@ export function projectDrop<T extends TreeNode>(
   indentWidth: number,
   maxDepth?: number,
 ): DropProjection {
-  const previousItem = visible[targetIndex - 1];
-  const nextItem = visible[targetIndex];
-
-  // How deep the pointer's horizontal offset requests, clamped to what's structurally possible
-  // at this position: no deeper than "child of the previous row," no shallower than "sibling of
-  // the next row" (going shallower than that would skip past it in the list).
   const requestedDepth = activeDepth + Math.round(dragOffsetX / indentWidth);
-  const maxAllowed = previousItem ? previousItem.depth + 1 : 0;
-  const minAllowed = nextItem ? nextItem.depth : 0;
+  return projectAtDepth(visible, activeNode, targetIndex, requestedDepth, maxDepth);
+}
+
+/**
+ * The projection itself, from a depth that has already been decided rather than from a pointer
+ * offset — `projectDrop` is just this with the pixels converted first.
+ *
+ * Split out because the keyboard has no pointer offset to convert: it picks a depth outright (see
+ * stepKeyboard) and needs the same parent/index/validity answer for it. Routing both inputs
+ * through one function is what keeps a keyboard drop and the pointer drop it looks identical to
+ * from landing anywhere different.
+ */
+export function projectAtDepth<T extends TreeNode>(
+  visible: FlatNode<T>[],
+  activeNode: T,
+  targetIndex: number,
+  requestedDepth: number,
+  maxDepth?: number,
+): DropProjection {
+  const previousItem = visible[targetIndex - 1];
+
+  // Clamped to what's structurally possible at this position.
+  const { min: minAllowed, max: maxAllowed } = structuralDepthBounds(visible, targetIndex);
   const depth = Math.min(Math.max(requestedDepth, minAllowed), maxAllowed);
 
   let parentId: string | null = null;

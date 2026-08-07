@@ -18,14 +18,19 @@ import i18n from 'i18next';
 import {
   createContext,
   useContext,
+  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
 import {
   flattenTree,
+  projectAtDepth,
   projectDrop,
+  stepKeyboard,
   visibleForDrag,
+  type ArrowKey,
   type DropProjection,
   type FlatNode,
   type TreeNode,
@@ -120,6 +125,13 @@ export function useSortableTreeRow(nodeId: string): SortableTreeRowState {
 
 const SPRING = { type: 'spring', damping: 32, stiffness: 420 } as const;
 
+const ARROW_KEYS: Record<string, ArrowKey> = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+};
+
 // Nudges the drag ghost above a touch point so a finger doesn't cover it; mice get no offset.
 const ghostOffsetModifier: Modifier = ({ transform }) => {
   const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
@@ -135,6 +147,29 @@ interface DragData<T extends TreeNode> {
   midpoints: number[];
   rowHeight: number;
 }
+
+/** dnd-kit types the activator as a bare Event; only a keyboard drag carries a KeyboardEvent. */
+const isKeyboardEvent = (event: Event | null): boolean =>
+  typeof KeyboardEvent !== 'undefined' && event instanceof KeyboardEvent;
+
+/**
+ * An element's top from layout alone, summed up the offsetParent chain.
+ *
+ * Deliberately not getBoundingClientRect: every row is a framer-motion `layout` child, so at the
+ * moment we measure, each one is mid-FLIP — sitting under an inverse transform that puts it where
+ * it is sliding *from*. A rect would report that, and the drag would resolve positions against a
+ * list that is still visually catching up. offsetTop/offsetHeight are layout-only and already show
+ * the settled result, which is the geometry a drop actually lands in.
+ *
+ * The value is offsetParent-relative rather than viewport-relative; the caller anchors it.
+ */
+const layoutTop = (el: HTMLElement): number => {
+  let top = 0;
+  for (let node: HTMLElement | null = el; node; node = node.offsetParent as HTMLElement | null) {
+    top += node.offsetTop;
+  }
+  return top;
+};
 
 export interface SortableTreeProviderProps<T extends TreeNode> {
   roots: T[];
@@ -190,29 +225,135 @@ export function SortableTreeProvider<T extends TreeNode>({
   // pickup/drop taps and the invalid-transition warning buzz below.
   const lastSlotKeyRef = useRef<string | null>(null);
 
+  /** True for a drag started with the keyboard (Space on the grip) rather than a pointer. */
+  const isKeyboardRef = useRef(false);
+
+  const rowElements = (): Map<string, HTMLElement> => {
+    const byId = new Map<string, HTMLElement>();
+    containerRef.current?.querySelectorAll<HTMLElement>('[data-tree-row-id]').forEach((el) => {
+      if (el.dataset.treeRowId) byId.set(el.dataset.treeRowId, el);
+    });
+    return byId;
+  };
+
   /**
-   * Arrow keys, in this tree's own units.
+   * Y midpoint of each visible row, in viewport space, as the list is laid out *right now*.
    *
-   * Everything below resolves a drop from coordinates — the target row from the ghost's centre
-   * against the row midpoints captured at drag start, the depth from horizontal delta over
-   * `indentWidth`. So a keyboard move doesn't need a parallel code path, only coordinates that
-   * land where a pointer would have: one row height per up/down, one indent per left/right.
-   * dnd-kit's stock getter steps a flat 25px, which lines up with neither.
+   * Anchoring off the container's own rect is what converts layoutTop's offsetParent-relative
+   * numbers into viewport ones: the container is a plain, untransformed div, so its rect is
+   * trustworthy, and every row differs from it by layout offsets alone. That also folds in page
+   * and ancestor scrolling for free, which walking offsetTop by itself would miss.
+   */
+  const measureMidpoints = (visible: FlatNode<T>[]): number[] => {
+    const container = containerRef.current;
+    if (!container) return visible.map(() => Number.POSITIVE_INFINITY);
+    const anchor = container.getBoundingClientRect().top - layoutTop(container);
+    const byId = rowElements();
+    return visible.map((v) => {
+      const el = byId.get(v.node.id);
+      return el ? anchor + layoutTop(el) + el.offsetHeight / 2 : Number.POSITIVE_INFINITY;
+    });
+  };
+
+  /**
+   * Re-measure whenever the rendered list changes shape.
+   *
+   * The drag's geometry used to be a single snapshot taken before any of it moved, which stopped
+   * describing the screen the moment the drag began: the dragged node's whole subtree leaves the
+   * list and a one-row shadow takes its place, so every row below the drag's origin sits
+   * `subtreeHeight - rowHeight` higher than the snapshot claimed. For a leaf those cancel, which
+   * is why it went unnoticed; for an entry with two children the list was two rows out, and the
+   * slots just after a parent — its first and second child — could not be hit at all. Aiming at
+   * them resolved two rows late (landing as a third child) or, correcting for that by aiming
+   * higher, fell off the parent's other side and became a root above it.
+   *
+   * targetIndex is the only input that moves rows: the shadow's depth changes an indent, not a
+   * height, and no row's height changes during a drag.
+   */
+  useLayoutEffect(() => {
+    const data = dragDataRef.current;
+    if (!activeId || !data) return;
+    data.midpoints = measureMidpoints(data.visible);
+  }, [activeId, targetIndex]);
+
+  /**
+   * A keyboard drag is modal — it owns the arrows, Escape and Enter — but only the keyboard can
+   * currently end one, and nothing on screen tells a user reaching for the mouse that a move is
+   * still in progress. So any press anywhere ends it too.
+   *
+   * It cancels rather than drops, matching Escape: clicking away from a move is abandoning it, and
+   * confirming stays the deliberate Enter/Space. Capture phase so the drag is gone before whatever
+   * was clicked reacts — including a grip handle, which would otherwise start a second drag on top
+   * of the first.
+   *
+   * Cancelling by dispatching the key dnd-kit already cancels on, rather than by clearing our own
+   * state: dnd-kit owns the drag, and tearing down only this half would leave its sensor attached
+   * and its overlay on screen.
+   */
+  useEffect(() => {
+    if (!activeId || !isKeyboardRef.current) return;
+    const cancel = () =>
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }),
+      );
+    window.addEventListener('pointerdown', cancel, true);
+    return () => window.removeEventListener('pointerdown', cancel, true);
+  }, [activeId]);
+
+  /** Adopt a resolved position, from whichever input resolved it, with the feedback that goes
+      with it. The one place the drag's state is written, so the two inputs can't drift. */
+  const commit = (nextIndex: number, next: DropProjection) => {
+    setTargetIndex(nextIndex);
+    targetIndexRef.current = nextIndex;
+    setProjection(next);
+    projectionRef.current = next;
+
+    if (!next.valid && !wasInvalidRef.current) hapticWarning();
+    wasInvalidRef.current = !next.valid;
+
+    // Only tick for a genuine slot change while it's actually droppable there — the warning
+    // buzz above already covers "you've hit a blocked spot," so this stays a single, subtle cue
+    // per position rather than stacking on top of it.
+    const slotKey = `${nextIndex}:${next.depth}`;
+    if (next.valid && lastSlotKeyRef.current !== null && lastSlotKeyRef.current !== slotKey) {
+      hapticTap();
+    }
+    lastSlotKeyRef.current = slotKey;
+  };
+
+  /**
+   * Arrow keys, resolved as slots rather than as coordinates.
+   *
+   * A pointer drag has a position that the projection is *derived* from. A keyboard drag has no
+   * position at all — no cursor to follow, nothing continuous to track — so it owns the projection
+   * directly and this never converts anything to pixels.
+   *
+   * It used to. It computed the right slot, encoded it as x/y for dnd-kit, and let handleDragMove
+   * decode it back out of `delta`. That round trip is lossy: dnd-kit folds scroll compensation
+   * into `delta`, and can spend a key press scrolling a container instead of moving at all. So the
+   * bounds were applied going in and then re-derived from different numbers coming out, which is
+   * why steps went past the depth the row above allowed, past the shallowest legal depth, and why
+   * some presses appeared to do nothing whatsoever. Nothing clamps reliably if the value is
+   * laundered through a channel that is free to alter it.
+   *
+   * Returning `currentCoordinates` unchanged keeps dnd-kit's own position fixed (there is nothing
+   * for it to move — see the shadow below) while still getting the key preventDefault'd, so the
+   * arrows don't scroll the page out from under the drag.
    */
   const coordinateGetter: KeyboardCoordinateGetter = (event, { currentCoordinates }) => {
-    const rowHeight = dragDataRef.current?.rowHeight ?? 44;
-    switch (event.code) {
-      case 'ArrowDown':
-        return { ...currentCoordinates, y: currentCoordinates.y + rowHeight };
-      case 'ArrowUp':
-        return { ...currentCoordinates, y: currentCoordinates.y - rowHeight };
-      case 'ArrowRight':
-        return { ...currentCoordinates, x: currentCoordinates.x + indentWidth };
-      case 'ArrowLeft':
-        return { ...currentCoordinates, x: currentCoordinates.x - indentWidth };
-      default:
-        return undefined;
-    }
+    const data = dragDataRef.current;
+    const key = ARROW_KEYS[event.code];
+    if (!key || !data) return undefined;
+    // No other rows: nothing to reorder against, so the arrows have nothing to do.
+    if (!data.visible.length) return currentCoordinates;
+
+    const from = {
+      targetIndex: targetIndexRef.current,
+      depth: projectionRef.current?.depth ?? data.activeDepth,
+    };
+    const to = stepKeyboard(data.visible, data.activeNode, from, key, maxDepth);
+    commit(to.targetIndex, projectAtDepth(data.visible, data.activeNode, to.targetIndex, to.depth, maxDepth));
+    return currentCoordinates;
   };
 
   const sensors = useSensors(
@@ -257,6 +398,7 @@ export function SortableTreeProvider<T extends TreeNode>({
     wasInvalidRef.current = false;
     lastSlotKeyRef.current = null;
     targetIndexRef.current = 0;
+    isKeyboardRef.current = false;
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -266,16 +408,6 @@ export function SortableTreeProvider<T extends TreeNode>({
     if (!activeFlat) return;
     const visible = visibleForDrag(flat, id);
     const visibleIds = new Set(visible.map((v) => v.node.id));
-
-    const rectById = new Map<string, DOMRect>();
-    containerRef.current?.querySelectorAll<HTMLElement>('[data-tree-row-id]').forEach((el) => {
-      const rowId = el.dataset.treeRowId;
-      if (rowId) rectById.set(rowId, el.getBoundingClientRect());
-    });
-    const midpoints = visible.map((v) => {
-      const r = rectById.get(v.node.id);
-      return r ? r.top + r.height / 2 : Number.POSITIVE_INFINITY;
-    });
 
     // Initial target: however many visible rows precede where the dragged node originally sat.
     let initialTarget = 0;
@@ -288,18 +420,37 @@ export function SortableTreeProvider<T extends TreeNode>({
       activeNode: activeFlat.node,
       activeDepth: activeFlat.depth,
       visible,
-      midpoints,
-      rowHeight: rectById.get(id)?.height ?? 44,
+      midpoints: measureMidpoints(visible),
+      rowHeight: rowElements().get(id)?.offsetHeight ?? 44,
     };
-    setTargetIndex(initialTarget);
-    targetIndexRef.current = initialTarget;
+    isKeyboardRef.current = isKeyboardEvent(event.activatorEvent);
     setActiveId(id);
+
+    if (isKeyboardRef.current) {
+      /* Start the keyboard drag already holding a projection of where it is *now*. It has no
+         pointer to produce a first move, so without this the first arrow press would have no
+         current depth to step from, and the card would render for a moment at a position nothing
+         had actually resolved. */
+      commit(
+        initialTarget,
+        projectAtDepth(visible, activeFlat.node, initialTarget, activeFlat.depth, maxDepth),
+      );
+    } else {
+      setTargetIndex(initialTarget);
+      targetIndexRef.current = initialTarget;
+    }
     hapticTap();
   };
 
   const handleDragMove = (event: DragMoveEvent) => {
     const data = dragDataRef.current;
     if (!data) return;
+    /* A keyboard drag resolves its own position in the coordinate getter and holds no meaningful
+       coordinates — dnd-kit still reports a move for each key press (that is what preventDefaults
+       it), and reading a projection back out of those coordinates would overwrite the slot the
+       key press just chose with one decoded from a position nobody set. */
+    if (isKeyboardRef.current) return;
+
     const activeRect = event.active.rect.current.translated ?? event.active.rect.current.initial;
     if (!activeRect) return;
     const ghostCenterY = activeRect.top + activeRect.height / 2;
@@ -311,31 +462,19 @@ export function SortableTreeProvider<T extends TreeNode>({
         break;
       }
     }
-    setTargetIndex(newTarget);
-    targetIndexRef.current = newTarget;
 
-    const result = projectDrop(
-      data.visible,
-      data.activeNode,
-      data.activeDepth,
+    commit(
       newTarget,
-      event.delta.x,
-      indentWidth,
-      maxDepth,
+      projectDrop(
+        data.visible,
+        data.activeNode,
+        data.activeDepth,
+        newTarget,
+        event.delta.x,
+        indentWidth,
+        maxDepth,
+      ),
     );
-    setProjection(result);
-    projectionRef.current = result;
-    if (!result.valid && !wasInvalidRef.current) hapticWarning();
-    wasInvalidRef.current = !result.valid;
-
-    // Only tick for a genuine slot change while it's actually droppable there — the warning
-    // buzz above already covers "you've hit a blocked spot," so this stays a single, subtle cue
-    // per position rather than stacking on top of it.
-    const slotKey = `${newTarget}:${result.depth}`;
-    if (result.valid && lastSlotKeyRef.current !== null && lastSlotKeyRef.current !== slotKey) {
-      hapticTap();
-    }
-    lastSlotKeyRef.current = slotKey;
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -357,6 +496,14 @@ export function SortableTreeProvider<T extends TreeNode>({
   const precedingRow = data?.visible[targetIndex - 1];
   const shadowAdjacentToOwnParent =
     denseRows && !!projection && !!precedingRow && projection.parentId === precedingRow.node.id;
+  /* A keyboard drag puts the preview *inside* the shadow instead of in a floating overlay. With no
+     cursor for an overlay to follow, its position would have to be derived from the row geometry —
+     and that derivation is exactly what left it sitting off the shadow it was meant to be on.
+     Nested in the slot there is nothing left to align: the outline says where the entry would
+     land, and the preview inside it says which entry is landing there. */
+  const previewInShadow = isKeyboardRef.current;
+  const rowHeight = data?.rowHeight ?? 44;
+  const blocked = !!projection && !projection.valid;
   const shadow = (
     <motion.div key="__shadow__" layout transition={SPRING} style={{ marginLeft: shadowDepth * indentWidth }}>
       <div
@@ -364,10 +511,16 @@ export function SortableTreeProvider<T extends TreeNode>({
           'rounded-lg border-2 border-dashed',
           // shadowAdjacentToOwnParent && 'rounded-t-none border-t-0',
           shadowAdjacentToOwnParent && 'border-t-0',
-          !projection || projection.valid ? 'border-primary/40 bg-primary/5' : 'border-destructive/50 bg-destructive/10',
+          // minHeight rather than height below, so a preview taller than the row grows the slot
+          // instead of spilling out of it. No horizontal padding: the preview sits flush against
+          // the outline's left edge, so its own left edge reads as the slot's.
+          previewInShadow && 'flex items-center',
+          blocked ? 'border-destructive/50 bg-destructive/10' : 'border-primary/40 bg-primary/5',
         )}
-        style={{ height: data?.rowHeight ?? 44 }}
-      />
+        style={previewInShadow ? { minHeight: rowHeight } : { height: rowHeight }}
+      >
+        {previewInShadow && data ? renderGhost(data.activeNode) : null}
+      </div>
     </motion.div>
   );
 
@@ -409,7 +562,7 @@ export function SortableTreeProvider<T extends TreeNode>({
         </div>
       </SortableTreeContext.Provider>
       <DragOverlay modifiers={[ghostOffsetModifier]}>
-        {activeId && data ? renderGhost(data.activeNode) : null}
+        {activeId && data && !previewInShadow ? renderGhost(data.activeNode) : null}
       </DragOverlay>
     </DndContext>
   );
