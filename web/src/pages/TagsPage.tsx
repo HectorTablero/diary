@@ -2,7 +2,7 @@ import type { TagWithStats } from '@diary/shared';
 import { Pencil, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCreateTag, useDeleteTag, useRestoreTag, useTags, useUpdateTag } from '@/api/hooks';
+import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
@@ -117,7 +117,6 @@ export default function TagsPage() {
   const { t } = useTranslation();
   const { data: tags, isLoading } = useTags();
   const deleteTag = useDeleteTag();
-  const restoreTag = useRestoreTag();
   const [editing, setEditing] = useState<TagWithStats | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<TagWithStats | null>(null);
@@ -231,8 +230,7 @@ export default function TagsPage() {
         onConfirm={() => {
           if (!deleting) return;
           deleteTag.mutate(deleting.id, {
-            onSuccess: (deletion) =>
-              notifyDeleted(t('tags.tagDeleted'), () => restoreTag.mutateAsync(deletion)),
+            onSuccess: (deletion) => notifyDeleted(t('tags.tagDeleted'), deletion),
             onError: () => notifyError(t('errors.unknown')),
           });
         }}

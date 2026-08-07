@@ -37,8 +37,6 @@ import {
   useMemories,
   usePerson,
   usePersonHistory,
-  useRestoreEvent,
-  useRestorePerson,
   useSetSaid,
   useSettings,
   useTalkingPoints,
@@ -300,7 +298,6 @@ function EventRow({
 }) {
   const { t } = useTranslation();
   const deleteEvent = useDeleteEvent();
-  const restoreEvent = useRestoreEvent();
   const markAsked = useMarkEventAsked();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -387,8 +384,7 @@ function EventRow({
           deleteEvent.mutate(
             { personId: person.id, eventId: event.id },
             {
-              onSuccess: (deletion) =>
-                notifyDeleted(t('people.eventDeleted'), () => restoreEvent.mutateAsync(deletion)),
+              onSuccess: (deletion) => notifyDeleted(t('people.eventDeleted'), deletion),
               onError: () => notifyError(t('errors.unknown')),
             },
           );
@@ -489,7 +485,6 @@ export default function PersonProfilePage() {
   const { t } = useTranslation();
   const { data: person, isLoading, isError } = usePerson(id ?? '');
   const deletePerson = useDeletePerson();
-  const restorePerson = useRestorePerson();
   const markCheckup = useMarkCheckup();
   const markEventAsked = useMarkEventAsked();
   const updatePerson = useUpdatePerson();
@@ -713,10 +708,10 @@ export default function PersonProfilePage() {
           deletePerson.mutate(person.id, {
             onSuccess: (deletion) => {
               // Navigating away doesn't take the toast with it, so the undo stays reachable from
-              // the list the user lands on.
-              notifyDeleted(t('people.personDeleted'), async () => {
-                await restorePerson.mutateAsync(deletion);
-                await navigate(`/people/${person.id}`);
+              // the list the user lands on — and going back to the profile is the confirmation
+              // that it worked.
+              notifyDeleted(t('people.personDeleted'), deletion, () => {
+                void navigate(`/people/${person.id}`);
               });
               void navigate('/people');
             },

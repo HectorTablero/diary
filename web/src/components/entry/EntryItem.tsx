@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDeleteEntry, useRestoreEntries, useSettings } from '@/api/hooks';
+import { useDeleteEntry, useSettings } from '@/api/hooks';
 import { VoiceSubEntryDialog } from '@/components/ai/VoiceSubEntryDialog';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
@@ -80,7 +80,6 @@ export function EntryItem({
   const [threading, setThreading] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteEntry = useDeleteEntry();
-  const restoreEntries = useRestoreEntries();
   const row = useSortableTreeRow(entry.id);
 
   // Chips only for linked entities that are not already visible as tokens in the text.
@@ -305,8 +304,7 @@ export function EntryItem({
           deleteEntry.mutate(entry.id, {
             // The snapshot covers the whole subtree, so undoing a parent brings its children back
             // with it — which is the only behaviour that matches what the confirm dialog warned about.
-            onSuccess: (deletion) =>
-              notifyDeleted(t('diary.entryDeleted'), () => restoreEntries.mutateAsync(deletion)),
+            onSuccess: (deletion) => notifyDeleted(t('diary.entryDeleted'), deletion),
             onError: () => notifyError(t('errors.unknown')),
           })
         }
