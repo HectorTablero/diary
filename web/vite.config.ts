@@ -42,6 +42,69 @@ const rootPkg = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json',
 const ENV_DIR = fileURLToPath(new URL('.', import.meta.url));
 const ENV_PREFIX = ['VITE_', 'IS_'];
 
+/* Heavy libraries split out of the entry chunk. Two reasons, in this order: a release that only
+   changes app code leaves these chunks byte-identical, so a returning user re-downloads none of
+   them; and the entry chunk stops being the place everything lands by default. */
+const VENDOR_CHUNKS: Record<string, string[]> = {
+  /* React did not need naming under the object form — it was reachable from the entry and simply
+     stayed there. Under the function form Rollup hoists it into a shared chunk of its own and
+     names that chunk after whichever module it happened to see first, which came out as
+     `button-<hash>.js`: 227 kB of react-dom under the name of a UI component, and a name that
+     would move the next time the import graph shifted. Naming it here is what makes it stable,
+     which is the entire point of this table. */
+  'react-vendor': ['react', 'react-dom', 'scheduler'],
+  // Reached from nearly every route, because @diary/shared's schemas are. Same story as React
+  // above: Rollup already gives it a shared chunk on its own, this only makes the name stable.
+  'schema-vendor': ['zod'],
+  'db-vendor': ['dexie'],
+  'date-vendor': ['date-fns'],
+  'radix-vendor': ['radix-ui', '@radix-ui'],
+  'icons-vendor': ['lucide-react'],
+  'auth-vendor': ['better-auth', '@capgo/capacitor-social-login'],
+  capacitor: ['@capacitor/core', '@capacitor/app', '@capacitor/haptics', '@capacitor/keyboard', '@capacitor/preferences', '@capacitor/splash-screen', '@capacitor/status-bar', '@capgo/capacitor-updater'],
+  'telemetry-vendor': ['@logtail/browser'],
+  // Only the entry tree and the suggestion review dialog drag anything, but both are reached
+  // from lazy routes — so this rides along with them rather than the shell.
+  'dnd-vendor': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities', 'framer-motion', 'motion', 'motion-dom', 'motion-utils'],
+  'query-vendor': ['@tanstack/react-query'],
+  'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+};
+
+/* Rollup 5 (Vite 8) dropped the object form this used to be written as, so the same table is now
+   applied by hand.
+ *
+ * The two forms are not quite equivalent, and the difference is why the table above gained a few
+ * entries. The object form assigned a package *and everything it pulled in* to the chunk; a
+ * function is only ever asked about one module at a time, so a dependency has to be named to land
+ * anywhere on purpose. `@radix-ui/*` (which `radix-ui` re-exports) and framer-motion's `motion*`
+ * runtime packages were previously swept along implicitly and would otherwise have fallen back
+ * into the entry chunk — precisely what this whole table exists to prevent.
+ *
+ * Anything unnamed returns undefined and is placed by Rollup's own analysis, which is the right
+ * default: a package used by exactly one lazy route belongs in that route's chunk, not in a
+ * vendor bundle every visitor downloads.
+ */
+const CHUNK_BY_PACKAGE = new Map(
+  Object.entries(VENDOR_CHUNKS).flatMap(([chunk, packages]) =>
+    packages.map((pkg) => [pkg, chunk] as const),
+  ),
+);
+
+function manualChunks(id: string): string | undefined {
+  // Separators are platform-native on the way in; the package name never is.
+  const path = id.replace(/\\/g, '/');
+  const afterLast = path.split('node_modules/').pop();
+  if (path === afterLast) return undefined; // not a dependency: app code
+  const segments = afterLast!.split('/');
+  // Scoped packages spend two segments on their name (@scope/name).
+  const scoped = segments[0].startsWith('@');
+  return (
+    CHUNK_BY_PACKAGE.get(scoped ? `${segments[0]}/${segments[1]}` : segments[0]) ??
+    // Lets a whole scope be claimed at once — see `@radix-ui` above.
+    (scoped ? CHUNK_BY_PACKAGE.get(segments[0]) : undefined)
+  );
+}
+
 /* The Capacitor build talks to the API cross-origin, so it *must* be given an absolute
    VITE_API_BASE (web/.env.app). If it isn't, `${API_BASE}/api/...` becomes a same-origin call to
    https://localhost — the webview's own asset server — and every request quietly goes nowhere:
@@ -131,24 +194,7 @@ export default defineConfig(({ mode }) => {
   build: {
     rollupOptions: {
       output: {
-        /* Heavy libraries split out of the entry chunk. Two reasons, in this order: a release
-           that only changes app code leaves these chunks byte-identical, so a returning user
-           re-downloads none of them; and the entry chunk stops being the place everything lands
-           by default. */
-        manualChunks: {
-          'db-vendor': ['dexie'],
-          'date-vendor': ['date-fns'],
-          'radix-vendor': ['radix-ui'],
-          'icons-vendor': ['lucide-react'],
-          'auth-vendor': ['better-auth', '@capgo/capacitor-social-login'],
-          'capacitor': ['@capacitor/core', '@capacitor/app', '@capacitor/haptics', '@capacitor/keyboard', '@capacitor/preferences', '@capacitor/splash-screen', '@capacitor/status-bar', '@capgo/capacitor-updater'],
-          'telemetry-vendor': ['@logtail/browser'],
-          // Only the entry tree and the suggestion review dialog drag anything, but both are
-          // reached from lazy routes — so this rides along with them rather than the shell.
-          'dnd-vendor': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities', 'framer-motion'],
-          'query-vendor': ['@tanstack/react-query'],
-          'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
-        },
+        manualChunks,
       },
     },
   },
