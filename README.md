@@ -41,10 +41,13 @@ underneath it. Keys are stored server-side and never sent to the browser.
 
 ## Reminders (Android)
 
-Four device-local alarms, each switchable in Settings: overdue checkups, birthdays, event
-follow-ups, and a nightly "you haven't written today". Quiet hours defer anything that has no
-time of its own. All of it lives in `localStorage` rather than the synced settings, so signing
-out cannot silently switch an alarm back on.
+Three device-local alarms, each switchable in Settings: overdue checkups (batched into a digest
+when several are due), birthdays, and a nightly "you haven't written today". Quiet hours defer
+anything that has no time of its own. Event follow-ups are in-app only — they surface as a banner
+on the person's profile and a badge in the people list, not as a notification.
+
+All of it lives in `localStorage` rather than the synced settings, so signing out cannot silently
+switch an alarm back on.
 
 ## Security and privacy
 
