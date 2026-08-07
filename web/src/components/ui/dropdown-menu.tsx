@@ -1,13 +1,27 @@
 import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
+import { hapticTap } from "@/lib/haptics"
 import { cn } from "@/lib/utils"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
+/* The trigger opens on pointerdown and the modal layer then blanks body pointer-events, so the
+   trailing click never reaches it and the global click haptics miss the opening tap. Only that
+   edge needs ticking here: closing lands as a real click, as does every item inside the menu. */
 function DropdownMenu({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+  return (
+    <DropdownMenuPrimitive.Root
+      data-slot="dropdown-menu"
+      onOpenChange={(open) => {
+        if (open) hapticTap()
+        onOpenChange?.(open)
+      }}
+      {...props}
+    />
+  )
 }
 
 function DropdownMenuPortal({

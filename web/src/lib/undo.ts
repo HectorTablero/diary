@@ -49,7 +49,7 @@ async function restore(deletion: Deletion): Promise<void> {
  * notify.ts), so the "hide routine notifications" preference can't take an undo away and the toast
  * stays up until dismissed. That is the whole undo window: nothing is persisted anywhere else.
  */
-export function notifyDeleted(message: string, deletion: Deletion, onRestored?: () => void) {
+export function notifyDeleted(message: string, deletion: Deletion) {
   return notifySuccess(message, {
     action: {
       label: i18n.t('common.undo'),
@@ -59,7 +59,6 @@ export function notifyDeleted(message: string, deletion: Deletion, onRestored?: 
             // Broad on purpose: restoring a person rewrites mentions on entries, a tag reattaches
             // to both entries and people, and an entry subtree touches the calendar and search.
             void queryClient.invalidateQueries();
-            onRestored?.();
           })
           .catch(() => notifyError(i18n.t('errors.unknown')));
       },

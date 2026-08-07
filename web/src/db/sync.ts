@@ -1,4 +1,4 @@
-import type { SyncResponse } from '@diary/shared';
+import type { SyncCollection, SyncResponse } from '@diary/shared';
 import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
 import { isMeteredConnection } from '@/lib/network';
 import { getPreferences } from '@/lib/preferences';
@@ -216,18 +216,43 @@ async function pull(): Promise<void> {
   const dirty = await dirtyIds();
   const clean = <T extends { id: string }>(docs: T[]) => docs.filter((d) => !dirty.has(d.id));
 
+  const threads = res.threads ?? []; // tolerates a server that predates threads (stale deploy)
+
+  /* Ids the server sent back as *alive* in this very response, per collection.
+     A doc is only in a pull if the server still had it when the query ran, so a tombstone naming
+     one of these is describing a doc that exists again — an undo re-created it under its original
+     id. The server normally retracts such a tombstone on the re-create (clearDeletions), so this
+     is the belt to that braces: it also covers the moment between the re-create committing and its
+     tombstone being cleared (the two pull queries run concurrently and can straddle it), and any
+     client still talking to a server from before that change.
+
+     Presence, not timestamps, decides it: TagDto carries no updatedAt to compare, and "the server
+     still has it" is the stronger statement anyway. The one case this reads too generously — a doc
+     deleted *while* this pull was running, so the entry query saw it alive and the deletion query
+     saw its tombstone — heals on the next pull, where the cursor overlap re-sends the tombstone and
+     the doc is genuinely absent. */
+  const alive: Record<SyncCollection, Set<string>> = {
+    entry: new Set(res.entries.map((e) => e.id)),
+    person: new Set(res.people.map((p) => p.id)),
+    tag: new Set(res.tags.map((t) => t.id)),
+    thread: new Set(threads.map((t) => t.id)),
+  };
+
   await db.transaction('rw', [db.entries, db.people, db.tags, db.threads, db.meta], async () => {
     await db.entries.bulkPut(clean(res.entries).map(entryFromDto));
     await db.people.bulkPut(clean(res.people).map(personFromDto));
     await db.tags.bulkPut(clean(res.tags));
-    // `?? []` tolerates a server that predates threads (a stale deploy mid-rollout).
-    await db.threads.bulkPut(clean(res.threads ?? []));
+    await db.threads.bulkPut(clean(threads));
+    const tables: Record<SyncCollection, { delete: (key: string) => Promise<void> }> = {
+      entry: db.entries,
+      person: db.people,
+      tag: db.tags,
+      thread: db.threads,
+    };
     for (const del of res.deletions) {
-      if (dirty.has(del.docId)) continue;
-      if (del.coll === 'entry') await db.entries.delete(del.docId);
-      else if (del.coll === 'person') await db.people.delete(del.docId);
-      else if (del.coll === 'thread') await db.threads.delete(del.docId);
-      else await db.tags.delete(del.docId);
+      if (dirty.has(del.docId)) continue; // an unpushed local edit outranks the server
+      if (alive[del.coll]?.has(del.docId)) continue; // re-created since: stale tombstone
+      await tables[del.coll]?.delete(del.docId);
     }
     await setMeta('settings', res.settings);
     // 10s overlap absorbs clock skew between capture and the queries; upserts are idempotent.

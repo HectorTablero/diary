@@ -1,10 +1,10 @@
 import { DEFAULT_TAG_COLORS, OBJECT_ID_REGEX, tagCreateSchema, tagUpdateSchema } from '@diary/shared';
 import { Hono } from 'hono';
 import { Types } from 'mongoose';
-import { conflict, notFound } from '../errors';
+import { conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { recordDeletions } from '../models/deletion';
+import { clearDeletions, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
@@ -14,9 +14,6 @@ const oid = (value: string) => {
   if (!OBJECT_ID_REGEX.test(value)) throw notFound('tag.not_found');
   return value;
 };
-
-const isDuplicateKey = (err: unknown): boolean =>
-  typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
 
 /** First palette color not yet used by this user's tags (cycles when all are taken). */
 async function nextColor(userId: string): Promise<string> {
@@ -45,8 +42,16 @@ export const tagsRouter = new Hono<AppEnv>()
         ],
         { timestamps: false },
       );
+      // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
+      if (input.id) await clearDeletions(userId, 'tag', [tag._id]);
       return c.json(tagToDto(tag.toObject() as unknown as LeanTag), 201);
     } catch (err) {
+      // A collision on _id means this exact tag is already there — a replayed create, which is a
+      // success, not a conflict. See replayedCreate in services/entryService for the full why.
+      if (input.id && isDuplicateKey(err, '_id')) {
+        const existing = await Tag.findOne({ _id: input.id, userId }).lean();
+        if (existing) return c.json(tagToDto(existing as unknown as LeanTag));
+      }
       if (isDuplicateKey(err)) throw conflict('tag.duplicate_name');
       throw err;
     }

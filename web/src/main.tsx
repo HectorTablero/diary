@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
-import { StrictMode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
@@ -18,6 +18,7 @@ import { notifySuccess } from './lib/notify';
 import { initLocalNotifications, refreshNotifications } from './lib/notifications';
 import { subscribePreferences } from './lib/preferences';
 import { queryClient } from './lib/queryClient';
+import { initReducedMotion, useReducedMotion } from './lib/reducedMotion';
 import { initTelemetry } from './lib/telemetry';
 import { logVersion } from './lib/version';
 import i18n, { ensureLanguage } from './i18n';
@@ -53,6 +54,8 @@ if (!isNative) {
 
 initSync();
 initGlobalHaptics();
+// Before the first render, so nothing gets one frame of the animation the user asked not to see.
+initReducedMotion();
 initLocalNotifications();
 // Starts the background-grace clock. The initial locked state is read synchronously when the
 // module loads, so a cold start is already locked before anything renders.
@@ -66,6 +69,21 @@ onSyncApplied(() => refreshNotifications());
 // time has to move it — neither happens until a reconcile runs.
 subscribePreferences(() => refreshNotifications());
 onReconnected(() => notifySuccess(i18n.t('sync.reconnected')));
+
+/**
+ * Framer Motion animates in JavaScript, so the reduced-motion rules in index.css can't reach it.
+ *
+ * "user" is Framer reading the media query itself: transforms are dropped, opacity and colour still
+ * cross-fade — which keeps the drag reflow legible rather than teleporting rows. "always" is the
+ * same behaviour, asked for on behalf of a platform whose answer the media query never carried; it
+ * comes through the store rather than a boot-time constant because the native answer arrives a tick
+ * late and can change while the app is open.
+ */
+function Motion({ children }: { children: ReactNode }) {
+  return (
+    <MotionConfig reducedMotion={useReducedMotion() ? 'always' : 'user'}>{children}</MotionConfig>
+  );
+}
 
 async function bootstrap() {
   // The bearer token must be in memory before anything talks to the API.
@@ -81,15 +99,12 @@ async function bootstrap() {
     <StrictMode>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          {/* Framer Motion animates in JavaScript, so the reduced-motion rules in index.css can't
-              reach it. "user" follows the OS setting: transforms are dropped, opacity and colour
-              still cross-fade — which keeps the drag reflow legible rather than teleporting rows. */}
-          <MotionConfig reducedMotion="user">
+          <Motion>
             <TooltipProvider delayDuration={300}>
               <App />
               <Toaster position="top-center" />
             </TooltipProvider>
-          </MotionConfig>
+          </Motion>
         </QueryClientProvider>
       </ErrorBoundary>
     </StrictMode>,

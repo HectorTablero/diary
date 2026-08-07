@@ -2,8 +2,8 @@ import type { EntryCreateInput, EntryUpdateInput } from '@diary/shared';
 import { wouldExceedMaxDepth } from '@diary/shared';
 import { generateKeyBetween } from 'fractional-indexing';
 import { Types } from 'mongoose';
-import { badRequest, notFound } from '../errors';
-import { recordDeletions } from '../models/deletion';
+import { badRequest, conflict, isDuplicateKey, notFound } from '../errors';
+import { clearDeletions, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
@@ -136,6 +136,27 @@ async function bumpLastCheckup(userId: string, marks: { personId: Types.ObjectId
   );
 }
 
+/**
+ * Was this create's failure just a replay of one that already succeeded? If so, hand back the
+ * entry that is already there.
+ *
+ * The outbox deletes an op only once its response arrives, so a create whose response is lost to a
+ * dropped connection stays queued and is sent again — as is the second press of an Undo button.
+ * Answering that with a 409 is actively harmful: the client reads a 409 on POST as "this create
+ * never reached the server, my local copy is a phantom" and deletes the row (see removeLocalDoc in
+ * web/src/db/sync.ts), which is undo throwing away the very entry it just restored. The document
+ * exists under the id we were asked to use, so the create has succeeded; say so.
+ *
+ * Scoped to `userId` deliberately: ids are client-generated, and an id that collides with *another
+ * user's* document is a genuine conflict, never something to hand back.
+ */
+async function replayedCreate(err: unknown, userId: string, id: string | undefined) {
+  if (!id || !isDuplicateKey(err, '_id')) return null;
+  const existing = await Entry.findOne({ _id: id, userId }).populate(ENTRY_POPULATE).lean();
+  if (!existing) throw conflict('errors.duplicate');
+  return entryToDto(existing as unknown as LeanEntry);
+}
+
 export async function createEntry(userId: string, input: EntryCreateInput) {
   if (input.parentId) await assertDepthAllowed(userId, input.parentId);
 
@@ -151,26 +172,36 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
 
   // timestamps off for this save: mongoose would otherwise force updatedAt = createdAt on new
   // docs, hiding replayed offline creates from other clients' sync cursors.
-  const [entry] = await Entry.create(
-    [
-      {
-        _id: input.id ? new Types.ObjectId(input.id) : new Types.ObjectId(),
-        createdAt: now,
-        updatedAt: new Date(),
-        userId,
-        content: input.content,
-        dateKey: input.dateKey,
-        importance: input.importance,
-        tags: await ownedTagIds(userId, input.tags),
-        threads: await ownedThreadIds(userId, input.threads),
-        people,
-        saidTo: saidToIds.map((person) => ({ person, at: providedAt.get(person.toString()) ?? now })),
-        parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
-        orderKey,
-      },
-    ],
-    { timestamps: false },
-  );
+  let entry;
+  try {
+    [entry] = await Entry.create(
+      [
+        {
+          _id: input.id ? new Types.ObjectId(input.id) : new Types.ObjectId(),
+          createdAt: now,
+          updatedAt: new Date(),
+          userId,
+          content: input.content,
+          dateKey: input.dateKey,
+          importance: input.importance,
+          tags: await ownedTagIds(userId, input.tags),
+          threads: await ownedThreadIds(userId, input.threads),
+          people,
+          saidTo: saidToIds.map((person) => ({ person, at: providedAt.get(person.toString()) ?? now })),
+          parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
+          orderKey,
+        },
+      ],
+      { timestamps: false },
+    );
+  } catch (err) {
+    const existing = await replayedCreate(err, userId, input.id);
+    if (existing) return existing;
+    throw err;
+  }
+  // Only a client-supplied id can collide with a tombstone — a fresh ObjectId has never been
+  // deleted, so there is nothing to retract for an ordinary create.
+  if (input.id) await clearDeletions(userId, 'entry', [entry._id]);
   await bumpLastCheckup(
     userId,
     saidToIds.map((id) => ({ personId: id, at: providedAt.get(id.toString()) ?? now })),

@@ -42,6 +42,9 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
 
       @Override
       public void onCreate(Bundle savedInstanceState) {
+        // Before super.onCreate: the bridge is built there, and it only picks up plugins that were
+        // registered by then.
+        registerPlugin(ReducedMotionPlugin.class);
         super.onCreate(savedInstanceState);
         // getUserMedia({audio:true}) needs two things Capacitor's default WebChromeClient never
         // grants on its own: the Android RECORD_AUDIO runtime permission, and an explicit grant()

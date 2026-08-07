@@ -708,11 +708,15 @@ export default function PersonProfilePage() {
           deletePerson.mutate(person.id, {
             onSuccess: (deletion) => {
               // Navigating away doesn't take the toast with it, so the undo stays reachable from
-              // the list the user lands on — and going back to the profile is the confirmation
-              // that it worked.
-              notifyDeleted(t('people.personDeleted'), deletion, () => {
-                void navigate(`/people/${person.id}`);
-              });
+              // the list the user lands on.
+              //
+              // Undo deliberately does NOT navigate back to the profile. It used to, and it
+              // flickered: the delete left an error cached under this person's query key, and the
+              // restore's invalidation is asynchronous, so the profile remounted while the key
+              // still held that error, hit the isError guard above and redirected straight back to
+              // /people. The person reappearing in the list underneath the toast is confirmation
+              // enough, and staying put is what the user asked the Undo button for anyway.
+              notifyDeleted(t('people.personDeleted'), deletion);
               void navigate('/people');
             },
             onError: () => notifyError(t('errors.unknown')),

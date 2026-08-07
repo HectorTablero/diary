@@ -337,3 +337,21 @@ html body[data-scroll-locked] {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * The same rules again, for the Android app.
+ *
+ * Inside the WebView the media query above is not a dependable reading of the system setting, so
+ * lib/reducedMotion.ts asks the platform directly and sets this attribute. It is written as a
+ * second block rather than folded into the one above because a media query and a selector cannot
+ * be combined in CSS — and the query has to stay the standalone baseline, since it is the only one
+ * of the two that works before any JavaScript has run.
+ */
+:root[data-reduced-motion='reduce'] *,
+:root[data-reduced-motion='reduce'] *::before,
+:root[data-reduced-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

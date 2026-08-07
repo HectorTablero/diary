@@ -1,10 +1,10 @@
 import { OBJECT_ID_REGEX, personCreateSchema, personUpdateSchema } from '@diary/shared';
 import { Hono } from 'hono';
 import { Types } from 'mongoose';
-import { conflict, notFound } from '../errors';
+import { conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { recordDeletions } from '../models/deletion';
+import { clearDeletions, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { personToDto, type LeanPerson } from '../dto';
@@ -15,9 +15,6 @@ const oid = (value: string) => {
   if (!OBJECT_ID_REGEX.test(value)) throw notFound('person.not_found');
   return value;
 };
-
-const isDuplicateKey = (err: unknown): boolean =>
-  typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
 
 async function ownedTagIds(userId: string, ids: string[]) {
   if (!ids.length) return [];
@@ -67,9 +64,19 @@ export const peopleRouter = new Hono<AppEnv>()
         ],
         { timestamps: false },
       );
+      // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
+      if (input.id) await clearDeletions(userId, 'person', [person._id]);
       const populated = await person.populate(PERSON_POPULATE);
       return c.json(personToDto(populated.toObject() as unknown as LeanPerson), 201);
     } catch (err) {
+      // A collision on _id means this exact person is already there — a replayed create, which is
+      // a success, not a conflict. See replayedCreate in services/entryService for the full why.
+      if (input.id && isDuplicateKey(err, '_id')) {
+        const existing = await Person.findOne({ _id: input.id, userId })
+          .populate(PERSON_POPULATE)
+          .lean();
+        if (existing) return c.json(personToDto(existing as unknown as LeanPerson));
+      }
       if (isDuplicateKey(err)) throw conflict('person.duplicate_name');
       throw err;
     }
