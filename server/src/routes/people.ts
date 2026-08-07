@@ -131,7 +131,7 @@ export const peopleRouter = new Hono<AppEnv>()
     const person = await Person.findOneAndUpdate(
       { _id: oid(c.req.param('id')), userId },
       { lastCheckupAt: new Date() },
-      { new: true },
+      { returnDocument: 'after' },
     )
       .populate(PERSON_POPULATE)
       .lean();
@@ -147,7 +147,7 @@ export const peopleRouter = new Hono<AppEnv>()
     const person = await Person.findOneAndUpdate(
       { _id: oid(c.req.param('id')), userId, 'events.id': c.req.param('eventId') },
       { $set: { 'events.$.askedAt': now, lastCheckupAt: now } },
-      { new: true },
+      { returnDocument: 'after' },
     )
       .populate(PERSON_POPULATE)
       .lean();

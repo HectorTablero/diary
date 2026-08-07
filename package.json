@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "6.15.0",
+  "version": "6.16.0",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -26,7 +26,7 @@
     "test": "npm test -w shared && npm test -w server && npm test -w web"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
+    "concurrently": "^10.0.4",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3"
   }
