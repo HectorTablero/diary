@@ -9,6 +9,7 @@ import { EntryComposer } from '@/components/entry/EntryComposer';
 import { EntryTree } from '@/components/entry/EntryTree';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ageOn, birthdaysOn } from '@/lib/birthday';
 import { formatDateKey, parseDateKey, toDateKey, todayKey } from '@/lib/dates';
@@ -38,27 +39,27 @@ export default function DiaryDayPage() {
           <ChevronLeft className="size-4" />
         </Button>
 
-        <button
-          type="button"
-          onClick={() => {
-            const input = document.createElement('input');
-            input.type = 'date';
-            input.value = dateKey;
-            input.onchange = (e) => {
-              const val = (e.target as HTMLInputElement).value;
-              if (val) goTo(val);
-            };
-            input.showPicker();
-          }}
-          className="min-w-0 flex-1 text-center"
-        >
-          <h1 className={cn('text-base font-semibold tracking-tight first-letter:uppercase', isToday && 'text-primary')}>
-            {formatDateKey(dateKey, i18n.language, 'EEEE, d MMMM')}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {isToday ? t('common.today') :formatDateKey(dateKey, i18n.language, 'yyyy') + (parseDateKey(dateKey) > new Date() ? ` (${t('common.future')})` : '')}
-          </p>
-        </button>
+        {/* The heading *is* the date field. It used to open a detached `<input type="date">` via
+            showPicker(), which meant the app's most-used date control was the only one not using
+            the app's own calendar — a different widget per browser, a full-screen Material dialog
+            on Android, and no first-day-of-week setting. Same DatePicker as the composer and
+            search now, just wearing the heading as its trigger. */}
+        <DatePicker
+          value={dateKey}
+          onChange={(value) => value && goTo(value)}
+          align="center"
+          aria-label={t('diary.entryDate')}
+          trigger={
+            <button type="button" className="min-w-0 flex-1 rounded-lg text-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+              <h1 className={cn('text-base font-semibold tracking-tight first-letter:uppercase', isToday && 'text-primary')}>
+                {formatDateKey(dateKey, i18n.language, 'EEEE, d MMMM')}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {isToday ? t('common.today') :formatDateKey(dateKey, i18n.language, 'yyyy') + (parseDateKey(dateKey) > new Date() ? ` (${t('common.future')})` : '')}
+              </p>
+            </button>
+          }
+        />
 
         <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => shift(1)} aria-label={t('diary.nextDay')}>
           <ChevronRight className="size-4" />

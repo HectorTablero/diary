@@ -27,6 +27,14 @@ interface DatePickerProps {
   className?: string;
   'aria-label'?: string;
   'aria-invalid'?: boolean;
+  /**
+   * Opens the same calendar from something that isn't a field — the diary's own date heading.
+   * Same escape hatch `EntityPicker` offers, and for the same reason: the popover and its
+   * calendar are the reusable part, the field-shaped button is not. Must be a single element
+   * that forwards ref and props (Radix `asChild`); when set, `size`, `placeholder` and the
+   * built-in label are unused.
+   */
+  trigger?: React.ReactNode;
 }
 
 /**
@@ -52,6 +60,7 @@ export function DatePicker({
   className,
   'aria-label': ariaLabel,
   'aria-invalid': ariaInvalid,
+  trigger,
 }: DatePickerProps) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -74,6 +83,7 @@ export function DatePicker({
       }}
     >
       <PopoverTrigger asChild ref={triggerRef}>
+        {trigger ?? (
         <button
           type="button"
           id={id}
@@ -91,6 +101,7 @@ export function DatePicker({
             {label || placeholder || t('common.selectDate')}
           </span>
         </button>
+        )}
       </PopoverTrigger>
       {/* collisionPadding keeps the popover off the screen edges on a phone, where the trigger is
           often flush with the viewport; the available-height variable Radix sets alongside it lets
