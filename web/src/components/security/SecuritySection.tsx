@@ -66,7 +66,7 @@ function PasscodeDialog({
     if (busy) return;
     setBusy(true);
     try {
-      if (needsCurrent && !(await verifyPasscode(current))) {
+      if (needsCurrent && !(await verifyPasscode(current, 'settings'))) {
         setError(t('security.wrongPasscode'));
         return;
       }

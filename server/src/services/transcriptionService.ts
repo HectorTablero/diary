@@ -1,5 +1,6 @@
 import { GROQ_API_BASE, GROQ_WHISPER_FALLBACK_MODEL, GROQ_WHISPER_MODEL } from '@diary/shared';
 import { badRequest, HttpError } from '../errors';
+import { trackEvent, userHash } from '../lib/telemetry';
 import { getProviderKeys } from './settingsService';
 
 /**
@@ -39,12 +40,39 @@ export async function transcribe(userId: string, audio: File): Promise<string> {
   const { groqApiKey } = await getProviderKeys(userId);
   if (!groqApiKey) throw badRequest('ai.no_key');
 
-  let res = await callGroq(groqApiKey, audio, GROQ_WHISPER_MODEL);
+  /* The upstream leg, timed separately from the request as a whole.
+   *
+   * The client already times the round trip (lib/transcribe.ts), and the difference between that
+   * number and this one is the upload — which on a phone is most of it, and which is not something
+   * anyone can fix by changing a model. Two timings on two sources, joined by client_id.
+   *
+   * The fallback matters more than the timing. `GROQ_WHISPER_MODEL` is the rate-limited turbo
+   * variant and the retry against the base model is silent by design, so a key whose turbo quota
+   * is exhausted every single time looks exactly like a healthy one from the outside — same 200,
+   * same text, twice the latency and a quietly different transcription model. `fell_back` is what
+   * makes that a number rather than a suspicion. */
+  const startedAt = performance.now();
+  let model = GROQ_WHISPER_MODEL;
+  let fellBack = false;
+
+  let res = await callGroq(groqApiKey, audio, model);
   if (res.status === 429) {
     // Turbo is the more rate-limited variant; the base model has separate quota headroom on
     // Groq's free tier, so a single retry there often just works.
-    res = await callGroq(groqApiKey, audio, GROQ_WHISPER_FALLBACK_MODEL);
+    model = GROQ_WHISPER_FALLBACK_MODEL;
+    fellBack = true;
+    res = await callGroq(groqApiKey, audio, model);
   }
+
+  trackEvent('ai_transcribe_upstream', {
+    user: userHash(userId),
+    model,
+    fell_back: fellBack,
+    status: res.status,
+    bytes: audio.size,
+    duration_ms: Math.round(performance.now() - startedAt),
+  });
+
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) throw new HttpError(res.status, 'ai.invalid_key');
     if (res.status === 429) throw new HttpError(429, 'ai.rate_limited');

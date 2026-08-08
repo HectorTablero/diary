@@ -7,6 +7,7 @@ import App from './App';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Toaster } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
+import { initDb } from './db/storage';
 import { initSync, onReconnected, onRejected, onSyncApplied } from './db/sync';
 import { initAppLock } from './lib/appLock';
 import { initAuthToken } from './lib/authToken';
@@ -52,6 +53,12 @@ if (!isNative) {
   });
 }
 
+/* Before initSync(), which is what used to open the database implicitly — via a `void`-ed
+   refreshPending(), so a database that would not open produced an unhandled rejection rather than
+   a report. Not awaited: the open is *initiated* here and every later query queues behind Dexie's
+   own open promise, so ordering is all this needs. Awaiting would put a storage estimate in front
+   of first paint. */
+void initDb();
 initSync();
 initGlobalHaptics();
 // Before the first render, so nothing gets one frame of the animation the user asked not to see.

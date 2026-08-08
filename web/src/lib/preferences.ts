@@ -152,13 +152,25 @@ export function resetPreferences() {
   emit();
 }
 
-// Another tab of the same diary changing a preference should be reflected here too. `storage`
-// only fires in *other* documents, so this can't feed back into the write above.
-window.addEventListener('storage', (event) => {
-  if (event.key !== null && event.key !== STORAGE_KEY) return;
-  current = load();
-  emit();
-});
+/* Another tab of the same diary changing a preference should be reflected here too. `storage`
+   only fires in *other* documents, so this can't feed back into the write above.
+
+   Guarded, because this is the one statement in the module that assumed a browser. `load()` above
+   is already safe (its localStorage read is inside a try/catch), so with this line unguarded the
+   module was importable everywhere except at the exact moment it was imported — a `ReferenceError:
+   window is not defined` under the node-environment `logic` test project, thrown before any test
+   body ran. The chain that reaches it is not obvious from any one file: db/repo.ts → db/outbox.ts →
+   db/sync.ts → here, which is why repo.test.ts has to `vi.mock('./sync')` and why db.test.ts
+   silently constrains what db.ts is allowed to import. Nothing about a cross-tab listener needs to
+   be load-bearing for that. lib/telemetry.ts already follows this rule — its window listeners live
+   inside initTelemetry() rather than at module scope. */
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    current = load();
+    emit();
+  });
+}
 
 /** Subscribe from outside React — used to re-arm the alarms when a reminder preference changes. */
 export const subscribePreferences = (listener: () => void) => subscribe(listener);

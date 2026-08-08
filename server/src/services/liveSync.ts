@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { WSContext } from 'hono/ws';
+import { trackEvent } from '../lib/telemetry';
 
 /* Live sync: one WebSocket per open client. Whenever a user's data changes,
    every OTHER client of the same user gets a "changed" nudge and pulls. */
@@ -31,7 +32,18 @@ export function issueWsTicket(userId: string): string {
 export function redeemWsTicket(ticket: string): string | null {
   const entry = tickets.get(ticket);
   tickets.delete(ticket);
-  if (!entry || entry.expires < Date.now()) return null;
+  if (!entry || entry.expires < Date.now()) {
+    /* A failed redeem should be close to impossible in normal use: the client requests a ticket
+       and opens the socket immediately, well inside thirty seconds. So the two reasons it fails
+       are worth separating and both are worth knowing about. `expired` at any volume means clients
+       are being delayed between the two calls — a slow network or a backgrounded webview — and
+       live sync is quietly not working for them. `unknown` means a ticket this process never
+       issued, which is either someone guessing at the endpoint or, far more likely, the first
+       symptom of a second container: these tickets are in-memory, so a second instance would fail
+       every redeem that did not land on the process that issued it. */
+    trackEvent('live_ws_ticket_rejected', { reason: entry ? 'expired' : 'unknown' });
+    return null;
+  }
   return entry.userId;
 }
 
@@ -52,6 +64,18 @@ export function removeLiveClient(userId: string, ws: WSContext): void {
   }
   if (set.size === 0) clients.delete(userId);
 }
+
+/* Gauges for the once-a-minute runtime_metrics row (wired up in index.ts).
+ *
+ * Both maps are unbounded in principle and swept only by their own logic — `clients` by socket
+ * close, `tickets` by the next issue — so these two numbers are also how a leak in either would
+ * ever be noticed: sockets that never close, or tickets issued to clients that never connect.
+ * Reported from the metrics loop rather than on change, because a gauge is a level, not an event. */
+export const liveSyncGauges = () => ({
+  ws_users: clients.size,
+  ws_clients: [...clients.values()].reduce((total, set) => total + set.size, 0),
+  ws_tickets_outstanding: tickets.size,
+});
 
 /** Tell the user's other devices that something changed (skips the originator). */
 export function notifyUserChanged(userId: string, exceptClientId?: string | null): void {

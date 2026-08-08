@@ -224,6 +224,73 @@ inside the bundle and must not be the server's:
 Both values are on each source's **Configure** screen. For local development put all four
 in `.env`. For CI, see below.
 
+### What is reported
+
+The two sources are joined by **`client_id`** — the random per-launch id the browser already sends
+as `X-Client-Id` (live-sync uses it to skip echoing a device's own changes back). The client stamps
+it on every event and the server records it on every request it logs, so the app's view of a slow
+sync and the request that served it can be lined up. Nothing else crosses between them.
+
+**Client** (`web/src/lib/telemetry.ts`)
+
+| Event                                                | When                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------- |
+| `app_started` / `web_vitals`                         | launch, and LCP/CLS/long-tasks once per session                       |
+| `sync_pass`                                          | every pass — see sampling below                                       |
+| `sync_dead_letter`                                   | the server refused a write and the queue moved on without it          |
+| `sync_reset`                                         | a full-state response replaced the local store, with what it erased   |
+| `sync_blocked` / `sync_unblocked` / `sync_auth_lost` | reachability and session transitions                                  |
+| `sync_backlog`                                       | the outbox crossed 50 / 200 / 1000 pending                            |
+| `sync_conflict`, `live_channel_open/_failed`         | write conflicts and the live WebSocket                                |
+| `background_fetch*`                                  | each Android background wake-up, and whether the OS grants them       |
+| `live_update_*`                                      | OTA: downloaded, applying, booted, or blocked on a native change      |
+| `transcribe`                                         | every voice note, including `empty` (silence transcribed to nothing)  |
+| `db_opened` / `db_open_failed`                       | the IndexedDB open, with how full the origin's storage is             |
+| `db_blocked` / `db_version_change`                   | another tab holding the schema open, or having upgraded past this one |
+| `storage_pressure`                                   | past 80% of the storage quota (once per session)                      |
+| `app_lock_unlock` / `app_lock_engaged`               | unlock outcomes by method, and grace-period re-locks                  |
+
+**Server** (`server/src/lib/telemetry.ts`)
+
+| Event                                      | When                                                         |
+| ------------------------------------------ | ------------------------------------------------------------ |
+| `http_request`                             | per API request — see sampling below                         |
+| `sync_reset_served` / `sync_delta_slow`    | the expensive branch of `/api/sync`, and its early warning   |
+| `ai_transcribe_upstream`                   | the Groq leg, including the silent fallback-model retry      |
+| `rate_limited`                             | a 429, with how far past the cap the caller is               |
+| `live_ws_ticket_rejected`                  | a WebSocket ticket that was expired or never issued          |
+| `mongo_disconnected` / `mongo_reconnected` | database outages, which heal themselves and otherwise vanish |
+| `auth_signin` / `auth_user_created`        | a session was created; a genuinely new account               |
+| `runtime_metrics`                          | heap, event-loop lag, live-client and tombstone gauges       |
+
+**Volume.** The free tier is a monthly allowance, and both ends spend it on the two events that
+fire on a loop. The rule is the same on both sides: **sample the uneventful, never the eventful.**
+A sync pass that pushed, pulled, reset or failed is always reported and an idle one is sampled at
+2%; an API request that was non-2xx or took over a second is always reported and the rest are
+sampled at 10%. Sampled rows carry the rate they were kept at (`sample_rate`, `sampled`), so a
+count built from them can be corrected rather than quietly read low.
+
+**Identifiers.** The server logs a salted, truncated hash of the user id (`user`), never the id
+itself — enough to ask "one account or the whole fleet", not enough to point at a person. Paths are
+reported as route shapes (`/people/:id/events/:id/asked`), and no entry content, name or tag ever
+leaves either process. The app lock reports outcomes only: never the passcode, its hash or its salt.
+
+### Alerts worth setting up
+
+Configured in Better Stack's UI, not in this repo. Dashboards are for questions you thought to ask;
+these four are the ones you want to be told about, and each one is silent-by-default damage:
+
+| Alert                                | Why it can't wait for someone to look                                                                                          |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `sync_dead_letter` above zero        | a write the user was told was saved and the server threw away. One is a bug report; a spike is a deploy eating everyone's data |
+| `sync_reset` with a large `orphaned` | a full-state pull deleted a lot of local documents. Either retention is being outrun or the server is wrong about what exists  |
+| `db_open_failed`                     | that device cannot open its diary at all. There is no degraded mode below this one                                             |
+| `mongo_disconnected`                 | a total outage that heals itself, and therefore gets reported as "it was broken earlier" and never reproduced                  |
+
+One worth a weekly glance rather than a page: `runtime_metrics.tombstone_oldest_h` climbing past
+the retention window plus its week of grace means Mongo's TTL monitor has stopped sweeping — the
+one promise in [Offline / sync](#offline--sync) that nothing else verifies.
+
 ### CI configuration
 
 The `VITE_*` pair is **inlined into the bundle at build time**, so it must be available to
@@ -254,14 +321,6 @@ three test suites, and `npm audit --omit=dev --audit-level=high` — runs first,
 publishing jobs declare `needs: verify`, so one commit gets one verdict and nothing publishes
 without it. `verify` needs no secrets: `config.ts` reads its required variables through
 getters, so importing a module never demands a credential.
-
-One audit line is expected and permanent for now: GHSA-frvp-7c67-39w9 against
-`@hono/node-server`. The server imports v2, where it is fixed — but `@hono/node-ws` still declares
-a peer range of `^1.19.11`, so npm installs a nested 1.x copy to satisfy it. That copy is never
-loaded (node-ws imports `hono/ws`, `ws` and `node:http`, and nothing from node-server), and npm's
-peer resolution overrules `overrides`, so it cannot be deduped away yet. It is moderate, so it
-does not fail the `--audit-level=high` gate; the path-traversal guard in `server/src/app.ts`
-covers it regardless. Drop this paragraph when node-ws widens its peer range.
 
 The `android` job is skipped when a commit changes nothing it builds from. That used to be a
 workflow-level `paths:` filter, which cannot be expressed per-job, so it is now a diff against

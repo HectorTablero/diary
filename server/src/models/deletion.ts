@@ -71,6 +71,38 @@ export async function ensureTombstoneTtl(): Promise<void> {
 export const isCursorStale = (since: Date, now: Date): boolean =>
   since.getTime() < now.getTime() - TOMBSTONE_RETENTION_MS;
 
+/**
+ * Gauges proving the tombstone collection is actually bounded.
+ *
+ * The whole design above rests on a promise nothing has ever verified: that Mongo's TTL monitor
+ * really does sweep, so the collection stays finite and a cursor inside the window really is
+ * answerable with a delta. `ensureTombstoneTtl` sets the index up and reports if that fails — but a
+ * TTL index that exists and is simply not being acted on (a monitor disabled on the deployment, a
+ * secondary that never runs it, a `collMod` that silently didn't take) looks identical from here.
+ *
+ * `oldest_age_h` is the readout. It should sit just under the retention window plus the week of
+ * grace and never exceed it; a value climbing past that is the sweep not happening, and the first
+ * symptom otherwise would be a disk filling up months later. `count` alone would not show it —
+ * a collection can grow for the entirely ordinary reason that someone deleted a lot of entries.
+ *
+ * Both queries are cheap enough to run once a minute: `estimatedDocumentCount` reads collection
+ * metadata rather than counting, and the sort is served by the existing `{userId, deletedAt}` index.
+ */
+export async function tombstoneGauges(): Promise<Record<string, number>> {
+  const [count, oldest] = await Promise.all([
+    Deletion.estimatedDocumentCount(),
+    Deletion.findOne({}, { deletedAt: 1 }).sort({ deletedAt: 1 }).lean(),
+  ]);
+  return {
+    tombstones: count,
+    // Absent rather than zero when the collection is empty — an empty collection has no oldest
+    // row, and reporting 0 would read as "swept perfectly" rather than "nothing to say".
+    ...(oldest
+      ? { tombstone_oldest_h: Math.round((Date.now() - +oldest.deletedAt) / 3_600_000) }
+      : {}),
+  };
+}
+
 export async function recordDeletions(
   userId: string,
   coll: SyncCollection,

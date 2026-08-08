@@ -119,7 +119,9 @@ export function DeleteAccountDialog({
   };
 
   const tryBiometrics = async () => {
-    if (await promptBiometrics(t('settings.data.deleteAccount.biometricsReason'))) {
+    if (
+      await promptBiometrics(t('settings.data.deleteAccount.biometricsReason'), 'delete_account')
+    ) {
       await runDeletion();
     }
   };
@@ -148,7 +150,7 @@ export function DeleteAccountDialog({
 
   const submitPasscode = async () => {
     if (!passcode || deleting) return;
-    if (!(await verifyPasscode(passcode))) {
+    if (!(await verifyPasscode(passcode, 'delete_account'))) {
       setPasscodeError(true);
       setPasscode('');
       passcodeRef.current?.focus();

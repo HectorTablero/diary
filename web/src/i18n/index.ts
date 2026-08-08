@@ -176,7 +176,11 @@ function forgetRefusals() {
   bumpProbeVersion();
 }
 
-window.addEventListener('online', forgetRefusals);
+// Guarded for the same reason as the `storage` listener in lib/preferences.ts: this is the only
+// statement in the module that assumes a browser, and leaving it bare made *importing* i18n throw
+// under the node-environment `logic` project — which lib/dates.ts drags in, and which therefore
+// dictated what half the app was allowed to import. onReconnected is environment-agnostic.
+if (typeof window !== 'undefined') window.addEventListener('online', forgetRefusals);
 onReconnected(forgetRefusals);
 
 /**
@@ -265,9 +269,18 @@ export async function followDeviceLanguage(): Promise<void> {
   }
 }
 
-i18n.on('languageChanged', (lng) => {
-  document.documentElement.lang = lng;
-});
-document.documentElement.lang = i18n.language;
+/* Keeping <html lang> in step with the active language — which is what makes a screen reader
+   switch voice, and what `checkI18n` cannot verify because it is not a string.
+
+   Guarded like the `online` listener above: the whole point of this module is to be importable by
+   anything, and a bare `document` at module scope meant it was importable only inside a DOM. That
+   restriction propagated a long way — lib/dates.ts imports this, so every node-environment test
+   whose graph reaches a date helper inherited it. */
+if (typeof document !== 'undefined') {
+  i18n.on('languageChanged', (lng) => {
+    document.documentElement.lang = lng;
+  });
+  document.documentElement.lang = i18n.language;
+}
 
 export default i18n;

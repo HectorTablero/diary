@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import { trackEvent, userHash } from '../lib/telemetry';
 import type { AppEnv } from './session';
 
 /**
@@ -59,11 +60,30 @@ export function rateLimit({ limit, windowMs, code }: RateLimitOptions): Middlewa
     }
 
     if (window.count >= limit) {
+      /* Counted even though it is being refused. The window's own logic does not need this — once
+         the cap is reached every request in the window is refused regardless of how far past it
+         the count goes — but "how hard is this caller pushing" is only knowable if the rejections
+         are counted too, and it is the number that tells a retry loop from a busy afternoon. */
+      window.count += 1;
       /* Returned rather than thrown as an HttpError. handleError builds a fresh response from the
          status and code alone, which would drop Retry-After — and that header is the whole
          difference between a client that waits the right amount of time and one that guesses. The
          body keeps the same `{ error: <i18n key> }` shape every other failure uses. */
       const retryAfter = Math.max(1, Math.ceil((window.resetAt - now) / 1000));
+      /* The limiter exists to catch a client retry loop, and until now catching one was completely
+         silent: the loop keeps running, the user sees a failure they can't explain, and the only
+         record is a 429 in an access log nobody reads. `over_by` is what separates the two cases
+         this middleware deliberately does not distinguish — someone who hit the cap by using the
+         feature (a handful over) from a loop hammering it (hundreds over) — without needing a
+         second counter to do it. */
+      trackEvent('rate_limited', {
+        user: userHash(userId),
+        route: c.req.routePath,
+        code,
+        limit,
+        over_by: window.count - limit,
+        retry_after_s: retryAfter,
+      });
       return c.json({ error: code }, 429, { 'Retry-After': String(retryAfter) });
     }
 

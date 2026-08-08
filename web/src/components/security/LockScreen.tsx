@@ -27,7 +27,7 @@ export function LockScreen() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const tryBiometrics = async () => {
-    if (await promptBiometrics(t('security.biometricsReason'))) unlock();
+    if (await promptBiometrics(t('security.biometricsReason'), 'lock_screen')) unlock();
   };
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function LockScreen() {
   const submit = async () => {
     if (!passcode || checking) return;
     setChecking(true);
-    const ok = await verifyPasscode(passcode);
+    const ok = await verifyPasscode(passcode, 'lock_screen');
     setChecking(false);
     if (ok) {
       unlock();

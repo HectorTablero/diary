@@ -3,6 +3,7 @@ import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
 import { isMeteredConnection } from '@/lib/network';
 import { getPreferences, subscribePreferences } from '@/lib/preferences';
 import { getCachedUser } from '@/lib/sessionCache';
+import { captureError, sampled, trackEvent } from '@/lib/telemetry';
 import {
   bumpLookupVersion,
   db,
@@ -12,6 +13,7 @@ import {
   setMeta,
   type OutboxOp,
 } from './db';
+import { checkStoragePressure } from './storage';
 
 /* Sync engine: replays the outbox against the REST API in order (push), then
    pulls everything changed since the last cursor. Pull only runs after a fully
@@ -57,8 +59,52 @@ const networkBlocker = (): SyncBlocker => (navigator.onLine ? 'unreachable' : 'o
 const statusListeners = new Set<() => void>();
 const dataListeners = new Set<() => void>();
 
+/* Telemetry for this module reports *transitions and incidents*, never states.
+ *
+ * Everything in here runs on a loop — a kick fires on every mutation, every foreground, every
+ * reconnect and every sixty seconds regardless — so an event per pass describing an unchanged
+ * situation would be thousands of identical rows a day per device, saying only that someone's
+ * phone is still on a train. What is worth a row is the moment the situation changed, and the
+ * gap between two of those is the duration, which the query can work out for itself. */
+
+/** Epoch ms at which the current blocker began; 0 when there isn't one. */
+let blockerSince = 0;
+
+function reportStatusChange(before: SyncStatus, after: SyncStatus): void {
+  /* `offline` is excluded in both directions. It is the normal condition of an offline-first app
+     rather than a fault, it is the one blocker the user can already see and explain, and on a
+     phone it would be the single noisiest event in the whole system. `unreachable` and `paused`
+     are the interesting ones: the first means the server is down or a captive portal is eating
+     requests, and the second means the app is holding writes back on a setting the user may have
+     forgotten turning on. */
+  if (before.blocker !== after.blocker) {
+    const now = Date.now();
+    if (before.blocker && before.blocker !== 'offline') {
+      trackEvent('sync_unblocked', {
+        blocker: before.blocker,
+        blocked_ms: blockerSince ? now - blockerSince : undefined,
+        pending: after.pending,
+      });
+    }
+    if (after.blocker && after.blocker !== 'offline') {
+      trackEvent('sync_blocked', { blocker: after.blocker, pending: after.pending });
+    }
+    blockerSince = after.blocker ? now : 0;
+  }
+
+  /* The quietest serious failure in the app: the session is gone, every write from here on stays
+     on the device, and nothing else in this file will ever say so again — `needsAuth` is set once
+     and then simply stays true. If this starts appearing across many clients at once it is a
+     server-side auth regression, and it would otherwise be visible only as sync traffic stopping. */
+  if (!before.needsAuth && after.needsAuth) {
+    trackEvent('sync_auth_lost', { pending: after.pending });
+  }
+}
+
 function setStatus(patch: Partial<SyncStatus>) {
+  const before = status;
   status = { ...status, ...patch };
+  reportStatusChange(before, status);
   statusListeners.forEach((cb) => cb());
 }
 
@@ -100,6 +146,31 @@ async function refreshPending() {
   setStatus({ pending: await db.outbox.count() });
 }
 
+/* Outbox paths carry document ids — `/people/<id>/events/<id>/asked` — and an id is both the
+   user's own data and the thing that would turn one chart into a thousand single-row series. The
+   shape is what a question about rejected writes is actually about, so every segment that isn't
+   part of the route template becomes `:id`. An allow-list rather than a pattern match, because the
+   ids are generated in more than one place and nothing guarantees they keep looking alike. */
+const ROUTE_SEGMENTS = new Set([
+  'entries',
+  'people',
+  'tags',
+  'threads',
+  'settings',
+  'sync',
+  'checkup',
+  'events',
+  'asked',
+  'said',
+  'order',
+]);
+
+const routeShape = (path: string): string =>
+  path
+    .split('/')
+    .map((segment) => (segment === '' || ROUTE_SEGMENTS.has(segment) ? segment : ':id'))
+    .join('/');
+
 /** Ids touched by still-queued ops; pull must not overwrite or delete them. */
 async function dirtyIds(): Promise<Set<string>> {
   const ids = new Set<string>();
@@ -128,6 +199,7 @@ async function pushOutbox(): Promise<boolean> {
         body: op.body === undefined ? undefined : JSON.stringify(op.body),
       });
       await db.outbox.delete(op.seq!);
+      pushedThisPass++;
     } catch (err) {
       if (!(err instanceof ApiError)) throw err;
       if (err.status === 0) {
@@ -147,6 +219,11 @@ async function pushOutbox(): Promise<boolean> {
       if (err.status === 409 && op.method === 'POST') {
         await removeLocalDoc(op);
         await db.outbox.delete(op.seq!);
+        /* Tolerated, so nothing else records it — but a replayed create and a *lost name race* both
+           arrive here and only the second one destroys a local document. Sampled because a flaky
+           connection replays whole batches of these at once, and one in ten is plenty to notice
+           that the rate has changed. */
+        if (sampled(0.1)) trackEvent('sync_conflict', { path: routeShape(op.path) });
         continue;
       }
       if (err.status === 404 && op.method !== 'POST') {
@@ -158,6 +235,19 @@ async function pushOutbox(): Promise<boolean> {
          dead-letter row and the toast that follows it stop the user finding out on another device
          months later, or not at all. */
       console.warn('sync: rejected op moved to dead letter', op, err.code);
+      /* Never sampled. This is a write the user was told had been saved and which the server threw
+         away — the single most serious thing that happens in this app that isn't a crash. Until
+         now the only traces were a console.warn nobody reads and a toast that is gone in seconds,
+         which means a systematic rejection (a payload the API stopped accepting after a deploy,
+         say) would be silently eating every affected write on every client with nothing anywhere
+         to show for it. `code` is the server's i18n key, which is what makes these groupable into
+         "the same bug" rather than a list of incidents. */
+      trackEvent('sync_dead_letter', {
+        status: err.status,
+        code: err.code,
+        method: op.method,
+        path: routeShape(op.path),
+      });
       await db.deadLetter.add({
         method: op.method,
         path: op.path,
@@ -208,6 +298,8 @@ async function removeLocalDoc(op: OutboxOp) {
 
 let liveSocket: WebSocket | null = null;
 let liveConnecting = false;
+/** Sockets opened this session — a reconnect counter, not a gauge. */
+let liveOpens = 0;
 
 function ensureLiveChannel(): void {
   if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return;
@@ -222,8 +314,16 @@ function ensureLiveChannel(): void {
       const base = API_BASE || window.location.origin;
       const params = new URLSearchParams({ ticket, client: CLIENT_ID });
       const socket = new WebSocket(`${base.replace(/^http/, 'ws')}/api/sync/ws?${params}`);
+      socket.onopen = () => {
+        /* Sampled: a phone switching networks reopens this all day, and the rate is the signal
+           rather than any individual open. `attempt` is what makes a reconnect *loop* — a socket
+           the server accepts and drops every ten seconds — visible as a rising number rather than
+           as a flat stream of identical rows. */
+        liveOpens++;
+        if (sampled(0.05)) trackEvent('live_channel_open', { attempt: liveOpens });
+      };
       socket.onmessage = (event) => {
-        if (event.data === 'changed') kick();
+        if (event.data === 'changed') kick('live');
       };
       socket.onclose = () => {
         if (liveSocket === socket) liveSocket = null;
@@ -232,8 +332,17 @@ function ensureLiveChannel(): void {
       };
       socket.onerror = () => socket.close();
       liveSocket = socket;
-    } catch {
+    } catch (err) {
       liveSocket = null; // not signed in yet or offline; later triggers retry
+      /* Only when the network was up. Offline, the ticket request fails by definition and the
+         retry above is the whole design; online it means the ticket endpoint refused us, which is
+         a session or a server problem and the reason live sync would be silently dead while
+         everything else looks fine. */
+      if (navigator.onLine && sampled(0.2)) {
+        trackEvent('live_channel_failed', {
+          code: err instanceof ApiError ? `${err.status}:${err.code}` : 'exception',
+        });
+      }
     } finally {
       liveConnecting = false;
     }
@@ -278,7 +387,7 @@ function startReconnectProbe() {
     stopReconnectProbe();
     setStatus({ blocker: null });
     reconnectListeners.forEach((cb) => cb());
-    kick();
+    kick('probe');
   }, PROBE_INTERVAL_MS);
 }
 
@@ -293,11 +402,26 @@ interface SyncTable {
   toCollection: () => { primaryKeys: () => Promise<string[]> };
 }
 
-async function pull(): Promise<void> {
+/** What one pull actually did, for the pass event assembled in run(). */
+interface PullSummary {
+  reset: boolean;
+  received: number;
+  deletions: number;
+  /** Docs the reset branch removed because the full state didn't name them. */
+  orphaned: number;
+  /** Server changes discarded because an unpushed local edit outranked them. */
+  dirtySkipped: number;
+  applied: boolean;
+  fetchMs: number;
+}
+
+async function pull(): Promise<PullSummary> {
   const since = await getMeta<string>('syncCursor');
+  const fetchStartedAt = performance.now();
   const res = await apiGet<SyncResponse>(
     `/sync${since ? `?since=${encodeURIComponent(since)}` : ''}`,
   );
+  const fetchMs = Math.round(performance.now() - fetchStartedAt);
 
   const threads = res.threads ?? []; // tolerates a server that predates threads (stale deploy)
   /* Whether this response is the whole server state rather than a delta — see SyncResponse.reset.
@@ -338,13 +462,19 @@ async function pull(): Promise<void> {
      seconds whether or not the diary changed. On an idle app that is the entire cost of the app,
      paid over and over to arrive back where it started. */
   let applied = reset;
+  let orphaned = 0;
+  let dirtySkipped = 0;
 
   await db.transaction(
     'rw',
     [db.entries, db.people, db.tags, db.threads, db.outbox, db.meta],
     async () => {
       const dirty = await dirtyIds();
-      const clean = <T extends { id: string }>(docs: T[]) => docs.filter((d) => !dirty.has(d.id));
+      const clean = <T extends { id: string }>(docs: T[]) => {
+        const kept = docs.filter((d) => !dirty.has(d.id));
+        dirtySkipped += docs.length - kept.length;
+        return kept;
+      };
 
       await db.entries.bulkPut(clean(res.entries).map(entryFromDto));
       await db.people.bulkPut(clean(res.people).map(personFromDto));
@@ -357,7 +487,10 @@ async function pull(): Promise<void> {
         thread: db.threads,
       };
       for (const del of res.deletions) {
-        if (dirty.has(del.docId)) continue; // an unpushed local edit outranks the server
+        if (dirty.has(del.docId)) {
+          dirtySkipped++;
+          continue; // an unpushed local edit outranks the server
+        }
         if (alive[del.coll]?.has(del.docId)) continue; // re-created since: stale tombstone
         await tables[del.coll]?.delete(del.docId);
       }
@@ -371,8 +504,9 @@ async function pull(): Promise<void> {
       if (reset) {
         for (const coll of Object.keys(tables) as SyncCollection[]) {
           const local = await tables[coll].toCollection().primaryKeys();
-          const orphaned = local.filter((id) => !alive[coll].has(id) && !dirty.has(id));
-          await tables[coll].bulkDelete(orphaned);
+          const gone = local.filter((id) => !alive[coll].has(id) && !dirty.has(id));
+          orphaned += gone.length;
+          await tables[coll].bulkDelete(gone);
         }
       }
 
@@ -405,10 +539,45 @@ async function pull(): Promise<void> {
      other "it's probably fine" was removed — see the note above run(). */
   setStatus({ blocker: null, needsAuth: false, lastSyncAt: new Date().toISOString() });
   stopReconnectProbe(); // reached the server through some other trigger
+
+  const received = res.entries.length + res.people.length + res.tags.length + threads.length;
+
+  /* A reset with a cursor is the one branch in this file that deletes local documents the user
+     never asked to delete, and it is never sampled.
+     `since` present means this was not a first sync: the client had a cursor and the server
+     declined to answer it incrementally, so its tombstones had aged out (README: 180 days) or the
+     device had been dark longer than that. `orphaned` is how many local documents that decision
+     removed, and it is the number that matters — a handful is a device catching up, while a large
+     one on a device that syncs weekly is the retention window being wrong, or a bug in the
+     server's idea of what still exists. Nothing could see that before this line. */
+  /* A reset writes the user's entire diary in one transaction — the largest thing this app ever
+     stores — so it is the write most likely to be the one that finds the edge of the quota, and
+     the moment just after it is when a device sitting near that edge is worth noticing. */
+  if (reset) void checkStoragePressure();
+
+  if (reset && since) {
+    trackEvent('sync_reset', {
+      cursor_age_ms: Date.now() - Date.parse(since),
+      received,
+      orphaned,
+      dirty_skipped: dirtySkipped,
+      fetch_ms: fetchMs,
+    });
+  }
   /* Only when something arrived. The status above is unconditional on purpose — it is a statement
      about reachability, which a successful empty pull proves as well as a full one — but the
      listeners are a statement about *data*, and an empty delta has nothing to say. */
   if (applied) dataListeners.forEach((cb) => cb());
+
+  return {
+    reset,
+    received,
+    deletions: res.deletions.length,
+    orphaned,
+    dirtySkipped,
+    applied,
+    fetchMs,
+  };
 }
 
 let running: Promise<void> | null = null;
@@ -416,6 +585,99 @@ let rerun = false;
 let networkFailure = false;
 /** Ops the server refused during this pass; announced once, from run()'s finally. */
 let rejectedThisPass = 0;
+/** Ops the server accepted during this pass. */
+let pushedThisPass = 0;
+/** What set this pass off, for the pass event — see kick(). */
+let triggerThisPass: SyncTrigger = 'unknown';
+
+/**
+ * Why a sync pass is happening.
+ *
+ * Worth carrying purely for the telemetry: the pass rate is dominated by the sixty-second timer,
+ * so "how often does sync run" is a question with a boring and useless answer, while "how often
+ * does a pass triggered by a *mutation* fail" is the one worth asking. Without this they are the
+ * same event.
+ */
+export type SyncTrigger =
+  | 'mutation'
+  | 'interval'
+  | 'visibility'
+  | 'online'
+  | 'live'
+  | 'probe'
+  | 'preferences'
+  | 'manual'
+  | 'signin'
+  | 'background'
+  /** Something was enqueued while a pass was already in flight, so it went again. */
+  | 'rerun'
+  | 'unknown';
+
+/* The outbox is the app's health in one number: it is how many things the user believes are saved
+   that the server has never seen. A backlog is normal (that is what offline-first *is*) and a
+   backlog that keeps growing while passes are succeeding is not, so what gets reported is crossing
+   a threshold upwards — once per crossing, not once per pass. */
+const BACKLOG_THRESHOLDS = [50, 200, 1000];
+let backlogReported = 0;
+
+function reportBacklog(pending: number): void {
+  const crossed = BACKLOG_THRESHOLDS.filter((t) => pending >= t).pop() ?? 0;
+  if (crossed > backlogReported) trackEvent('sync_backlog', { pending, threshold: crossed });
+  // Reset on the way down too, so a queue that drains and refills reports the second time.
+  backlogReported = crossed;
+}
+
+/**
+ * One row per sync pass — but only when the pass had something to say.
+ *
+ * A pass fires at least once a minute per open client whether or not the diary changed, and the
+ * overwhelming majority of them push nothing, pull nothing and fail at nothing. Reporting all of
+ * them would be somewhere around 1,400 rows per device per day to establish that an idle app is
+ * idle, which on a fixed monthly volume is the whole budget spent on the least informative
+ * possible event.
+ *
+ * So: everything that failed, pushed, pulled or reset is always reported, and the idle remainder
+ * is sampled at 2% purely to keep a baseline — enough to tell "sync is quiet" from "sync stopped
+ * running", which are indistinguishable from silence alone and mean very different things.
+ */
+function reportPass(
+  startedAt: number,
+  pendingBefore: number,
+  summary: PullSummary | null,
+  failure: string | null,
+): void {
+  const pendingAfter = getSyncStatus().pending;
+  reportBacklog(pendingAfter);
+
+  const eventful =
+    failure !== null ||
+    pushedThisPass > 0 ||
+    rejectedThisPass > 0 ||
+    (summary?.received ?? 0) > 0 ||
+    (summary?.deletions ?? 0) > 0 ||
+    summary?.reset === true;
+  if (!eventful && !sampled(0.02)) return;
+
+  trackEvent('sync_pass', {
+    trigger: triggerThisPass,
+    duration_ms: Math.round(performance.now() - startedAt),
+    ok: failure === null,
+    failure: failure ?? undefined,
+    pushed: pushedThisPass,
+    rejected: rejectedThisPass,
+    pending_before: pendingBefore,
+    pending_after: pendingAfter,
+    // Absent rather than zero when the push never drained, so "the pull didn't run" stays
+    // distinguishable from "the pull ran and found nothing".
+    pulled: summary?.received,
+    deletions: summary?.deletions,
+    dirty_skipped: summary?.dirtySkipped,
+    reset: summary?.reset,
+    fetch_ms: summary?.fetchMs,
+    blocker: getSyncStatus().blocker ?? undefined,
+    sampled: !eventful,
+  });
+}
 
 /**
  * One sync pass.
@@ -441,10 +703,21 @@ async function run(): Promise<void> {
   setStatus({ syncing: true });
   networkFailure = false;
   rejectedThisPass = 0;
+  pushedThisPass = 0;
+  const startedAt = performance.now();
+  const pendingBefore = getSyncStatus().pending;
+  let summary: PullSummary | null = null;
+  let failure: string | null = null;
   try {
     const drained = await pushOutbox();
-    if (drained) await pull();
+    if (drained) summary = await pull();
   } catch (err) {
+    failure = err instanceof ApiError ? `${err.status}:${err.code}` : 'exception';
+    /* A non-ApiError escaping this far is a bug in the sync engine itself rather than a network
+       condition — a Dexie transaction aborting, a malformed response — and it is the class of
+       failure that leaves the outbox permanently stuck. The existing branch below logs it to a
+       console nobody is reading; this is the same thing said somewhere it can be counted. */
+    if (!(err instanceof ApiError)) captureError(err, { scope: 'sync.run' });
     if (err instanceof ApiError) {
       if (err.status === 0) {
         setStatus({ blocker: networkBlocker() });
@@ -467,6 +740,7 @@ async function run(): Promise<void> {
   } finally {
     await refreshPending();
     setStatus({ syncing: false });
+    reportPass(startedAt, pendingBefore, summary, failure);
     if (networkFailure) startReconnectProbe();
     if (rejectedThisPass > 0) {
       const count = rejectedThisPass;
@@ -480,8 +754,8 @@ async function run(): Promise<void> {
 }
 
 /** Fire-and-forget sync request; coalesces while one is already running. */
-export function kick(): void {
-  void syncNow();
+export function kick(trigger: SyncTrigger = 'unknown'): void {
+  void syncNow({ trigger });
 }
 
 /**
@@ -493,10 +767,12 @@ export function kick(): void {
  * be unreachable, the ordinary failure path takes over and the pill says so instead.
  */
 export function forceSyncNow(): Promise<void> {
-  return syncNow({ ignoreWifiOnly: true });
+  return syncNow({ ignoreWifiOnly: true, trigger: 'manual' });
 }
 
-export function syncNow(options: { ignoreWifiOnly?: boolean } = {}): Promise<void> {
+export function syncNow(
+  options: { ignoreWifiOnly?: boolean; trigger?: SyncTrigger } = {},
+): Promise<void> {
   // Never linked to an account (or explicitly local-only) — nothing to push or pull yet.
   // Mutations still queue in db.outbox unconditionally; the moment an account is linked,
   // getCachedUser() becomes non-null and the very next kick() drains the whole queue in order.
@@ -526,11 +802,14 @@ export function syncNow(options: { ignoreWifiOnly?: boolean } = {}): Promise<voi
     rerun = true; // something changed mid-sync: go again right after
     return running;
   }
+  // Set here rather than at the top: a coalesced call returns above without starting a pass, and
+  // overwriting the trigger there would attribute the running pass to whatever arrived during it.
+  triggerThisPass = options.trigger ?? 'unknown';
   running = run().finally(() => {
     running = null;
     if (rerun) {
       rerun = false;
-      kick();
+      kick('rerun');
     }
   });
   return running;
@@ -549,17 +828,19 @@ export function initSync(): void {
      still-true statement, and the kick settles it either way within a request. */
   window.addEventListener('online', () => {
     if (getSyncStatus().blocker === 'offline') setStatus({ blocker: 'unreachable' });
-    kick();
+    kick('online');
   });
   window.addEventListener('offline', () => setStatus({ blocker: 'offline' }));
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) kick();
+    if (!document.hidden) kick('visibility');
   });
   /* Turning "sync on Wi-Fi only" off, on a phone that has been holding writes back for hours,
      should drain them now rather than at the next minute tick — and turning it on should show
      the paused pill immediately rather than leaving the app looking synced until then. */
-  subscribePreferences(kick);
-  setInterval(kick, 60_000);
+  // Wrapped rather than passed by reference: kick() now takes an argument, and a subscriber called
+  // with whatever the store hands its listeners would report that as the trigger.
+  subscribePreferences(() => kick('preferences'));
+  setInterval(() => kick('interval'), 60_000);
   void refreshPending();
   /* The age cap needs a trigger that doesn't depend on new rejections, or a table that stopped
      growing would keep its oldest rows for good. Once per launch is plenty for a 90-day bound. */
