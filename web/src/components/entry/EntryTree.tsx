@@ -45,10 +45,13 @@ export function EntryTree({ entries }: { entries: EntryNode[] }) {
   const displayEntries = optimisticEntries ?? entries;
 
   const handleMove = (activeId: string, newParentId: string | null, newIndex: number) => {
-    const siblings = (newParentId === null ? entries : (findNode(entries, newParentId)?.children ?? [])).filter(
-      (n) => n.id !== activeId,
+    const siblings = (
+      newParentId === null ? entries : (findNode(entries, newParentId)?.children ?? [])
+    ).filter((n) => n.id !== activeId);
+    const newOrderKey = generateKeyBetween(
+      siblings[newIndex - 1]?.orderKey ?? null,
+      siblings[newIndex]?.orderKey ?? null,
     );
-    const newOrderKey = generateKeyBetween(siblings[newIndex - 1]?.orderKey ?? null, siblings[newIndex]?.orderKey ?? null);
     setOptimisticEntries(applyMove(entries, activeId, newParentId, newIndex));
     // On failure entries never changes, so the effect above would never clear the optimistic
     // tree on its own — drop it explicitly so a rejected move doesn't stick around forever.

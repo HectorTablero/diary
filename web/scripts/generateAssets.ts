@@ -173,10 +173,7 @@ async function generateSplashScreens(): Promise<void> {
 
     const outPath = path.join(outDir, 'splash.png');
 
-    await sharp(source)
-      .resize(w, h, { fit: 'cover', position: 'center' })
-      .png()
-      .toFile(outPath);
+    await sharp(source).resize(w, h, { fit: 'cover', position: 'center' }).png().toFile(outPath);
 
     log(`  ✓ ${folder}: ${w}×${h}`);
   }
@@ -285,7 +282,7 @@ async function main(): Promise<void> {
   await generateAdaptiveBackgrounds();
   await generateLegacyIcons();
   await generateRoundIcons();
-//   await generateSplashScreens();
+  //   await generateSplashScreens();
   await generateWebIcons();
   await generateStoreAsset();
   await generateSplashIcon();

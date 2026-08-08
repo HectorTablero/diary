@@ -55,7 +55,7 @@ export function useDeleteTag() {
     onSuccess: () => {
       hapticWarning();
       qc.invalidateQueries();
-    }
+    },
   });
 }
 
@@ -268,8 +268,15 @@ export function useDeleteEntry() {
 export function useMoveEntry() {
   const invalidate = useInvalidateEntryData();
   return useMutation({
-    mutationFn: ({ id, newParentId, newOrderKey }: { id: string; newParentId: string | null; newOrderKey: string }) =>
-      mutations.moveEntry(id, newParentId, newOrderKey),
+    mutationFn: ({
+      id,
+      newParentId,
+      newOrderKey,
+    }: {
+      id: string;
+      newParentId: string | null;
+      newOrderKey: string;
+    }) => mutations.moveEntry(id, newParentId, newOrderKey),
     onSuccess: invalidate,
   });
 }
@@ -277,8 +284,15 @@ export function useMoveEntry() {
 export function useSetSaid() {
   const invalidate = useInvalidateEntryData();
   return useMutation({
-    mutationFn: ({ entryId, personId, said }: { entryId: string; personId: string; said: boolean }) =>
-      mutations.setSaid(entryId, personId, said),
+    mutationFn: ({
+      entryId,
+      personId,
+      said,
+    }: {
+      entryId: string;
+      personId: string;
+      said: boolean;
+    }) => mutations.setSaid(entryId, personId, said),
     onSuccess: invalidate,
   });
 }

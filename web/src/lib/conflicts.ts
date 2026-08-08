@@ -45,9 +45,7 @@ export interface ConflictMatch {
 
 /** How the user chose to deal with a candidate. `create` doubles as "keep both". */
 export type Resolution =
-  | { action: 'create' }
-  | { action: 'merge'; personId: string }
-  | { action: 'skip' };
+  { action: 'create' } | { action: 'merge'; personId: string } | { action: 'skip' };
 
 /** Words of a name, accent- and case-insensitive: "Irene G." -> {"irene", "g"}. */
 export function nameTokens(name: string): Set<string> {

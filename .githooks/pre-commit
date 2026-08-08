@@ -12,3 +12,8 @@ if ( exec < /dev/tty ) 2>/dev/null; then
 fi
 
 node scripts/bump-version.mjs || exit 1
+
+# Format the staged files, package.json included — which is why this runs after the bump, not
+# before it. Aborts the commit if prettier cannot parse something, on the grounds that a file it
+# chokes on is not one you meant to commit.
+node scripts/format-staged.mjs || exit 1

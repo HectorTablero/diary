@@ -81,8 +81,10 @@ describe('routeForUrl', () => {
 
     expect(claimed.length).toBeGreaterThan(0);
     for (const prefix of claimed) {
-      expect(routeForUrl(`https://diary.tablerus.es${prefix}`), `${prefix} is claimed but ignored`)
-        .toBe(prefix);
+      expect(
+        routeForUrl(`https://diary.tablerus.es${prefix}`),
+        `${prefix} is claimed but ignored`,
+      ).toBe(prefix);
     }
   });
 });

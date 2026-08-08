@@ -522,7 +522,7 @@
       "wifiOnly": "Sync on Wi-Fi only",
       "wifiOnlyDescription": "Changes keep saving on this device and go up the next time you're on Wi-Fi. The diary is text, so this rarely saves much.",
       "hidePausedStatus": "Hide the waiting-for-Wi-Fi pill",
-      "hidePausedStatusDescription": "Queued changes still sync as soon as you are on Wi-Fi. Going offline and the server being unreachable are still shown.",
+      "hidePausedStatusDescription": "Queued changes still sync as soon as you are on Wi-Fi.",
       "nestingDepth": "How deep sub-entries can nest",
       "nestingDepthDescription": "Levels below a top-level entry. Lowering it doesn't touch entries that are already deeper."
     },

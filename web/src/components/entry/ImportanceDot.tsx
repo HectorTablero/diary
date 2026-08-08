@@ -47,7 +47,10 @@ export const importanceDotClass = (importance: number) => DOT_CLASSES[level(impo
 export function useImportanceMarkerClass(): (importance: number) => string {
   const { importanceShapes } = usePreferences();
   return (importance) =>
-    cn(DOT_CLASSES[level(importance)], importanceShapes ? SHAPE_CLASSES[level(importance)] : 'rounded-full');
+    cn(
+      DOT_CLASSES[level(importance)],
+      importanceShapes ? SHAPE_CLASSES[level(importance)] : 'rounded-full',
+    );
 }
 
 export function ImportanceDot({
@@ -103,7 +106,9 @@ export function ImportancePicker({
           <TooltipContent side="bottom">
             <p className="font-medium mr-1">{t(`importance.levels.${importance}`)}</p>
             <div className="w-[0.75px] self-stretch bg-muted-foreground" />
-            <p className="max-w-48 text-xs opacity-80">{t(`importance.descriptions.${importance}`)}</p>
+            <p className="max-w-48 text-xs opacity-80">
+              {t(`importance.descriptions.${importance}`)}
+            </p>
           </TooltipContent>
         </Tooltip>
       ))}

@@ -18,7 +18,10 @@ const oid = (value: string) => {
 
 async function ownedTagIds(userId: string, ids: string[]) {
   if (!ids.length) return [];
-  const tags = await Tag.find({ userId, _id: { $in: ids.map((id) => new Types.ObjectId(id)) } }, '_id').lean();
+  const tags = await Tag.find(
+    { userId, _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
+    '_id',
+  ).lean();
   return tags.map((t) => t._id);
 }
 
@@ -101,7 +104,8 @@ export const peopleRouter = new Hono<AppEnv>()
     if (input.events !== undefined) person.set('events', input.events);
     if (input.notes !== undefined) person.notes = input.notes;
     if (input.tags !== undefined) person.tags = await ownedTagIds(userId, input.tags);
-    if (input.checkupIntervalDays !== undefined) person.checkupIntervalDays = input.checkupIntervalDays;
+    if (input.checkupIntervalDays !== undefined)
+      person.checkupIntervalDays = input.checkupIntervalDays;
     try {
       await person.save();
     } catch (err) {
@@ -120,7 +124,10 @@ export const peopleRouter = new Hono<AppEnv>()
     // Scoped filter: only entries that actually reference the person get their updatedAt bumped
     // (sync pulls rely on updatedAt, so an unscoped updateMany would re-send every entry).
     await Entry.updateMany(
-      { userId, $or: [{ people: personId }, { 'saidTo.person': personId }, { hiddenFor: personId }] },
+      {
+        userId,
+        $or: [{ people: personId }, { 'saidTo.person': personId }, { hiddenFor: personId }],
+      },
       { $pull: { people: personId, saidTo: { person: personId }, hiddenFor: personId } },
     );
     await recordDeletions(userId, 'person', [personId]);

@@ -12,9 +12,17 @@ import { SuggestionReviewDialog } from './SuggestionReviewDialog';
     sub-entry flavour lives in VoiceSubEntryDialog, reached from an entry's ⋯ menu. `disabled`
     covers the "no live session" case: the suggestions call always needs a real authenticated
     request. */
-export function VoiceEntryButton({ dateKey, disabled = false }: { dateKey: string; disabled?: boolean }) {
+export function VoiceEntryButton({
+  dateKey,
+  disabled = false,
+}: {
+  dateKey: string;
+  disabled?: boolean;
+}) {
   const { t } = useTranslation();
-  const { phase, recorder, start, suggestions, clearSuggestions } = useVoiceToSuggestions({ dateKey });
+  const { phase, recorder, start, suggestions, clearSuggestions } = useVoiceToSuggestions({
+    dateKey,
+  });
 
   const startRecording = () => {
     if (disabled) {

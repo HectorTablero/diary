@@ -516,7 +516,7 @@
       "wifiOnly": "Sincronizza solo con il Wi-Fi",
       "wifiOnlyDescription": "Le modifiche continuano a salvarsi su questo dispositivo e salgono al prossimo Wi-Fi. Il diario è testo, quindi si risparmia poco.",
       "hidePausedStatus": "Nascondi l’avviso di attesa del Wi-Fi",
-      "hidePausedStatusDescription": "Le modifiche in coda si sincronizzano comunque appena c’è il Wi-Fi. Gli avvisi di assenza di rete e di server irraggiungibile restano visibili.",
+      "hidePausedStatusDescription": "Le modifiche in coda si sincronizzano comunque appena c’è il Wi-Fi.",
       "nestingDepth": "Livelli di sotto-voci",
       "nestingDepthDescription": "Quanto si può annidare sotto una voce principale. Abbassarlo non tocca le voci già più in basso."
     },

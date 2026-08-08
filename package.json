@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "6.20.0",
+  "version": "6.21.0",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -26,6 +26,9 @@
     "format:check": "prettier --check .",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web",
     "test": "npm test -w shared && npm test -w server && npm test -w web"
+  },
+  "engines": {
+    "node": ">=24.0.0"
   },
   "devDependencies": {
     "concurrently": "^10.0.4",

@@ -17,13 +17,23 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/common/Spinner';
 import { getEntriesInRange, getPerson, getTalkingPoints, getUnsaidCount } from '@/db/repo';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { saveBinaryFile, saveTextFile } from '@/lib/fileSave';
 import { buildEntriesMarkdown } from '@/lib/markdownExport/entries';
-import { buildPeopleMarkdown, buildPersonMarkdown, type PersonMarkdownOptions } from '@/lib/markdownExport/person';
+import {
+  buildPeopleMarkdown,
+  buildPersonMarkdown,
+  type PersonMarkdownOptions,
+} from '@/lib/markdownExport/person';
 import { fuzzyIncludes } from '@/lib/tokens';
 
 type ExportType = 'entries' | 'people';
@@ -78,11 +88,17 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
   const [exporting, setExporting] = useState(false);
 
   const toggleTag = (id: string) =>
-    setTagIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+    setTagIds((prev) =>
+      prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id],
+    );
   const togglePersonTag = (id: string) =>
-    setPersonTagFilter((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+    setPersonTagFilter((prev) =>
+      prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id],
+    );
   const togglePerson = (id: string) =>
-    setPersonIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+    setPersonIds((prev) =>
+      prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id],
+    );
 
   /* What each person matched the search on, beyond their plain name — same idea as
      PeopleListPage's searchMatches, so "Mum", a job title, or a note all find the right person
@@ -105,8 +121,11 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
       allPeople
         .filter(
           (p) =>
-            (!personQuery.trim() || fuzzyIncludes(p.name, personQuery) || personMatches.has(p.id)) &&
-            (personTagFilter.length === 0 || p.tags.some((tag) => personTagFilter.includes(tag.id))),
+            (!personQuery.trim() ||
+              fuzzyIncludes(p.name, personQuery) ||
+              personMatches.has(p.id)) &&
+            (personTagFilter.length === 0 ||
+              p.tags.some((tag) => personTagFilter.includes(tag.id))),
         )
         .sort((a, b) => a.name.localeCompare(b.name)),
     [allPeople, personQuery, personTagFilter, personMatches],
@@ -157,7 +176,10 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
           const { default: JSZip } = await import('jszip');
           const zip = new JSZip();
           for (const { person, said, unsaidCount } of results) {
-            zip.file(`${person.name}.md`, buildPersonMarkdown(person, said, unsaidCount, personOptions));
+            zip.file(
+              `${person.name}.md`,
+              buildPersonMarkdown(person, said, unsaidCount, personOptions),
+            );
           }
           const base64 = await zip.generateAsync({ type: 'base64' });
           await saveBinaryFile(`briefings-${Date.now()}.zip`, base64, 'application/zip');
@@ -189,7 +211,9 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="entries">{t('settings.markdownExport.typeEntries')}</SelectItem>
+                  <SelectItem value="entries">
+                    {t('settings.markdownExport.typeEntries')}
+                  </SelectItem>
                   <SelectItem value="people">{t('settings.markdownExport.typePeople')}</SelectItem>
                 </SelectContent>
               </Select>
@@ -200,11 +224,23 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                 <div className="flex gap-2">
                   <div className="flex flex-1 flex-col gap-1.5">
                     <Label htmlFor="md-from">{t('settings.markdownExport.from')}</Label>
-                    <DatePicker id="md-from" value={from} max={to || undefined} rangeAnchor={to} onChange={setFrom} />
+                    <DatePicker
+                      id="md-from"
+                      value={from}
+                      max={to || undefined}
+                      rangeAnchor={to}
+                      onChange={setFrom}
+                    />
                   </div>
                   <div className="flex flex-1 flex-col gap-1.5">
                     <Label htmlFor="md-to">{t('settings.markdownExport.to')}</Label>
-                    <DatePicker id="md-to" value={to} min={from || undefined} rangeAnchor={from} onChange={setTo} />
+                    <DatePicker
+                      id="md-to"
+                      value={to}
+                      min={from || undefined}
+                      rangeAnchor={from}
+                      onChange={setTo}
+                    />
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -212,7 +248,9 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                   <div className="flex flex-wrap items-center gap-1.5">
                     {tagIds.map((id) => {
                       const tag = allTags.find((tg) => tg.id === id);
-                      return tag ? <TagChip key={tag.id} tag={tag} onRemove={() => toggleTag(tag.id)} /> : null;
+                      return tag ? (
+                        <TagChip key={tag.id} tag={tag} onRemove={() => toggleTag(tag.id)} />
+                      ) : null;
                     })}
                     <EntityPicker
                       trigger={
@@ -220,7 +258,11 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                           {t('common.add')}
                         </Button>
                       }
-                      items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
+                      items={allTags.map((tag) => ({
+                        id: tag.id,
+                        label: tag.name,
+                        color: tag.color,
+                      }))}
                       selectedIds={tagIds}
                       onToggle={toggleTag}
                       placeholder={t('tags.namePlaceholder')}
@@ -257,7 +299,11 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                               {t('people.filterByTag')}
                             </Button>
                           }
-                          items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
+                          items={allTags.map((tag) => ({
+                            id: tag.id,
+                            label: tag.name,
+                            color: tag.color,
+                          }))}
                           selectedIds={personTagFilter}
                           onToggle={togglePersonTag}
                           placeholder={t('tags.namePlaceholder')}
@@ -274,13 +320,17 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                       {allFilteredSelected
                         ? t('settings.markdownExport.selectNone')
                         : personFilterActive
-                          ? t('settings.markdownExport.selectAllMatching', { count: filteredPeople.length })
+                          ? t('settings.markdownExport.selectAllMatching', {
+                              count: filteredPeople.length,
+                            })
                           : t('settings.markdownExport.selectAll')}
                     </Button>
                   </div>
                   <div className="max-h-56 overflow-y-auto rounded-lg border">
                     {filteredPeople.length === 0 ? (
-                      <p className="p-3 text-center text-xs text-muted-foreground">{t('common.noResults')}</p>
+                      <p className="p-3 text-center text-xs text-muted-foreground">
+                        {t('common.noResults')}
+                      </p>
                     ) : (
                       <ul className="divide-y">
                         {filteredPeople.map((person) => {
@@ -300,7 +350,9 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                                     </p>
                                   )}
                                   {match?.job && (
-                                    <p className="truncate text-xs text-muted-foreground">{match.job}</p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {match.job}
+                                    </p>
                                   )}
                                 </div>
                               </label>
@@ -320,13 +372,20 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                 {personIds.length > 1 && (
                   <div className="flex flex-col gap-1.5">
                     <Label>{t('settings.markdownExport.outputMode')}</Label>
-                    <Select value={outputMode} onValueChange={(v) => setOutputMode(v as OutputMode)}>
+                    <Select
+                      value={outputMode}
+                      onValueChange={(v) => setOutputMode(v as OutputMode)}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="merge">{t('settings.markdownExport.outputMerge')}</SelectItem>
-                        <SelectItem value="zip">{t('settings.markdownExport.outputZip')}</SelectItem>
+                        <SelectItem value="merge">
+                          {t('settings.markdownExport.outputMerge')}
+                        </SelectItem>
+                        <SelectItem value="zip">
+                          {t('settings.markdownExport.outputZip')}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

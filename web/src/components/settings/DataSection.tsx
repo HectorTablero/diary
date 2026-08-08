@@ -65,7 +65,11 @@ export function DataSection() {
                 disabled={exportingBackup}
                 onClick={() => void handleExportBackup()}
               >
-                {exportingBackup ? <Spinner className="size-3.5" /> : <Download className="size-3.5" />}
+                {exportingBackup ? (
+                  <Spinner className="size-3.5" />
+                ) : (
+                  <Download className="size-3.5" />
+                )}
                 {t('settings.data.export')}
               </Button>
               <Button
@@ -101,7 +105,9 @@ export function DataSection() {
               <FileText className="size-3.5" />
               {t('settings.data.exportMarkdown')}
             </Button>
-            <p className="text-xs text-muted-foreground">{t('settings.data.exportMarkdownDescription')}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('settings.data.exportMarkdownDescription')}
+            </p>
           </div>
 
           {/* Only where the build actually reports somewhere. Telemetry used to be a decision

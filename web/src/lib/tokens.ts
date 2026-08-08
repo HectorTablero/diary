@@ -12,11 +12,7 @@ export interface MentionEntity {
 }
 
 /** NFD, strip diacritics, lowercase. Mirrors `normalize` in server/src/services/personSearch.ts. */
-export const normalize = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
+export const normalize = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export const fuzzyIncludes = (haystack: string, needle: string) =>
   normalize(haystack).includes(normalize(needle));
@@ -74,11 +70,13 @@ export function matchWindows(text: string, query: string, contextChars = 24): Ma
     let cursor = window.start;
     for (const range of ranges) {
       if (range.start < window.start || range.end > window.end) continue;
-      if (range.start > cursor) segments.push({ text: text.slice(cursor, range.start), matched: false });
+      if (range.start > cursor)
+        segments.push({ text: text.slice(cursor, range.start), matched: false });
       segments.push({ text: text.slice(range.start, range.end), matched: true });
       cursor = range.end;
     }
-    if (cursor < window.end) segments.push({ text: text.slice(cursor, window.end), matched: false });
+    if (cursor < window.end)
+      segments.push({ text: text.slice(cursor, window.end), matched: false });
     if (window.end < text.length) segments.push({ text: '...', matched: false });
     return { segments };
   });
@@ -149,7 +147,9 @@ export function renameMentions(
       const rest = content.slice(i + 1);
       const match = sorted.find((n) => fuzzyEquals(rest.slice(0, n.length), n));
       if (match) {
-        result += fuzzyEquals(match, oldName) ? marker + newName : content.slice(i, i + 1 + match.length);
+        result += fuzzyEquals(match, oldName)
+          ? marker + newName
+          : content.slice(i, i + 1 + match.length);
         i += 1 + match.length;
         continue;
       }

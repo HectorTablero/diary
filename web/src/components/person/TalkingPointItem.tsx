@@ -102,7 +102,12 @@ export function TalkingPointItem({
           while the actions were a flex sibling but leaves the floated cluster sitting flush on the
           rounded border. Less than the `pl-3` on the other side because the trailing ⋯ button is a
           ghost icon that already carries its own optical padding. */}
-      <div className={cn('rounded-xl py-1.5 pr-2 pl-3', isMatch ? 'border bg-card shadow-xs' : 'opacity-70')}>
+      <div
+        className={cn(
+          'rounded-xl py-1.5 pr-2 pl-3',
+          isMatch ? 'border bg-card shadow-xs' : 'opacity-70',
+        )}
+      >
         <EntryRow entry={node} showChips={false} showDate={depth === 0}>
           {isMatch && (
             // No wrapper of its own — EntryRow floats these and already lays them out in a row.
@@ -126,7 +131,12 @@ export function TalkingPointItem({
                       : 'people.matchBroadcast',
                 )}
               </Badge>
-              <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs mt-1.5" onClick={markSaid}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs mt-1.5"
+                onClick={markSaid}
+              >
                 <Check className="size-3.5" />
                 {t('people.markSaid')}
               </Button>
@@ -180,8 +190,12 @@ export function TalkingPointItem({
                 className="h-7 gap-1 px-2 text-xs text-muted-foreground"
                 onClick={() => setOpen((o) => !o)}
               >
-                <ChevronRight className={cn('size-3.5 transition-transform', open && 'rotate-90')} />
-                {open ? t('people.hideSubEntries') : t('people.hiddenSubEntries', { count: hiddenCount })}
+                <ChevronRight
+                  className={cn('size-3.5 transition-transform', open && 'rotate-90')}
+                />
+                {open
+                  ? t('people.hideSubEntries')
+                  : t('people.hiddenSubEntries', { count: hiddenCount })}
               </Button>
             </li>
           )}

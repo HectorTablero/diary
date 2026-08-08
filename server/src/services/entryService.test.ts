@@ -19,7 +19,10 @@ describe('saidTo normalisation', () => {
      and treating them as "now" would silently rewrite the record being restored. */
 
   it('reads ids out of both shapes', () => {
-    expect(saidToIdList(['a', { personId: 'b', at: '2026-01-02T00:00:00.000Z' }])).toEqual(['a', 'b']);
+    expect(saidToIdList(['a', { personId: 'b', at: '2026-01-02T00:00:00.000Z' }])).toEqual([
+      'a',
+      'b',
+    ]);
   });
 
   it('treats an absent saidTo as empty rather than throwing', () => {

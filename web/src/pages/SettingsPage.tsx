@@ -18,7 +18,7 @@ import { ApiKeyField } from '@/components/settings/ApiKeyField';
    device-only pickers, the reminders block, the version line — lives beside them in
    components/settings, so this file is the draft, its save path, and the order of the sections. */
 import { RemindersSection } from '@/components/settings/RemindersSection';
-import { notifyDeviceSaved, Section, ToggleRow } from '@/components/settings/Section';
+import { notifyDeviceSaved, Section, SubToggleRow, ToggleRow } from '@/components/settings/Section';
 import { VersionFooter } from '@/components/settings/VersionFooter';
 import {
   HourCycleSetting,
@@ -44,9 +44,6 @@ import { useSession } from '@/lib/authClient';
 import { setPreference, usePreferences } from '@/lib/preferences';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-
-
-
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -157,7 +154,10 @@ export default function SettingsPage() {
    * because PUT /settings replaces the document — sending only the key would blank everything
    * else. The optimistic local mirror keeps just the has*Key flag (see mutations.saveSettings).
    */
-  const saveApiKey = (field: 'groqApiKey' | 'openRouterApiKey' | 'cerebrasApiKey', value: string) => {
+  const saveApiKey = (
+    field: 'groqApiKey' | 'openRouterApiKey' | 'cerebrasApiKey',
+    value: string,
+  ) => {
     if (!draft) return;
     const payload = buildPayload(draft, checkupsEnabled, checkupIntervalDays);
     if (!payload) return;
@@ -246,16 +246,14 @@ export default function SettingsPage() {
                         notifyDeviceSaved(t('settings.general.savedOnDevice'));
                       }}
                     >
-                      {/* Nested under the setting it qualifies, and rendered only while that
-                          setting is on — a switch for hiding a pill that cannot appear would be
-                          a control with no effect. ToggleRow's `children` already stack under the
-                          row, so this reads as belonging to it.
+                      {/* Rendered only while the setting it qualifies is on — a switch for hiding
+                          a pill that cannot appear would be a control with no effect.
 
                           Deliberately narrow: it hides the "waiting for Wi-Fi" pill and nothing
                           else. Going offline and the server being unreachable are failures rather
                           than a setting working as asked, and they keep announcing themselves. */}
                       {prefs.syncOnWifiOnly && (
-                        <ToggleRow
+                        <SubToggleRow
                           id="sync-hide-paused"
                           label={t('settings.advanced.hidePausedStatus')}
                           description={t('settings.advanced.hidePausedStatusDescription')}
@@ -289,7 +287,10 @@ export default function SettingsPage() {
                       key={value}
                       variant={theme === value ? 'secondary' : 'outline'}
                       size="sm"
-                      className={cn('gap-1.5 h-8', theme === value && 'ring-[1.5px] ring-inset ring-ring')}
+                      className={cn(
+                        'gap-1.5 h-8',
+                        theme === value && 'ring-[1.5px] ring-inset ring-ring',
+                      )}
                       onClick={() => changeTheme(value)}
                     >
                       <Icon className="size-4" />
@@ -390,7 +391,9 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-1.5">
                 <Label>{t('settings.entries.defaultImportance')}</Label>
                 <Select
-                  value={draft.defaultImportance === null ? 'last' : String(draft.defaultImportance)}
+                  value={
+                    draft.defaultImportance === null ? 'last' : String(draft.defaultImportance)
+                  }
                   onValueChange={(value) => {
                     setDraft({
                       ...draft,
@@ -405,7 +408,9 @@ export default function SettingsPage() {
                   <SelectContent>
                     {LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
-                        <span className={cn('mr-1 inline-block size-2.5', markerClass(Number(level)))} />
+                        <span
+                          className={cn('mr-1 inline-block size-2.5', markerClass(Number(level)))}
+                        />
                         {t(`importance.levels.${level}`)}
                       </SelectItem>
                     ))}
@@ -434,7 +439,9 @@ export default function SettingsPage() {
           advanced={
             draft && (
               <div className="flex items-center gap-3">
-                <span className="w-36 flex-1 text-sm sm:flex-none">{t('settings.decay.limit')}</span>
+                <span className="w-36 flex-1 text-sm sm:flex-none">
+                  {t('settings.decay.limit')}
+                </span>
                 <NumberInput
                   min={1}
                   max={200}
@@ -456,7 +463,9 @@ export default function SettingsPage() {
               {LEVELS.map((level) => (
                 <div key={level} className="flex items-center gap-3">
                   <span className={cn('size-3 shrink-0', markerClass(Number(level)))} />
-                  <span className="w-36 flex-1 text-sm sm:flex-none">{t(`importance.levels.${level}`)}</span>
+                  <span className="w-36 flex-1 text-sm sm:flex-none">
+                    {t(`importance.levels.${level}`)}
+                  </span>
                   <NumberInput
                     min={1}
                     max={3650}
@@ -472,14 +481,19 @@ export default function SettingsPage() {
                       })
                     }
                   />
-                  <span className="text-xs text-muted-foreground">{t('settings.memories.days')}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t('settings.memories.days')}
+                  </span>
                 </div>
               ))}
             </div>
           )}
         </Section>
 
-        <Section title={t('settings.memories.title')} description={t('settings.memories.description')}>
+        <Section
+          title={t('settings.memories.title')}
+          description={t('settings.memories.description')}
+        >
           {isLoading || !draft ? (
             <Skeleton className="h-20" />
           ) : (
@@ -499,13 +513,17 @@ export default function SettingsPage() {
                   <SelectContent>
                     {LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
-                        <span className={cn('mr-1 inline-block size-2.5', markerClass(Number(level)))} />
+                        <span
+                          className={cn('mr-1 inline-block size-2.5', markerClass(Number(level)))}
+                        />
                         {t(`importance.levels.${level}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">{t('settings.memories.thresholdDescription')}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.memories.thresholdDescription')}
+                </p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="memory-age">{t('settings.memories.minAge')}</Label>
@@ -520,21 +538,28 @@ export default function SettingsPage() {
                     onCommit={requestCommit}
                     onChange={(value) => setDraft({ ...draft, memoryMinAgeDays: value })}
                   />
-                  <span className="text-xs text-muted-foreground">{t('settings.memories.days')}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t('settings.memories.days')}
+                  </span>
                 </div>
               </div>
             </div>
           )}
         </Section>
 
-        <Section title={t('settings.broadcast.title')} description={t('settings.broadcast.description')}>
+        <Section
+          title={t('settings.broadcast.title')}
+          description={t('settings.broadcast.description')}
+        >
           {isLoading || !draft ? (
             <Skeleton className="h-24" />
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <Label htmlFor="broadcast-life-changing">{t('settings.broadcast.lifeChanging')}</Label>
+                  <Label htmlFor="broadcast-life-changing">
+                    {t('settings.broadcast.lifeChanging')}
+                  </Label>
                   <p className="text-xs text-muted-foreground">
                     {t('settings.broadcast.lifeChangingDescription')}
                   </p>
@@ -550,7 +575,9 @@ export default function SettingsPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>{t('settings.broadcast.tags')}</Label>
-                <p className="text-xs text-muted-foreground">{t('settings.broadcast.tagsDescription')}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.broadcast.tagsDescription')}
+                </p>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {draft.broadcastTagIds.map((id) => {
                     const tag = allTags.find((tg) => tg.id === id);
@@ -565,7 +592,11 @@ export default function SettingsPage() {
                         {t('common.add')}
                       </Button>
                     }
-                    items={allTags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
+                    items={allTags.map((tag) => ({
+                      id: tag.id,
+                      label: tag.name,
+                      color: tag.color,
+                    }))}
                     selectedIds={draft.broadcastTagIds}
                     onToggle={toggleBroadcastTag}
                     placeholder={t('tags.namePlaceholder')}
@@ -576,7 +607,10 @@ export default function SettingsPage() {
           )}
         </Section>
 
-        <Section title={t('settings.checkups.title')} description={t('settings.checkups.description')}>
+        <Section
+          title={t('settings.checkups.title')}
+          description={t('settings.checkups.description')}
+        >
           {isLoading || !draft ? (
             <Skeleton className="h-16" />
           ) : (
@@ -605,7 +639,9 @@ export default function SettingsPage() {
                     onCommit={requestCommit}
                     onChange={setCheckupIntervalDays}
                   />
-                  <span className="text-xs text-muted-foreground">{t('settings.memories.days')}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t('settings.memories.days')}
+                  </span>
                 </div>
               )}
             </div>
@@ -620,7 +656,9 @@ export default function SettingsPage() {
           ) : (
             <div className="flex flex-col gap-4">
               {aiDisabled && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">{t('settings.ai.signInRequired')}</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {t('settings.ai.signInRequired')}
+                </p>
               )}
               {/* hasKey comes from the query, never the draft: the draft is seeded once and then
                   held apart on purpose (see `commit`), so a key saved on this visit would leave it
@@ -637,7 +675,12 @@ export default function SettingsPage() {
                 hint={
                   <>
                     {t('settings.ai.apiKeyHint')}{' '}
-                    <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline">
+                    <a
+                      href="https://console.groq.com/keys"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
                       console.groq.com
                     </a>
                   </>
@@ -653,7 +696,12 @@ export default function SettingsPage() {
                 hint={
                   <>
                     {t('settings.ai.cerebrasApiKeyHint')}{' '}
-                    <a href="https://cloud.cerebras.ai/" target="_blank" rel="noreferrer" className="underline">
+                    <a
+                      href="https://cloud.cerebras.ai/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
                       cloud.cerebras.ai
                     </a>
                   </>
@@ -669,7 +717,12 @@ export default function SettingsPage() {
                 hint={
                   <>
                     {t('settings.ai.openRouterApiKeyHint')}{' '}
-                    <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="underline">
+                    <a
+                      href="https://openrouter.ai/keys"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
                       openrouter.ai/keys
                     </a>
                   </>
@@ -679,8 +732,12 @@ export default function SettingsPage() {
                   not about which provider writes it, and it was splitting the three in two. */}
               <div className="flex items-center justify-between gap-2 border-t pt-4">
                 <div className="flex flex-col gap-0.5">
-                  <Label htmlFor="force-english-ai-events">{t('settings.ai.forceEnglishAIEvents')}</Label>
-                  <p className="text-xs text-muted-foreground">{t('settings.ai.forceEnglishAIEventsDescription')}</p>
+                  <Label htmlFor="force-english-ai-events">
+                    {t('settings.ai.forceEnglishAIEvents')}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.ai.forceEnglishAIEventsDescription')}
+                  </p>
                 </div>
                 <Switch
                   id="force-english-ai-events"
@@ -718,7 +775,6 @@ export default function SettingsPage() {
 
       <VersionFooter />
 
-
       {/* Autosave took away the pause before a destructive change took effect, so the reset
           asks first — it's the one control on the page that can't be undone by retyping. */}
       <ConfirmDialog
@@ -729,7 +785,6 @@ export default function SettingsPage() {
         confirmLabel={t('settings.resetDefaults')}
         onConfirm={resetDefaults}
       />
-
     </PageContainer>
   );
 }

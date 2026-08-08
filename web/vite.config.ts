@@ -37,7 +37,9 @@ process.env.VITE_GOOGLE_CLIENT_ID ??= process.env.GOOGLE_CLIENT_ID;
 /* The root package.json version is the single source of truth (bumped by the pre-commit hook).
    Baking it into the bundle lets the *running* code report its own version — which is what the
    OTA logic needs, since after a live update the JS is no longer the one shipped in the APK. */
-const rootPkg = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'));
+const rootPkg = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
+);
 
 const ENV_DIR = fileURLToPath(new URL('.', import.meta.url));
 const ENV_PREFIX = ['VITE_', 'IS_'];
@@ -61,11 +63,28 @@ const VENDOR_CHUNKS: Record<string, string[]> = {
   'radix-vendor': ['radix-ui', '@radix-ui'],
   'icons-vendor': ['lucide-react'],
   'auth-vendor': ['better-auth', '@capgo/capacitor-social-login'],
-  capacitor: ['@capacitor/core', '@capacitor/app', '@capacitor/haptics', '@capacitor/keyboard', '@capacitor/preferences', '@capacitor/splash-screen', '@capacitor/status-bar', '@capgo/capacitor-updater'],
+  capacitor: [
+    '@capacitor/core',
+    '@capacitor/app',
+    '@capacitor/haptics',
+    '@capacitor/keyboard',
+    '@capacitor/preferences',
+    '@capacitor/splash-screen',
+    '@capacitor/status-bar',
+    '@capgo/capacitor-updater',
+  ],
   'telemetry-vendor': ['@logtail/browser'],
   // Only the entry tree and the suggestion review dialog drag anything, but both are reached
   // from lazy routes — so this rides along with them rather than the shell.
-  'dnd-vendor': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities', 'framer-motion', 'motion', 'motion-dom', 'motion-utils'],
+  'dnd-vendor': [
+    '@dnd-kit/core',
+    '@dnd-kit/sortable',
+    '@dnd-kit/utilities',
+    'framer-motion',
+    'motion',
+    'motion-dom',
+    'motion-utils',
+  ],
   'query-vendor': ['@tanstack/react-query'],
   'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
 };
@@ -126,43 +145,43 @@ export default defineConfig(({ mode }) => {
   if (mode === 'app') assertAppModeEnv(loadEnv(mode, ENV_DIR, ENV_PREFIX));
 
   return {
-  envPrefix: ENV_PREFIX,
-  define: {
-    __APP_VERSION__: JSON.stringify(rootPkg.version),
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-    __NATIVE_FINGERPRINT__: JSON.stringify(computeNativeFingerprint()),
-  },
-  plugins: [
-    localePlaceholders(),
-    react(),
-    tailwindcss(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
-      manifest: {
-        name: 'Diary',
-        short_name: 'Diary',
-        description: 'Personal diary with talking points, memories and people',
-        start_url: '/diary',
-        display: 'standalone',
-        background_color: '#18181b',
-        theme_color: '#18181b',
-        icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          {
-            src: '/icons/icon-512-maskable.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-        ],
-      },
-      workbox: {
-        // Data lives in the local Dexie store now; the SW only precaches the app shell.
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
-        /* Workbox's default list is js,css,html,ico,png,svg — no json, which the locale files
+    envPrefix: ENV_PREFIX,
+    define: {
+      __APP_VERSION__: JSON.stringify(rootPkg.version),
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+      __NATIVE_FINGERPRINT__: JSON.stringify(computeNativeFingerprint()),
+    },
+    plugins: [
+      localePlaceholders(),
+      react(),
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon.svg'],
+        manifest: {
+          name: 'Diary',
+          short_name: 'Diary',
+          description: 'Personal diary with talking points, memories and people',
+          start_url: '/diary',
+          display: 'standalone',
+          background_color: '#18181b',
+          theme_color: '#18181b',
+          icons: [
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+            {
+              src: '/icons/icon-512-maskable.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          // Data lives in the local Dexie store now; the SW only precaches the app shell.
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api\//],
+          /* Workbox's default list is js,css,html,ico,png,svg — no json, which the locale files
            became the moment they stopped being `import()`ed chunks and started being fetched by
            URL (see src/i18n/index.ts). Without this the app would come up offline with no strings
            at all, which is a far louder failure than the one that change was fixing.
@@ -175,28 +194,69 @@ export default defineConfig(({ mode }) => {
            All five subsets are precached, not just the two the shipped languages need. The UI is
            latin, but the *content* is whatever the user writes, and a Cyrillic name in an entry
            should not be the one thing on the page in a different font. 84 kB buys that outright;
-           `unicode-range` still means nothing extra is fetched at runtime. */
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,woff2}'],
+           `unicode-range` still means nothing extra is fetched at runtime.
+
+           Noto is the one case where that reasoning inverts. Geist is 84 kB across five subsets;
+           Noto JP and SC are 9.3 MB across ~225, so precaching them the same way would put a 9.3
+           MB download in front of first paint for every visitor, in every language, to cover two.
+           They are excluded from the manifest and picked up at runtime instead — the browser
+           requests only the subsets it needs, and CacheFirst makes those offline-durable from
+           second use. A ja/zh reader pays once for the handful of subsets their text touches;
+           everyone else pays nothing. */
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,json,woff2}'],
+          globIgnores: ['**/noto-sans-{jp,sc}-*.woff2'],
+          runtimeCaching: [
+            {
+              urlPattern: /\/assets\/noto-sans-(jp|sc)-[^/]*\.woff2$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'cjk-font-subsets',
+                // Hashed filenames, so an entry is immutable and only ever falls out on eviction.
+                expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+          ],
+        },
+      }),
+    ],
+    resolve: {
+      alias: [
+        /* The CJK webfonts are a web-only asset.
+
+         Fontsource ships Noto Sans JP and SC as ~225 `unicode-range` subsets between them. A
+         browser fetches only the subsets whose codepoints are actually on the page, so serving
+         them costs a latin reader nothing and gets ja/zh real Noto on every platform. `cap sync`
+         has no such laziness — it copies all of dist/ into the APK, so the same two @imports are
+         9.3 MB of woff2 that ships to every user regardless of language.
+
+         Stubbing the packages here rather than branching in the CSS keeps the decision in one
+         place, and makes it a resolver fact rather than something dead-code elimination has to be
+         trusted to notice. index.css lists the system Noto right behind the '… Variable' name, so
+         the APK simply falls through to the CJK faces Android already has. */
+        ...(mode === 'app'
+          ? [
+              {
+                find: /^@fontsource-variable\/noto-sans-(jp|sc)$/,
+                replacement: fileURLToPath(new URL('./src/cjk-webfont-stub.css', import.meta.url)),
+              },
+            ]
+          : []),
+        { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+      ],
+    },
+    server: {
+      proxy: {
+        // ws: true lets the live-sync WebSocket flow through the dev proxy too.
+        '/api': { target: `http://localhost:${apiPort}`, changeOrigin: false, ws: true },
       },
-    }),
-  ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
-  },
-  server: {
-    proxy: {
-      // ws: true lets the live-sync WebSocket flow through the dev proxy too.
-      '/api': { target: `http://localhost:${apiPort}`, changeOrigin: false, ws: true },
-    },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks,
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks,
+        },
       },
     },
-  },
   };
 });

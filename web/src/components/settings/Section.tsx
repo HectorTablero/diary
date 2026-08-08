@@ -50,9 +50,7 @@ export function Section({
             />
             {t('settings.advanced.title')}
           </button>
-          {showAdvanced && (
-            <div className="mt-3 flex flex-col gap-4 border-t pt-4">{advanced}</div>
-          )}
+          {showAdvanced && <div className="mt-3 flex flex-col gap-4 border-t pt-4">{advanced}</div>}
         </>
       )}
     </section>
@@ -88,6 +86,46 @@ export function ToggleRow({
         <Switch id={id} disabled={disabled} checked={checked} onCheckedChange={onCheckedChange} />
       </div>
       {children}
+    </div>
+  );
+}
+
+/**
+ * A switch that qualifies the setting above it rather than standing on its own.
+ *
+ * Same shape as the reminders' "At:" row: indented behind a rule, which is what says "this belongs
+ * to the row above" — a full-width ToggleRow nested in another one sits exactly as far from its
+ * parent as any two unrelated settings do, so nothing distinguishes a sub-option from the next
+ * setting down.
+ *
+ * The switch still goes to the far right, unlike the reminders' time picker. It is the same control
+ * as every other switch in the section and reads as out of place anywhere else, so the indent
+ * carries the nesting and the right-hand column stays a column.
+ */
+export function SubToggleRow({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  description?: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="ml-1 flex items-center gap-3 border-l pl-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        {/* A step down from ToggleRow's `text-sm`, so the hierarchy survives even where the rule
+            is hard to see. */}
+        <Label htmlFor={id} className="text-xs">
+          {label}
+        </Label>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      </div>
+      <Switch id={id} className="ml-auto" checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   );
 }

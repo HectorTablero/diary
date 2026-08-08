@@ -58,7 +58,10 @@ describe('the default language', () => {
   it('is the reference locale checkI18n compares the others against', () => {
     // That reference is the only locale guaranteed to define every key, which is what makes it
     // safe to fall back to a bundle that may not be loaded.
-    const source = readFileSync(fileURLToPath(new URL('../../scripts/checkI18n.ts', import.meta.url)), 'utf8');
+    const source = readFileSync(
+      fileURLToPath(new URL('../../scripts/checkI18n.ts', import.meta.url)),
+      'utf8',
+    );
     expect(source).toContain(`const REFERENCE = '${DEFAULT_LANGUAGE}'`);
   });
 });

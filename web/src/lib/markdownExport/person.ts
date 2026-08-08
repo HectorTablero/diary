@@ -32,7 +32,10 @@ export function buildPersonMarkdown(
   }
   if (options.workInfo && (person.company || person.jobTitle)) {
     meta.push(
-      [person.company && `Company: ${person.company}`, person.jobTitle && `Role: ${person.jobTitle}`]
+      [
+        person.company && `Company: ${person.company}`,
+        person.jobTitle && `Role: ${person.jobTitle}`,
+      ]
         .filter(Boolean)
         .join(' · '),
     );
@@ -82,7 +85,9 @@ export function buildPersonMarkdown(
     } else {
       for (const entry of said) {
         const saidAt = entry.saidTo.find((s) => s.personId === person.id)?.at.slice(0, 10) ?? '?';
-        lines.push(`- [importance ${entry.importance}] **${entry.dateKey}** (said ${saidAt}) — ${entry.content}`);
+        lines.push(
+          `- [importance ${entry.importance}] **${entry.dateKey}** (said ${saidAt}) — ${entry.content}`,
+        );
         const otherTags = entry.tags.map((t) => `#${t.name}`);
         const otherPeople = entry.people.filter((p) => p.id !== person.id).map((p) => p.name);
         const extras = [
@@ -109,14 +114,16 @@ function buildStructureLegend(options: PersonMarkdownOptions): string {
     '# Document structure',
     '',
     'Each person below follows this structure. A described field can still be missing for a given ' +
-      'person when the condition next to it isn\'t met — that\'s expected, not an error.',
+      "person when the condition next to it isn't met — that's expected, not an error.",
     '',
     '- `# Briefing: <name>` — one section per person.',
   ];
 
   const metaFields: string[] = [];
   if (options.aliases) {
-    metaFields.push('`Also known as: <name>, <name>, ...` — present only if the person has aliases on file.');
+    metaFields.push(
+      '`Also known as: <name>, <name>, ...` — present only if the person has aliases on file.',
+    );
   }
   if (options.workInfo) {
     metaFields.push(
@@ -129,18 +136,24 @@ function buildStructureLegend(options: PersonMarkdownOptions): string {
     );
   }
   if (options.checkupInterval) {
-    metaFields.push('`Checkup reminder: every <N> days` — present only if checkups are enabled for this person.');
+    metaFields.push(
+      '`Checkup reminder: every <N> days` — present only if checkups are enabled for this person.',
+    );
   }
   if (options.tags) {
     metaFields.push('`Tags: #tag, #tag, ...` — present only if the person has tags.');
   }
   if (metaFields.length) {
-    lines.push('- A block of bold one-line facts right under the heading, each optional and independent:');
+    lines.push(
+      '- A block of bold one-line facts right under the heading, each optional and independent:',
+    );
     for (const field of metaFields) lines.push(`  - ${field}`);
   }
 
   if (options.notes) {
-    lines.push('- `## Notes` — the person\'s notes verbatim; the whole section is absent if notes are empty.');
+    lines.push(
+      "- `## Notes` — the person's notes verbatim; the whole section is absent if notes are empty.",
+    );
   }
   if (options.events) {
     lines.push(
@@ -179,6 +192,8 @@ export function buildPeopleMarkdown(
   const sections = people.map(({ person, said, unsaidCount }) =>
     buildPersonMarkdown(person, said, unsaidCount, options),
   );
-  const legend = buildStructureLegend(options) + (options.saidTimeline ? `\n${buildImportanceLegend()}\n---\n\n` : '');
+  const legend =
+    buildStructureLegend(options) +
+    (options.saidTimeline ? `\n${buildImportanceLegend()}\n---\n\n` : '');
   return `${legend}${sections.join('\n---\n\n')}`;
 }

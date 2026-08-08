@@ -73,7 +73,9 @@ export const entryUpdateSchema = z.object({
 
 // --- People ---
 
-export const aliasesSchema = z.array(z.string().trim().min(1).max(MAX_ALIAS_LENGTH)).max(MAX_ALIASES);
+export const aliasesSchema = z
+  .array(z.string().trim().min(1).max(MAX_ALIAS_LENGTH))
+  .max(MAX_ALIASES);
 /** Stored as-is even when it isn't E.164: an imported local-format number is still worth
     keeping (the UI flags it), and only the edit form insists on a full international number. */
 export const phoneSchema = z.string().trim().max(MAX_PHONE_LENGTH).nullable();

@@ -1,2 +1,33 @@
+# Prettier reads the ignore files at the repo ROOT and nowhere else: `--ignore-path` defaults to
+# [.gitignore, .prettierignore], and a nested .gitignore is never consulted. This repo has five of
+# those, so everything web/android/.gitignore covers was invisible to prettier and `npm run format`
+# walked straight into it — 255 generated files, among them the minified bundle under
+# app/src/main/assets/public that `cap sync` copies into the APK. Reformatting that inflates the
+# APK and changes bytes the OTA bundle is fingerprinted from.
+#
+# So: anything ignored by a NESTED .gitignore has to be repeated here. Only the root one is shared.
+
 node_modules
 dist
+dev-dist
+
+# --- web/android/.gitignore ---
+# Gradle's own output trees.
+web/android/build/
+web/android/app/build/
+# Copied web assets and the config Capacitor generates beside them (`cap sync` output).
+web/android/app/src/main/assets/public/
+web/android/app/src/main/assets/capacitor.config.json
+web/android/app/src/main/assets/capacitor.plugins.json
+web/android/app/src/main/res/xml/config.xml
+# Regenerated from node_modules on every sync.
+web/android/capacitor-cordova-android-plugins/
+
+# --- web/android/app/src/main/res/.gitignore, web/assets/.gitignore, web/public/.gitignore ---
+# Generated icon/splash artwork. Prettier has no parser for png/svg today, but --ignore-unknown is
+# not in play for `format`, and these are outputs either way.
+web/android/app/src/main/res/mipmap-*/
+web/assets/
+web/public/icons/
+web/public/favicon.svg
+web/public/favicon-local.svg

@@ -11,7 +11,8 @@ export interface EntriesMarkdownOptions {
    Mentioned people appear as names only (EntryDto.people is already {id, name}), so no contact
    info about them can leak into the export by construction. */
 export function buildEntriesMarkdown(entries: EntryDto[], options: EntriesMarkdownOptions): string {
-  const range = options.from || options.to ? ` (${options.from ?? '…'} – ${options.to ?? '…'})` : '';
+  const range =
+    options.from || options.to ? ` (${options.from ?? '…'} – ${options.to ?? '…'})` : '';
   const lines: string[] = [`# Diary export${range}`, '', buildImportanceLegend(), '---', ''];
 
   const byDate = new Map<string, EntryDto[]>();
@@ -26,8 +27,10 @@ export function buildEntriesMarkdown(entries: EntryDto[], options: EntriesMarkdo
     const dayEntries = byDate.get(date)!.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const entry of dayEntries) {
       lines.push(`- [importance ${entry.importance}] ${entry.content}`);
-      if (entry.tags.length) lines.push(`  Tags: ${entry.tags.map((t) => `#${t.name}`).join(', ')}`);
-      if (entry.people.length) lines.push(`  Mentions: ${entry.people.map((p) => p.name).join(', ')}`);
+      if (entry.tags.length)
+        lines.push(`  Tags: ${entry.tags.map((t) => `#${t.name}`).join(', ')}`);
+      if (entry.people.length)
+        lines.push(`  Mentions: ${entry.people.map((p) => p.name).join(', ')}`);
     }
     lines.push('');
   }

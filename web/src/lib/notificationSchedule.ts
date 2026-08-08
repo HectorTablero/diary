@@ -21,7 +21,10 @@ export interface TimeOfDay {
  * corrupt profile can put anything into, and a bad string must not be able to stop the whole
  * reconcile — losing every alarm is far worse than one being at the wrong minute.
  */
-export function parseTimeOfDay(value: string, fallback: TimeOfDay = { hours: 9, minutes: 0 }): TimeOfDay {
+export function parseTimeOfDay(
+  value: string,
+  fallback: TimeOfDay = { hours: 9, minutes: 0 },
+): TimeOfDay {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value?.trim() ?? '');
   if (!match) return fallback;
   const hours = Number(match[1]);
@@ -56,7 +59,8 @@ export function nextDailyReminderAt(now: Date, time: string): Date {
  * own catch-up rules and its own re-announcement guard — a lot of machinery for a nudge whose
  * useful version is the one that arrives on the morning.
  */
-export const birthdayFireAt = (occurrence: Date, time: string): Date => atTimeOfDay(occurrence, time);
+export const birthdayFireAt = (occurrence: Date, time: string): Date =>
+  atTimeOfDay(occurrence, time);
 
 /**
  * Whether `at` falls inside the quiet window.

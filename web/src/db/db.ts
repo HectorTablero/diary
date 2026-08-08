@@ -1,4 +1,11 @@
-import type { EntryDto, PersonDto, PersonEventDto, SaidMark, TagDto, ThreadDto } from '@diary/shared';
+import type {
+  EntryDto,
+  PersonDto,
+  PersonEventDto,
+  SaidMark,
+  TagDto,
+  ThreadDto,
+} from '@diary/shared';
 import { normalizeBirthday } from '@diary/shared';
 import Dexie, { type EntityTable } from 'dexie';
 

@@ -15,13 +15,12 @@ export interface ScoredPerson extends SearchablePerson {
 }
 
 /** Same normalization rule as web/src/lib/tokens.ts: NFD, strip diacritics, lowercase. */
-export const normalize = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
+export const normalize = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-const tokenize = (s: string): string[] => normalize(s).split(/[^a-z0-9]+/).filter(Boolean);
+const tokenize = (s: string): string[] =>
+  normalize(s)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 
 function phoneticizeToken(token: string): string {
   return token
@@ -37,7 +36,8 @@ function phoneticizeToken(token: string): string {
     .replace(/(.)\1+/g, '$1');
 }
 
-const phoneticizeTokens = (s: string): string[] => tokenize(s).map(phoneticizeToken).filter(Boolean);
+const phoneticizeTokens = (s: string): string[] =>
+  tokenize(s).map(phoneticizeToken).filter(Boolean);
 
 /** Classic edit-distance DP, O(len(a) * len(b)). Inputs here are short tokens, not full text. */
 function levenshtein(a: string, b: string): number {

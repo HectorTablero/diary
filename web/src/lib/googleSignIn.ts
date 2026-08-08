@@ -23,7 +23,8 @@ async function nativeGoogleSignIn(): Promise<void> {
     provider: 'google',
     options: {},
   });
-  if (!('idToken' in result) || !result.idToken) throw new Error('Google sign-in returned no idToken');
+  if (!('idToken' in result) || !result.idToken)
+    throw new Error('Google sign-in returned no idToken');
   const { error } = await authClient.signIn.social({
     provider: 'google',
     idToken: { token: result.idToken, accessToken: result.accessToken?.token },

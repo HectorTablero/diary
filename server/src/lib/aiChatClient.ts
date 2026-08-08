@@ -66,7 +66,8 @@ export async function chatCompletion(
         signal: AbortSignal.timeout(60_000),
       });
     } catch (err) {
-      if (err instanceof Error && err.name === 'TimeoutError') throw new HttpError(504, 'ai.timeout');
+      if (err instanceof Error && err.name === 'TimeoutError')
+        throw new HttpError(504, 'ai.timeout');
       throw new HttpError(502, 'ai.upstream_error');
     }
     if (res.ok) return (await res.json()) as ChatCompletionResponse;
@@ -86,7 +87,8 @@ export async function chatCompletion(
     }
 
     const detail = await res.text().catch(() => '');
-    if (detail) console.warn(`ai chat (${baseUrl}): request failed (${res.status})`, detail.slice(0, 500));
+    if (detail)
+      console.warn(`ai chat (${baseUrl}): request failed (${res.status})`, detail.slice(0, 500));
     throw mapErrorResponse(res);
   }
   throw new HttpError(429, 'ai.rate_limited');

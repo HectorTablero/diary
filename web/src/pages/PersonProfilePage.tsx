@@ -213,10 +213,7 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
 
   // Threads come off the entries themselves, so grouping needs no extra query. With no threads
   // defined this returns one singleton group per cluster, in the order the forest already had.
-  const groups = useMemo(
-    () => (data ? groupTalkingPointsByThread(data.active) : []),
-    [data],
-  );
+  const groups = useMemo(() => (data ? groupTalkingPointsByThread(data.active) : []), [data]);
 
   if (isLoading) {
     return (
@@ -361,7 +358,12 @@ function HistoryTab({ personId, personName }: { personId: string; personName: st
       </ul>
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 text-sm">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
             ‹
           </Button>
           <span className="text-muted-foreground">
@@ -385,7 +387,9 @@ function HistoryTab({ personId, personName }: { personId: string; personName: st
 function useEventDates(event: PersonEventDto) {
   const { t, i18n } = useTranslation();
   const day = (key: string) => formatDateKey(key, i18n.language, 'd MMM yyyy');
-  const range = event.endDate ? `${day(event.startDate)} – ${day(event.endDate)}` : day(event.startDate);
+  const range = event.endDate
+    ? `${day(event.startDate)} – ${day(event.endDate)}`
+    : day(event.startDate);
   const length = eventLengthDays(event);
   return length > 1 ? `${range} · ${t('people.eventDays', { count: length })}` : range;
 }
@@ -415,7 +419,10 @@ function EventRow({
 
   const followUpDue = isEventFollowUpDue(event, today);
   const dates = useEventDates(event);
-  const daysSinceEnd = differenceInCalendarDays(parseDateKey(today), parseDateKey(eventEndKey(event)));
+  const daysSinceEnd = differenceInCalendarDays(
+    parseDateKey(today),
+    parseDateKey(eventEndKey(event)),
+  );
 
   return (
     <li className="rounded-xl border bg-card shadow-xs">
@@ -425,7 +432,9 @@ function EventRow({
               and drop to their own line only when the title needs the room. */}
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="max-w-full truncate text-sm font-medium">{event.title}</span>
-            <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">{dates}</span>
+            <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
+              {dates}
+            </span>
             {event.askedAt && (
               <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
             )}
@@ -678,7 +687,9 @@ export default function PersonProfilePage() {
           <div className="flex items-start gap-2.5">
             <BellRing className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <div>
-              <p className="text-sm font-medium">{t('people.checkupDueTitle', { name: person.name })}</p>
+              <p className="text-sm font-medium">
+                {t('people.checkupDueTitle', { name: person.name })}
+              </p>
               <p className="text-xs text-muted-foreground">{t('people.checkupDueDescription')}</p>
             </div>
           </div>

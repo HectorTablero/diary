@@ -19,7 +19,7 @@ tells you what to talk about with the people in your life.
   ranked by a decaying score: `importanceWeight · matchStrength · 2^(-age/halfLife)`.
   Important things stay relevant for months; trivia fades in days. Half-lives are
   configurable in Settings.
-- **Said** — mentioning `@Ana` in an entry automatically marks it as *said to Ana*
+- **Said** — mentioning `@Ana` in an entry automatically marks it as _said to Ana_
   (untick in the composer if you haven't told her). One click on the profile marks a
   talking point as said; it moves to a crossed-out "already told" list.
 - **Memories** — important entries (importance ≤ 2 by default) that directly mention a
@@ -77,18 +77,18 @@ themselves; and a skip link (web only) jumps past the sidebar's seven stops.
 
 npm workspaces monorepo:
 
-| Workspace | Stack |
-|---|---|
-| `web/` | React 19 + Vite 7 + TypeScript, Tailwind v4, shadcn/ui, TanStack Query, react-router 7, i18next (es/en/it/ja/zh), Dexie (IndexedDB), dnd-kit, PWA (vite-plugin-pwa), Capacitor (Android) |
-| `server/` | Hono on Node, Mongoose 8 (MongoDB), Better Auth (Google OAuth) |
-| `shared/` | zod schemas, DTO types, constants and the talking-points scoring, shared by both |
+| Workspace | Stack                                                                                                                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `web/`    | React 19 + Vite 7 + TypeScript, Tailwind v4, shadcn/ui, TanStack Query, react-router 7, i18next (es/en/it/ja/zh), Dexie (IndexedDB), dnd-kit, PWA (vite-plugin-pwa), Capacitor (Android) |
+| `server/` | Hono on Node, Mongoose 8 (MongoDB), Better Auth (Google OAuth)                                                                                                                           |
+| `shared/` | zod schemas, DTO types, constants and the talking-points scoring, shared by both                                                                                                         |
 
 In production the server serves the built SPA (single origin, single container).
 
 ## Offline / sync
 
 The app is **local-first**: every page reads from an IndexedDB mirror (`web/src/db`), so
-reading *and writing* work fully offline on both the website and the Android app.
+reading _and writing_ work fully offline on both the website and the Android app.
 Mutations apply locally and queue in an outbox that replays against the REST API when
 online; `GET /api/sync?since=` then pulls everything that changed (deletes propagate via
 tombstones). Conflicts resolve last-write-wins — fine for a single-user app.
@@ -202,17 +202,17 @@ reconnect); it needs none of the above.
 
 Errors and request/usage metrics go to [Better Stack](https://telemetry.betterstack.com).
 It is entirely optional — with the env vars unset, both the server and the client log to
-the console only. The env vars decide whether reporting is *possible*; the switch in
+the console only. The env vars decide whether reporting is _possible_; the switch in
 Settings → Data decides whether it happens, and is shown only when a build has somewhere to
 report to.
 
 Create **two** sources (Sources → Connect source), because the client token is shipped
 inside the bundle and must not be the server's:
 
-| Source platform | Used by | Token env var | Host env var |
-| --- | --- | --- | --- |
-| Node.js | API server (runtime) | `BETTERSTACK_SOURCE_TOKEN` | `BETTERSTACK_INGEST_URL` |
-| JavaScript | web + Android app (build time) | `VITE_BETTERSTACK_SOURCE_TOKEN` | `VITE_BETTERSTACK_INGEST_URL` |
+| Source platform | Used by                        | Token env var                   | Host env var                  |
+| --------------- | ------------------------------ | ------------------------------- | ----------------------------- |
+| Node.js         | API server (runtime)           | `BETTERSTACK_SOURCE_TOKEN`      | `BETTERSTACK_INGEST_URL`      |
+| JavaScript      | web + Android app (build time) | `VITE_BETTERSTACK_SOURCE_TOKEN` | `VITE_BETTERSTACK_INGEST_URL` |
 
 Both values are on each source's **Configure** screen. For local development put all four
 in `.env`. For CI, see below.
@@ -227,10 +227,10 @@ Two GitHub **environments** hold the secrets, and the two publishing jobs in
 environment secrets are invisible to a job that doesn't declare it. The Better Stack pair is
 therefore **duplicated across both**:
 
-| Environment | Secret | Value |
-| --- | --- | --- |
-| `android` + `docker` | `BETTERSTACK_CLIENT_SOURCE_TOKEN` | *JavaScript* source token |
-| `android` + `docker` | `BETTERSTACK_CLIENT_INGEST_URL` | *JavaScript* source ingesting host |
+| Environment          | Secret                            | Value                              |
+| -------------------- | --------------------------------- | ---------------------------------- |
+| `android` + `docker` | `BETTERSTACK_CLIENT_SOURCE_TOKEN` | _JavaScript_ source token          |
+| `android` + `docker` | `BETTERSTACK_CLIENT_INGEST_URL`   | _JavaScript_ source ingesting host |
 
 Both are **secrets**, not variables — `secrets.` and `vars.` are separate namespaces, and
 reading one through the other yields an empty string with no error. If the bundle ever
@@ -260,7 +260,7 @@ The `android` job is skipped when a commit changes nothing it builds from. That 
 workflow-level `paths:` filter, which cannot be expressed per-job, so it is now a diff against
 the pushed range — see the `scope` step. In practice it rarely skips, because the pre-commit
 hook touches `package.json` on most commits and `package.json` is in the list (as it was
-before: a version bump *is* a new release).
+before: a version bump _is_ a new release).
 
 The **server**'s pair are plain runtime env vars — set `BETTERSTACK_SOURCE_TOKEN` and
 `BETTERSTACK_INGEST_URL` wherever the container's environment is configured, alongside

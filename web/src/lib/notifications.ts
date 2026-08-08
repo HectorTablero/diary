@@ -120,7 +120,12 @@ async function collectCheckupNotifications(
         scheduled.push(checkupNotification(person, at, lastCheckupAt));
       }
     } else {
-      scheduled.push(checkupDigest(overdue.map(({ person }) => person.name), at));
+      scheduled.push(
+        checkupDigest(
+          overdue.map(({ person }) => person.name),
+          at,
+        ),
+      );
     }
   }
 

@@ -56,7 +56,9 @@ export function RemindersSection() {
   const { t } = useTranslation();
   const prefs = usePreferences();
   const [permission, setPermission] = useState<'granted' | 'denied' | 'prompt'>('granted');
-  const [exactAlarms, setExactAlarms] = useState<'granted' | 'denied' | 'unsupported'>('unsupported');
+  const [exactAlarms, setExactAlarms] = useState<'granted' | 'denied' | 'unsupported'>(
+    'unsupported',
+  );
 
   // Both are changed from outside the app, so re-read whenever the user comes back to it.
   useEffect(() => {
@@ -76,10 +78,15 @@ export function RemindersSection() {
   };
 
   return (
-    <Section title={t('settings.reminders.title')} description={t('settings.reminders.description')}>
+    <Section
+      title={t('settings.reminders.title')}
+      description={t('settings.reminders.description')}
+    >
       <div className="flex flex-col gap-5">
         {permission === 'denied' && (
-          <p className="text-xs text-amber-600 dark:text-amber-400">{t('settings.reminders.blocked')}</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            {t('settings.reminders.blocked')}
+          </p>
         )}
         {/* Full width and in the primary colour, unlike every other button on this page. Nothing
             below it can do anything until it has been pressed, so it is not one option among the
@@ -149,13 +156,17 @@ export function RemindersSection() {
             {t('settings.reminders.quietHoursDescription')}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t('settings.reminders.quietFrom')}</span>
+            <span className="text-xs text-muted-foreground">
+              {t('settings.reminders.quietFrom')}
+            </span>
             <TimePicker
               aria-label={t('settings.reminders.quietFrom')}
               value={prefs.quietHoursStart}
               onChange={(value) => set('quietHoursStart', value)}
             />
-            <span className="text-xs text-muted-foreground">{t('settings.reminders.quietUntil')}</span>
+            <span className="text-xs text-muted-foreground">
+              {t('settings.reminders.quietUntil')}
+            </span>
             <TimePicker
               aria-label={t('settings.reminders.quietUntil')}
               value={prefs.quietHoursEnd}
@@ -169,7 +180,12 @@ export function RemindersSection() {
             <p className="text-xs text-muted-foreground">
               {t('settings.reminders.exactAlarmsDescription')}
             </p>
-            <Button variant="outline" size="sm" className="w-fit" onClick={() => void requestExactAlarms()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-fit"
+              onClick={() => void requestExactAlarms()}
+            >
               {t('settings.reminders.exactAlarms')}
             </Button>
           </div>

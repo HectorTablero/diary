@@ -31,7 +31,11 @@ export interface VersionInfo {
 
 /** Compares two Major.Minor.Patch strings. Returns >0 when `a` is newer than `b`. */
 export function compareVersions(a: string, b: string): number {
-  const parse = (v: string) => v.trim().split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const parse = (v: string) =>
+    v
+      .trim()
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
   const [aMajor, aMinor, aPatch] = parse(a);
   const [bMajor, bMinor, bPatch] = parse(b);
   return aMajor - bMajor || aMinor - bMinor || aPatch - bPatch;

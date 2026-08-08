@@ -3,13 +3,7 @@ import { MAX_ALIASES } from '@diary/shared';
 import { Hash, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useCreatePerson,
-  useCreateTag,
-  useSettings,
-  useTags,
-  useUpdatePerson,
-} from '@/api/hooks';
+import { useCreatePerson, useCreateTag, useSettings, useTags, useUpdatePerson } from '@/api/hooks';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { Spinner } from '@/components/common/Spinner';
@@ -58,7 +52,8 @@ function buildBirthday(day: string, month: string, year: string): string | null 
   // validation on the server and losing the whole save.
   const safeDay = Math.min(Math.max(dayNum, 1), daysInMonth(monthNum));
   const yearNum = Number(year);
-  const safeYear = year.trim() && yearNum >= 1900 && yearNum <= new Date().getFullYear() ? yearNum : null;
+  const safeYear =
+    year.trim() && yearNum >= 1900 && yearNum <= new Date().getFullYear() ? yearNum : null;
   return formatBirthdayValue(safeYear, monthNum, safeDay);
 }
 
@@ -278,7 +273,9 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
               void createTag
                 .mutateAsync({ name: tagName })
                 .then((tag) => setTags((prev) => [...prev, tag]))
-                .catch((err) => notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown')))
+                .catch((err) =>
+                  notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown')),
+                )
             }
             placeholder={t('tags.namePlaceholder')}
           />
@@ -367,10 +364,7 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
             className="w-20 min-w-0"
             onChange={(e) => setBirthdayDay(e.target.value)}
           />
-          <Select
-            value={birthdayMonth}
-            onValueChange={(value) => setBirthdayMonth(value)}
-          >
+          <Select value={birthdayMonth} onValueChange={(value) => setBirthdayMonth(value)}>
             <SelectTrigger className="min-w-0 flex-1">
               <SelectValue placeholder={t('people.birthdayMonth')} />
             </SelectTrigger>
@@ -426,7 +420,11 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
       <div className="flex flex-col gap-1.5 border-t pt-4">
         <div className="flex items-center justify-between gap-2">
           <Label htmlFor="person-checkup">{t('people.checkupReminders')}</Label>
-          <Switch id="person-checkup" checked={checkupEnabled} onCheckedChange={setCheckupEnabled} />
+          <Switch
+            id="person-checkup"
+            checked={checkupEnabled}
+            onCheckedChange={setCheckupEnabled}
+          />
         </div>
         <p className="text-xs text-muted-foreground">{t('people.checkupRemindersDescription')}</p>
         {checkupEnabled && (

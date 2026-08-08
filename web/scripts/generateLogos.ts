@@ -64,7 +64,10 @@ async function main(): Promise<void> {
   log('  Diary Logo Generator');
   log('═══════════════════════════════════════════════');
 
-  await writeSvg(path.join(WEB_ASSETS, 'splash-base.svg'), createSvg(LOGO_VIEWBOX, BRAND_LOGO_PATHS));
+  await writeSvg(
+    path.join(WEB_ASSETS, 'splash-base.svg'),
+    createSvg(LOGO_VIEWBOX, BRAND_LOGO_PATHS),
+  );
   log('  ✓ assets/splash-base.svg');
 
   await writeSvg(path.join(WEB_PUBLIC, 'favicon.svg'), createSvg(LOGO_VIEWBOX, APP_LOGO_PATHS));

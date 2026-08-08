@@ -124,7 +124,11 @@ export function AddToThreadDialog({
               disabled={!newName.trim() || createThread.isPending || atLimit}
               onClick={() => void createAndAdd()}
             >
-              {createThread.isPending ? <Spinner className="size-3.5" /> : <Plus className="size-4" />}
+              {createThread.isPending ? (
+                <Spinner className="size-3.5" />
+              ) : (
+                <Plus className="size-4" />
+              )}
             </Button>
           </div>
 

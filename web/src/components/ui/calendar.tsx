@@ -94,7 +94,9 @@ export function Calendar({ value, onSelect, min, max, rangeAnchor, className }: 
 
   const weekdays = useMemo(
     () =>
-      Array.from({ length: 7 }, (_, i) => weekdayName((weekStart + i) % 7, i18n.language, 'EEEEEE')),
+      Array.from({ length: 7 }, (_, i) =>
+        weekdayName((weekStart + i) % 7, i18n.language, 'EEEEEE'),
+      ),
     [weekStart, i18n.language],
   );
 

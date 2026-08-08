@@ -61,7 +61,10 @@ async function main() {
   // said entries are excluded from talking points
   let tp = await repo.getTalkingPoints(ana.id);
   check('said entry not an active talking point', !tp.active.some((e) => e.id === mentioned.id));
-  check('said entry listed under said', tp.said.some((e) => e.id === mentioned.id));
+  check(
+    'said entry listed under said',
+    tp.said.some((e) => e.id === mentioned.id),
+  );
 
   // unsay -> becomes a mention-strength talking point
   await mutations.setSaid(mentioned.id, ana.id, false);
@@ -86,7 +89,10 @@ async function main() {
 
   // people list badge counts
   const people = await repo.getPeople();
-  check('talking point badge for Ana = 2', people.find((p) => p.id === ana.id)?.talkingPointCount === 2);
+  check(
+    'talking point badge for Ana = 2',
+    people.find((p) => p.id === ana.id)?.talkingPointCount === 2,
+  );
   check('no badge for Luis', people.find((p) => p.id === luis.id)?.talkingPointCount === 0);
 
   // hide removes from talking points but keeps history
@@ -119,28 +125,37 @@ async function main() {
     people: [ana.id],
     parentId: null,
   });
-  const month = await repo.getCalendarMonth(
-    Number(today.slice(0, 4)),
-    Number(today.slice(5, 7)),
-  );
+  const month = await repo.getCalendarMonth(Number(today.slice(0, 4)), Number(today.slice(5, 7)));
   const dayCell = month.find((d) => d.date === today);
   check('calendar counts roots only', dayCell?.count === 2, `count=${dayCell?.count}`);
   check('calendar maxImportance = strongest', dayCell?.maxImportance === 2);
 
   const otd = await repo.getOnThisDay(today);
-  check('on-this-day finds last year', otd.some((e) => e.dateKey === oldKey));
+  check(
+    'on-this-day finds last year',
+    otd.some((e) => e.dateKey === oldKey),
+  );
 
   const memories = await repo.getMemories(ana.id);
-  check('memory: old important mention', memories.some((e) => e.dateKey === oldKey));
+  check(
+    'memory: old important mention',
+    memories.some((e) => e.dateKey === oldKey),
+  );
   check('memory excludes recent entries', !memories.some((e) => e.dateKey === today));
 
   // --- search (accent-insensitive) ---
   const found = await repo.search(new URLSearchParams({ q: 'planeando' }));
-  check('search finds by text', found.results.some((e) => e.id === mentioned.id));
+  check(
+    'search finds by text',
+    found.results.some((e) => e.id === mentioned.id),
+  );
   const accents = await repo.search(new URLSearchParams({ q: 'AVIÓN' }));
   check('search is accent/case-insensitive vs "avion"', accents.total === 0); // no such entry
   const byPerson = await repo.search(new URLSearchParams({ people: ana.id }));
-  check('search filter by person', byPerson.results.every((e) => e.people.some((p) => p.id === ana.id)));
+  check(
+    'search filter by person',
+    byPerson.results.every((e) => e.people.some((p) => p.id === ana.id)),
+  );
 
   // --- cascade delete ---
   const del = await mutations.deleteEntry(mentioned.id);
@@ -163,9 +178,11 @@ async function main() {
   check('outbox has ops', ops.length > 5, `${ops.length} ops`);
   check('first op is the first tag create', ops[0].method === 'POST' && ops[0].path === '/tags');
   const createOp = ops.find((o) => o.path === '/entries' && o.method === 'POST') as
-    | { body?: { id?: string; createdAt?: string } }
-    | undefined;
-  check('entry create op carries id + createdAt', !!createOp?.body?.id && !!createOp?.body?.createdAt);
+    { body?: { id?: string; createdAt?: string } } | undefined;
+  check(
+    'entry create op carries id + createdAt',
+    !!createOp?.body?.id && !!createOp?.body?.createdAt,
+  );
 
   // --- settings ---
   const settings = await repo.getSettings();

@@ -6,7 +6,11 @@ import { kick } from './sync';
    mutations.ts so db/repo.ts's lazy orderKey healer can enqueue sync ops too, without repo.ts
    importing mutations.ts (which already imports repo.ts — that would be a cycle). */
 
-export async function enqueue(method: OutboxOp['method'], path: string, body?: unknown): Promise<void> {
+export async function enqueue(
+  method: OutboxOp['method'],
+  path: string,
+  body?: unknown,
+): Promise<void> {
   await db.outbox.add({ method, path, body });
   kick();
   refreshNotifications();

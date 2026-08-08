@@ -61,7 +61,15 @@ describe('projectDrop', () => {
     const visible = visibleForDrag(flat, 'c1');
     // Insert right before root2 (i.e. after c2), dragged right one level to nest under c2.
     const targetIndex = visible.findIndex((f) => f.node.id === 'root2');
-    const result = projectDrop(visible, active.node, active.depth, targetIndex, indentWidth, indentWidth, 3);
+    const result = projectDrop(
+      visible,
+      active.node,
+      active.depth,
+      targetIndex,
+      indentWidth,
+      indentWidth,
+      3,
+    );
     // Blocked, but the shadow should stay at depth 4 under c2 — the nesting the user actually
     // reached for — not silently fall back to some other depth.
     expect(result).toEqual({ parentId: 'c2', depth: 4, index: 0, valid: false });
@@ -73,7 +81,15 @@ describe('projectDrop', () => {
     const visible = visibleForDrag(flat, 'c1');
     // Insert as a2's first child: before b2, dragged right one level.
     const targetIndex = visible.findIndex((f) => f.node.id === 'b2');
-    const result = projectDrop(visible, active.node, active.depth, targetIndex, indentWidth, indentWidth, 3);
+    const result = projectDrop(
+      visible,
+      active.node,
+      active.depth,
+      targetIndex,
+      indentWidth,
+      indentWidth,
+      3,
+    );
     expect(result).toEqual({ parentId: 'a2', depth: 2, index: 0, valid: true });
   });
 
@@ -99,7 +115,15 @@ describe('projectDrop', () => {
     const visible = visibleForDrag(flat, 'b1');
     // Insert as b2's first child: before c2.
     const targetIndex = visible.findIndex((f) => f.node.id === 'c2');
-    const result = projectDrop(visible, active.node, active.depth, targetIndex, indentWidth, indentWidth, 3);
+    const result = projectDrop(
+      visible,
+      active.node,
+      active.depth,
+      targetIndex,
+      indentWidth,
+      indentWidth,
+      3,
+    );
     expect(result).toEqual({ parentId: 'b2', depth: 3, index: 0, valid: false });
   });
 
@@ -108,7 +132,15 @@ describe('projectDrop', () => {
     const active = flat.find((f) => f.node.id === 'b1')!;
     const visible = visibleForDrag(flat, 'b1');
     const targetIndex = visible.findIndex((f) => f.node.id === 'root2');
-    const result = projectDrop(visible, active.node, active.depth, targetIndex, 2 * indentWidth, indentWidth, 3);
+    const result = projectDrop(
+      visible,
+      active.node,
+      active.depth,
+      targetIndex,
+      2 * indentWidth,
+      indentWidth,
+      3,
+    );
     expect(result.valid).toBe(false);
   });
 
@@ -117,7 +149,15 @@ describe('projectDrop', () => {
     const active = flat.find((f) => f.node.id === 'a1')!;
     const visible = visibleForDrag(flat, 'a1');
     const targetIndex = visible.findIndex((f) => f.node.id === 'root2');
-    const result = projectDrop(visible, active.node, active.depth, targetIndex, 3 * indentWidth, indentWidth, 3);
+    const result = projectDrop(
+      visible,
+      active.node,
+      active.depth,
+      targetIndex,
+      3 * indentWidth,
+      indentWidth,
+      3,
+    );
     expect(result.valid).toBe(false);
   });
 
@@ -145,7 +185,8 @@ describe('stepKeyboard', () => {
     active: Node,
     start: KeyboardSlot,
     keys: ArrowKey[],
-  ): KeyboardSlot => keys.reduce((slot, key) => stepKeyboard(visible, active, slot, key, MAX), start);
+  ): KeyboardSlot =>
+    keys.reduce((slot, key) => stepKeyboard(visible, active, slot, key, MAX), start);
 
   const setup = (activeId: string) => {
     const flat = flattenTree(fixture());
@@ -216,7 +257,10 @@ describe('stepKeyboard', () => {
           indentWidth,
           MAX,
         );
-        expect({ id: activeId, ...slot, depth: projected.depth }).toEqual({ id: activeId, ...slot });
+        expect({ id: activeId, ...slot, depth: projected.depth }).toEqual({
+          id: activeId,
+          ...slot,
+        });
       }
     }
   });
@@ -274,7 +318,8 @@ function reachable(
       const next = stepKeyboard(visible, active, slot, key, 3);
       const id = `${next.targetIndex}:${next.depth}`;
       if (seen.has(id)) continue;
-      if (seen.size >= limit) throw new Error(`stepKeyboard reached ${id}: unbounded, not clamping`);
+      if (seen.size >= limit)
+        throw new Error(`stepKeyboard reached ${id}: unbounded, not clamping`);
       seen.set(id, next);
       queue.push(next);
     }
@@ -296,6 +341,9 @@ describe('applyMove', () => {
     const result = applyMove(fixture(), 'a1', null, 2);
     expect(result.map((n) => n.id)).toEqual(['root1', 'root2', 'a1']);
     // Its own subtree moved with it, untouched.
-    expect(result[2]).toMatchObject({ id: 'a1', children: [{ id: 'b1', children: [{ id: 'c1' }] }] });
+    expect(result[2]).toMatchObject({
+      id: 'a1',
+      children: [{ id: 'b1', children: [{ id: 'c1' }] }],
+    });
   });
 });

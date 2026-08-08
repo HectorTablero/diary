@@ -111,9 +111,11 @@ async function ensureOrderKeys(entries: LocalEntry[]): Promise<LocalEntry[]> {
 
   await db.entries.bulkPut(healed);
   await enqueueBatch(
-    healed.map(
-      (e): OutboxOp => ({ method: 'PATCH', path: `/entries/${e.id}`, body: { orderKey: e.orderKey } }),
-    ),
+    healed.map((e): OutboxOp => ({
+      method: 'PATCH',
+      path: `/entries/${e.id}`,
+      body: { orderKey: e.orderKey },
+    })),
   );
   return entries;
 }
@@ -188,7 +190,10 @@ export async function getOnThisDay(dateKey: string): Promise<EntryDto[]> {
   const settings = await getSettings();
   const monthDay = dateKey.slice(4); // "-MM-DD"
   const [entries, maps] = await Promise.all([
-    db.entries.where('dateKey').below(dateKey.slice(0, 4) + monthDay).toArray(),
+    db.entries
+      .where('dateKey')
+      .below(dateKey.slice(0, 4) + monthDay)
+      .toArray(),
     joinMaps(),
   ]);
   return entries
@@ -329,9 +334,7 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
 
   // Full date-range set (not just matching candidates): a matching sub-entry
   // needs its non-matching ancestors/siblings available as context too.
-  const withinCutoff = entries
-    .filter((e) => e.dateKey >= cutoff)
-    .map((e) => entryToDto(e, maps));
+  const withinCutoff = entries.filter((e) => e.dateKey >= cutoff).map((e) => entryToDto(e, maps));
   const active = buildTalkingPointForest(
     withinCutoff,
     personId,
