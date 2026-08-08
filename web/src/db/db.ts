@@ -239,6 +239,23 @@ export const personFromDto = (dto: PersonDto): LocalPerson => ({
   createdAt: dto.createdAt,
 });
 
+/**
+ * A counter bumped whenever the lookup tables — tags, people, threads — are written.
+ *
+ * repo.ts caches those three as id→doc maps (see joinMaps) because nearly every read joins against
+ * them and re-reading all three per query was most of the cost of opening a screen. This is how it
+ * knows the cache is still good.
+ *
+ * It lives here, in the module both the writer and the reader already depend on, rather than being
+ * exported from repo.ts — outbox.ts is where the bump belongs (see invalidateCachesFor there) and
+ * repo.ts already imports outbox.ts, so putting it there would close an import cycle.
+ */
+let lookupVersion = 0;
+export const bumpLookupVersion = (): void => {
+  lookupVersion++;
+};
+export const getLookupVersion = (): number => lookupVersion;
+
 export async function getMeta<T>(key: string): Promise<T | undefined> {
   const row = await db.meta.get(key);
   return row?.value as T | undefined;
@@ -265,4 +282,5 @@ export async function clearLocalData(): Promise<void> {
       ]);
     },
   );
+  bumpLookupVersion(); // the maps repo.ts may still be holding describe tables that are now empty
 }

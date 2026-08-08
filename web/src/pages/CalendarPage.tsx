@@ -1,4 +1,4 @@
-import type { PersonListItem } from '@diary/shared';
+import type { PersonDto } from '@diary/shared';
 import { addMonths, endOfMonth, format, getDay, startOfMonth } from 'date-fns';
 import { Cake, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -97,7 +97,7 @@ export default function CalendarPage() {
   // Anniversaries for the visible month only — birthdaysOn ignores the stored year, so a
   // birthday recorded as `--07-13` lands on 13 July of whichever year is on screen.
   const birthdaysByDate = useMemo(() => {
-    const map = new Map<string, PersonListItem[]>();
+    const map = new Map<string, PersonDto[]>();
     if (!people?.length) return map;
     for (const dateKey of cells) {
       if (!dateKey) continue;

@@ -1,4 +1,4 @@
-import type { PersonDto, PersonEventDto, PersonListItem, TagDto } from '@diary/shared';
+import type { PersonDto, PersonEventDto, TagDto } from '@diary/shared';
 import {
   eventEndKey,
   eventLengthDays,
@@ -157,7 +157,7 @@ function ProfileFallback({
   state,
   onRetry,
 }: {
-  cached: PersonListItem | undefined;
+  cached: PersonDto | undefined;
   state: 'loading' | 'error' | 'not-found';
   onRetry: () => void;
 }) {
