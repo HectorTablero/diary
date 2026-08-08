@@ -34,7 +34,7 @@ async function nativeGoogleSignIn(): Promise<void> {
   // doesn't include /sign-in/social (the web flow reloads the page instead, so
   // it never notices). Nudge the session store manually.
   authClient.$store.notify('$sessionSignal');
-  kick();
+  kick('signin');
 }
 
 /** Google sign-in for both native and web, parametrized by post-sign-in destination. Web is

@@ -53,21 +53,35 @@ const VENDOR_CHUNKS: Record<string, string[]> = {
      names that chunk after whichever module it happened to see first, which came out as
      `button-<hash>.js`: 227 kB of react-dom under the name of a UI component, and a name that
      would move the next time the import graph shifted. Naming it here is what makes it stable,
-     which is the entire point of this table. */
+     which is the entire point of this table.
+
+     Naming a package can only ever fix half of that, though — see chunkFileNames below for the
+     half this table cannot reach. */
   'react-vendor': ['react', 'react-dom', 'scheduler'],
   // Reached from nearly every route, because @diary/shared's schemas are. Same story as React
   // above: Rollup already gives it a shared chunk on its own, this only makes the name stable.
   'schema-vendor': ['zod'],
   'db-vendor': ['dexie'],
   'date-vendor': ['date-fns'],
-  'radix-vendor': ['radix-ui', '@radix-ui'],
+  /* The presentational primitive layer: Radix and the three styling helpers every `components/ui`
+     file calls (`cn` is clsx + tailwind-merge; the variants are cva). Those three were unnamed and
+     so kept landing in the shared app chunk — a few kB of dependency that never changes, re-hashed
+     on every release because the app code around it did. They are here rather than in a chunk of
+     their own because this one is already on the shell's critical path, so grouping them costs no
+     extra request. */
+  'ui-vendor': ['radix-ui', '@radix-ui', 'class-variance-authority', 'clsx', 'tailwind-merge'],
   'icons-vendor': ['lucide-react'],
+  // Reached from the shell (the router is what renders it), so this is eager either way — but
+  // naming it takes ~20 kB of never-changing dependency out of the shared app chunk's hash.
+  'router-vendor': ['react-router'],
   'auth-vendor': ['better-auth', '@capgo/capacitor-social-login'],
   capacitor: [
     '@capacitor/core',
     '@capacitor/app',
     '@capacitor/haptics',
     '@capacitor/keyboard',
+    // Pulled in by lib/notifications.ts, which the shell reconciles on every sync.
+    '@capacitor/local-notifications',
     '@capacitor/preferences',
     '@capacitor/splash-screen',
     '@capacitor/status-bar',
@@ -122,6 +136,46 @@ function manualChunks(id: string): string | undefined {
     // Lets a whole scope be claimed at once — see `@radix-ui` above.
     (scoped ? CHUNK_BY_PACKAGE.get(segments[0]) : undefined)
   );
+}
+
+/* Everything the table above deliberately does not name.
+ *
+ * A chunk that is neither an entry, a lazy route, nor one of ours is a *shared* chunk: code
+ * Rolldown hoisted out because more than one route reached it. Those chunks get named after
+ * whichever of their modules the bundler happened to see first, and that is a property of the
+ * import graph rather than of the contents — so `button-<hash>.js` was 173 kB of db layer, lib
+ * utilities, i18n runtime and @diary/shared, carrying the name of the one UI component in it.
+ *
+ * The name is not cosmetic. The filename is `[name]-[hash]`, so a name that moves changes the URL
+ * of a file whose bytes did not change, and a returning visitor re-downloads it — the exact cost
+ * this whole config exists to avoid. It had already moved once, from `react-dom`'s chunk to this
+ * one, and the modules in it are the ones every route imports, so it would keep moving.
+ *
+ * The fix is not to hand-place app code in VENDOR_CHUNKS. Membership there is forced rather than
+ * inferred, so a rule broad enough to catch `src/lib`'s shared half (apiClient, preferences,
+ * notifications, …) would also drag in its route-local half (the jszip-backed backup exporter,
+ * the transcription client, the contacts importer) and put all of it in front of first paint.
+ * Rolldown's own analysis is right about where app code goes; it is only wrong about what to
+ * call the result. So name the result instead, and leave the graph alone.
+ *
+ * A one-module shared chunk keeps its name: a single member cannot be the *first* of several, so
+ * that name describes the contents and is already stable. If it later gains a module its bytes
+ * changed anyway, and the hash would have moved with or without the rename.
+ */
+const MANUAL_CHUNK_NAMES = new Set(Object.keys(VENDOR_CHUNKS));
+
+function chunkFileNames(chunk: {
+  name: string;
+  isEntry: boolean;
+  isDynamicEntry: boolean;
+  moduleIds: string[];
+}): string {
+  const named =
+    chunk.isEntry || // the app entry
+    chunk.isDynamicEntry || // a lazy route: named after the module it fronts
+    MANUAL_CHUNK_NAMES.has(chunk.name) || // named by the table above
+    chunk.moduleIds.length === 1; // sole member: the name is a description, not a lottery
+  return named ? 'assets/[name]-[hash].js' : 'assets/shared-[hash].js';
 }
 
 /* The Capacitor build talks to the API cross-origin, so it *must* be given an absolute
@@ -255,6 +309,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks,
+          chunkFileNames,
         },
       },
     },

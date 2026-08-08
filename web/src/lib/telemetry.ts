@@ -1,4 +1,5 @@
 import { Logtail } from '@logtail/browser';
+import { CLIENT_ID } from './apiClient';
 import { isNative } from './native';
 import { getPreferences } from './preferences';
 
@@ -53,6 +54,15 @@ function baseContext(): Fields {
     app_version: __APP_VERSION__,
     platform: isNative ? 'android' : 'web',
     native_fingerprint: __NATIVE_FINGERPRINT__,
+    /* The same id the REST client already sends as `X-Client-Id`, which the server now records on
+       every request it logs.
+
+       This is the *only* thing joining the two Better Stack sources. They are separate on purpose —
+       the client token ships inside the bundle and must not be the server's — so a slow pull seen
+       from the app and the request that served it are two unrelated rows unless something is
+       carried across, and this is it. One page load (one app launch) gets one id, which makes it
+       the session key on this side as well; it is random per launch and identifies no person. */
+    client_id: CLIENT_ID,
   };
 }
 
@@ -65,11 +75,15 @@ function send({ level, message, fields }: QueuedEvent): void {
 }
 
 function emit(level: Level, message: string, fields: Fields): void {
-  const event: QueuedEvent = { level, message, fields: { ...baseContext(), ...fields } };
-
-  // Checked before the queue, not just before the send: opted out, nothing should accumulate in
-  // memory waiting for a reconnect that would then ship it.
+  /* First, before the event is even built.
+     Checking before the *queue* was always the point — opted out, nothing should accumulate in
+     memory waiting for a reconnect that would then ship it — but it used to happen after
+     baseContext() had already run, which made a disabled telemetry module do real work on every
+     call and, worse, made it capable of *failing* on one. Now that the sync engine calls in from a
+     hot path, "off" has to mean nothing happens at all, including nothing that could throw. */
   if (!reportingAllowed()) return;
+
+  const event: QueuedEvent = { level, message, fields: { ...baseContext(), ...fields } };
 
   if (!navigator.onLine) {
     if (queue.length >= MAX_QUEUED) queue.shift();
@@ -115,6 +129,88 @@ export async function trackTiming<T>(name: string, run: () => Promise<T>): Promi
   }
 }
 
+/**
+ * Whether to report *this* occurrence of a high-frequency event.
+ *
+ * Better Stack's free tier is a monthly volume, and the events worth sampling are precisely the
+ * ones that would spend it. A sync pass fires on every mutation, every foreground, every reconnect
+ * and every sixty seconds regardless — roughly 1,400 a day per open client, nearly all of them
+ * reporting that nothing changed. Sampling those keeps the shape of the latency distribution,
+ * which is all a chart of it needs, for a twentieth of the volume.
+ *
+ * The rule this is only ever used under: **sample the uneventful, never the eventful.** Anything
+ * carrying a failure, a rejection, a reset or a state transition is rare by construction, and the
+ * one occurrence dropped is the one that was worth the whole exercise.
+ */
+export const sampled = (rate: number): boolean => Math.random() < rate;
+
+/* Startup and rendering quality, reported once per session.
+ *
+ * Gathered from PerformanceObserver directly rather than by adding the `web-vitals` package: LCP
+ * and CLS are two observers and a running total, and a telemetry module has no business being a
+ * reason the bundle grew. INP is deliberately absent — measuring it properly is a great deal more
+ * than this, and a long-task count answers the question one would act on ("is the main thread
+ * being blocked, and by roughly how much?") without pretending to a standard metric it isn't.
+ *
+ * Nothing here is collected for a device fingerprint: no memory size, no core count, no user agent
+ * beyond the platform already in baseContext. It is a diary. */
+let largestContentfulPaint = 0;
+let cumulativeLayoutShift = 0;
+let longTaskCount = 0;
+let longTaskTotalMs = 0;
+let vitalsReported = false;
+
+interface LayoutShiftEntry extends PerformanceEntry {
+  value: number;
+  hadRecentInput: boolean;
+}
+
+function observe(type: string, onEntries: (entries: PerformanceEntryList) => void): void {
+  try {
+    new PerformanceObserver((list) => onEntries(list.getEntries())).observe({
+      type,
+      buffered: true, // entries from before this ran — LCP's best candidate is usually one of them
+    });
+  } catch {
+    // An entry type this browser doesn't implement: it simply contributes no field.
+  }
+}
+
+function observeVitals(): void {
+  if (typeof PerformanceObserver === 'undefined') return;
+  observe('largest-contentful-paint', (entries) => {
+    // Only the last one counts: LCP is re-reported as bigger candidates paint.
+    largestContentfulPaint = Math.round(entries[entries.length - 1]?.startTime ?? 0);
+  });
+  observe('layout-shift', (entries) => {
+    for (const entry of entries as LayoutShiftEntry[]) {
+      // Shifts within 500ms of an interaction are the user's own doing, not a defect.
+      if (!entry.hadRecentInput) cumulativeLayoutShift += entry.value;
+    }
+  });
+  observe('longtask', (entries) => {
+    longTaskCount += entries.length;
+    for (const entry of entries) longTaskTotalMs += entry.duration;
+  });
+}
+
+/** One `web_vitals` event per session, at the last moment the page is still able to send one. */
+function reportVitals(): void {
+  if (vitalsReported) return;
+  vitalsReported = true;
+  const nav = performance.getEntriesByType('navigation')[0] as
+    PerformanceNavigationTiming | undefined;
+  trackEvent('web_vitals', {
+    lcp_ms: largestContentfulPaint || undefined,
+    cls: Math.round(cumulativeLayoutShift * 1000) / 1000,
+    long_tasks: longTaskCount,
+    long_task_ms: Math.round(longTaskTotalMs),
+    ttfb_ms: nav && Math.round(nav.responseStart),
+    dom_interactive_ms: nav && Math.round(nav.domInteractive),
+    session_ms: Math.round(performance.now()),
+  });
+}
+
 export function initTelemetry(): void {
   if (!logtail) {
     console.info(
@@ -130,12 +226,35 @@ export function initTelemetry(): void {
     captureError(event.reason, { source: 'unhandledrejection' });
   });
   window.addEventListener('online', flushQueue);
-  // The tab can vanish without warning on mobile; get whatever is buffered out first.
-  window.addEventListener('pagehide', () => {
+  observeVitals();
+  /* The tab can vanish without warning on mobile; get whatever is buffered out first, and take the
+     one-per-session vitals event with it.
+
+     Both events, because neither is reliable alone: `pagehide` does not fire when Android kills a
+     backgrounded webview, and `visibilitychange` fires on every app switch — which is why
+     reportVitals() is idempotent and this is the only place it is called from. Whichever arrives
+     first is the one that reports; the other finds the work already done. */
+  const finish = () => {
+    reportVitals();
     void logtail.flush().catch(() => {
       /* dropped */
     });
+  };
+  window.addEventListener('pagehide', finish);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) finish();
   });
 
-  trackEvent('app_started', { build_time: __BUILD_TIME__ });
+  trackEvent('app_started', {
+    build_time: __BUILD_TIME__,
+    /* Time from navigation to the app's first line of JavaScript. On the web that is network plus
+       parse; in the Capacitor app the assets are local, so it is very nearly the webview's own
+       start-up cost — and it is the number to watch after a live update swaps the bundle. */
+    bootstrap_ms: Math.round(performance.now()),
+    locale: document.documentElement.lang || undefined,
+    // How the web app is actually being used: an installed PWA behaves (and fails) differently
+    // from a browser tab, and the two are indistinguishable in the logs otherwise.
+    standalone: !isNative && window.matchMedia('(display-mode: standalone)').matches,
+    online: navigator.onLine,
+  });
 }

@@ -446,7 +446,7 @@ export default function AppLayout() {
       // linked from Settings, local-only mode is over. The kick() below drains anything queued
       // in the outbox while local-only, exactly like an ordinary reconnect-and-sync.
       setLocalOnly(false);
-      kick();
+      kick('signin');
     }
   }, [session]);
 

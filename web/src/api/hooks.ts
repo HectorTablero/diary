@@ -19,6 +19,7 @@ import * as mutations from '@/db/mutations';
 import * as repo from '@/db/repo';
 import { apiPost } from '@/lib/apiClient';
 import { hapticWarning } from '@/lib/haptics';
+import { trackTiming } from '@/lib/telemetry';
 
 /* All reads and writes go through the local Dexie store (see src/db); the sync
    engine reconciles with the server in the background. Query keys are kept from
@@ -412,7 +413,15 @@ export function useSaveSettings() {
     suggestions are generated live from the transcript, there's nothing local to read. */
 export function useAiSuggestions() {
   return useMutation({
+    /* The other half of the voice flow, and the half that was unmeasured: lib/transcribe.ts times
+       the recording's round trip, and this is what happens to the transcript afterwards. Both legs
+       run before the user sees anything, so the wait they actually experience is the sum — and
+       until both were timed, a slow one could not be attributed to either.
+
+       trackTiming rather than a hand-rolled timer because this call is exactly its shape: a named
+       promise whose duration and success are the whole story, with no extra fields worth carrying
+       (the transcript is the user's diary and does not leave the device except to be answered). */
     mutationFn: (input: AiSuggestionsRequest) =>
-      apiPost<AiSuggestionsResponse>('/ai/suggestions', input),
+      trackTiming('ai_suggestions', () => apiPost<AiSuggestionsResponse>('/ai/suggestions', input)),
   });
 }

@@ -11,11 +11,30 @@ import { defineConfig } from 'vitest/config';
    keeps that division obvious from the filename: `.test.ts` is logic, `.test.tsx` is a component. */
 const alias = { '@': fileURLToPath(new URL('./src', import.meta.url)) };
 
+/* The three constants vite.config.ts bakes into the bundle.
+ *
+ * They are not optional the way a plugin is: a module that reads one is reading a plain global,
+ * and under a config that doesn't declare it that is a ReferenceError at the point of use rather
+ * than a missing feature. lib/telemetry.ts stamps all three onto every event, so the moment
+ * anything under test reported anything, it crashed — which is a test failure describing the test
+ * environment and nothing about the code.
+ *
+ * Fixed values rather than the real ones. Tests must not vary with the version in package.json or
+ * with which plugins happen to be installed, and no assertion here cares what they say — only that
+ * reading them is not an error. */
+const define = {
+  __APP_VERSION__: JSON.stringify('0.0.0-test'),
+  __BUILD_TIME__: JSON.stringify('1970-01-01T00:00:00.000Z'),
+  __NATIVE_FINGERPRINT__: JSON.stringify('test'),
+};
+
 export default defineConfig({
+  define,
   resolve: { alias },
   test: {
     projects: [
       {
+        define,
         resolve: { alias },
         test: {
           name: 'logic',
@@ -25,6 +44,7 @@ export default defineConfig({
       },
       {
         plugins: [react()],
+        define,
         resolve: { alias },
         test: {
           name: 'components',

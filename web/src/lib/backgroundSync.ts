@@ -2,6 +2,7 @@ import { BackgroundFetch } from '@transistorsoft/capacitor-background-fetch';
 import { syncNow } from '@/db/sync';
 import { isNative } from './native';
 import { refreshNotificationsNow } from './notifications';
+import { captureError, trackEvent } from './telemetry';
 
 /* Periodic background sync for the Android app.
  *
@@ -27,7 +28,7 @@ async function runBackgroundSync(): Promise<void> {
   // syncNow swallows its own network/auth failures and resolves either way, so an offline wake-up
   // still falls through to the reconcile below — which is the half that matters offline anyway,
   // since a rolled-over day changes which reminders should be armed with no server involved.
-  await syncNow();
+  await syncNow({ trigger: 'background' });
   await refreshNotificationsNow();
 }
 
@@ -53,8 +54,21 @@ export async function initBackgroundSync(): Promise<void> {
         requiresStorageNotLow: false,
       },
       async (taskId) => {
+        /* Every one of these is worth a row, and there are at most ~96 a day per device: Android
+           grants the slot roughly every fifteen minutes and no more often. The rate is the point —
+           a device where the OS has quietly stopped granting them at all looks, from the server,
+           exactly like a device nobody is using, and the two need telling apart. */
+        const startedAt = performance.now();
         try {
           await runBackgroundSync();
+          trackEvent('background_fetch', {
+            outcome: 'completed',
+            duration_ms: Math.round(performance.now() - startedAt),
+          });
+        } catch (err) {
+          // runBackgroundSync's own calls swallow their failures, so anything arriving here is
+          // unexpected — and it happens where no user could ever see it.
+          captureError(err, { scope: 'backgroundSync.task' });
         } finally {
           // Unconditional: not reporting back gets the app's background execution throttled.
           void BackgroundFetch.finish(taskId);
@@ -64,6 +78,9 @@ export async function initBackgroundSync(): Promise<void> {
         // The OS withdrew the remaining background time. Whatever the sync got through is already
         // committed to Dexie (and replays from the outbox next time) — just hand the slot back.
         console.warn('backgroundSync: OS timeout', taskId);
+        // Not an error: the slot is a loan and Android is entitled to call it in. It becomes one
+        // if it is *most* of them, which is a rate this can be divided by the line above to get.
+        trackEvent('background_fetch', { outcome: 'os_timeout' });
         void BackgroundFetch.finish(taskId);
       },
     );
@@ -71,8 +88,11 @@ export async function initBackgroundSync(): Promise<void> {
       // The user (or a device policy) turned background activity off. Foreground sync is unaffected,
       // so there is nothing to recover from — just don't leave it looking like it worked.
       console.warn('backgroundSync: unavailable, status', status);
+      // Once per launch, and it explains every subsequent silence from this device.
+      trackEvent('background_fetch_unavailable', { status });
     }
   } catch (err) {
     console.warn('backgroundSync: configure failed', err);
+    captureError(err, { scope: 'backgroundSync.configure' });
   }
 }

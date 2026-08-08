@@ -11,10 +11,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
    for fixtures built to catch the ways each rewrite could quietly disagree with the code it
    replaced. */
 
-// repo.ts reaches outbox.ts (via the lazy orderKey healer), which pulls in the notification
-// reconciler and the sync engine. Neither has anything to do with reading.
+/* repo.ts reaches outbox.ts (via the lazy orderKey healer), which pulls in the notification
+   reconciler and the sync engine. Neither has anything to do with reading.
+
+   `onReconnected` is stubbed as well as `kick` because i18n/index.ts subscribes to it at module
+   scope to expire its language-availability refusals, and outbox.ts now reaches i18n through
+   telemetry → preferences → dates. A module mock replaces the module wholesale, so an export it
+   omits is a hard error rather than an undefined — which is the right behaviour, and the reason
+   this list has to name everything the graph actually uses. */
 vi.mock('@/lib/notifications', () => ({ refreshNotifications: () => {} }));
-vi.mock('./sync', () => ({ kick: () => {} }));
+vi.mock('./sync', () => ({ kick: () => {}, onReconnected: () => () => {} }));
 
 const { db, bumpLookupVersion, setMeta } = await import('./db');
 const repo = await import('./repo');

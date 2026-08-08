@@ -1,7 +1,7 @@
 import { App as CapApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
 import { CapacitorUpdater, type BundleInfo } from '@capgo/capacitor-updater';
-import { captureError } from './telemetry';
+import { captureError, trackEvent } from './telemetry';
 import { isNative } from './native';
 import { fetchLatestRelease, isNewerThanRunning, type ReleaseInfo } from './updateCheck';
 
@@ -94,12 +94,30 @@ async function checkAndDownload(): Promise<void> {
         version: release.version,
         releaseUrl: release.releaseUrl,
       });
+      /* The fleet stops updating itself from here until people sideload an APK, and this is the
+         only signal that it has happened. It also catches the failure mode the fingerprint scheme
+         is most likely to have: a fingerprint that changed when it shouldn't have, which strands
+         every installed app on a release that was meant to go out over the air. */
+      trackEvent('live_update_native_required', {
+        release_version: release.version,
+        apk_fingerprint: await getApkFingerprint(),
+        bundle_fingerprint: release.fingerprint,
+      });
       return;
     }
 
+    const reused = await findDownloadedBundle(release.version);
+    const startedAt = performance.now();
     pending =
-      (await findDownloadedBundle(release.version)) ??
+      reused ??
       (await CapacitorUpdater.download({ url: release.bundleUrl!, version: release.version }));
+    // The success half of the three captureError calls that were this module's only telemetry.
+    // Without it "OTA is broken" and "OTA had nothing to deliver" are the same silence.
+    trackEvent('live_update_downloaded', {
+      release_version: release.version,
+      reused: reused !== null,
+      duration_ms: reused ? undefined : Math.round(performance.now() - startedAt),
+    });
   } catch (err) {
     // Offline, rate-limited, or a failed download: keep running what we have.
     captureError(err, { scope: 'liveUpdate.checkAndDownload' });
@@ -115,6 +133,12 @@ async function applyPending(): Promise<void> {
   pending = null;
 
   try {
+    /* Reported *before* the call, not after: `set` reloads the webview, so this JavaScript stops
+       existing partway through it and a line after it would never run. Its pair is the
+       `live_update_boot` below, from the bundle that comes up next — the two together are what say
+       whether an update actually landed, and an apply with no matching boot within the minute is
+       exactly the shape of a bundle Capgo rolled back. */
+    trackEvent('live_update_applying', { bundle_version: bundle.version });
     await CapacitorUpdater.set({ id: bundle.id });
   } catch (err) {
     captureError(err, { scope: 'liveUpdate.applyPending', bundle: bundle.version });
@@ -131,6 +155,17 @@ export async function initLiveUpdate(): Promise<void> {
     // safety net that makes shipping JS over the air survivable.
     await CapacitorUpdater.notifyAppReady();
     await recordApkFingerprintIfBuiltin();
+    /* Which bundle is actually running, said by the bundle itself once it is far enough along to
+       be trusted. This is the readout for the rollback net: a release whose `live_update_applying`
+       count is healthy but whose boots never appear is a bundle that fails before this line and is
+       being reverted on every device that takes it — which is precisely the situation the
+       `appReadyTimeout` design exists to survive, and precisely the one nothing could observe. */
+    const { bundle } = await CapacitorUpdater.current();
+    trackEvent('live_update_boot', {
+      bundle_id: bundle.id,
+      bundle_version: bundle.version,
+      builtin: bundle.id === BUILTIN_BUNDLE_ID,
+    });
   } catch (err) {
     captureError(err, { scope: 'liveUpdate.init' });
   }

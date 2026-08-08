@@ -1,6 +1,7 @@
 import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { useSyncExternalStore } from 'react';
 import { isNative } from './native';
+import { trackEvent } from './telemetry';
 
 /**
  * The lock in front of the diary.
@@ -26,6 +27,48 @@ import { isNative } from './native';
 
 const STORAGE_KEY = 'appLock';
 const PBKDF2_ITERATIONS = 210_000;
+
+/**
+ * Which gate an unlock attempt was made at.
+ *
+ * Passed in rather than inferred, because the three are the same two functions used for genuinely
+ * different things and the numbers only mean something apart. `lock_screen` is the whole app
+ * refusing to open — a failure there is someone locked out of their own diary. `delete_account` is
+ * a re-authentication in front of an irreversible action, where a *high* failure rate is the system
+ * working. `settings` is someone changing the lock they already know.
+ */
+export type LockContext = 'lock_screen' | 'settings' | 'delete_account';
+
+/* What the lock reports.
+ *
+ * Outcomes only, and never the passcode, the hash, the salt or the iteration count — the whole
+ * point of this module is that those do not leave the device, and a telemetry pipeline is exactly
+ * the kind of place they would leak to without anyone noticing.
+ *
+ * Volume is negligible: this fires when a person unlocks their diary, a handful of times a day at
+ * most, which is why none of it is sampled. */
+function reportUnlock(
+  method: 'passcode' | 'biometric',
+  context: LockContext,
+  ok: boolean,
+  reason?: string,
+): void {
+  trackEvent('app_lock_unlock', { method, context, ok, reason });
+}
+
+/**
+ * The plugin's own name for why biometry didn't happen.
+ *
+ * Read off the thrown value rather than imported as a type: `BiometryError.code` is a string enum
+ * (`userCancel`, `biometryLockout`, `biometryNotEnrolled`, `authenticationFailed`, …) and the
+ * distinctions are the entire value of this event — "the user pressed cancel" and "the sensor has
+ * locked itself out after five bad fingers" are the same `false` today, and only one of them means
+ * the fast path is broken. Defensive because a plugin upgrade must not be able to break unlocking.
+ */
+function biometryFailureReason(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? code : 'unknown';
+}
 
 /** How long the app may sit in the background before it locks again. */
 export const GRACE_CHOICES = [0, 60, 300, 900] as const;
@@ -147,21 +190,26 @@ export async function setPasscode(passcode: string): Promise<void> {
   setState({ locked: false });
 }
 
-export async function verifyPasscode(passcode: string): Promise<boolean> {
+export async function verifyPasscode(passcode: string, context: LockContext): Promise<boolean> {
   const config = state.config;
+  // No lock set: a vacuous pass, not an unlock. Reporting it would put a permanent `ok: true`
+  // baseline under the success rate of every device that has never turned the lock on.
   if (!config) return true;
   const salt = Uint8Array.from(atob(config.salt), (c) => c.charCodeAt(0));
   const hash = await derive(passcode, salt, config.iterations);
   // Both operands are hashes of the same fixed length, and an attacker able to time this already
   // has the device — so a constant-time compare would be theatre.
-  return hash === config.hash;
+  const ok = hash === config.hash;
+  reportUnlock('passcode', context, ok);
+  return ok;
 }
 
 /** Switching the lock off requires proving you can already pass it. */
 export async function disableLock(passcode: string): Promise<boolean> {
-  if (!(await verifyPasscode(passcode))) return false;
+  if (!(await verifyPasscode(passcode, 'settings'))) return false;
   write(null);
   setState({ locked: false });
+  trackEvent('app_lock_disabled');
   return true;
 }
 
@@ -188,12 +236,16 @@ export async function biometryAvailable(): Promise<boolean> {
 }
 
 /** Prompt for biometry. Resolves false on any refusal or failure — the passcode is always behind it. */
-export async function promptBiometrics(reason: string): Promise<boolean> {
+export async function promptBiometrics(reason: string, context: LockContext): Promise<boolean> {
+  // Not an attempt: there is no plugin on the web, so the caller falls straight through to the
+  // passcode field. Counting these would make biometry look broken on every browser.
   if (!isNative) return false;
   try {
     await BiometricAuth.authenticate({ reason, allowDeviceCredential: true });
+    reportUnlock('biometric', context, true);
     return true;
-  } catch {
+  } catch (err) {
+    reportUnlock('biometric', context, false, biometryFailureReason(err));
     return false;
   }
 }
@@ -213,8 +265,16 @@ export function initAppLock() {
   const onVisible = () => {
     if (!state.config || state.locked || hiddenAt === null) return;
     const away = (Date.now() - hiddenAt) / 1000;
+    const grace = state.config.graceSeconds;
     hiddenAt = null;
-    if (away >= state.config.graceSeconds) setState({ locked: true });
+    if (away < grace) return;
+    setState({ locked: true });
+    /* The grace period is a guess — DEFAULT_GRACE_SECONDS is 60 because the comment above argues a
+       lock that demands a passcode for every glance at a notification is a lock people switch off.
+       This is the only way to find out whether that guess is right: `away_s` clustered just above
+       `grace_s` means the app is re-locking on exactly the quick app-switches the default was
+       chosen to tolerate, and the default is too short. */
+    trackEvent('app_lock_engaged', { away_s: Math.round(away), grace_s: grace });
   };
 
   document.addEventListener('visibilitychange', () => {
