@@ -71,9 +71,14 @@ function isStrictSubset(a: Set<string>, b: Set<string>): boolean {
  * María — and leaves unrelated names that merely share letters alone.
  */
 export function isContained(a: string, b: string): boolean {
-  const ta = nameTokens(a);
-  const tb = nameTokens(b);
-  return isStrictSubset(ta, tb) || isStrictSubset(tb, ta);
+  return isContainedTokens(nameTokens(a), nameTokens(b));
+}
+
+/** `isContained` for callers that already hold the token sets. Comparing every row of a backup
+    against every local person re-tokenizes the same names thousands of times otherwise, and the
+    names on both sides are fixed for the whole comparison. */
+export function isContainedTokens(a: Set<string>, b: Set<string>): boolean {
+  return isStrictSubset(a, b) || isStrictSubset(b, a);
 }
 
 /** A duplicate name is fatal (the DB rejects it); the softer kinds are only warnings. */

@@ -18,7 +18,9 @@ import {
   redeemWsTicket,
   removeLiveClient,
 } from './services/liveSync';
+import { requireTrustedOrigin } from './middleware/origin';
 import { requireAuth, type AppEnv } from './middleware/session';
+import { accountRouter } from './routes/account';
 import { aiRouter } from './routes/ai';
 import { entriesRouter } from './routes/entries';
 import { peopleRouter } from './routes/people';
@@ -81,16 +83,23 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
     }),
   );
 
-  // The Capacitor app calls the API cross-origin from the native webview.
+  /* The Capacitor app calls the API cross-origin from the native webview, so the allowlist is the
+     web origin plus the two the webview can present. One list, used twice: CORS answers the
+     browser's preflight with it, and requireTrustedOrigin below re-checks it server-side on every
+     mutation — see that file for why the second check is not redundant. */
+  const trustedOrigins = [config.betterAuthUrl, 'https://localhost', 'capacitor://localhost'];
   app.use(
     '/api/*',
     cors({
-      origin: [config.betterAuthUrl, 'https://localhost', 'capacitor://localhost'],
+      origin: trustedOrigins,
       allowHeaders: ['Content-Type', 'Authorization', 'X-Client-Id'],
       exposeHeaders: ['set-auth-token'],
       credentials: true,
     }),
   );
+  /* Ahead of the auth handler as well as the API's own routes: sign-in and sign-out are
+     state-changing too, and there is no reason to hold them to a weaker rule than a tag rename. */
+  app.use('/api/*', requireTrustedOrigin(trustedOrigins));
 
   app.get('/api/health', (c) => c.json({ ok: true }));
   app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
@@ -132,6 +141,8 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   api.route('/threads', threadsRouter);
   api.route('/settings', settingsRouter);
   api.route('/sync', syncRouter);
+  // DELETE only: erases the diary and the account behind it. See routes/account.ts.
+  api.route('/account', accountRouter);
   api.route('/ai', aiRouter);
   app.route('/api', api);
 

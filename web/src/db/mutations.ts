@@ -1057,9 +1057,22 @@ export interface TagImportItem {
   resolution: BackupResolution;
 }
 
+/**
+ * The id a "keep both" should be created under.
+ *
+ * `row.id` whenever it is free, which is what lets a clean restore put everything back exactly
+ * where it was — the ids in the file are the ids the entries still reference. When it is taken the
+ * row is asking to sit *alongside* the thing already holding that id, so it needs one of its own:
+ * reusing it would fail `bulkAdd` outright and, on the server, come back as a 409 that sync.ts
+ * resolves by deleting the local row.
+ */
+const freeImportId = (id: string, taken: Set<string> | Map<string, unknown>): string =>
+  taken.has(id) ? newObjectId() : id;
+
 export async function importTags(
   items: TagImportItem[],
 ): Promise<{ created: number; merged: number; tagIdMap: Map<string, string>; ops: OutboxOp[] }> {
+  const existingIds = new Set(await db.tags.toCollection().primaryKeys());
   const tagIdMap = new Map<string, string>();
   const creates: TagDto[] = [];
   const ops: OutboxOp[] = [];
@@ -1076,17 +1089,15 @@ export async function importTags(
         tagIdMap.set(row.id, resolution.targetId);
         merged++;
         continue;
-      case 'create':
+      case 'create': {
         // A name clash blocks 'create' at review time (see isTagHardConflict), so by the time
         // this runs `row.name` has already been edited to something free, if it needed to be.
-        tagIdMap.set(row.id, row.id);
-        creates.push({ id: row.id, name: row.name, color: row.color });
-        ops.push({
-          method: 'POST',
-          path: '/tags',
-          body: { id: row.id, name: row.name, color: row.color },
-        });
+        const id = freeImportId(row.id, existingIds);
+        tagIdMap.set(row.id, id);
+        creates.push({ id, name: row.name, color: row.color });
+        ops.push({ method: 'POST', path: '/tags', body: { id, name: row.name, color: row.color } });
         continue;
+      }
     }
   }
 
@@ -1103,6 +1114,7 @@ export interface ThreadImportItem {
 export async function importThreads(
   items: ThreadImportItem[],
 ): Promise<{ created: number; merged: number; threadIdMap: Map<string, string>; ops: OutboxOp[] }> {
+  const existingIds = new Set(await db.threads.toCollection().primaryKeys());
   const threadIdMap = new Map<string, string>();
   const creates: ThreadDto[] = [];
   const ops: OutboxOp[] = [];
@@ -1116,15 +1128,17 @@ export async function importThreads(
         threadIdMap.set(row.id, resolution.targetId);
         merged++;
         continue;
-      case 'create':
-        threadIdMap.set(row.id, row.id);
-        creates.push(row);
+      case 'create': {
+        const id = freeImportId(row.id, existingIds);
+        threadIdMap.set(row.id, id);
+        creates.push({ ...row, id });
         ops.push({
           method: 'POST',
           path: '/threads',
-          body: { id: row.id, name: row.name, createdAt: row.createdAt },
+          body: { id, name: row.name, createdAt: row.createdAt },
         });
         continue;
+      }
     }
   }
 
@@ -1230,7 +1244,7 @@ export async function importPeopleFromBackup(
           return mapped ? [mapped] : [];
         });
         const person: LocalPerson = {
-          id: row.id,
+          id: freeImportId(row.id, byId),
           name: row.name,
           aliases: row.aliases,
           phone: row.phone,
@@ -1248,7 +1262,7 @@ export async function importPeopleFromBackup(
           createdAt: row.createdAt,
         };
         creates.push(person);
-        personIdMap.set(row.id, row.id);
+        personIdMap.set(row.id, person.id);
         ops.push({
           method: 'POST',
           path: '/people',
@@ -1293,7 +1307,13 @@ export async function importEntries(
   tagIdMap: Map<string, string>,
   personIdMap: Map<string, string>,
   threadIdMap: Map<string, string>,
-): Promise<{ created: number; merged: number; orphaned: number; ops: OutboxOp[] }> {
+): Promise<{
+  created: number;
+  merged: number;
+  skipped: number;
+  orphaned: number;
+  ops: OutboxOp[];
+}> {
   const existingIds = new Set((await db.entries.toArray()).map((e) => e.id));
   const remapIds = (ids: string[], map: Map<string, string>) =>
     ids.flatMap((id) => {
@@ -1305,10 +1325,20 @@ export async function importEntries(
   // in file order, so the full id map must exist before pass 2 rewrites any parentId.
   const entryIdMap = new Map<string, string>();
   const prepared: { row: EntryBackupRow; finalId: string; isOverwrite: boolean }[] = [];
+  let skipped = 0;
 
   for (const { row, resolution } of items) {
-    if (resolution.action === 'merge')
-      throw new Error('entries do not support the merge resolution');
+    /* `merge` on an entry writes nothing at all — it is the resolution for "this entry is already
+       here", whether recognised by content (detectEntryConflicts' `duplicate`) or chosen by hand
+       over an id collision. The row still has to enter the id map, and that is the entire point of
+       it: a sub-entry of this row then attaches to the copy that already exists instead of to a
+       fresh duplicate of its parent. Nothing about the local entry is touched, so a merge can never
+       overwrite something the user has edited since. */
+    if (resolution.action === 'merge') {
+      entryIdMap.set(row.id, resolution.targetId);
+      skipped++;
+      continue;
+    }
     const isOverwrite = resolution.action === 'overwrite';
     const finalId = isOverwrite ? row.id : newObjectId();
     entryIdMap.set(row.id, finalId);
@@ -1407,7 +1437,7 @@ export async function importEntries(
     if (overwrites.length) await db.entries.bulkPut(overwrites);
   });
 
-  return { created: creates.length, merged: overwrites.length, orphaned, ops };
+  return { created: creates.length, merged: overwrites.length, skipped, orphaned, ops };
 }
 
 export interface BackupImportPlan {
@@ -1421,7 +1451,9 @@ export interface BackupImportSummary {
   tags: { created: number; merged: number };
   threads: { created: number; merged: number };
   people: { created: number; merged: number };
-  entries: { created: number; merged: number; orphaned: number };
+  /** `merged` is entries overwritten in place; `skipped` is rows that were already here and were
+      left exactly as they are. */
+  entries: { created: number; merged: number; skipped: number; orphaned: number };
 }
 
 /** Applies a fully-resolved backup import plan: tags and threads first, then people (their tagIds
@@ -1453,6 +1485,7 @@ export async function importBackup(plan: BackupImportPlan): Promise<BackupImport
     entries: {
       created: entriesResult.created,
       merged: entriesResult.merged,
+      skipped: entriesResult.skipped,
       orphaned: entriesResult.orphaned,
     },
   };

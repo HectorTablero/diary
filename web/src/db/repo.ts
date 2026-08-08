@@ -11,6 +11,7 @@ import type {
   ThreadDto,
   ThreadWithStats,
 } from '@diary/shared';
+import { entryFingerprint, type ExistingEntryIndex } from '@/lib/backup/conflicts';
 import {
   buildEntryTree,
   buildTalkingPointForest,
@@ -484,11 +485,22 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
   return { active, said };
 }
 
-/** Every entry id currently stored locally — used to detect id collisions when restoring a
-    JSON backup (see lib/backup/conflicts.ts's detectEntryConflicts). */
-export async function getEntryIds(): Promise<Set<string>> {
-  // Straight off the primary-key index — the row payloads were only ever thrown away.
-  return new Set(await db.entries.toCollection().primaryKeys());
+/** Full index for backup-import conflict detection: every id plus a content fingerprint map so
+    re-imports under different ids are recognised as duplicates. */
+export async function getEntryIndex(): Promise<ExistingEntryIndex> {
+  const entries = await db.entries.toArray();
+  const byFingerprint = new Map<string, string>();
+  const byId = new Map<string, { content: string }>();
+  for (const entry of entries) {
+    const fp = entryFingerprint(entry);
+    if (!byFingerprint.has(fp)) byFingerprint.set(fp, entry.id);
+    byId.set(entry.id, { content: entry.content.slice(0, 80) });
+  }
+  return {
+    ids: new Set(entries.map((e) => e.id)),
+    byFingerprint,
+    byId,
+  };
 }
 
 /** Entries mentioning this person, created since they were added, that were never marked as said

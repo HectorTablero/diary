@@ -169,7 +169,8 @@
         "checkups": "Account-wide default for the per-person checkup interval.",
         "ai": "Optional voice-to-entry assistant. Provider names and key prefixes are literal; apiKeyHint and its siblings end mid-sentence because a link follows in the UI — keep them ending in a way that a URL can follow.",
         "markdownExport": "Exports part of the diary as Markdown intended to be pasted into an AI agent, not read as a backup.",
-        "data": "Backup, restore and export. \"Backup\" as a noun may stay a loanword where that's what people say."
+        "data": "Backup, restore and export. \"Backup\" as a noun may stay a loanword where that's what people say.",
+        "deleteAccount": "The one irreversible action in the app: it erases the diary from the server and closes the account. Precision over softness everywhere — a euphemism here costs someone their diary. Say plainly that it cannot be undone, and keep bulletDevices honest: other devices really do keep their copy until they sign out, and the string must not imply this reaches them. confirmWord is TYPED BY THE USER before the button unlocks, so it has to be something the language’s ordinary keyboard produces directly: Latin-script languages use their own word (DELETE, BORRAR, ELIMINA), but Japanese and Chinese deliberately keep the Latin \"DELETE\" rather than 削除/删除, because typing those needs an IME conversion and a confirmation nobody can type is a lockout, not a safeguard. If you change confirmWord, typeToConfirm shows it in {{word}} and the input placeholder repeats it, so they stay in step automatically. biometricsReason is shown by the operating system in its own biometric prompt, so it must stand alone with no app context around it."
       }
     },
     "errors": {
@@ -221,8 +222,21 @@
     "importBackup": {
       "where": "Restoring a JSON backup file, and its conflict-resolution review screen.",
       "keys": {
-        "sectionSummary": "{{label}} is a section name taken from this same namespace (tags/threads/people/entries), so the sentence must work with any of them substituted in.",
+        "exportedAt": "Identifies which backup is being reviewed, at the top of the screen. The file has no name by the time it reaches this page, so the export date is the only handle on it — {{date}} arrives already formatted by date-fns in the target language.",
+        "fileVersion": "The backup file format number, not the app version. A literal \"v\" next to {{version}} is fine to keep or drop, whichever reads as a version in the language.",
+        "needsReview": "Counted. Sits under a large number in a small tile, so it has to stay very short — this is the warning state, and the number beside it is the count of items needing a decision.",
+        "allNew": "The opposite of needsReview, in the same tile: nothing in this category clashes with anything on the device. Two or three words at most.",
+        "sectionRemaining": "Counted. A badge beside a section heading, giving how many conflicts in that section are still undecided. Extremely tight — a word plus the number.",
+        "sectionDone": "Counted. Replaces sectionRemaining once a section is finished, so it reads as completion rather than as a total.",
+        "allClear": "Shown instead of any conflict list when the whole backup is new to this device. Reassurance, not a warning.",
+        "allClearDescription": "Explains why there is nothing to do: nothing will be overwritten or merged. Should sound like good news.",
+        "allResolved": "Replaces resolveFirst in the footer once every conflict has a decision, immediately above the import button.",
+        "resolvedProgress": "A progress readout beside a bar — \"{{resolved}} of {{total}}\". Numerals only, no nouns; the sentence next to it already says what is being counted.",
+        "conflictIdExists": "The row's own id is already in use here. Shown only when nothing else on the card already says so — a plain restore matches by id and by name at once, and conflictDuplicate says both, so this line is suppressed there. {{name}} is what the local copy is called, which is the whole reason this survives: the case it is left for is a row whose local counterpart has since been renamed. For an entry it is the first line of that entry's text instead of a name, so the sentence must not assume a short noun.",
+        "conflictEntryDuplicate": "An entry with the same text, written on the same day, at the same moment — the file is a re-import of an entry already here rather than a new one. No placeholder: quoting the text back would just repeat the entry shown directly above it.",
         "overwrite": "Replaces the existing entry in place, as opposed to addAsNew.",
+        "setAll": "Label in front of a row of buttons that apply one decision to every conflict in a section at once. The buttons after it are the section's own words (merge/keepBoth/addAsNew/overwrite), so this must read as the start of a phrase they complete — \"Set all → Merge\". Very short; it sits on one line with the buttons.",
+        "entriesSkipped": "Counted. Reported after the import, alongside `orphaned`. These entries were already on the device, so the import deliberately left them untouched rather than adding a second copy — reassurance that nothing was lost, not a warning.",
         "done": "Eight counts in one sentence. Feel free to restructure into clauses that read naturally; keep every placeholder.",
         "orphaned": "Counted. An imported sub-entry whose parent wasn't imported gets promoted to the top level."
       }

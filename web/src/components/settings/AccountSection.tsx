@@ -6,15 +6,11 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Button } from '@/components/ui/button';
-import { clearLocalData } from '@/db/db';
-import { closeLiveChannel } from '@/db/sync';
 import { useSyncStatus } from '@/db/useSyncStatus';
-import { signOut, useSession } from '@/lib/authClient';
-import { setAuthToken } from '@/lib/authToken';
+import { useSession } from '@/lib/authClient';
+import { endSession } from '@/lib/endSession';
 import { googleSignIn } from '@/lib/googleSignIn';
-import { setLocalOnly } from '@/lib/localOnly';
 import { notifyError } from '@/lib/notify';
-import { cacheUser } from '@/lib/sessionCache';
 import { Section } from './Section';
 
 /** Who this diary belongs to: the signed-in account, or the offer to attach one. Owns the whole
@@ -28,13 +24,9 @@ export function AccountSection() {
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
-    // Local data belongs to the signed-in account: wipe it all.
-    closeLiveChannel();
-    await clearLocalData();
-    setAuthToken(null);
-    cacheUser(null);
-    setLocalOnly(false);
+    // Local data belongs to the signed-in account: wipe it all. Shared with account deletion, which
+    // has to leave the device in exactly this state too — see lib/endSession.ts.
+    await endSession();
     navigate('/login');
   };
 
