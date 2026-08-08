@@ -1,10 +1,13 @@
-import { Download, FileText, Upload } from 'lucide-react';
+import { Download, FileText, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { Spinner } from '@/components/common/Spinner';
+import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
 import { MarkdownExportDialog } from '@/components/settings/MarkdownExportDialog';
 import { Button } from '@/components/ui/button';
+import { useSyncStatus } from '@/db/useSyncStatus';
+import { useSession } from '@/lib/authClient';
 import { buildBackupEnvelope } from '@/lib/backup/export';
 import { backupEnvelopeSchema } from '@/lib/backup/schema';
 import { saveTextFile } from '@/lib/fileSave';
@@ -19,8 +22,15 @@ export function DataSection() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const prefs = usePreferences();
+  const { data: session } = useSession();
+  /* Deleting the account is the one action on this page that *only* works online — everything else
+     here reads or writes the local store. `paused` is not included: wi-fi-only holds back the
+     background sync on purpose, and it should not silently veto something the user just asked for. */
+  const { blocker } = useSyncStatus();
+  const serverUnreachable = blocker === 'offline' || blocker === 'unreachable';
   const [exportingBackup, setExportingBackup] = useState(false);
   const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const handleExportBackup = async () => {
@@ -127,10 +137,37 @@ export function DataSection() {
               />
             </div>
           )}
+
+          {/* Only with an account: there is no server-side copy to erase in local-only mode, and
+              offering to delete one would be offering something this button cannot do. Sitting last
+              and behind a divider is the point — nothing else here destroys anything. */}
+          {session?.user && (
+            <div className="flex flex-col gap-1 border-t pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-fit gap-1.5 h-8 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={serverUnreachable}
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 className="size-3.5" />
+                {t('settings.data.deleteAccount.action')}
+              </Button>
+              {/* Says which of the two it is. A disabled destructive button with no reason beside
+                  it reads as "this feature is broken", and the user is owed the difference between
+                  that and "the server can't be reached right now". */}
+              <p className="text-xs text-muted-foreground">
+                {serverUnreachable
+                  ? t('settings.data.deleteAccount.needsConnection')
+                  : t('settings.data.deleteAccount.actionDescription')}
+              </p>
+            </div>
+          )}
         </div>
       </Section>
 
       <MarkdownExportDialog open={markdownDialogOpen} onOpenChange={setMarkdownDialogOpen} />
+      <DeleteAccountDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} />
     </>
   );
 }

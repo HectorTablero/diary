@@ -13,6 +13,7 @@ import type {
   ThreadCreateInput,
   ThreadUpdateInput,
 } from '@diary/shared';
+import type { ExistingEntryIndex } from '@/lib/backup/conflicts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as mutations from '@/db/mutations';
 import * as repo from '@/db/repo';
@@ -388,10 +389,10 @@ export const useSettings = () =>
 
 // --- Backup import ---
 
-export const useEntryIds = () =>
+export const useEntryIndex = () =>
   useQuery({
-    queryKey: ['entries', 'all-ids'],
-    queryFn: () => repo.getEntryIds(),
+    queryKey: ['entries', 'index'],
+    queryFn: () => repo.getEntryIndex(),
   });
 
 export function useSaveSettings() {

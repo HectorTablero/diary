@@ -2,20 +2,19 @@ import {
   Check,
   FilePenLine,
   Merge,
-  Pencil,
   ShieldAlert,
   TriangleAlert,
   UserPlus,
+  type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import type { BackupResolution } from '@/lib/backup/conflicts';
 
 export interface BackupMergeTarget {
   targetId: string;
-  name: string;
+  name: string | undefined;
 }
 
 interface BackupConflictRowProps {
@@ -28,9 +27,8 @@ interface BackupConflictRowProps {
   createLabel: string;
   allowCreate: boolean;
   allowOverwrite?: boolean;
+  createIcon?: LucideIcon;
   onResolve: (resolution: BackupResolution) => void;
-  /** Omitted for entries — there's no name to rename. */
-  onRename?: (name: string) => void;
 }
 
 /** Generic conflict row for restoring a JSON backup, shared across tags/people/entries.
@@ -45,71 +43,66 @@ export function BackupConflictRow({
   createLabel,
   allowCreate,
   allowOverwrite = false,
+  createIcon: CreateIcon = UserPlus,
   onResolve,
-  onRename,
 }: BackupConflictRowProps) {
   const { t } = useTranslation();
-  const [renaming, setRenaming] = useState(false);
-  const [draft, setDraft] = useState(name);
 
   const isChosen = (action: BackupResolution['action'], targetId?: string) =>
     resolution?.action === action &&
     (action !== 'merge' || (resolution as { targetId: string }).targetId === targetId);
 
-  const commitRename = () => {
-    const value = draft.trim();
-    if (value) onRename?.(value);
-    setRenaming(false);
-  };
-
   return (
     <li
-      className={
-        'flex flex-col gap-2 rounded-xl border p-3 ' +
-        (resolution
+      className={cn(
+        'flex flex-col gap-2.5 rounded-xl border p-3 shadow-xs transition-colors',
+        resolution
           ? 'border-border bg-card'
           : hard
             ? 'border-destructive/50 bg-destructive/5'
-            : 'border-amber-500/50 bg-amber-500/5')
-      }
+            : 'border-amber-500/50 bg-amber-500/5',
+      )}
     >
-      <div className="flex items-start gap-2">
-        {resolution ? (
-          <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        ) : hard ? (
-          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-        ) : (
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-        )}
-        <div className="min-w-0 flex-1">
-          {renaming ? (
-            <div className="flex items-center gap-1.5">
-              <Input
-                value={draft}
-                autoFocus
-                className="h-8"
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitRename();
-                  if (e.key === 'Escape') setRenaming(false);
-                }}
-              />
-              <Button size="sm" className="h-8" onClick={commitRename}>
-                {t('common.save')}
-              </Button>
-            </div>
-          ) : (
-            <p className="truncate text-sm font-medium">{name}</p>
+      <div className="flex items-start gap-2.5">
+        {/* A tinted disc rather than a bare glyph. At 16px against a tinted card the three icons
+            were nearly indistinguishable from the text beside them, which is the one thing this
+            column exists to avoid — it is the only marker of whether a row still needs a decision. */}
+        <span
+          className={cn(
+            'mt-px flex size-6 shrink-0 items-center justify-center rounded-md',
+            resolution
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              : hard
+                ? 'bg-destructive/10 text-destructive'
+                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
           )}
-          <ul className="mt-0.5 flex flex-col text-xs text-muted-foreground">
+        >
+          {resolution ? (
+            <Check className="size-3.5" />
+          ) : hard ? (
+            <ShieldAlert className="size-3.5" />
+          ) : (
+            <TriangleAlert className="size-3.5" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{name}</p>
+          <ul className="mt-1 flex flex-col gap-0.5 text-xs text-muted-foreground">
             {conflictLabels.map((label, index) => (
-              <li key={index}>{label}</li>
+              <li key={index} className="text-pretty">
+                {label}
+              </li>
             ))}
           </ul>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
+      {/* Indented to the text column, not the icon: the buttons answer the reason above them, and
+          lining them up under it is what says so. Divided off because a resolved row's chosen
+          action otherwise floats against the name with nothing separating decision from subject.
+          Every row has at least one of these — a backup row can only clash with something that is
+          already here, so merging into it is always available and no row is ever a dead end. */}
+      <div className="flex flex-wrap gap-1.5 border-t pt-2.5 pl-8.5">
         {mergeTargets.map((target) => (
           <Button
             key={target.targetId}
@@ -119,7 +112,9 @@ export function BackupConflictRow({
             onClick={() => onResolve({ action: 'merge', targetId: target.targetId })}
           >
             <Merge className="size-3" />
-            {t('importBackup.mergeInto', { name: target.name })}
+            {target.name
+              ? t('importBackup.mergeInto', { name: target.name })
+              : t('importBackup.merge')}
           </Button>
         ))}
         {allowCreate && (
@@ -129,7 +124,7 @@ export function BackupConflictRow({
             className="h-7 gap-1 text-xs"
             onClick={() => onResolve({ action: 'create' })}
           >
-            <UserPlus className="size-3" />
+            <CreateIcon className="size-3" />
             {createLabel}
           </Button>
         )}
@@ -142,20 +137,6 @@ export function BackupConflictRow({
           >
             <FilePenLine className="size-3" />
             {t('importBackup.overwrite')}
-          </Button>
-        )}
-        {onRename && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1 text-xs"
-            onClick={() => {
-              setDraft(name);
-              setRenaming(true);
-            }}
-          >
-            <Pencil className="size-3" />
-            {t('importBackup.rename')}
           </Button>
         )}
       </div>
