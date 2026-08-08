@@ -241,6 +241,15 @@ export interface SyncDeletion {
 export interface SyncResponse {
   /** Cursor for the next pull (captured server-side before the queries ran). */
   serverTime: string;
+  /**
+   * This is the complete server state rather than a delta: either the client sent no cursor, or it
+   * sent one older than TOMBSTONE_RETENTION_DAYS.
+   *
+   * It obliges the client to drop every local doc this response doesn't contain. The deletes an
+   * expired cursor missed have had their tombstones pruned, so nothing can name them any more —
+   * absence from a full dump is the only evidence left that they happened.
+   */
+  reset: boolean;
   entries: EntryDto[];
   people: PersonDto[];
   tags: TagDto[];

@@ -2,7 +2,7 @@
 import { newObjectId } from '@diary/shared';
 import mongoose from 'mongoose';
 import { config } from '../config';
-import { Deletion } from '../models/deletion';
+import { Deletion, ensureTombstoneTtl, TOMBSTONE_TTL_SECONDS } from '../models/deletion';
 import { Entry } from '../models/entry';
 import '../models/person';
 import '../models/tag';
@@ -105,6 +105,36 @@ async function main() {
   check('restore retracts the entry tombstone', !remaining.has(id));
   // Scoped to the id actually restored: the child is still deleted and must stay tombstoned.
   check('restore leaves other tombstones alone', remaining.has(child.id));
+
+  /* 6. The TTL index that stops tombstones accumulating forever.
+        Worth a live check rather than a unit test because both of its failure modes are silent:
+        no index at all just means the collection quietly grows, and a stale duration left over
+        from an earlier deploy means the retention window everything else assumes is a fiction.
+        Neither shows up in a response. */
+  const ttlSeconds = async () =>
+    (await Deletion.collection.indexes()).find((i) => i.name === 'deletedAt_ttl')
+      ?.expireAfterSeconds;
+
+  await Deletion.collection.dropIndex('deletedAt_ttl').catch(() => {}); // may not exist yet
+  await ensureTombstoneTtl();
+  check(
+    'TTL index created',
+    (await ttlSeconds()) === TOMBSTONE_TTL_SECONDS,
+    `${await ttlSeconds()}`,
+  );
+
+  // A deployment that last ran under a different retention leaves the index with the old duration.
+  // createIndex refuses to redefine it (IndexOptionsConflict); only the collMod fallback fixes it.
+  await Deletion.db.db!.command({
+    collMod: Deletion.collection.collectionName,
+    index: { name: 'deletedAt_ttl', expireAfterSeconds: 60 },
+  });
+  await ensureTombstoneTtl();
+  check(
+    'TTL index retuned in place',
+    (await ttlSeconds()) === TOMBSTONE_TTL_SECONDS,
+    `${await ttlSeconds()}`,
+  );
 
   await Entry.deleteMany({ userId: USER });
   await Deletion.deleteMany({ userId: USER });

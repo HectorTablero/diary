@@ -145,6 +145,20 @@ export const DEFAULT_TAG_COLORS = [
   '#F8C471', // Light Orange
 ] as const;
 
+/**
+ * How long a delete stays pullable as a tombstone.
+ *
+ * A tombstone is the only evidence a client has that a doc was deleted, so this window is the
+ * contract between what the server keeps and how far back a client's sync cursor may reach. Past
+ * it the deletes have been pruned and an incremental pull would silently omit them, so `/api/sync`
+ * answers such a cursor with a full reset instead (`SyncResponse.reset`).
+ *
+ * It lives here rather than in the environment because both halves of that contract have to agree
+ * on one number — it is protocol, not deployment.
+ */
+export const TOMBSTONE_RETENTION_DAYS = 180;
+export const TOMBSTONE_RETENTION_MS = TOMBSTONE_RETENTION_DAYS * 86_400_000;
+
 export const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 export const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 export const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;

@@ -93,6 +93,13 @@ Mutations apply locally and queue in an outbox that replays against the REST API
 online; `GET /api/sync?since=` then pulls everything that changed (deletes propagate via
 tombstones). Conflicts resolve last-write-wins — fine for a single-user app.
 
+Tombstones are kept for `TOMBSTONE_RETENTION_DAYS` (180, in `shared/src/constants.ts`) and then
+swept by a Mongo TTL index, so the collection stays bounded. Past that window a delete has nothing
+left to announce it, so a cursor older than the window can no longer be brought up to date by a
+delta: the server answers it with the complete state and `reset: true`, and the client removes
+every local doc that response doesn't name. The index is deliberately set a week beyond the window
+— the sweep must never outrun the promise.
+
 ## Setup
 
 1. `cp .env.example .env` and fill it in (`BETTER_AUTH_SECRET` via `openssl rand -base64 32`).

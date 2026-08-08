@@ -164,6 +164,26 @@ async function pushOutbox(): Promise<boolean> {
   }
 }
 
+/* Dead letters are the only trace of a write the server refused, so they are kept — but the table
+   is otherwise emptied by nothing short of a sign-out, and both of these bounds close a different
+   way for it to grow without end. Age: a rejection from last spring has long since been reported
+   and acted on or forgotten, and keeping it can only make the next report harder to read. Count: a
+   write the server rejects *systematically* — a client version the API no longer accepts, say —
+   produces one of these per attempt, indefinitely, and that one is a disk-filling loop rather than
+   a slow accumulation. */
+const DEAD_LETTER_MAX = 200;
+const DEAD_LETTER_MAX_AGE_MS = 90 * 86_400_000;
+
+async function trimDeadLetter(): Promise<void> {
+  const cutoff = new Date(Date.now() - DEAD_LETTER_MAX_AGE_MS).toISOString();
+  // `failedAt` is indexed and holds ISO strings, which sort lexicographically in date order.
+  await db.deadLetter.where('failedAt').below(cutoff).delete();
+  const excess = (await db.deadLetter.count()) - DEAD_LETTER_MAX;
+  if (excess <= 0) return;
+  const oldest = await db.deadLetter.orderBy('failedAt').limit(excess).primaryKeys();
+  await db.deadLetter.bulkDelete(oldest);
+}
+
 /** A conflicted local create is a phantom (never made it to the server): remove it. */
 async function removeLocalDoc(op: OutboxOp) {
   const id = (op.body as { id?: string } | undefined)?.id;
@@ -254,15 +274,29 @@ function startReconnectProbe() {
   }, PROBE_INTERVAL_MS);
 }
 
+/* The three operations a pull performs on a synced table, and no more. Dexie's own EntityTable
+   types don't unify into one Record — each carries its own row shape, and their insert types differ
+   over whether `id` is optional — so a structural type is what lets the four be addressed by
+   collection name. Being the narrowest one that compiles is the point: nothing reached through here
+   can write. */
+interface SyncTable {
+  delete: (key: string) => Promise<void>;
+  bulkDelete: (keys: string[]) => Promise<void>;
+  toCollection: () => { primaryKeys: () => Promise<string[]> };
+}
+
 async function pull(): Promise<void> {
   const since = await getMeta<string>('syncCursor');
   const res = await apiGet<SyncResponse>(
     `/sync${since ? `?since=${encodeURIComponent(since)}` : ''}`,
   );
-  const dirty = await dirtyIds();
-  const clean = <T extends { id: string }>(docs: T[]) => docs.filter((d) => !dirty.has(d.id));
 
   const threads = res.threads ?? []; // tolerates a server that predates threads (stale deploy)
+  /* Whether this response is the whole server state rather than a delta — see SyncResponse.reset.
+     The `?? !since` mirrors the threads line above for a server that predates the field: without a
+     cursor the client can reach the same conclusion on its own, and that is the only case where it
+     safely can. With a cursor it must assume a delta, which is exactly how it behaved before. */
+  const reset = res.reset ?? !since;
 
   /* Ids the server sent back as *alive* in this very response, per collection.
      A doc is only in a pull if the server still had it when the query ran, so a tombstone naming
@@ -284,26 +318,54 @@ async function pull(): Promise<void> {
     thread: new Set(threads.map((t) => t.id)),
   };
 
-  await db.transaction('rw', [db.entries, db.people, db.tags, db.threads, db.meta], async () => {
-    await db.entries.bulkPut(clean(res.entries).map(entryFromDto));
-    await db.people.bulkPut(clean(res.people).map(personFromDto));
-    await db.tags.bulkPut(clean(res.tags));
-    await db.threads.bulkPut(clean(threads));
-    const tables: Record<SyncCollection, { delete: (key: string) => Promise<void> }> = {
-      entry: db.entries,
-      person: db.people,
-      tag: db.tags,
-      thread: db.threads,
-    };
-    for (const del of res.deletions) {
-      if (dirty.has(del.docId)) continue; // an unpushed local edit outranks the server
-      if (alive[del.coll]?.has(del.docId)) continue; // re-created since: stale tombstone
-      await tables[del.coll]?.delete(del.docId);
-    }
-    await setMeta('settings', res.settings);
-    // 10s overlap absorbs clock skew between capture and the queries; upserts are idempotent.
-    await setMeta('syncCursor', new Date(Date.parse(res.serverTime) - 10_000).toISOString());
-  });
+  /* db.outbox joins the transaction so `dirty` can be read *inside* it.
+     Reading it beforehand left a window: a mutation enqueued between that read and this
+     transaction is missing from `dirty`, and — being newer than the response — missing from the
+     server's answer too. Under the reset branch below, "in neither" is the definition of a doc to
+     delete, so a note written in that instant would be erased by the very sync meant to save it.
+     Holding the table for the transaction's duration makes the two reads agree. */
+  await db.transaction(
+    'rw',
+    [db.entries, db.people, db.tags, db.threads, db.outbox, db.meta],
+    async () => {
+      const dirty = await dirtyIds();
+      const clean = <T extends { id: string }>(docs: T[]) => docs.filter((d) => !dirty.has(d.id));
+
+      await db.entries.bulkPut(clean(res.entries).map(entryFromDto));
+      await db.people.bulkPut(clean(res.people).map(personFromDto));
+      await db.tags.bulkPut(clean(res.tags));
+      await db.threads.bulkPut(clean(threads));
+      const tables: Record<SyncCollection, SyncTable> = {
+        entry: db.entries,
+        person: db.people,
+        tag: db.tags,
+        thread: db.threads,
+      };
+      for (const del of res.deletions) {
+        if (dirty.has(del.docId)) continue; // an unpushed local edit outranks the server
+        if (alive[del.coll]?.has(del.docId)) continue; // re-created since: stale tombstone
+        await tables[del.coll]?.delete(del.docId);
+      }
+
+      /* A reset response carries no tombstones — there are none left to carry — so the deletes it
+         has to convey are the ids it simply doesn't mention. `alive` is already that list.
+
+         This runs only under reset, and the distinction is the whole safety of it: a delta names
+         only what changed, so treating an unmentioned id as deleted there would wipe the entire
+         local database on the first quiet minute. */
+      if (reset) {
+        for (const coll of Object.keys(tables) as SyncCollection[]) {
+          const local = await tables[coll].toCollection().primaryKeys();
+          const orphaned = local.filter((id) => !alive[coll].has(id) && !dirty.has(id));
+          await tables[coll].bulkDelete(orphaned);
+        }
+      }
+
+      await setMeta('settings', res.settings);
+      // 10s overlap absorbs clock skew between capture and the queries; upserts are idempotent.
+      await setMeta('syncCursor', new Date(Date.parse(res.serverTime) - 10_000).toISOString());
+    },
+  );
   /* The one place anything is allowed to say the coast is clear, because it is the one place that
      has proof: a pull that got this far exchanged a request and a response with the server. Every
      other "it's probably fine" was removed — see the note above run(). */
@@ -373,6 +435,9 @@ async function run(): Promise<void> {
       const count = rejectedThisPass;
       rejectedThisPass = 0;
       rejectionListeners.forEach((cb) => cb(count));
+      // Only when the table just grew. A kick fires every minute and on every mutation; trimming
+      // on all of them would be an index scan a thousand times a day to find nothing.
+      await trimDeadLetter();
     }
   }
 }
@@ -459,4 +524,7 @@ export function initSync(): void {
   subscribePreferences(kick);
   setInterval(kick, 60_000);
   void refreshPending();
+  /* The age cap needs a trigger that doesn't depend on new rejections, or a table that stopped
+     growing would keep its oldest rows for good. Once per launch is plenty for a 90-day bound. */
+  void trimDeadLetter();
 }
