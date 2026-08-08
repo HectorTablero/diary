@@ -110,6 +110,23 @@ export const usePeople = () =>
     queryFn: () => repo.getPeople(),
   });
 
+/**
+ * The talking-point badge numbers, split out of `usePeople` — only the people list shows them.
+ *
+ * `usePeople` is mounted app-wide (AppLayout's nav badge), and computing these means walking the
+ * scoring window once per person. Keeping them here means that work happens on the one screen that
+ * displays it rather than on every route.
+ *
+ * Keyed under the `['people']` prefix on purpose: `useInvalidateEntryData` already invalidates that
+ * prefix after an entry write, which is exactly when these numbers change. Person ids are
+ * ObjectId-shaped, so the literal second segment can't collide with `usePerson`'s `['people', id]`.
+ */
+export const useTalkingPointCounts = () =>
+  useQuery({
+    queryKey: ['people', 'talking-point-counts'],
+    queryFn: () => repo.getTalkingPointCounts(),
+  });
+
 export const usePerson = (id: string) =>
   useQuery({
     queryKey: ['people', id],

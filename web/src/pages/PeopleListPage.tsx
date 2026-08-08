@@ -19,7 +19,7 @@ import {
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { useMarkCheckup, usePeople, useTags } from '@/api/hooks';
+import { useMarkCheckup, usePeople, useTags, useTalkingPointCounts } from '@/api/hooks';
 import { EmptyState } from '@/components/common/EmptyState';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { TagChip } from '@/components/entry/chips';
@@ -309,7 +309,21 @@ function PersonRow({
 
 export default function PeopleListPage() {
   const { t } = useTranslation();
-  const { data: people, isLoading } = usePeople();
+  /* The badge counts come from their own query — they're the expensive half, and every other
+     screen that calls usePeople throws them away. Recombined here, where they're the only place
+     they're shown. Both feed the loading gate: 'talking-points' is a sort option, so rendering the
+     list before the counts land would order it by a column that is still all zeroes. */
+  const { data: basePeople, isLoading: peopleLoading } = usePeople();
+  const { data: talkingPointCounts, isLoading: countsLoading } = useTalkingPointCounts();
+  const isLoading = peopleLoading || countsLoading;
+  const people = useMemo(
+    () =>
+      basePeople?.map((person): PersonListItem => ({
+        ...person,
+        talkingPointCount: talkingPointCounts?.[person.id] ?? 0,
+      })),
+    [basePeople, talkingPointCounts],
+  );
   const { data: tags } = useTags();
   // The event follow-up maths is date-key based, so it needs today's *local* key.
   const today = todayKey();

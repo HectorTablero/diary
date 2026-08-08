@@ -3,7 +3,15 @@ import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
 import { isMeteredConnection } from '@/lib/network';
 import { getPreferences, subscribePreferences } from '@/lib/preferences';
 import { getCachedUser } from '@/lib/sessionCache';
-import { db, entryFromDto, getMeta, personFromDto, setMeta, type OutboxOp } from './db';
+import {
+  bumpLookupVersion,
+  db,
+  entryFromDto,
+  getMeta,
+  personFromDto,
+  setMeta,
+  type OutboxOp,
+} from './db';
 
 /* Sync engine: replays the outbox against the REST API in order (push), then
    pulls everything changed since the last cursor. Pull only runs after a fully
@@ -324,6 +332,13 @@ async function pull(): Promise<void> {
      server's answer too. Under the reset branch below, "in neither" is the definition of a doc to
      delete, so a note written in that instant would be erased by the very sync meant to save it.
      Holding the table for the transaction's duration makes the two reads agree. */
+  /* Did this response actually carry anything? Set inside the transaction, read after it.
+     Everything downstream of a pull is expensive — the listeners invalidate the whole query cache
+     and re-run every read on screen, several of which scan a table — and a poll fires every 60
+     seconds whether or not the diary changed. On an idle app that is the entire cost of the app,
+     paid over and over to arrive back where it started. */
+  let applied = reset;
+
   await db.transaction(
     'rw',
     [db.entries, db.people, db.tags, db.threads, db.outbox, db.meta],
@@ -361,7 +376,26 @@ async function pull(): Promise<void> {
         }
       }
 
+      /* Settings come back on every pull regardless of the cursor — the server has no changed-since
+         filter for a singleton — so they can't be counted as a change by their presence, the way
+         the arrays above can. Comparing is cheap (one small object) and is the only way a
+         preference changed on another device still reaches this one promptly. */
+      const previous = await getMeta<unknown>('settings');
+      if (JSON.stringify(previous) !== JSON.stringify(res.settings)) applied = true;
       await setMeta('settings', res.settings);
+
+      if (
+        res.entries.length ||
+        res.people.length ||
+        res.tags.length ||
+        threads.length ||
+        res.deletions.length
+      ) {
+        applied = true;
+      }
+      // Tags, people and threads are what repo.ts's join-map cache is built from; entries aren't.
+      if (reset || res.people.length || res.tags.length || threads.length) bumpLookupVersion();
+
       // 10s overlap absorbs clock skew between capture and the queries; upserts are idempotent.
       await setMeta('syncCursor', new Date(Date.parse(res.serverTime) - 10_000).toISOString());
     },
@@ -371,7 +405,10 @@ async function pull(): Promise<void> {
      other "it's probably fine" was removed — see the note above run(). */
   setStatus({ blocker: null, needsAuth: false, lastSyncAt: new Date().toISOString() });
   stopReconnectProbe(); // reached the server through some other trigger
-  dataListeners.forEach((cb) => cb());
+  /* Only when something arrived. The status above is unconditional on purpose — it is a statement
+     about reachability, which a successful empty pull proves as well as a full one — but the
+     listeners are a statement about *data*, and an empty delta has nothing to say. */
+  if (applied) dataListeners.forEach((cb) => cb());
 }
 
 let running: Promise<void> | null = null;

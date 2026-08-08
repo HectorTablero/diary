@@ -52,7 +52,7 @@ vi.mock('@/lib/preferences', () => ({
 vi.mock('@/lib/network', () => ({ isMeteredConnection: () => network.metered }));
 
 const { db, entryFromDto, setMeta } = await import('./db');
-const { forceSyncNow, getSyncStatus, onRejected, syncNow } = await import('./sync');
+const { forceSyncNow, getSyncStatus, onRejected, onSyncApplied, syncNow } = await import('./sync');
 
 const DELETED_AT = '2026-08-07T10:00:00.000Z';
 const RESTORED_AT = '2026-08-07T10:00:03.000Z';
@@ -261,6 +261,58 @@ describe('push: a rejected write', () => {
 
     expect(await db.outbox.count()).toBe(0);
     expect(await db.deadLetter.count()).toBe(0);
+  });
+});
+
+/* A pull runs every 60 seconds whether or not anything changed, and announcing one invalidates the
+   whole query cache and re-runs every read on screen — several of which walk a table. On an idle
+   app that used to be the entire cost of the app, paid on a timer to arrive back where it started.
+   So the announcement is now a statement about data, and an empty delta has nothing to say. */
+describe('pull: announcing only what arrived', () => {
+  const countAnnouncements = async (response: Partial<SyncResponse>) => {
+    apiGet.mockResolvedValue(syncResponse(response));
+    let announced = 0;
+    const off = onSyncApplied(() => announced++);
+    await syncNow();
+    off();
+    return announced;
+  };
+
+  it('stays quiet when the server had nothing to send', async () => {
+    await setMeta('syncCursor', '2026-08-01T00:00:00.000Z');
+    await setMeta('settings', DEFAULT_SETTINGS);
+
+    expect(await countAnnouncements({})).toBe(0);
+  });
+
+  it('announces a delta that carried a document', async () => {
+    await setMeta('syncCursor', '2026-08-01T00:00:00.000Z');
+    await setMeta('settings', DEFAULT_SETTINGS);
+
+    expect(await countAnnouncements({ entries: [entryDto('e10')] })).toBe(1);
+  });
+
+  it('announces a tombstone, which carries no document at all', async () => {
+    await setMeta('syncCursor', '2026-08-01T00:00:00.000Z');
+    await setMeta('settings', DEFAULT_SETTINGS);
+    const deletions = [{ coll: 'entry' as const, docId: 'gone', deletedAt: DELETED_AT }];
+
+    expect(await countAnnouncements({ deletions })).toBe(1);
+  });
+
+  it('announces a settings change made on another device', async () => {
+    /* Settings ride along on every pull regardless of the cursor — the server has no changed-since
+       filter for a singleton — so presence can't mean "changed" here the way it does above. */
+    await setMeta('syncCursor', '2026-08-01T00:00:00.000Z');
+    await setMeta('settings', { ...DEFAULT_SETTINGS, talkingPointsLimit: 10 });
+
+    expect(await countAnnouncements({})).toBe(1);
+  });
+
+  it('announces a reset, which is a change even when the server is empty', async () => {
+    await setMeta('settings', DEFAULT_SETTINGS);
+
+    expect(await countAnnouncements({ reset: true })).toBe(1);
   });
 });
 

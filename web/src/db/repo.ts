@@ -3,7 +3,6 @@ import type {
   EntryDto,
   EntryNode,
   PersonDto,
-  PersonListItem,
   SearchResponse,
   SettingsDto,
   TagDto,
@@ -23,7 +22,14 @@ import {
 import { generateNKeysBetween } from 'fractional-indexing';
 import { ApiError } from '@/lib/apiClient';
 import { fuzzyIncludes } from '@/lib/tokens';
-import { db, getMeta, type LocalEntry, type LocalPerson, type OutboxOp } from './db';
+import {
+  db,
+  getLookupVersion,
+  getMeta,
+  type LocalEntry,
+  type LocalPerson,
+  type OutboxOp,
+} from './db';
 import { enqueueBatch } from './outbox';
 
 /* Local read layer: mirrors the server's read endpoints over the Dexie store,
@@ -35,7 +41,38 @@ interface JoinMaps {
   threads: Map<string, ThreadDto>;
 }
 
+/**
+ * The three lookup tables, cached until something writes to them.
+ *
+ * Almost every read below needs these, and a screen has four to eight queries mounted at once — so
+ * rendering one day used to read the whole people table four or five times over, plus tags and
+ * threads, before any of it was joined to anything. They are the small tables and they change
+ * rarely; the entries table they are joined *onto* is the one that grows.
+ *
+ * The promise, not the value, is what's held: queries mounting together arrive within the same tick
+ * and would otherwise each start their own read. Sharing the in-flight promise collapses that to
+ * one, which is most of the win on a cold screen.
+ *
+ * Nothing expires it on a timer, deliberately. A stale map is not a slow read, it is a renamed tag
+ * still showing its old name — and since the result gets cached again by react-query on top of
+ * this, a timeout wouldn't heal it either. Correctness rests entirely on db.ts's lookupVersion
+ * being bumped, which is why the bump lives where a write cannot skip it (outbox.ts).
+ */
+let joinMapsCache: { version: number; maps: Promise<JoinMaps> } | null = null;
+
 async function joinMaps(): Promise<JoinMaps> {
+  const version = getLookupVersion();
+  if (joinMapsCache?.version === version) return joinMapsCache.maps;
+  const maps = readJoinMaps().catch((err: unknown) => {
+    // A failed read must not become the cached answer for the rest of the session.
+    if (joinMapsCache?.maps === maps) joinMapsCache = null;
+    throw err;
+  });
+  joinMapsCache = { version, maps };
+  return maps;
+}
+
+async function readJoinMaps(): Promise<JoinMaps> {
   const [tags, people, threads] = await Promise.all([
     db.tags.toArray(),
     db.people.toArray(),
@@ -120,6 +157,19 @@ async function ensureOrderKeys(entries: LocalEntry[]): Promise<LocalEntry[]> {
   return entries;
 }
 
+/** The subset of an entry the talking-point scorer reads — see ClusterCandidate in shared/scoring. */
+const toClusterCandidate = (e: LocalEntry) => ({
+  id: e.id,
+  parentId: e.parentId,
+  dateKey: e.dateKey,
+  importance: e.importance,
+  tagIds: e.tagIds,
+  peopleIds: e.peopleIds,
+  threadIds: e.threadIds ?? [],
+  saidToIds: e.saidTo.map((s) => s.personId),
+  hiddenForIds: e.hiddenFor,
+});
+
 function personToDto(person: LocalPerson, tags: Map<string, TagDto>): PersonDto {
   return {
     id: person.id,
@@ -186,26 +236,94 @@ export async function getCalendarMonth(year: number, month: number): Promise<Cal
   return [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * The same day in earlier years.
+ *
+ * Asked one year at a time, newest first, rather than by reading everything before today and
+ * keeping the rows whose dateKey ends in the right five characters. Twenty results out of a whole
+ * diary is a punishing ratio to pay a full scan for, and the answer is a handful of exact keys —
+ * `2025-08-08`, `2024-08-08`, … — which is precisely what an index is good at. The number of
+ * queries is the age of the diary in years, so it stays in the tens forever.
+ *
+ * Walking backwards also means the 20-row limit usually stops it after two or three years rather
+ * than at the beginning of time. Feb 29 needs no special case: a non-leap year simply matches
+ * nothing and the loop moves on.
+ */
 export async function getOnThisDay(dateKey: string): Promise<EntryDto[]> {
   const settings = await getSettings();
   const monthDay = dateKey.slice(4); // "-MM-DD"
-  const [entries, maps] = await Promise.all([
-    db.entries
-      .where('dateKey')
-      .below(dateKey.slice(0, 4) + monthDay)
-      .toArray(),
-    joinMaps(),
-  ]);
-  return entries
-    .filter(
-      (e) => e.dateKey.endsWith(monthDay) && e.importance <= settings.memoryImportanceThreshold,
-    )
+  const thisYear = Number(dateKey.slice(0, 4));
+  // One indexed row, and the only thing that decides where the loop stops.
+  const earliest = await db.entries.orderBy('dateKey').first();
+  if (!earliest) return [];
+  const firstYear = Number(earliest.dateKey.slice(0, 4));
+
+  const found: LocalEntry[] = [];
+  for (let year = thisYear - 1; year >= firstYear && found.length < 20; year--) {
+    const sameDay = await db.entries.where('dateKey').equals(`${year}${monthDay}`).toArray();
+    for (const entry of sameDay) {
+      if (entry.importance <= settings.memoryImportanceThreshold) found.push(entry);
+    }
+  }
+
+  const maps = await joinMaps();
+  return found
     .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
     .slice(0, 20)
     .map((e) => entryToDto(e, maps));
 }
 
 // --- Search ---
+
+/** Inferred rather than written out: Dexie's Collection carries a third parameter for the table's
+ *insert* shape, in which the primary key is optional, and naming it by hand gets that wrong. */
+type EntryCollection = ReturnType<typeof db.entries.toCollection>;
+
+/**
+ * Pick the narrowest index that can serve a filtered entry query, or `null` for "no index helps".
+ *
+ * Only one index can drive a Dexie query, so this chooses a *prefilter* — a superset of the answer,
+ * cheap to obtain — and every filter, including the one that chose it, is still applied in JS by
+ * the caller. That redundancy is deliberate: it keeps one predicate as the single definition of a
+ * match, so narrowing can never quietly change what search returns, only how much is read to
+ * find it.
+ *
+ * Order is by how much each typically eliminates. A date range is the most selective and cannot
+ * duplicate; the two multi-entry indexes come next and can, hence `.distinct()` — `anyOf` on
+ * `*tagIds` yields an entry once per tag of its that matched, which would otherwise show the same
+ * entry twice and inflate `total`.
+ */
+function narrowSearch(f: {
+  from: string | null;
+  to: string | null;
+  tagIds: string[];
+  personIds: string[];
+}): EntryCollection | null {
+  if (f.from && f.to) return db.entries.where('dateKey').between(f.from, f.to, true, true);
+  if (f.from) return db.entries.where('dateKey').aboveOrEqual(f.from);
+  if (f.to) return db.entries.where('dateKey').belowOrEqual(f.to);
+  if (f.personIds.length) return db.entries.where('peopleIds').anyOf(f.personIds).distinct();
+  if (f.tagIds.length) return db.entries.where('tagIds').anyOf(f.tagIds).distinct();
+  return null;
+}
+
+/**
+ * Rows matching `keep`, streamed rather than materialised.
+ *
+ * `.each()` hands over one row at a time, so peak memory is the survivors plus a row — where
+ * `toArray().filter()` allocates an object for every entry in the diary before the first predicate
+ * runs. For a search that matches nine things out of forty thousand, that is the whole difference.
+ */
+async function collectEntries(
+  source: EntryCollection | null,
+  keep: (entry: LocalEntry) => boolean,
+): Promise<LocalEntry[]> {
+  const kept: LocalEntry[] = [];
+  await (source ?? db.entries.toCollection()).each((entry) => {
+    if (keep(entry)) kept.push(entry);
+  });
+  return kept;
+}
 
 export async function search(params: URLSearchParams): Promise<SearchResponse> {
   const q = params.get('q')?.trim() ?? '';
@@ -220,19 +338,18 @@ export async function search(params: URLSearchParams): Promise<SearchResponse> {
   const page = Math.max(1, Number(params.get('page') ?? 1) || 1);
   const limit = Math.min(100, Math.max(1, Number(params.get('limit') ?? 50) || 50));
 
-  const [all, maps] = await Promise.all([db.entries.toArray(), joinMaps()]);
-  const results = all
-    .filter((e) => {
-      if (tagIds.length && !e.tagIds.some((id) => tagIds.includes(id))) return false;
-      if (personIds.length && !e.peopleIds.some((id) => personIds.includes(id))) return false;
-      if (importances.length && !importances.includes(e.importance)) return false;
-      if (from && e.dateKey < from) return false;
-      if (to && e.dateKey > to) return false;
-      if (q && !fuzzyIncludes(e.content, q)) return false;
-      return true;
-    })
-    .sort(byDateDesc);
+  const results = await collectEntries(narrowSearch({ from, to, tagIds, personIds }), (e) => {
+    if (tagIds.length && !e.tagIds.some((id) => tagIds.includes(id))) return false;
+    if (personIds.length && !e.peopleIds.some((id) => personIds.includes(id))) return false;
+    if (importances.length && !importances.includes(e.importance)) return false;
+    if (from && e.dateKey < from) return false;
+    if (to && e.dateKey > to) return false;
+    if (q && !fuzzyIncludes(e.content, q)) return false;
+    return true;
+  });
+  results.sort(byDateDesc);
 
+  const maps = await joinMaps();
   return {
     results: results.slice((page - 1) * limit, page * limit).map((e) => entryToDto(e, maps)),
     total: results.length,
@@ -249,64 +366,71 @@ export async function getEntriesInRange(
   to: string | null,
   tagIds: string[],
 ): Promise<EntryDto[]> {
-  const [all, maps] = await Promise.all([db.entries.toArray(), joinMaps()]);
-  return all
-    .filter((e) => {
-      if (tagIds.length && !e.tagIds.some((id) => tagIds.includes(id))) return false;
-      if (from && e.dateKey < from) return false;
-      if (to && e.dateKey > to) return false;
-      return true;
-    })
+  const entries = await collectEntries(narrowSearch({ from, to, tagIds, personIds: [] }), (e) => {
+    if (tagIds.length && !e.tagIds.some((id) => tagIds.includes(id))) return false;
+    if (from && e.dateKey < from) return false;
+    if (to && e.dateKey > to) return false;
+    return true;
+  });
+  const maps = await joinMaps();
+  return entries
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.createdAt.localeCompare(b.createdAt))
     .map((e) => entryToDto(e, maps));
 }
 
 // --- People ---
 
-export async function getPeople(): Promise<PersonListItem[]> {
-  const [people, entries, settings, maps] = await Promise.all([
-    db.people.toArray(),
-    db.entries.toArray(),
-    getSettings(),
-    joinMaps(),
-  ]);
+/**
+ * The people list itself — no talking-point counts.
+ *
+ * This is mounted on every route in the app (AppLayout's nav badge calls usePeople for a
+ * pending-checkups number), so what it costs is what *every* screen costs. It used to read the
+ * whole entries table and then run the talking-point counter once per person — a pass over the
+ * diary per person, for a figure exactly one page displays. See getTalkingPointCounts.
+ */
+export async function getPeople(): Promise<PersonDto[]> {
+  const maps = await joinMaps();
+  return [...maps.people.values()]
+    .map((person) => personToDto(person, maps.tags))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The talking-point badge number per person, for the people list — the one page that shows it.
+ *
+ * It counts *things you'd bring up*, not matched entries: a matching parent and its matching
+ * sub-entries are one cluster, and every live cluster of one thread is one row. So it agrees with
+ * the number of rows the profile's Talking Points tab will actually show.
+ *
+ * Still a pass over the candidates per person, which is the shape countTalkingPointGroups has and
+ * which the server shares — but now over the scoring window only, and only while the people list is
+ * on screen instead of on every route.
+ */
+export async function getTalkingPointCounts(): Promise<Record<string, number>> {
+  // Through joinMaps rather than its own db.people.toArray(): the people list is on screen beside
+  // this, so the read is already cached and this costs nothing.
+  const [maps, settings] = await Promise.all([joinMaps(), getSettings()]);
   const now = Date.now();
   const cutoff = scoreCutoffDateKey(settings, now);
-  // The badge counts *things you'd bring up*, not matched entries: a matching parent and its
-  // matching sub-entries are one cluster, and every live cluster of one thread is one row. So it
-  // matches the number of rows the profile's Talking Points tab will actually show.
-  const recent = entries
-    .filter((e) => e.dateKey >= cutoff)
-    .map((e) => ({
-      id: e.id,
-      parentId: e.parentId,
-      dateKey: e.dateKey,
-      importance: e.importance,
-      tagIds: e.tagIds,
-      peopleIds: e.peopleIds,
-      threadIds: e.threadIds ?? [],
-      saidToIds: e.saidTo.map((s) => s.personId),
-      hiddenForIds: e.hiddenFor,
-    }));
+  // Indexed rather than read-everything-then-filter: nothing before the scoring cutoff can score
+  // above epsilon, so entries older than it cannot affect any count.
+  const entries = await db.entries.where('dateKey').aboveOrEqual(cutoff).toArray();
+  const recent = entries.map(toClusterCandidate);
   const broadcastTagIds = new Set(settings.broadcastTagIds);
 
-  return people
-    .map((person) => {
-      const personTagIds = new Set(person.tagIds);
-      const count = countTalkingPointGroups(
-        recent,
-        person.id,
-        personTagIds,
-        settings,
-        broadcastTagIds,
-        now,
-      );
-      return {
-        ...personToDto(person, maps.tags),
-        talkingPointCount: Math.min(count, settings.talkingPointsLimit),
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const counts: Record<string, number> = {};
+  for (const person of maps.people.values()) {
+    const count = countTalkingPointGroups(
+      recent,
+      person.id,
+      new Set(person.tagIds),
+      settings,
+      broadcastTagIds,
+      now,
+    );
+    counts[person.id] = Math.min(count, settings.talkingPointsLimit);
+  }
+  return counts;
 }
 
 async function requirePerson(personId: string): Promise<LocalPerson> {
@@ -321,9 +445,8 @@ export async function getPerson(personId: string): Promise<PersonDto> {
 }
 
 export async function getTalkingPoints(personId: string): Promise<TalkingPointsResponse> {
-  const [person, entries, settings, maps] = await Promise.all([
+  const [person, settings, maps] = await Promise.all([
     requirePerson(personId),
-    db.entries.toArray(),
     getSettings(),
     joinMaps(),
   ]);
@@ -332,11 +455,19 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
   const personTagIds = new Set(person.tagIds);
   const broadcastTagIds = new Set(settings.broadcastTagIds);
 
-  // Full date-range set (not just matching candidates): a matching sub-entry
-  // needs its non-matching ancestors/siblings available as context too.
-  const withinCutoff = entries.filter((e) => e.dateKey >= cutoff).map((e) => entryToDto(e, maps));
+  const [inWindow, linked] = await Promise.all([
+    // Full date-range set (not just matching candidates): a matching sub-entry
+    // needs its non-matching ancestors/siblings available as context too. The range is the
+    // scoring window, which the dateKey index can serve directly.
+    db.entries.where('dateKey').aboveOrEqual(cutoff).toArray(),
+    /* Every entry linked to this person, which is a superset of the ones marked as said to them —
+       a said-mark is only ever written alongside the link. So the multi-entry index answers a
+       question the old code asked by reading the whole table and testing saidTo on each row. */
+    db.entries.where('peopleIds').equals(personId).toArray(),
+  ]);
+
   const active = buildTalkingPointForest(
-    withinCutoff,
+    inWindow.map((e) => entryToDto(e, maps)),
     personId,
     personTagIds,
     settings,
@@ -344,7 +475,7 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
     now,
   ).slice(0, settings.talkingPointsLimit);
 
-  const said = entries
+  const said = linked
     .filter((e) => e.saidTo.some((s) => s.personId === personId))
     .sort(byDateDesc)
     .slice(0, 50)
@@ -356,7 +487,8 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
 /** Every entry id currently stored locally — used to detect id collisions when restoring a
     JSON backup (see lib/backup/conflicts.ts's detectEntryConflicts). */
 export async function getEntryIds(): Promise<Set<string>> {
-  return new Set((await db.entries.toArray()).map((e) => e.id));
+  // Straight off the primary-key index — the row payloads were only ever thrown away.
+  return new Set(await db.entries.toCollection().primaryKeys());
 }
 
 /** Entries mentioning this person, created since they were added, that were never marked as said
@@ -407,22 +539,26 @@ export async function getHistory(
 // --- Tags ---
 
 export async function getTags(): Promise<TagWithStats[]> {
-  const [tags, entries, people] = await Promise.all([
-    db.tags.toArray(),
-    db.entries.toArray(),
-    db.people.toArray(),
-  ]);
-  const entryCounts = new Map<string, number>();
-  for (const entry of entries)
-    for (const id of entry.tagIds) entryCounts.set(id, (entryCounts.get(id) ?? 0) + 1);
+  const maps = await joinMaps();
+  const tags = [...maps.tags.values()];
+
+  /* One count per tag off the *tagIds index, rather than one pass over every entry in the diary.
+     Dexie answers these from the index alone — no row is deserialised, nothing is held — so the
+     cost is the number of tags, which is a handful, instead of the number of entries, which isn't.
+     The whole reason either number exists is the "12 entries · 3 people" line under each tag. */
+  const entryCounts = await Promise.all(
+    tags.map((tag) => db.entries.where('tagIds').equals(tag.id).count()),
+  );
+
+  // People stay an in-memory tally: they're already loaded (joinMaps) and they're the small table.
   const personCounts = new Map<string, number>();
-  for (const person of people)
+  for (const person of maps.people.values())
     for (const id of person.tagIds) personCounts.set(id, (personCounts.get(id) ?? 0) + 1);
 
   return tags
-    .map((tag) => ({
+    .map((tag, i) => ({
       ...tag,
-      entryCount: entryCounts.get(tag.id) ?? 0,
+      entryCount: entryCounts[i],
       personCount: personCounts.get(tag.id) ?? 0,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -431,15 +567,30 @@ export async function getTags(): Promise<TagWithStats[]> {
 // --- Threads ---
 
 export async function getThreads(): Promise<ThreadWithStats[]> {
-  const [threads, entries] = await Promise.all([db.threads.toArray(), db.entries.toArray()]);
+  const maps = await joinMaps();
+  const threads = [...maps.threads.values()];
+
+  /* Per thread off the *threadIds index rather than one pass over the whole diary. Unlike tags this
+     needs more than a count — the ranking below wants each thread's newest day — so it reads the
+     member rows, but streamed: `.each()` never holds more than the row in hand, and thread
+     membership is sparse, so the rows read are a small fraction of the table either way. */
   const entryCounts = new Map<string, number>();
   const newestDateKey = new Map<string, string>();
-  for (const entry of entries)
-    for (const id of entry.threadIds ?? []) {
-      entryCounts.set(id, (entryCounts.get(id) ?? 0) + 1);
-      const seen = newestDateKey.get(id);
-      if (!seen || entry.dateKey > seen) newestDateKey.set(id, entry.dateKey);
-    }
+  await Promise.all(
+    threads.map(async (thread) => {
+      let count = 0;
+      let newest = '';
+      await db.entries
+        .where('threadIds')
+        .equals(thread.id)
+        .each((entry) => {
+          count++;
+          if (entry.dateKey > newest) newest = entry.dateKey;
+        });
+      entryCounts.set(thread.id, count);
+      if (newest) newestDateKey.set(thread.id, newest);
+    }),
+  );
 
   /* Ordered by each thread's newest entry, so a topic you're currently writing about stays at the
      top and a finished one sinks — not by `thread.updatedAt`, which only moves when the thread
