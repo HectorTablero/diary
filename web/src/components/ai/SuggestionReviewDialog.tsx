@@ -103,7 +103,9 @@ function SuggestionNodeEditor({
 
   const toggleSaid = (id: string) =>
     onChange(node.id, {
-      saidTo: node.saidTo.includes(id) ? node.saidTo.filter((pid) => pid !== id) : [...node.saidTo, id],
+      saidTo: node.saidTo.includes(id)
+        ? node.saidTo.filter((pid) => pid !== id)
+        : [...node.saidTo, id],
     });
 
   return (
@@ -159,20 +161,31 @@ function SuggestionNodeEditor({
                 <TagChip
                   key={tag.id}
                   tag={tag}
-                  onRemove={() => onChange(node.id, { tags: node.tags.filter((tg) => tg.id !== tag.id) })}
+                  onRemove={() =>
+                    onChange(node.id, { tags: node.tags.filter((tg) => tg.id !== tag.id) })
+                  }
                 />
               ))}
               {node.people.map((person) => (
-                <PersonChip key={person.id} person={person} onRemove={() => removePerson(person.id)} />
+                <PersonChip
+                  key={person.id}
+                  person={person}
+                  onRemove={() => removePerson(person.id)}
+                />
               ))}
             </div>
           )}
           {node.people.length > 0 && (
             <div className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3 py-2">
-              <span className="text-xs font-medium text-muted-foreground">{t('diary.willBeSaidTo')}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('diary.willBeSaidTo')}
+              </span>
               <div className="flex flex-wrap gap-x-4 gap-y-1">
                 {node.people.map((person) => (
-                  <label key={person.id} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                  <label
+                    key={person.id}
+                    className="flex cursor-pointer items-center gap-1.5 text-sm"
+                  >
                     <Checkbox
                       checked={node.saidTo.includes(person.id)}
                       onCheckedChange={() => toggleSaid(person.id)}

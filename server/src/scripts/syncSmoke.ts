@@ -80,7 +80,11 @@ async function main() {
   await deleteEntry(USER, id);
   const tombstones = await Deletion.find({ userId: USER, coll: 'entry' }).lean();
   const ids = new Set(tombstones.map((t) => t.docId.toString()));
-  check('tombstones for root + child', ids.has(id) && ids.has(child.id), `${tombstones.length} tombstones`);
+  check(
+    'tombstones for root + child',
+    ids.has(id) && ids.has(child.id),
+    `${tombstones.length} tombstones`,
+  );
 
   // 5. Undo: re-creating a deleted id retracts its tombstone. Without this the server holds two
   //    contradictory facts about the id — the entry is back, but a tombstone still says it is

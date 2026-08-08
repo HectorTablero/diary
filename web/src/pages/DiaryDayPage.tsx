@@ -35,7 +35,13 @@ export default function DiaryDayPage() {
   return (
     <PageContainer>
       <div className="mb-4 flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => shift(-1)} aria-label={t('diary.previousDay')}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0"
+          onClick={() => shift(-1)}
+          aria-label={t('diary.previousDay')}
+        >
           <ChevronLeft className="size-4" />
         </Button>
 
@@ -50,18 +56,35 @@ export default function DiaryDayPage() {
           align="center"
           aria-label={t('diary.entryDate')}
           trigger={
-            <button type="button" className="min-w-0 flex-1 rounded-lg text-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-              <h1 className={cn('text-base font-semibold tracking-tight first-letter:uppercase', isToday && 'text-primary')}>
+            <button
+              type="button"
+              className="min-w-0 flex-1 rounded-lg text-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <h1
+                className={cn(
+                  'text-base font-semibold tracking-tight first-letter:uppercase',
+                  isToday && 'text-primary',
+                )}
+              >
                 {formatDateKey(dateKey, i18n.language, 'EEEE, d MMMM')}
               </h1>
               <p className="text-xs text-muted-foreground">
-                {isToday ? t('common.today') :formatDateKey(dateKey, i18n.language, 'yyyy') + (parseDateKey(dateKey) > new Date() ? ` (${t('common.future')})` : '')}
+                {isToday
+                  ? t('common.today')
+                  : formatDateKey(dateKey, i18n.language, 'yyyy') +
+                    (parseDateKey(dateKey) > new Date() ? ` (${t('common.future')})` : '')}
               </p>
             </button>
           }
         />
 
-        <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => shift(1)} aria-label={t('diary.nextDay')}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0"
+          onClick={() => shift(1)}
+          aria-label={t('diary.nextDay')}
+        >
           <ChevronRight className="size-4" />
         </Button>
       </div>

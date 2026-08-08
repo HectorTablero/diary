@@ -36,7 +36,10 @@ export function flattenTree<T extends TreeNode>(roots: T[]): FlatNode<T>[] {
     for a drop. Call once at drag start; reuse the same array for every projectDrop call and for
     measuring row rects, so the vertical target index and the projected parent/depth are computed
     against the exact same, stable ordering for the whole drag. */
-export function visibleForDrag<T extends TreeNode>(flat: FlatNode<T>[], activeId: string): FlatNode<T>[] {
+export function visibleForDrag<T extends TreeNode>(
+  flat: FlatNode<T>[],
+  activeId: string,
+): FlatNode<T>[] {
   const active = flat.find((f) => f.node.id === activeId);
   if (!active) return flat;
   const excluded = new Set<string>();

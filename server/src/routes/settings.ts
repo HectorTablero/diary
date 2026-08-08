@@ -13,8 +13,10 @@ async function ownedTagIds(userId: string, ids: string[]) {
 }
 
 /* Write only — the client reads settings from its Dexie `meta` row, refreshed by GET /sync. */
-export const settingsRouter = new Hono<AppEnv>()
-  .put('/', jsonValidator(settingsSchema), async (c) => {
+export const settingsRouter = new Hono<AppEnv>().put(
+  '/',
+  jsonValidator(settingsSchema),
+  async (c) => {
     const userId = c.get('userId');
     const { groqApiKey, openRouterApiKey, cerebrasApiKey, ...input } = c.req.valid('json');
     await UserSettings.findOneAndUpdate(
@@ -34,4 +36,5 @@ export const settingsRouter = new Hono<AppEnv>()
       { upsert: true },
     );
     return c.json(await getSettings(userId));
-  });
+  },
+);

@@ -9,7 +9,9 @@ const LEVELS = ['1', '2', '3', '4', '5'] as const;
 export function buildImportanceLegend(): string {
   const lines: string[] = ['## Importance scale', ''];
   for (const level of LEVELS) {
-    lines.push(`- **${level} — ${en.importance.levels[level]}**: ${en.importance.descriptions[level]}`);
+    lines.push(
+      `- **${level} — ${en.importance.levels[level]}**: ${en.importance.descriptions[level]}`,
+    );
   }
   lines.push('');
   return lines.join('\n');

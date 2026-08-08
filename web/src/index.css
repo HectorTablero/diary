@@ -3,6 +3,7 @@
 @import 'shadcn/tailwind.css';
 
 @import '@fontsource-variable/geist';
+/* Web only — vite.config.ts stubs these out in `--mode app`. See the CJK block below. */
 @import '@fontsource-variable/noto-sans-sc';
 @import '@fontsource-variable/noto-sans-jp';
 
@@ -254,16 +255,50 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+ * What Geist hands off to.
+ *
+ * Geist ships latin, latin-ext, cyrillic, cyrillic-ext and vietnamese — no CJK, because it has
+ * none. Two of the five shipped languages are Japanese and Chinese, so without this the entire UI
+ * in those languages fell through to `sans-serif` and the design system quietly did not apply to
+ * them. System CJK is the right rendering; the point of this block is that it is now chosen.
+ *
+ * Scoped by :lang() rather than merged into one list, because Han characters are shared between
+ * the two scripts while several of their shapes are not (直, 骨, 化 among them). A single stack
+ * with a Japanese face ahead of a Chinese one renders Chinese in Japanese letterforms — legible,
+ * and wrong in the way a native reader notices immediately.
+ *
+ * This works before any JavaScript has run: index.html sets documentElement.lang from
+ * localStorage in the pre-paint script, for exactly this class of reason.
+ *
+ * Noto leads both stacks: its ja and zh cuts are drawn as a matched pair, so the two languages
+ * render at the same weight and metrics instead of drifting apart between platforms. Apple's and
+ * Microsoft's system UI faces follow to catch macOS/iOS and Windows; both are low-contrast modern
+ * gothics, which is as close to Geist's register as CJK gets.
+ *
+ * The '… Variable' entries are the Fontsource webfonts, and they are FIRST but not required. On
+ * the web their @font-face exists and wins, so ja/zh get real Noto on every platform. In the APK
+ * the alias in vite.config.ts stubs those packages out, no @font-face is declared, the name
+ * matches nothing, and the very next entry — system Noto, which Android ships — takes over. One
+ * stack, both targets, no build-time branch in the CSS.
+ *
+ * Why the APK cannot just bundle them: Fontsource splits CJK into ~120 unicode-range subsets each,
+ * which a browser fetches lazily but `cap sync` copies into the APK wholesale — 9.3 MB of woff2,
+ * which is what took the release APK from 3.3 MB to 13.6 MB. The same lazy-fetch asymmetry is why
+ * vite.config.ts keeps these subsets out of the service worker's precache manifest.
+ */
 :root {
   --font-cjk: ui-sans-serif;
 }
 
 :root:lang(ja) {
-  --font-cjk: 'Noto Sans JP Variable', ui-sans-serif;
+  --font-cjk:
+    'Noto Sans JP Variable', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic UI', ui-sans-serif;
 }
 
 :root:lang(zh) {
-  --font-cjk: 'Noto Sans SC Variable', ui-sans-serif;
+  --font-cjk:
+    'Noto Sans SC Variable', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif;
 }
 
 @layer base {

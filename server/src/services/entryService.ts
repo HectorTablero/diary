@@ -84,14 +84,21 @@ async function maxDepthFor(userId: string): Promise<number> {
 }
 
 async function assertDepthAllowed(userId: string, parentId: string) {
-  const [depth, maxDepth] = await Promise.all([ancestorDepth(userId, parentId), maxDepthFor(userId)]);
+  const [depth, maxDepth] = await Promise.all([
+    ancestorDepth(userId, parentId),
+    maxDepthFor(userId),
+  ]);
   if (wouldExceedMaxDepth(depth, 1, maxDepth)) throw badRequest('entry.max_depth');
 }
 
 /** Fractional-index key placing a new/moved entry after the current last sibling. Root-level
     siblings are scoped by dateKey (only same-day roots are ever siblings in the UI); sub-entry
     siblings are scoped by parentId alone (they always share their parent's dateKey). */
-async function appendOrderKey(userId: string, parentId: string | null, dateKey: string): Promise<string> {
+async function appendOrderKey(
+  userId: string,
+  parentId: string | null,
+  dateKey: string,
+): Promise<string> {
   const filter = parentId
     ? { userId, parentId: new Types.ObjectId(parentId) }
     : { userId, parentId: null, dateKey };
@@ -118,7 +125,10 @@ async function bumpLastCheckup(userId: string, marks: { personId: Types.ObjectId
   }
   await Promise.all(
     [...groups.values()].map(({ at, ids }) =>
-      Person.updateMany({ userId, _id: { $in: ids }, lastCheckupAt: { $lt: at } }, { lastCheckupAt: at }),
+      Person.updateMany(
+        { userId, _id: { $in: ids }, lastCheckupAt: { $lt: at } },
+        { lastCheckupAt: at },
+      ),
     ),
   );
 }
@@ -155,7 +165,8 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
   // Offline creates replay with their original timestamp so ordering within a day survives.
   const now = input.createdAt ? new Date(input.createdAt) : new Date();
   // Defense-in-depth for a client that predates orderKey — normally the client always sends one.
-  const orderKey = input.orderKey ?? (await appendOrderKey(userId, input.parentId ?? null, input.dateKey));
+  const orderKey =
+    input.orderKey ?? (await appendOrderKey(userId, input.parentId ?? null, input.dateKey));
 
   // timestamps off for this save: mongoose would otherwise force updatedAt = createdAt on new
   // docs, hiding replayed offline creates from other clients' sync cursors.
@@ -174,7 +185,10 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
           tags: await ownedTagIds(userId, input.tags),
           threads: await ownedThreadIds(userId, input.threads),
           people,
-          saidTo: saidToIds.map((person) => ({ person, at: providedAt.get(person.toString()) ?? now })),
+          saidTo: saidToIds.map((person) => ({
+            person,
+            at: providedAt.get(person.toString()) ?? now,
+          })),
           parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
           orderKey,
         },
@@ -203,7 +217,10 @@ async function cascadeDateKey(userId: string, rootId: string, dateKey: string) {
   if (!ids.length) return;
   // One update for the whole subtree rather than one per level, and every row gets the same
   // updatedAt — so a client's sync cursor cannot land between two levels of the same move.
-  await Entry.updateMany({ userId, _id: { $in: toObjectIds(ids) } }, { dateKey, updatedAt: new Date() });
+  await Entry.updateMany(
+    { userId, _id: { $in: toObjectIds(ids) } },
+    { dateKey, updatedAt: new Date() },
+  );
 }
 
 export async function updateEntry(userId: string, entryId: string, input: EntryUpdateInput) {
@@ -237,7 +254,8 @@ export async function updateEntry(userId: string, entryId: string, input: EntryU
       })),
     );
   }
-  if (input.hiddenFor !== undefined) entry.hiddenFor = await ownedPersonIds(userId, input.hiddenFor);
+  if (input.hiddenFor !== undefined)
+    entry.hiddenFor = await ownedPersonIds(userId, input.hiddenFor);
 
   // Reparent: dragging elsewhere in the tree, or promoting to root with parentId: null.
   const parentChanging = input.parentId !== undefined && input.parentId !== originalParentId;
@@ -309,12 +327,20 @@ export async function setSaid(userId: string, entryId: string, personId: string,
   if (!result.matchedCount) throw notFound('entry.not_found');
   if (said) {
     const now = new Date();
-    await Entry.updateOne({ _id: entryId, userId }, { $push: { saidTo: { person: pid, at: now } } });
+    await Entry.updateOne(
+      { _id: entryId, userId },
+      { $push: { saidTo: { person: pid, at: now } } },
+    );
     await bumpLastCheckup(userId, [{ personId: pid, at: now }]);
   }
 }
 
-export async function setHidden(userId: string, entryId: string, personId: string, hidden: boolean) {
+export async function setHidden(
+  userId: string,
+  entryId: string,
+  personId: string,
+  hidden: boolean,
+) {
   await assertPersonOwned(userId, personId);
   const update = hidden
     ? { $addToSet: { hiddenFor: new Types.ObjectId(personId) } }

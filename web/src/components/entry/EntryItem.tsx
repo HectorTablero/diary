@@ -22,12 +22,7 @@ import { EntryContent } from '@/components/entry/EntryContent';
 import { ImportanceDot } from '@/components/entry/ImportanceDot';
 import { useSortableTreeRow } from '@/components/tree/SortableTreeProvider';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,

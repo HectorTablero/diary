@@ -2,7 +2,13 @@ import type { PersonRefDto, TagDto } from '@diary/shared';
 import { Plus, Tag as TagIcon, User } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { detectActiveToken, fuzzyEquals, fuzzyIncludes, segmentContent, type ActiveToken } from '@/lib/tokens';
+import {
+  detectActiveToken,
+  fuzzyEquals,
+  fuzzyIncludes,
+  segmentContent,
+  type ActiveToken,
+} from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
 interface Suggestion {
@@ -178,8 +184,7 @@ export function TokenTextarea({
   };
 
   const segments = useMemo(
-    () =>
-      segmentContent(value, linkedPeople, linkedTags),
+    () => segmentContent(value, linkedPeople, linkedTags),
     [value, linkedPeople, linkedTags],
   );
 
@@ -204,7 +209,10 @@ export function TokenTextarea({
         <div
           ref={overlayRef}
           aria-hidden="true"
-          className={cn(SHARED_TEXT_CLASSES, 'pointer-events-none absolute inset-0 overflow-hidden text-foreground')}
+          className={cn(
+            SHARED_TEXT_CLASSES,
+            'pointer-events-none absolute inset-0 overflow-hidden text-foreground',
+          )}
         >
           {segments.map((seg, i) =>
             seg.kind === 'text' ? (
@@ -290,9 +298,15 @@ export function TokenTextarea({
                 i === selectedIndex && 'bg-accent text-accent-foreground',
               )}
             >
-              {s.icon === 'person' && <User aria-hidden className="size-3.5 text-muted-foreground" />}
-              {s.icon === 'tag' && <TagIcon aria-hidden className="size-3.5 text-muted-foreground" />}
-              {s.icon === 'create' && <Plus aria-hidden className="size-3.5 text-muted-foreground" />}
+              {s.icon === 'person' && (
+                <User aria-hidden className="size-3.5 text-muted-foreground" />
+              )}
+              {s.icon === 'tag' && (
+                <TagIcon aria-hidden className="size-3.5 text-muted-foreground" />
+              )}
+              {s.icon === 'create' && (
+                <Plus aria-hidden className="size-3.5 text-muted-foreground" />
+              )}
               {s.icon === 'create' ? (
                 <span>{t('diary.createTag', { name: s.label })}</span>
               ) : (

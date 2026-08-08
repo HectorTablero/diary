@@ -197,7 +197,11 @@ export function EntryComposer({
       {(tags.length > 0 || people.length > 0 || threads.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
           {tags.map((tag) => (
-            <TagChip key={tag.id} tag={tag} onRemove={() => setTags((p) => p.filter((tg) => tg.id !== tag.id))} />
+            <TagChip
+              key={tag.id}
+              tag={tag}
+              onRemove={() => setTags((p) => p.filter((tg) => tg.id !== tag.id))}
+            />
           ))}
           {threads.map((thread) => (
             <ThreadChip
@@ -214,7 +218,9 @@ export function EntryComposer({
 
       {people.length > 0 && (
         <div className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3 py-2">
-          <span className="text-xs font-medium text-muted-foreground">{t('diary.willBeSaidTo')}</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('diary.willBeSaidTo')}
+          </span>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {people.map((person) => (
               <label key={person.id} className="flex cursor-pointer items-center gap-1.5 text-sm">
@@ -284,7 +290,8 @@ export function EntryComposer({
             onToggle={(id) => {
               const thread = allThreads.find((th) => th.id === id);
               if (!thread) return;
-              if (threads.some((th) => th.id === id)) setThreads((p) => p.filter((th) => th.id !== id));
+              if (threads.some((th) => th.id === id))
+                setThreads((p) => p.filter((th) => th.id !== id));
               else addThread(thread);
             }}
             onCreate={(name) => void handleCreateThread(name)}

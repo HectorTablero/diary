@@ -50,7 +50,8 @@ export function useVoiceRecorder({ onStop }: UseVoiceRecorderOptions) {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
       const denied =
-        err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
+        err instanceof DOMException &&
+        (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
       throw new ApiError(0, denied ? 'ai.mic_denied' : 'ai.mic_unavailable');
     }
 
@@ -74,7 +75,10 @@ export function useVoiceRecorder({ onStop }: UseVoiceRecorderOptions) {
     setElapsedMs(0);
     recorder.start();
     setRecording(true);
-    tickRef.current = window.setInterval(() => setElapsedMs(Date.now() - startedAtRef.current), 200);
+    tickRef.current = window.setInterval(
+      () => setElapsedMs(Date.now() - startedAtRef.current),
+      200,
+    );
     autoStopRef.current = window.setTimeout(() => recorderRef.current?.stop(), AI_MAX_RECORDING_MS);
   }, [cleanup]);
 

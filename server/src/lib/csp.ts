@@ -73,7 +73,9 @@ export function buildCsp(indexHtmlPath: string): CspDirectives {
     /* No index.html to read — a source checkout run without a web build, where the server never
        serves the SPA and Vite is the one delivering the page. Said out loud rather than shipping a
        policy that would silently blank the app if this ever happened in production. */
-    console.warn(`[csp] no built SPA at ${indexHtmlPath}; inline scripts would be blocked if served`);
+    console.warn(
+      `[csp] no built SPA at ${indexHtmlPath}; inline scripts would be blocked if served`,
+    );
   }
   const scriptSrc = ["'self'", ...(hashes ?? [])];
 

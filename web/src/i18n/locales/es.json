@@ -517,7 +517,7 @@
       "wifiOnly": "Sincronizar solo con wifi",
       "wifiOnlyDescription": "Los cambios se siguen guardando en este dispositivo y suben la próxima vez que haya wifi. El diario es texto, así que esto ahorra poco.",
       "hidePausedStatus": "Ocultar el aviso de espera al wifi",
-      "hidePausedStatusDescription": "Los cambios en cola se sincronizan igual en cuanto haya wifi. Seguirás viendo los avisos de sin conexión y de servidor inaccesible.",
+      "hidePausedStatusDescription": "Los cambios en cola se sincronizan igual en cuanto haya wifi.",
       "nestingDepth": "Niveles de subentradas",
       "nestingDepthDescription": "Cuánto se puede anidar por debajo de una entrada principal. Bajarlo no toca las entradas que ya están más abajo."
     },

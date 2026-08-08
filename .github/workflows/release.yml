@@ -16,13 +16,13 @@ name: Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
     # Publishing versioned images from a manually pushed tag. Note that the tag the Android job
     # pushes below does NOT land here: GitHub does not trigger workflows from pushes made with the
     # default GITHUB_TOKEN, which is what keeps this from looping.
-    tags: [ 'v*.*.*' ]
+    tags: ['v*.*.*']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
   workflow_dispatch:
 
 permissions:
@@ -47,7 +47,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -129,7 +129,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Set up JDK

@@ -28,7 +28,9 @@ async function main() {
 
   // A crash or a container stop shouldn't take buffered telemetry with it.
   process.on('uncaughtException', (err) => captureError(err, { scope: 'uncaughtException' }));
-  process.on('unhandledRejection', (reason) => captureError(reason, { scope: 'unhandledRejection' }));
+  process.on('unhandledRejection', (reason) =>
+    captureError(reason, { scope: 'unhandledRejection' }),
+  );
   process.on('SIGTERM', () => {
     void flushTelemetry().finally(() => process.exit(0));
   });

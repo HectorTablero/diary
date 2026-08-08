@@ -71,7 +71,12 @@ export function AccountSection() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               {session.user.image && (
-                <img src={session.user.image} alt="" className="size-9 rounded-full" referrerPolicy="no-referrer" />
+                <img
+                  src={session.user.image}
+                  alt=""
+                  className="size-9 rounded-full"
+                  referrerPolicy="no-referrer"
+                />
               )}
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{session.user.name}</p>
@@ -85,7 +90,9 @@ export function AccountSection() {
           </div>
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">{t('settings.accountLocalOnlyDescription')}</p>
+            <p className="text-sm text-muted-foreground">
+              {t('settings.accountLocalOnlyDescription')}
+            </p>
             <Button
               size="sm"
               className="gap-1.5 h-8"

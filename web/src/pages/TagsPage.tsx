@@ -9,12 +9,7 @@ import { Spinner } from '@/components/common/Spinner';
 import { BOTTOM_NAV_ONLY, SIDEBAR_ONLY, SIDEBAR_ONLY_SR } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -102,7 +97,10 @@ function TagFormDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={submit} disabled={!name.trim() || !/^#[0-9A-Fa-f]{6}$/.test(color) || pending}>
+            <Button
+              onClick={submit}
+              disabled={!name.trim() || !/^#[0-9A-Fa-f]{6}$/.test(color) || pending}
+            >
               {pending && <Spinner className="size-3.5" />}
               {t('common.save')}
             </Button>
@@ -181,7 +179,10 @@ export default function TagsPage() {
               key={tag.id}
               className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs"
             >
-              <span className="size-4 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} />
+              <span
+                className="size-4 shrink-0 rounded-full"
+                style={{ backgroundColor: tag.color }}
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">
                   <span className="text-muted-foreground">#</span>
@@ -216,7 +217,11 @@ export default function TagsPage() {
           ))}
         </ul>
       ) : (
-        <EmptyState icon={TagIcon} title={t('tags.noTags')} description={t('tags.noTagsDescription')} />
+        <EmptyState
+          icon={TagIcon}
+          title={t('tags.noTags')}
+          description={t('tags.noTagsDescription')}
+        />
       )}
 
       <TagFormDialog tag={editing} open={formOpen} onOpenChange={setFormOpen} />

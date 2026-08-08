@@ -51,7 +51,9 @@ export function detectTagConflicts(
 /** `idExists` merges into itself — a no-op mapping, since the tag is already exactly there.
     `nameDuplicate` has no safe default: the user must choose to merge into the clashing tag
     or rename this one. */
-export function defaultTagResolution(matches: TagConflictMatch[] | undefined): BackupResolution | null {
+export function defaultTagResolution(
+  matches: TagConflictMatch[] | undefined,
+): BackupResolution | null {
   if (!matches?.length) return { action: 'create' };
   const idExists = matches.find((m) => m.kind === 'idExists');
   if (idExists) return { action: 'merge', targetId: idExists.targetId };
@@ -158,7 +160,9 @@ export function detectPersonBackupConflicts(
 
 /** `idExists` defaults to merging into itself: mergeBackupPersonPatch only ever fills blanks, so
     it's always safe. Every other kind requires an explicit choice. */
-export function defaultPersonResolution(matches: PersonConflictMatch[] | undefined): BackupResolution | null {
+export function defaultPersonResolution(
+  matches: PersonConflictMatch[] | undefined,
+): BackupResolution | null {
   if (!matches?.length) return { action: 'create' };
   const idExists = matches.find((m) => m.kind === 'idExists');
   if (idExists) return { action: 'merge', targetId: idExists.targetId };

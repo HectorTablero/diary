@@ -66,7 +66,8 @@ const baseKeys = (keys: Iterable<string>) => new Set([...keys].map(stripPlural))
 
 /** i18next resolves `key` through `key_one` / `key_other` / `key_many` … for counted strings. */
 const defines = (keys: Iterable<string>, key: string): boolean => {
-  for (const candidate of keys) if (candidate === key || candidate.startsWith(`${key}_`)) return true;
+  for (const candidate of keys)
+    if (candidate === key || candidate.startsWith(`${key}_`)) return true;
   return false;
 };
 
@@ -157,7 +158,8 @@ for (const lang of languages) {
         if (!vars.has(name)) problems.push(`${lang}.json ${label}: missing {{${name}}}`);
       }
       for (const name of vars) {
-        if (!reference.allowed.has(name)) problems.push(`${lang}.json ${label}: unknown {{${name}}}`);
+        if (!reference.allowed.has(name))
+          problems.push(`${lang}.json ${label}: unknown {{${name}}}`);
       }
     }
   }

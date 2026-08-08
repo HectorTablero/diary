@@ -1,4 +1,9 @@
-import { DEFAULT_TAG_COLORS, OBJECT_ID_REGEX, tagCreateSchema, tagUpdateSchema } from '@diary/shared';
+import {
+  DEFAULT_TAG_COLORS,
+  OBJECT_ID_REGEX,
+  tagCreateSchema,
+  tagUpdateSchema,
+} from '@diary/shared';
 import { Hono } from 'hono';
 import { Types } from 'mongoose';
 import { conflict, isDuplicateKey, notFound } from '../errors';
@@ -18,7 +23,10 @@ const oid = (value: string) => {
 /** First palette color not yet used by this user's tags (cycles when all are taken). */
 async function nextColor(userId: string): Promise<string> {
   const used = new Set((await Tag.find({ userId }, 'color').lean()).map((t) => t.color));
-  return DEFAULT_TAG_COLORS.find((c) => !used.has(c)) ?? DEFAULT_TAG_COLORS[used.size % DEFAULT_TAG_COLORS.length];
+  return (
+    DEFAULT_TAG_COLORS.find((c) => !used.has(c)) ??
+    DEFAULT_TAG_COLORS[used.size % DEFAULT_TAG_COLORS.length]
+  );
 }
 
 /* Writes only — the tag list and its usage counts are derived on the client (repo.ts getTags). */

@@ -76,7 +76,9 @@ describe('searchPeopleCsv', () => {
   });
 
   it('lists aliases so the model can see why a nickname matched', () => {
-    const csv = searchPeopleCsv('Ire', [person({ id: 'a', name: 'Irene', aliases: ['Ire', 'Irenita'] })]);
+    const csv = searchPeopleCsv('Ire', [
+      person({ id: 'a', name: 'Irene', aliases: ['Ire', 'Irenita'] }),
+    ]);
     const [, row] = csv.split('\n');
     expect(row).toContain('Irene,Ire|Irenita,a,');
   });

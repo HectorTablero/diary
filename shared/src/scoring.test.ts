@@ -247,7 +247,11 @@ describe('groupTalkingPointsByThread', () => {
     const research = thread('research');
     const entries = [
       entry({ id: 'todo', threads: [research] }),
-      entry({ id: 'told', threads: [research], saidTo: [{ personId: ANA, at: '2026-07-20T00:00:00.000Z' }] }),
+      entry({
+        id: 'told',
+        threads: [research],
+        saidTo: [{ personId: ANA, at: '2026-07-20T00:00:00.000Z' }],
+      }),
       entry({ id: 'hidden', threads: [research], hiddenFor: [ANA] }),
     ];
     const groups = groupsFor(entries);
@@ -328,10 +332,7 @@ describe('countTalkingPointGroups', () => {
   });
 
   it('still counts a matching parent and sub-entry as one cluster', () => {
-    const entries = [
-      entry({ id: 'root' }),
-      entry({ id: 'child', parentId: 'root' }),
-    ];
+    const entries = [entry({ id: 'root' }), entry({ id: 'child', parentId: 'root' })];
 
     expect(countFor(entries)).toBe(1);
   });
@@ -346,7 +347,11 @@ describe('countTalkingPointGroups', () => {
       entry({ id: 'd', dateKey: daysAgo(2), threads: [t1, t2] }),
       entry({ id: 'plain', dateKey: daysAgo(1) }),
       entry({ id: 'faded', importance: 5, dateKey: daysAgo(30), threads: [t2] }),
-      entry({ id: 'told', dateKey: daysAgo(1), saidTo: [{ personId: ANA, at: '2026-07-24T00:00:00.000Z' }] }),
+      entry({
+        id: 'told',
+        dateKey: daysAgo(1),
+        saidTo: [{ personId: ANA, at: '2026-07-24T00:00:00.000Z' }],
+      }),
     ];
 
     expect(countFor(entries)).toBe(groupsFor(entries).length);

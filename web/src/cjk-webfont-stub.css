@@ -1,0 +1,7 @@
+/*
+ * Deliberately empty.
+ *
+ * vite.config.ts aliases @fontsource-variable/noto-sans-jp|sc to this file in `--mode app`, so the
+ * APK ships none of their ~225 unicode-range subsets. The font stacks in index.css fall through to
+ * the system Noto CJK that Android already has. See the comment on the alias for why.
+ */

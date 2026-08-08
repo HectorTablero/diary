@@ -13,7 +13,8 @@ const writeHtml = (html: string): string => {
   return path;
 };
 
-const sha256 = (body: string) => `'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`;
+const sha256 = (body: string) =>
+  `'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`;
 
 describe('buildCsp', () => {
   it('hashes every inline script and leaves sourced ones to self', () => {
@@ -53,7 +54,9 @@ describe('buildCsp', () => {
   it('allows the live-sync WebSocket, which self does not cover', () => {
     // config.betterAuthUrl defaults to http://localhost:5173 in tests.
     const { connectSrc } = buildCsp(writeHtml(''));
-    expect(connectSrc.some((src) => src.startsWith('ws://') || src.startsWith('wss://'))).toBe(true);
+    expect(connectSrc.some((src) => src.startsWith('ws://') || src.startsWith('wss://'))).toBe(
+      true,
+    );
   });
 
   it('locks down the directives that stop framing and injection', () => {

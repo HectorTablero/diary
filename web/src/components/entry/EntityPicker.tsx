@@ -67,7 +67,9 @@ export function EntityPicker({
         }
       }}
     >
-      <PopoverTrigger asChild ref={triggerRef}>{trigger}</PopoverTrigger>
+      <PopoverTrigger asChild ref={triggerRef}>
+        {trigger}
+      </PopoverTrigger>
       <PopoverContent
         container={dialogContainer}
         className={cn('w-56 p-0', contentClassName)}
@@ -79,13 +81,19 @@ export function EntityPicker({
             <CommandEmpty>{t('common.noResults')}</CommandEmpty>
             <CommandGroup>
               {items.map((item) => (
-                <CommandItem key={item.id} value={`${item.id}:${item.label}`} onSelect={() => onToggle(item.id)}>
+                <CommandItem
+                  key={item.id}
+                  value={`${item.id}:${item.label}`}
+                  onSelect={() => onToggle(item.id)}
+                >
                   <span
                     className="mr-1 inline-block size-2 rounded-full"
                     style={{ backgroundColor: item.color ?? 'var(--muted-foreground)' }}
                   />
                   <span className="flex-1 truncate">{item.label}</span>
-                  {selected.has(item.id) && <span className="text-xs text-muted-foreground">✓</span>}
+                  {selected.has(item.id) && (
+                    <span className="text-xs text-muted-foreground">✓</span>
+                  )}
                 </CommandItem>
               ))}
               {canCreate && (
@@ -97,7 +105,9 @@ export function EntityPicker({
                   }}
                 >
                   <Plus className="mr-1 size-3.5" />
-                  {(createLabel ?? ((name: string) => t('diary.createTag', { name })))(query.trim())}
+                  {(createLabel ?? ((name: string) => t('diary.createTag', { name })))(
+                    query.trim(),
+                  )}
                 </CommandItem>
               )}
             </CommandGroup>

@@ -89,24 +89,29 @@ export function DatePicker({
     >
       <PopoverTrigger asChild ref={triggerRef}>
         {trigger ?? (
-        <button
-          type="button"
-          id={id}
-          disabled={disabled}
-          aria-label={ariaLabel}
-          aria-invalid={ariaInvalid}
-          aria-describedby={ariaDescribedBy}
-          className={cn(
-            'flex w-full min-w-0 items-center gap-1.5 rounded-lg border border-input bg-transparent text-left transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-expanded:border-ring aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
-            size === 'sm' ? 'h-7 gap-1 px-2 text-xs' : 'h-8 px-2.5 text-sm',
-            className,
-          )}
-        >
-          <CalendarDays className={cn('shrink-0 text-muted-foreground', size === 'sm' ? 'size-3.5' : 'size-4')} />
-          <span className={cn('flex-1 truncate', !value && 'text-muted-foreground')}>
-            {label || placeholder || t('common.selectDate')}
-          </span>
-        </button>
+          <button
+            type="button"
+            id={id}
+            disabled={disabled}
+            aria-label={ariaLabel}
+            aria-invalid={ariaInvalid}
+            aria-describedby={ariaDescribedBy}
+            className={cn(
+              'flex w-full min-w-0 items-center gap-1.5 rounded-lg border border-input bg-transparent text-left transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-expanded:border-ring aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
+              size === 'sm' ? 'h-7 gap-1 px-2 text-xs' : 'h-8 px-2.5 text-sm',
+              className,
+            )}
+          >
+            <CalendarDays
+              className={cn(
+                'shrink-0 text-muted-foreground',
+                size === 'sm' ? 'size-3.5' : 'size-4',
+              )}
+            />
+            <span className={cn('flex-1 truncate', !value && 'text-muted-foreground')}>
+              {label || placeholder || t('common.selectDate')}
+            </span>
+          </button>
         )}
       </PopoverTrigger>
       {/* collisionPadding keeps the popover off the screen edges on a phone, where the trigger is

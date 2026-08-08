@@ -141,7 +141,9 @@ async function entryDto(entryId: string, dateKey: string): Promise<EntryDto> {
 async function bottomOrderKey(parentId: string | null, dateKey: string): Promise<string> {
   const siblings = parentId
     ? await db.entries.where('parentId').equals(parentId).toArray()
-    : (await db.entries.where('dateKey').equals(dateKey).toArray()).filter((e) => e.parentId === null);
+    : (await db.entries.where('dateKey').equals(dateKey).toArray()).filter(
+        (e) => e.parentId === null,
+      );
   let max: string | undefined;
   for (const sibling of siblings) {
     if (sibling.orderKey && (!max || sibling.orderKey > max)) max = sibling.orderKey;
@@ -210,7 +212,9 @@ export async function updateEntry(entryId: string, input: EntryUpdateInput): Pro
   // EntryComposer only shows the date field for entry.parentId === null, but this doesn't need
   // to assume that.)
   const dateChanging = input.dateKey !== undefined && input.dateKey !== entry.dateKey;
-  const orderKey = dateChanging ? await bottomOrderKey(entry.parentId, input.dateKey!) : entry.orderKey;
+  const orderKey = dateChanging
+    ? await bottomOrderKey(entry.parentId, input.dateKey!)
+    : entry.orderKey;
 
   const updated: LocalEntry = {
     ...entry,
@@ -256,11 +260,13 @@ export async function moveEntry(
     }
     const depthOf = (id: string | null): number => {
       let depth = -1;
-      for (let current = id; current !== null; current = parentById.get(current) ?? null) depth += 1;
+      for (let current = id; current !== null; current = parentById.get(current) ?? null)
+        depth += 1;
       return depth;
     };
     const childrenByParent = new Map<string | null, string[]>();
-    for (const row of rows) childrenByParent.set(row.parentId, [...(childrenByParent.get(row.parentId) ?? []), row.id]);
+    for (const row of rows)
+      childrenByParent.set(row.parentId, [...(childrenByParent.get(row.parentId) ?? []), row.id]);
     const heightOf = (id: string): number => {
       const kids = childrenByParent.get(id) ?? [];
       return kids.length === 0 ? 1 : 1 + Math.max(...kids.map(heightOf));
@@ -272,7 +278,11 @@ export async function moveEntry(
   }
 
   const now = nowIso();
-  await db.entries.update(entryId, { parentId: newParentId, orderKey: newOrderKey, updatedAt: now });
+  await db.entries.update(entryId, {
+    parentId: newParentId,
+    orderKey: newOrderKey,
+    updatedAt: now,
+  });
   await enqueue('PATCH', `/entries/${entryId}`, { parentId: newParentId, orderKey: newOrderKey });
   return entryDto(entryId, entry.dateKey);
 }
@@ -342,12 +352,10 @@ export async function setSaidBulk(
   // One bump, not one per entry — it only ever moves lastCheckupAt forward anyway.
   if (said) await bumpLastCheckup([personId], now);
   await enqueueBatch(
-    entryIds.map(
-      (entryId): OutboxOp => ({
-        method: said ? 'PUT' : 'DELETE',
-        path: `/entries/${entryId}/said/${personId}`,
-      }),
-    ),
+    entryIds.map((entryId): OutboxOp => ({
+      method: said ? 'PUT' : 'DELETE',
+      path: `/entries/${entryId}/said/${personId}`,
+    })),
   );
 }
 
@@ -409,7 +417,11 @@ export async function createPerson(input: PersonCreateInput): Promise<PersonDto>
 
 /** Rewrite every entry's literal @OldName text to @NewName after a person rename
     (the structured peopleIds link is already correct — only the mention text is stale). */
-async function renamePersonMentions(personId: string, oldName: string, newName: string): Promise<void> {
+async function renamePersonMentions(
+  personId: string,
+  oldName: string,
+  newName: string,
+): Promise<void> {
   const entries = await db.entries.where('peopleIds').equals(personId).toArray();
   if (!entries.length) return;
   const nameById = new Map((await db.people.toArray()).map((p) => [p.id, p.name]));
@@ -446,7 +458,8 @@ export async function updatePerson(personId: string, input: PersonUpdateInput): 
       if (input.events !== undefined) p.events = input.events;
       if (input.notes !== undefined) p.notes = input.notes;
       if (input.tags !== undefined) p.tagIds = input.tags;
-      if (input.checkupIntervalDays !== undefined) p.checkupIntervalDays = input.checkupIntervalDays;
+      if (input.checkupIntervalDays !== undefined)
+        p.checkupIntervalDays = input.checkupIntervalDays;
     });
   if (!count) throw new ApiError(404, 'person.not_found');
   if (input.name !== undefined && oldName !== undefined && !fuzzyEquals(input.name, oldName)) {
@@ -528,7 +541,9 @@ export interface ImportItem {
  * Creates go in as one bulk write plus one outbox op each — per-person ops keep `dirtyIds()` and
  * `removeLocalDoc()` working unchanged, and the UI is local-first so nobody waits on the queue.
  */
-export async function importPeople(items: ImportItem[]): Promise<{ created: number; merged: number }> {
+export async function importPeople(
+  items: ImportItem[],
+): Promise<{ created: number; merged: number }> {
   // Read settings and people once. Looping over createPerson() would re-read every person on
   // every single call (assertUniquePersonName does a full table scan) — O(n²) on a 500-contact
   // address book.
@@ -700,7 +715,12 @@ export async function createTag(input: TagCreateInput): Promise<TagDto> {
   const tag: TagDto = { id, name: input.name, color: input.color ?? (await nextColor()) };
   await db.tags.add(tag);
   // Color resolved locally so the server stores the exact same one.
-  await enqueue('POST', '/tags', { ...input, id, createdAt: input.createdAt ?? nowIso(), color: tag.color });
+  await enqueue('POST', '/tags', {
+    ...input,
+    id,
+    createdAt: input.createdAt ?? nowIso(),
+    color: tag.color,
+  });
   return tag;
 }
 
@@ -810,7 +830,9 @@ export async function updateThread(threadId: string, input: ThreadUpdateInput): 
 export async function deleteThread(threadId: string): Promise<ThreadDeletion> {
   const thread = await db.threads.get(threadId);
   if (!thread) throw new ApiError(404, 'thread.not_found');
-  const entryIds = (await db.entries.where('threadIds').equals(threadId).toArray()).map((e) => e.id);
+  const entryIds = (await db.entries.where('threadIds').equals(threadId).toArray()).map(
+    (e) => e.id,
+  );
 
   await db.threads.delete(threadId);
   const now = nowIso();
@@ -868,9 +890,10 @@ export async function restoreEntries(deletion: EntryDeletion): Promise<void> {
     entries.flatMap((entry): OutboxOp[] => [
       { method: 'POST', path: '/entries', body: entryCreateBody(entry) },
       // hiddenFor rides its own call per person, exactly as it does in importEntries.
-      ...entry.hiddenFor.map(
-        (personId): OutboxOp => ({ method: 'PUT', path: `/entries/${entry.id}/hidden/${personId}` }),
-      ),
+      ...entry.hiddenFor.map((personId): OutboxOp => ({
+        method: 'PUT',
+        path: `/entries/${entry.id}/hidden/${personId}`,
+      })),
     ]),
   );
 }
@@ -883,11 +906,19 @@ export async function restorePerson(deletion: PersonDeletion): Promise<void> {
   const byId = new Map(links.map((link) => [link.entryId, link]));
   // Only entries that still exist: one may have been deleted while the toast was up, and putting
   // a bare link row back would resurrect it as a half-formed entry.
-  const present = await db.entries.where('id').anyOf([...byId.keys()]).toArray();
+  const present = await db.entries
+    .where('id')
+    .anyOf([...byId.keys()])
+    .toArray();
   await db.entries.bulkPut(
     present.map((entry) => {
       const link = byId.get(entry.id)!;
-      return { ...entry, peopleIds: link.peopleIds, hiddenFor: link.hiddenFor, saidTo: link.saidTo };
+      return {
+        ...entry,
+        peopleIds: link.peopleIds,
+        hiddenFor: link.hiddenFor,
+        saidTo: link.saidTo,
+      };
     }),
   );
 
@@ -942,8 +973,16 @@ export async function restoreTag(deletion: TagDeletion): Promise<void> {
   ]);
   await enqueueBatch([
     { method: 'POST', path: '/tags', body: { id: tag.id, name: tag.name, color: tag.color } },
-    ...entries.map((e): OutboxOp => ({ method: 'PATCH', path: `/entries/${e.id}`, body: { tags: e.tagIds } })),
-    ...people.map((p): OutboxOp => ({ method: 'PATCH', path: `/people/${p.id}`, body: { tags: p.tagIds } })),
+    ...entries.map((e): OutboxOp => ({
+      method: 'PATCH',
+      path: `/entries/${e.id}`,
+      body: { tags: e.tagIds },
+    })),
+    ...people.map((p): OutboxOp => ({
+      method: 'PATCH',
+      path: `/people/${p.id}`,
+      body: { tags: p.tagIds },
+    })),
   ]);
 }
 
@@ -967,9 +1006,11 @@ export async function restoreThread(deletion: ThreadDeletion): Promise<void> {
       path: '/threads',
       body: { id: thread.id, name: thread.name, createdAt: thread.createdAt },
     },
-    ...entries.map(
-      (e): OutboxOp => ({ method: 'PATCH', path: `/entries/${e.id}`, body: { threads: e.threadIds } }),
-    ),
+    ...entries.map((e): OutboxOp => ({
+      method: 'PATCH',
+      path: `/entries/${e.id}`,
+      body: { threads: e.threadIds },
+    })),
   ]);
 }
 
@@ -1040,7 +1081,11 @@ export async function importTags(
         // this runs `row.name` has already been edited to something free, if it needed to be.
         tagIdMap.set(row.id, row.id);
         creates.push({ id: row.id, name: row.name, color: row.color });
-        ops.push({ method: 'POST', path: '/tags', body: { id: row.id, name: row.name, color: row.color } });
+        ops.push({
+          method: 'POST',
+          path: '/tags',
+          body: { id: row.id, name: row.name, color: row.color },
+        });
         continue;
     }
   }
@@ -1120,7 +1165,8 @@ function mergeBackupPersonPatch(
     if (mergedAliases.some((known) => fuzzyEquals(known, alias))) continue;
     mergedAliases.push(alias);
   }
-  if (mergedAliases.length !== existingAliases.length) patch.aliases = mergedAliases.slice(0, MAX_ALIASES);
+  if (mergedAliases.length !== existingAliases.length)
+    patch.aliases = mergedAliases.slice(0, MAX_ALIASES);
 
   const mappedTagIds = incoming.tagIds.flatMap((id) => {
     const mapped = tagIdMap.get(id);
@@ -1261,7 +1307,8 @@ export async function importEntries(
   const prepared: { row: EntryBackupRow; finalId: string; isOverwrite: boolean }[] = [];
 
   for (const { row, resolution } of items) {
-    if (resolution.action === 'merge') throw new Error('entries do not support the merge resolution');
+    if (resolution.action === 'merge')
+      throw new Error('entries do not support the merge resolution');
     const isOverwrite = resolution.action === 'overwrite';
     const finalId = isOverwrite ? row.id : newObjectId();
     entryIdMap.set(row.id, finalId);

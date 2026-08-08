@@ -1,4 +1,9 @@
-import { EVENT_REMEMBER_MULTIPLIER, importanceWeight, MATCH_STRENGTH, type MatchType } from './constants';
+import {
+  EVENT_REMEMBER_MULTIPLIER,
+  importanceWeight,
+  MATCH_STRENGTH,
+  type MatchType,
+} from './constants';
 import type {
   EntryDto,
   EntryNode,

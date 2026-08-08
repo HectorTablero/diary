@@ -3,7 +3,8 @@ import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
 
 export const LEVELS = ['1', '2', '3', '4', '5'] as const;
 
-export const clampDays = (value: number, min: number) => Math.min(3650, Math.max(min, Math.round(value)));
+export const clampDays = (value: number, min: number) =>
+  Math.min(3650, Math.max(min, Math.round(value)));
 
 /**
  * The draft as a payload the API will accept, or null while a number is mid-edit.
@@ -44,7 +45,10 @@ export function buildPayload(
     quietNotifications: draft.quietNotifications,
     defaultImportance: draft.defaultImportance,
     autoSaidOnMention: draft.autoSaidOnMention,
-    maxSubEntryDepth: Math.min(MAX_SUB_ENTRY_DEPTH, Math.max(1, Math.round(draft.maxSubEntryDepth))),
+    maxSubEntryDepth: Math.min(
+      MAX_SUB_ENTRY_DEPTH,
+      Math.max(1, Math.round(draft.maxSubEntryDepth)),
+    ),
     defaultCheckupIntervalDays: checkupsEnabled ? clampDays(checkupIntervalDays, 1) : null,
     /* No provider keys here on purpose. They are write-only and are not part of the draft at
        all, so the autosave below has nothing to send — and, more to the point, cannot resend a

@@ -7,7 +7,11 @@ import { isNative } from './native';
    share sheet instead — that's the actual persistence step, letting the user pick Drive/Files/
    email/etc. Cache (not Documents) needs no runtime storage permission. */
 
-export async function saveTextFile(filename: string, content: string, mimeType: string): Promise<void> {
+export async function saveTextFile(
+  filename: string,
+  content: string,
+  mimeType: string,
+): Promise<void> {
   if (isNative) {
     const { uri } = await Filesystem.writeFile({
       path: filename,
@@ -25,9 +29,17 @@ export async function saveTextFile(filename: string, content: string, mimeType: 
 /** Same as saveTextFile, for binary content (e.g. a zip) already base64-encoded — Capacitor's
     Filesystem plugin takes base64 directly when no `encoding` is given, and the web path just
     decodes it into a Blob. */
-export async function saveBinaryFile(filename: string, base64Data: string, mimeType: string): Promise<void> {
+export async function saveBinaryFile(
+  filename: string,
+  base64Data: string,
+  mimeType: string,
+): Promise<void> {
   if (isNative) {
-    const { uri } = await Filesystem.writeFile({ path: filename, data: base64Data, directory: Directory.Cache });
+    const { uri } = await Filesystem.writeFile({
+      path: filename,
+      data: base64Data,
+      directory: Directory.Cache,
+    });
     await Share.share({ url: uri, title: filename });
     return;
   }

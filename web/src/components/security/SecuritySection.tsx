@@ -221,7 +221,9 @@ export function SecuritySection() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-0.5">
             <Label htmlFor="app-lock">{t('security.requirePasscode')}</Label>
-            <p className="text-xs text-muted-foreground">{t('security.requirePasscodeDescription')}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('security.requirePasscodeDescription')}
+            </p>
           </div>
           <Switch
             id="app-lock"
@@ -272,7 +274,12 @@ export function SecuritySection() {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setDialog('change')}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => setDialog('change')}
+              >
                 <LockKeyhole className="size-3.5" />
                 {t('security.changePasscode')}
               </Button>

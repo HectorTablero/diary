@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ageOn, birthdayFallsOn, birthdaysOn, formatBirthdayValue, parseBirthday } from './birthday';
+import {
+  ageOn,
+  birthdayFallsOn,
+  birthdaysOn,
+  formatBirthdayValue,
+  parseBirthday,
+} from './birthday';
 
 describe('parseBirthday', () => {
   it('reads a full date', () => {

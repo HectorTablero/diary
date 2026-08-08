@@ -24,7 +24,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { importPeople, type ImportItem } from '@/db/mutations';
 import { notifyError, notifySuccess } from '@/lib/notify';
-import { canImportContacts, checkContactsPermission, readContacts, requestContactsPermission } from '@/lib/contacts';
+import {
+  canImportContacts,
+  checkContactsPermission,
+  readContacts,
+  requestContactsPermission,
+} from '@/lib/contacts';
 import {
   canKeepBoth,
   defaultResolution,
@@ -272,9 +277,7 @@ export default function ImportContactsPage() {
   const candidates = useMemo<ContactCandidate[]>(
     () =>
       contacts.map((contact) =>
-        renames[contact.contactId]
-          ? { ...contact, name: renames[contact.contactId] }
-          : contact,
+        renames[contact.contactId] ? { ...contact, name: renames[contact.contactId] } : contact,
       ),
     [contacts, renames],
   );

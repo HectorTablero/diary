@@ -1,5 +1,14 @@
 import type { PersonDto } from '@diary/shared';
-import { Briefcase, Cake, Copy, Mail, MessageCircle, Phone, QrCode, TriangleAlert } from 'lucide-react';
+import {
+  Briefcase,
+  Cake,
+  Copy,
+  Mail,
+  MessageCircle,
+  Phone,
+  QrCode,
+  TriangleAlert,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -16,13 +25,7 @@ import {
 import { notifySuccess } from '@/lib/notify';
 import { ageOn, daysUntilBirthday, formatBirthday } from '@/lib/birthday';
 import { qrcodeLoader } from '@/lib/preloaders';
-import {
-  isIncompletePhone,
-  mailtoLink,
-  telLink,
-  WECHAT_APP_URL,
-  whatsappLink,
-} from '@/lib/phone';
+import { isIncompletePhone, mailtoLink, telLink, WECHAT_APP_URL, whatsappLink } from '@/lib/phone';
 
 /* Contact actions in the profile header. Shown on web as well as native — wa.me, mailto: and tel:
    all resolve fine in a desktop browser; only the contact *import* is Android-only.
@@ -125,7 +128,9 @@ function WeChatAction({ wechatId }: { wechatId: string }) {
 
   const openWeChat = async () => {
     const copied = await copyId();
-    toast.info(copied ? t('people.wechatCopiedHint') : t('people.wechatSearchHint', { id: wechatId }));
+    toast.info(
+      copied ? t('people.wechatCopiedHint') : t('people.wechatSearchHint', { id: wechatId }),
+    );
     window.location.href = WECHAT_APP_URL;
   };
 

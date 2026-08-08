@@ -164,8 +164,7 @@ export const BIRTHDAY_REGEX = /^(?:\d{4}-|--)(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|
    delete LEGACY_YEARLESS_BIRTHDAY_REGEX + normalizeBirthday and their call sites (the Zod
    birthdaySchema and parseBirthday). See the marker comment in web/src/db/db.ts. */
 
-export const LEGACY_YEARLESS_BIRTHDAY_REGEX =
-  /^---(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
+export const LEGACY_YEARLESS_BIRTHDAY_REGEX = /^---(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 
 /** Accepts either format, always returns the canonical one. */
 export const normalizeBirthday = (value: string): string =>

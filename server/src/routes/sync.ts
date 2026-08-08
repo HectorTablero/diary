@@ -44,8 +44,12 @@ export const syncRouter = new Hono<AppEnv>()
     const changedSince = since ? { updatedAt: { $gt: new Date(since) } } : {};
 
     const [entries, people, tags, threads, settings, deletions] = await Promise.all([
-      Entry.find({ userId, ...changedSince }).populate(ENTRY_POPULATE).lean(),
-      Person.find({ userId, ...changedSince }).populate(PERSON_POPULATE).lean(),
+      Entry.find({ userId, ...changedSince })
+        .populate(ENTRY_POPULATE)
+        .lean(),
+      Person.find({ userId, ...changedSince })
+        .populate(PERSON_POPULATE)
+        .lean(),
       Tag.find({ userId, ...changedSince }).lean(),
       Thread.find({ userId, ...changedSince }).lean(),
       getSettings(userId),

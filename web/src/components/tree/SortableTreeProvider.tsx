@@ -352,7 +352,10 @@ export function SortableTreeProvider<T extends TreeNode>({
       depth: projectionRef.current?.depth ?? data.activeDepth,
     };
     const to = stepKeyboard(data.visible, data.activeNode, from, key, maxDepth);
-    commit(to.targetIndex, projectAtDepth(data.visible, data.activeNode, to.targetIndex, to.depth, maxDepth));
+    commit(
+      to.targetIndex,
+      projectAtDepth(data.visible, data.activeNode, to.targetIndex, to.depth, maxDepth),
+    );
     return currentCoordinates;
   };
 
@@ -505,7 +508,12 @@ export function SortableTreeProvider<T extends TreeNode>({
   const rowHeight = data?.rowHeight ?? 44;
   const blocked = !!projection && !projection.valid;
   const shadow = (
-    <motion.div key="__shadow__" layout transition={SPRING} style={{ marginLeft: shadowDepth * indentWidth }}>
+    <motion.div
+      key="__shadow__"
+      layout
+      transition={SPRING}
+      style={{ marginLeft: shadowDepth * indentWidth }}
+    >
       <div
         className={cn(
           'rounded-lg border-2 border-dashed',
@@ -534,7 +542,11 @@ export function SortableTreeProvider<T extends TreeNode>({
       onDragCancel={reset}
     >
       <SortableTreeContext.Provider
-        value={{ activeId, projectedParentId: projection?.parentId ?? null, projectionValid: projection?.valid ?? true }}
+        value={{
+          activeId,
+          projectedParentId: projection?.parentId ?? null,
+          projectionValid: projection?.valid ?? true,
+        }}
       >
         <div ref={containerRef}>
           {activeId && data ? (

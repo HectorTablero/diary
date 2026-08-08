@@ -118,7 +118,8 @@ const subscribe = (listener: () => void) => {
 };
 
 export const getLockState = (): LockState => state;
-export const useLockState = (): LockState => useSyncExternalStore(subscribe, getLockState, getLockState);
+export const useLockState = (): LockState =>
+  useSyncExternalStore(subscribe, getLockState, getLockState);
 
 export const isLockEnabled = () => state.config !== null;
 

@@ -75,8 +75,9 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
       referrerPolicy: 'strict-origin-when-cross-origin',
       xContentTypeOptions: 'nosniff',
       // HSTS is only meaningful over TLS, and the dev server is plain http on localhost.
-      strictTransportSecurity:
-        config.betterAuthUrl.startsWith('https://') ? 'max-age=31536000; includeSubDomains' : false,
+      strictTransportSecurity: config.betterAuthUrl.startsWith('https://')
+        ? 'max-age=31536000; includeSubDomains'
+        : false,
     }),
   );
 

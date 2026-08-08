@@ -54,9 +54,7 @@ export function routeForUrl(url: string): string | null {
 
   // `new URL` has already resolved any `..` segments, so pathname cannot climb out of the prefixes.
   const path = parsed.pathname.replace(/\/+$/, '') || '/';
-  const openable = OPENABLE.some(
-    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-  );
+  const openable = OPENABLE.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   if (!openable) return null;
 
   return `${path}${parsed.search}${parsed.hash}`;

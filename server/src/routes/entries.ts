@@ -3,7 +3,13 @@ import { Hono } from 'hono';
 import { notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { createEntry, deleteEntry, setHidden, setSaid, updateEntry } from '../services/entryService';
+import {
+  createEntry,
+  deleteEntry,
+  setHidden,
+  setSaid,
+  updateEntry,
+} from '../services/entryService';
 
 const oid = (value: string) => {
   if (!OBJECT_ID_REGEX.test(value)) throw notFound('errors.not_found');

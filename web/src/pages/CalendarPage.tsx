@@ -16,9 +16,7 @@ import { useWeekStart } from '@/lib/preferences';
 import { cn } from '@/lib/utils';
 
 function useIsDark(): boolean {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains('dark'),
-  );
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setIsDark(document.documentElement.classList.contains('dark'));
@@ -89,7 +87,10 @@ export default function CalendarPage() {
   }, [cursor, year, month, weekStart]);
 
   const weekdays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => weekdayName((weekStart + i) % 7, i18n.language, 'EEEEEE')),
+    () =>
+      Array.from({ length: 7 }, (_, i) =>
+        weekdayName((weekStart + i) % 7, i18n.language, 'EEEEEE'),
+      ),
     [i18n.language, weekStart],
   );
 
@@ -133,7 +134,12 @@ export default function CalendarPage() {
             >
               <ChevronRight className="size-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setCursor(startOfMonth(new Date()))}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setCursor(startOfMonth(new Date()))}
+            >
               {t('common.today')}
             </Button>
           </div>
@@ -142,7 +148,10 @@ export default function CalendarPage() {
 
       <div className="grid grid-cols-7 gap-0.5 mb-1">
         {weekdays.map((wd, i) => (
-          <div key={i} className="py-1 text-center text-[11px] font-medium text-muted-foreground uppercase">
+          <div
+            key={i}
+            className="py-1 text-center text-[11px] font-medium text-muted-foreground uppercase"
+          >
             {wd}
           </div>
         ))}
@@ -165,11 +174,21 @@ export default function CalendarPage() {
               )}
               style={
                 dateKey !== today && byDate.has(dateKey)
-                  ? { backgroundColor: heatmapBg(byDate.get(dateKey)!.count, byDate.get(dateKey)!.maxImportance, isDark) }
+                  ? {
+                      backgroundColor: heatmapBg(
+                        byDate.get(dateKey)!.count,
+                        byDate.get(dateKey)!.maxImportance,
+                        isDark,
+                      ),
+                    }
                   : undefined
               }
             >
-              <span className={cn(isHighDensity(byDate.get(dateKey)?.count ?? 0) && 'font-semibold text-foreground')}>
+              <span
+                className={cn(
+                  isHighDensity(byDate.get(dateKey)?.count ?? 0) && 'font-semibold text-foreground',
+                )}
+              >
                 {Number(dateKey.slice(8))}
               </span>
               {byDate.has(dateKey) && (
@@ -225,9 +244,12 @@ export default function CalendarPage() {
                 key={i}
                 className="size-3.5 rounded-sm border"
                 style={{
-                  backgroundColor: op === 0 ? 'transparent' : isDark
-                    ? `rgba(255, 255, 255, ${op})`
-                    : `rgba(23, 23, 23, ${op})`,
+                  backgroundColor:
+                    op === 0
+                      ? 'transparent'
+                      : isDark
+                        ? `rgba(255, 255, 255, ${op})`
+                        : `rgba(23, 23, 23, ${op})`,
                   borderColor: 'var(--border)',
                 }}
               />
@@ -239,7 +261,9 @@ export default function CalendarPage() {
           {[1, 2, 3, 4, 5].map((level) => (
             <div key={level} className="flex items-center gap-1">
               <span className={cn('size-1.5', markerClass(level))} />
-              <span className="text-[10px] text-muted-foreground">{t(`importance.levels.${level}`)}</span>
+              <span className="text-[10px] text-muted-foreground">
+                {t(`importance.levels.${level}`)}
+              </span>
             </div>
           ))}
           {birthdaysByDate.size > 0 && (

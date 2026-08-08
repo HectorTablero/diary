@@ -42,13 +42,29 @@ function buildEntryNodeSchema(remainingDepth: number): Record<string, unknown> {
   return {
     type: 'object',
     properties: {
-      content: { type: 'string', description: 'First-person diary bullet, may contain @Name and #Tag tokens' },
-      importance: { type: 'integer', minimum: 1, maximum: 5, description: '1 = highest, 5 = lowest' },
+      content: {
+        type: 'string',
+        description: 'First-person diary bullet, may contain @Name and #Tag tokens',
+      },
+      importance: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 5,
+        description: '1 = highest, 5 = lowest',
+      },
       tags: { type: 'array', items: { type: 'string' }, description: 'Existing tag ids only' },
-      people: { type: 'array', items: { type: 'string' }, description: 'Existing person ids only, from query_people' },
+      people: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Existing person ids only, from query_people',
+      },
       children:
         remainingDepth > 0
-          ? { type: 'array', items: buildEntryNodeSchema(remainingDepth - 1), description: 'Nested sub-details' }
+          ? {
+              type: 'array',
+              items: buildEntryNodeSchema(remainingDepth - 1),
+              description: 'Nested sub-details',
+            }
           : { type: 'array', items: {}, maxItems: 0, description: 'Max nesting depth reached' },
     },
     required: ['content', 'importance', 'tags', 'people', 'children'],
@@ -175,7 +191,9 @@ function sanitizeNodes(
  */
 function buildPlacementSection(parentPath: string[], availableDepth: number): string {
   if (!parentPath.length) return '';
-  const chain = parentPath.map((content, i) => `${'  '.repeat(i)}- level ${i}: "${content}"`).join('\n');
+  const chain = parentPath
+    .map((content, i) => `${'  '.repeat(i)}- level ${i}: "${content}"`)
+    .join('\n');
   const target = parentPath.length - 1;
   return `
 ### 0. Where These Entries Go
@@ -202,7 +220,9 @@ function buildSystemPrompt(
   availableDepth: number,
 ): string {
   const today = new Date().toISOString().slice(0, 10);
-  const tagLines = tags.length ? tags.map((t) => `${t.id}: ${t.name}`).join('\n') : '(no tags exist yet)';
+  const tagLines = tags.length
+    ? tags.map((t) => `${t.id}: ${t.name}`).join('\n')
+    : '(no tags exist yet)';
   return `You extract diary bullet points from a voice transcript recorded by the user.
 ${buildPlacementSection(parentPath, availableDepth)}
 
@@ -213,10 +233,10 @@ Take your time and prioritize correctness over speed. Reason carefully about the
 - ${forceEnglishAIEvents ? `Write every "content" field in English, even if the transcript is in another language (app language hint: "${language}").` : `Write every "content" field in the same language as the transcript (app language hint: "${language}").`}
 - Split the transcript into concise, first-person diary bullet points. Capture every distinct action, fact, or event mentioned in the transcript. Never omit details, minor tasks, or routine activities just to keep the summary short.
 ${
-    availableDepth === 0
-      ? `- Submit a flat list: every entry MUST have "children": []. Where you would normally nest a detail under an event, submit both as separate entries in order instead, with the detail written so it still stands on its own.`
-      : `- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under that event. You may nest up to ${availableDepth} level${availableDepth === 1 ? '' : 's'} below each entry you submit.`
-  }
+  availableDepth === 0
+    ? `- Submit a flat list: every entry MUST have "children": []. Where you would normally nest a detail under an event, submit both as separate entries in order instead, with the detail written so it still stands on its own.`
+    : `- Group related details logically using the "children" array. Do not list every detail as a flat, top-level entry. If the transcript describes a main event (e.g., "Went to London") and subsequent details about it (e.g., "Visited the museum", "Had dinner with @John"), those details MUST be nested as children under that event. You may nest up to ${availableDepth} level${availableDepth === 1 ? '' : 's'} below each entry you submit.`
+}
 - Every parent entry must be an event the transcript itself states, in the user's own words. Before writing a parent, find the phrase in the transcript it comes from; if there is no such phrase, its children are separate entries side by side, not a group. An entry that describes the day as a whole rather than a specific event always fails this check — the diary already knows the date.
 - One entry covers exactly one event, project or topic. A detail belongs under a parent only when it is a detail of that specific event. Two things that merely happened on the same day, are the same kind of activity, or involve the same person still stay separate: shared subject matter is not a parent.
 - Never invent facts that are not in the transcript. If the transcript is ambiguous, prefer a conservative interpretation.
@@ -311,19 +331,23 @@ export async function generateSuggestions(
     Person.find({ userId }, 'name aliases notes').populate({ path: 'tags', select: 'name' }).lean(),
   ]);
 
-  const tags: TagRef[] = (tagDocs as unknown as { _id: Types.ObjectId; name: string }[]).map((t) => ({
-    id: t._id.toString(),
-    name: t.name,
-  }));
+  const tags: TagRef[] = (tagDocs as unknown as { _id: Types.ObjectId; name: string }[]).map(
+    (t) => ({
+      id: t._id.toString(),
+      name: t.name,
+    }),
+  );
   const ownedTagIds = new Set(tags.map((t) => t.id));
 
-  const searchablePeople: SearchablePerson[] = (personDocs as unknown as LeanPersonForSearch[]).map((p) => ({
-    id: p._id.toString(),
-    name: p.name,
-    aliases: p.aliases ?? [],
-    tagNames: (p.tags ?? []).map((t) => t.name),
-    notes: p.notes ?? '',
-  }));
+  const searchablePeople: SearchablePerson[] = (personDocs as unknown as LeanPersonForSearch[]).map(
+    (p) => ({
+      id: p._id.toString(),
+      name: p.name,
+      aliases: p.aliases ?? [],
+      tagNames: (p.tags ?? []).map((t) => t.name),
+      notes: p.notes ?? '',
+    }),
+  );
   const ownedPersonIds = new Set(searchablePeople.map((p) => p.id));
 
   const messages: ChatMessage[] = [
@@ -365,12 +389,18 @@ export async function generateSuggestions(
       for (const call of message.tool_calls) {
         if (call.function.name === 'query_people') {
           const query = parseQueryArg(call.function.arguments);
-          const result = query ? searchPeopleCsv(query, searchablePeople) : 'error: missing "query" argument';
+          const result = query
+            ? searchPeopleCsv(query, searchablePeople)
+            : 'error: missing "query" argument';
           messages.push({ role: 'tool', tool_call_id: call.id, content: result });
         } else if (call.function.name === 'submit_entries') {
           const args = parseJsonSafely(call.function.arguments);
           if (args === undefined) {
-            messages.push({ role: 'tool', tool_call_id: call.id, content: 'error: invalid JSON arguments' });
+            messages.push({
+              role: 'tool',
+              tool_call_id: call.id,
+              content: 'error: invalid JSON arguments',
+            });
             continue;
           }
           const parsed = buildSubmitEntriesArgsSchema(availableDepth).parse(args);
@@ -392,7 +422,8 @@ export async function generateSuggestions(
       reminders += 1;
       messages.push({
         role: 'user',
-        content: 'You must call submit_entries to finish — with an empty list if nothing is extractable.',
+        content:
+          'You must call submit_entries to finish — with an empty list if nothing is extractable.',
       });
     } else {
       break;

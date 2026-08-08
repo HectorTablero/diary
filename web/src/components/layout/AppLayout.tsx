@@ -347,17 +347,18 @@ function SyncStatusOverlay() {
      `paused` has no zero-pending wording, because showBlocker above never lets it reach the screen
      with nothing queued. The other two do: being offline with nothing to send is still worth
      saying, since it is also why nothing is arriving. */
-  const label = !showBlocker || !status.blocker
-    ? null
-    : status.blocker === 'paused'
-      ? t('sync.pausedPending', { count: status.pending })
-      : status.blocker === 'unreachable'
-        ? status.pending > 0
-          ? t('sync.unreachablePending', { count: status.pending })
-          : t('sync.unreachable')
-        : status.pending > 0
-          ? t('sync.offlinePending', { count: status.pending })
-          : t('sync.offline');
+  const label =
+    !showBlocker || !status.blocker
+      ? null
+      : status.blocker === 'paused'
+        ? t('sync.pausedPending', { count: status.pending })
+        : status.blocker === 'unreachable'
+          ? status.pending > 0
+            ? t('sync.unreachablePending', { count: status.pending })
+            : t('sync.unreachable')
+          : status.pending > 0
+            ? t('sync.offlinePending', { count: status.pending })
+            : t('sync.offline');
 
   /* The wrapper is always mounted and the *pill* is what comes and goes, so that going offline is a
      text change inside an existing live region rather than a whole region appearing at once — the
@@ -485,7 +486,10 @@ export default function AppLayout() {
       <main
         id="main"
         tabIndex={-1}
-        className={cn('min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]', !isNative && 'md:pb-0')}
+        className={cn(
+          'min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]',
+          !isNative && 'md:pb-0',
+        )}
       >
         <UpdateBanner />
         <SyncStatusOverlay />

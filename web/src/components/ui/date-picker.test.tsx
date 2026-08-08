@@ -11,7 +11,10 @@ import { DatePicker } from './date-picker';
  * `trigger` escape hatch (which is what let the diary heading adopt it) really does replace the
  * default button rather than sit next to it.
  */
-function Controlled({ initial = '', ...props }: { initial?: string } & Partial<React.ComponentProps<typeof DatePicker>>) {
+function Controlled({
+  initial = '',
+  ...props
+}: { initial?: string } & Partial<React.ComponentProps<typeof DatePicker>>) {
   const [value, setValue] = useState(initial);
   return <DatePicker value={value} onChange={setValue} aria-label="Date" {...props} />;
 }
@@ -57,7 +60,15 @@ describe('DatePicker', () => {
   it('blocks days outside min/max', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(<DatePicker value="2026-08-15" onChange={onChange} min="2026-08-10" max="2026-08-20" aria-label="Date" />);
+    render(
+      <DatePicker
+        value="2026-08-15"
+        onChange={onChange}
+        min="2026-08-10"
+        max="2026-08-20"
+        aria-label="Date"
+      />,
+    );
 
     await open(user);
     expect(screen.getByRole('button', { name: '5' })).toBeDisabled();

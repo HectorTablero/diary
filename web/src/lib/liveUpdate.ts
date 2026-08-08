@@ -89,7 +89,11 @@ async function checkAndDownload(): Promise<void> {
 
     if (!(await isCompatible(release))) {
       // The web layer alone can't carry this one — surface it so the user can install the APK.
-      setState({ kind: 'native-required', version: release.version, releaseUrl: release.releaseUrl });
+      setState({
+        kind: 'native-required',
+        version: release.version,
+        releaseUrl: release.releaseUrl,
+      });
       return;
     }
 

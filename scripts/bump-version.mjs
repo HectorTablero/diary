@@ -47,7 +47,9 @@ async function main() {
   writeVersion(next.version);
   // Stage it so the bump lands in the commit that triggered the hook.
   execFileSync('git', ['add', 'package.json'], { stdio: 'inherit' });
-  console.log(`[version] v${current.version} -> v${next.version} (versionCode ${versionCode(next)})`);
+  console.log(
+    `[version] v${current.version} -> v${next.version} (versionCode ${versionCode(next)})`,
+  );
 }
 
 await main();

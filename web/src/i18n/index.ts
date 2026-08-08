@@ -2,8 +2,11 @@ import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { useEffect, useSyncExternalStore } from 'react';
 import { initReactI18next } from 'react-i18next';
+import { onReconnected } from '@/db/sync';
+import { useSyncStatus } from '@/db/useSyncStatus';
 import { isNative } from '@/lib/native';
 import { useOnline } from '@/lib/online';
+import { canFetchLocales } from './availability';
 
 /* The language table lives in ./languages, which has no side effects. Imported for use below and
    re-exported so every existing `from '@/i18n'` import keeps working — and so that wanting the
@@ -110,16 +113,22 @@ export function ensureLanguage(lng: string): Promise<void> {
    worked. And the Cache API can't usefully be asked either: it would answer for the HTTP cache
    while the service worker holds its own.
 
-   What does answer it exactly is trying. Offline, a precached file comes back from the service
-   worker with no network involved and an absent one rejects, so the probe below is decisive and
-   costs nothing but a cache read. This is only safe because the loader is `fetch`-based: probing
-   with `import()` would have cached its own failures into the module map and made every language
-   it found missing permanently unloadable for the rest of the session — a probe that broke what
-   it measured. It runs only while offline, where the answer actually varies:
+   What does answer it exactly is trying. With nothing fetchable, a precached file comes back from
+   the service worker with no network involved and an absent one rejects, so the probe below is
+   decisive and costs nothing but a cache read. This is only safe because the loader is
+   `fetch`-based: probing with `import()` would have cached its own failures into the module map and
+   made every language it found missing permanently unloadable for the rest of the session — a probe
+   that broke what it measured. It runs only when the strings cannot be downloaded, where the answer
+   actually varies:
 
-     - online, or the native build (whose locale files all ship inside the APK) — everything is
-       offered, and a switch that fails anyway is reported by the caller, as it must be regardless;
-     - offline — each absent language is probed once, and only a probe that *failed* greys one out.
+     - strings are fetchable, or the native build (whose locale files all ship inside the APK) —
+       everything is offered, and a switch that fails anyway is reported by the caller, as it must
+       be regardless;
+     - they are not — each absent language is probed once, and only a probe that *failed* greys one
+       out.
+
+   "Cannot be downloaded" is deliberately wider than `navigator.onLine`: a server the sync engine
+   cannot reach serves these chunks no better than no network does. See `useLanguageAvailability`.
 
    Unprobed and in-flight both read as available, so the list never flickers a language out from
    under the user's cursor on the way to deciding it was fine. */
@@ -154,14 +163,21 @@ const subscribeProbes = (cb: () => void) => {
   };
 };
 
-/* A refusal only ever meant "not on the device *then*". Once there is a network again the service
-   worker can precache the chunk, so the verdicts have to expire — otherwise a language greyed out
-   during one flight stays greyed out for the rest of the session. */
-window.addEventListener('online', () => {
+/* A refusal only ever meant "not on the device *then*". Once the strings can be fetched again the
+   service worker can precache the chunk, so the verdicts have to expire — otherwise a language
+   greyed out during one flight stays greyed out for the rest of the session.
+
+   Two ways back, matching the two ways out: the browser regaining a network, and the server
+   answering again after it had stopped. `onReconnected` only fires when a sync had actually
+   failed, which is exactly when `unreachable` was the thing greying languages out. */
+function forgetRefusals() {
   if (refused.size === 0) return;
   refused.clear();
   bumpProbeVersion();
-});
+}
+
+window.addEventListener('online', forgetRefusals);
+onReconnected(forgetRefusals);
 
 /**
  * A predicate for "could this device switch to that language right now", which re-renders its
@@ -172,21 +188,29 @@ window.addEventListener('online', () => {
  */
 export function useLanguageAvailability(): (code: LanguageCode) => boolean {
   const online = useOnline();
+  const { blocker } = useSyncStatus();
   useSyncExternalStore(
     subscribeProbes,
     () => probeVersion,
     () => probeVersion,
   );
 
+  // Wider than `navigator.onLine`: an unreachable server serves these chunks no better than no
+  // network does. The reasoning, and why the other two blockers are not in it, is in ./availability.
+  const canFetchStrings = canFetchLocales(online, blocker);
+
   useEffect(() => {
-    if (online || isNative) return;
+    if (canFetchStrings || isNative) return;
     for (const { code } of LANGUAGES) void probeLanguage(code);
-  }, [online]);
+  }, [canFetchStrings]);
 
   // Unprobed and in-flight both read as available, so the list never flickers a language out from
   // under the user's cursor on the way to deciding it was fine.
   return (code) =>
-    i18n.hasResourceBundle(code, 'translation') || isNative || online || !refused.has(code);
+    i18n.hasResourceBundle(code, 'translation') ||
+    isNative ||
+    canFetchStrings ||
+    !refused.has(code);
 }
 
 /**

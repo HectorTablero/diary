@@ -77,7 +77,8 @@ export default function SearchPage() {
 
   const { data, isLoading } = useSearch(apiParams, true);
 
-  const hasFilters = tagIds.length > 0 || personIds.length > 0 || importances.length > 0 || !!from || !!to || !!q;
+  const hasFilters =
+    tagIds.length > 0 || personIds.length > 0 || importances.length > 0 || !!from || !!to || !!q;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 
   const toggleCsvParam = (key: string, current: string[], id: string) => {
@@ -133,7 +134,11 @@ export default function SearchPage() {
         {/* role="group" is what makes the aria-label stick: a bare <div> is a generic element, and
             a generic element's accessible name is discarded, so this label was being dropped
             entirely. With the role it names the set, and each dot names and states itself. */}
-        <div role="group" className="flex items-center gap-0.5" aria-label={t('search.byImportance')}>
+        <div
+          role="group"
+          className="flex items-center gap-0.5"
+          aria-label={t('search.byImportance')}
+        >
           {[1, 2, 3, 4, 5].map((level) => (
             <Tooltip key={level}>
               <TooltipTrigger asChild>
@@ -209,7 +214,11 @@ export default function SearchPage() {
           {personIds.map((id) => {
             const person = allPeople.find((p) => p.id === id);
             return person ? (
-              <PersonChip key={id} person={person} onRemove={() => toggleCsvParam('people', personIds, id)} />
+              <PersonChip
+                key={id}
+                person={person}
+                onRemove={() => toggleCsvParam('people', personIds, id)}
+              />
             ) : null;
           })}
         </div>

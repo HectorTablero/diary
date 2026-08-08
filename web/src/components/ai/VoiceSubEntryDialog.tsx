@@ -91,7 +91,9 @@ export function VoiceSubEntryDialog({
         <DialogContent className="sm:max-w-sm" showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>{t('ai.subEntryTitle')}</DialogTitle>
-            <DialogDescription>{t('ai.subEntryDescription', { parent: parentContent })}</DialogDescription>
+            <DialogDescription>
+              {t('ai.subEntryDescription', { parent: parentContent })}
+            </DialogDescription>
           </DialogHeader>
           {phase === 'idle' ? (
             <div className="flex items-center justify-center gap-4 py-4">

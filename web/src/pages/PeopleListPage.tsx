@@ -36,7 +36,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { isCheckupDue } from '@/lib/checkup';
@@ -179,7 +185,9 @@ function PersonRow({
               <p
                 className={cn(
                   'mt-0.5 flex w-fit max-w-full items-center gap-1 text-xs text-muted-foreground',
-                  ongoing.length > 1 && !isNative && 'underline decoration-dotted underline-offset-2',
+                  ongoing.length > 1 &&
+                    !isNative &&
+                    'underline decoration-dotted underline-offset-2',
                 )}
               >
                 <CalendarClock className="size-3 shrink-0" />
@@ -246,7 +254,12 @@ function PersonRow({
         </Badge>
       )}
       {person.checkupIntervalDays != null && (
-        <span className={"hidden shrink-0 items-center gap-1 text-xs sm:flex" + (checkupPending ? ' text-destructive' : ' text-muted-foreground')}>
+        <span
+          className={
+            'hidden shrink-0 items-center gap-1 text-xs sm:flex' +
+            (checkupPending ? ' text-destructive' : ' text-muted-foreground')
+          }
+        >
           <BellRing className="size-3" />
           {t('people.checkupEvery')} {person.checkupIntervalDays} {t('settings.memories.days')}
         </span>
@@ -395,7 +408,9 @@ export default function PeopleListPage() {
                   <Button variant="outline" size="sm" className="h-7 gap-1">
                     <Hash className="size-3.5" />
                     {t('people.filterByTag')}
-                    {tagFilter.length > 0 && <span className="text-primary">({tagFilter.length})</span>}
+                    {tagFilter.length > 0 && (
+                      <span className="text-primary">({tagFilter.length})</span>
+                    )}
                   </Button>
                 }
                 items={tags.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}

@@ -29,7 +29,8 @@ interface QueuedEvent {
   fields: Fields;
 }
 
-const logtail = SOURCE_TOKEN && INGEST_URL ? new Logtail(SOURCE_TOKEN, { endpoint: INGEST_URL }) : null;
+const logtail =
+  SOURCE_TOKEN && INGEST_URL ? new Logtail(SOURCE_TOKEN, { endpoint: INGEST_URL }) : null;
 const queue: QueuedEvent[] = [];
 
 /** Whether this build has somewhere to report to at all. Used by Settings to decide whether the
@@ -116,7 +117,9 @@ export async function trackTiming<T>(name: string, run: () => Promise<T>): Promi
 
 export function initTelemetry(): void {
   if (!logtail) {
-    console.info('[telemetry] disabled (no VITE_BETTERSTACK_SOURCE_TOKEN / VITE_BETTERSTACK_INGEST_URL)');
+    console.info(
+      '[telemetry] disabled (no VITE_BETTERSTACK_SOURCE_TOKEN / VITE_BETTERSTACK_INGEST_URL)',
+    );
     return;
   }
 

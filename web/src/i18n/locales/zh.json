@@ -491,7 +491,7 @@
       "wifiOnly": "仅在 Wi-Fi 下同步",
       "wifiOnlyDescription": "改动仍会保存在本设备上，等下次连上 Wi-Fi 再上传。日记是纯文字，这样省下的流量很有限。",
       "hidePausedStatus": "隐藏等待 Wi-Fi 的提示",
-      "hidePausedStatusDescription": "排队的更改仍会在连接 Wi-Fi 后立即同步。离线和服务器无法访问的提示仍会显示。",
+      "hidePausedStatusDescription": "排队的更改仍会在连接 Wi-Fi 后立即同步。",
       "nestingDepth": "子记录的嵌套层数",
       "nestingDepthDescription": "顶层记录下面最多能嵌套几层。调低不会影响已经更深的记录。"
     },
