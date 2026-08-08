@@ -56,7 +56,28 @@ function birthdayNotificationId(personId: string): number {
   return BIRTHDAY_ID_BASE + (fnv1a(personId) % ID_SPACE);
 }
 
+/**
+ * Which occurrence of a recurring reminder has already been announced, per person.
+ *
+ * These maps are self-bounding in the ordinary case: each collector below rebuilds one from
+ * scratch over the people that exist right now and writes it whole, so a person who is deleted, or
+ * whose reminder is no longer due, drops out on the next pass without anything having to remove
+ * them. The one path that escapes that is the reminder being switched off — the collector returns
+ * before it writes, and the last map is stranded for as long as the setting stays off. Hence
+ * `forgetAnnounced`, called on exactly that early return.
+ */
 type NotifiedCheckups = Record<string, string>;
+
+/**
+ * Drop the record of what has been announced.
+ *
+ * Consequence worth knowing, because it is a behaviour and not just a tidy-up: switching a
+ * reminder back on can announce a checkup that is currently overdue (or a birthday whose time
+ * passed earlier today) one more time, having forgotten it was already mentioned. That reads as
+ * the right way round — someone who has just asked to be reminded about people is better served by
+ * one repeat than by silence about someone genuinely overdue.
+ */
+const forgetAnnounced = (key: string) => db.meta.delete(key);
 
 type LocalPeople = LocalPerson[];
 
@@ -82,7 +103,10 @@ async function collectCheckupNotifications(
   people: LocalPeople,
   prefs: Preferences,
 ): Promise<LocalNotificationSchema[]> {
-  if (!prefs.checkupReminders) return [];
+  if (!prefs.checkupReminders) {
+    await forgetAnnounced('notifiedCheckups');
+    return [];
+  }
 
   const notified = (await getMeta<NotifiedCheckups>('notifiedCheckups')) ?? {};
   const nextNotified: NotifiedCheckups = {};
@@ -180,7 +204,10 @@ async function collectBirthdayNotifications(
   people: LocalPeople,
   prefs: Preferences,
 ): Promise<LocalNotificationSchema[]> {
-  if (!prefs.birthdayReminders) return [];
+  if (!prefs.birthdayReminders) {
+    await forgetAnnounced('notifiedBirthdays');
+    return [];
+  }
 
   const notified = (await getMeta<NotifiedCheckups>('notifiedBirthdays')) ?? {};
   const nextNotified: NotifiedCheckups = {};

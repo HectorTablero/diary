@@ -51,7 +51,7 @@ vi.mock('@/lib/preferences', () => ({
 }));
 vi.mock('@/lib/network', () => ({ isMeteredConnection: () => network.metered }));
 
-const { db } = await import('./db');
+const { db, entryFromDto, setMeta } = await import('./db');
 const { forceSyncNow, getSyncStatus, onRejected, syncNow } = await import('./sync');
 
 const DELETED_AT = '2026-08-07T10:00:00.000Z';
@@ -75,6 +75,9 @@ const entryDto = (id: string): EntryDto => ({
 
 const syncResponse = (patch: Partial<SyncResponse>): SyncResponse => ({
   serverTime: '2026-08-07T10:00:05.000Z',
+  // Defaults to a delta, which is what all but the reset block below is about. The server sets it
+  // the other way for a first sync; here every test that wants a full state says so.
+  reset: false,
   entries: [],
   people: [],
   tags: [],
@@ -90,8 +93,12 @@ beforeEach(async () => {
   prefs.syncOnWifiOnly = false;
   network.metered = false;
   await Promise.all([
+    // All four synced tables, not just the two the tombstone cases use: a reset prunes every one
+    // of them, so a row left behind by an earlier test would be deleted by a later one.
     db.entries.clear(),
+    db.people.clear(),
     db.tags.clear(),
+    db.threads.clear(),
     db.outbox.clear(),
     db.deadLetter.clear(),
     db.meta.clear(),
@@ -166,6 +173,64 @@ describe('pull: tombstones', () => {
   });
 });
 
+/* Tombstones don't live forever — past TOMBSTONE_RETENTION_DAYS the server prunes them, and a
+   device whose cursor predates that can no longer be told what it missed by a delta. The server
+   answers such a pull with the complete state and `reset: true`, and the deletes are then carried
+   by the ids it doesn't mention. Which makes absence load-bearing, and that is the danger: read the
+   same way on an ordinary delta — which only ever names what changed — it would empty the diary. */
+describe('pull: reset', () => {
+  it('removes a local doc the full state does not contain', async () => {
+    await db.entries.put(entryFromDto(entryDto('e5')));
+    await db.tags.put({ id: 't5', name: 'travel', color: '#fff' });
+    // No tombstone anywhere in this response: the one for e5 was pruned long ago.
+    apiGet.mockResolvedValue(
+      syncResponse({ reset: true, tags: [{ id: 't5', name: 'travel', color: '#fff' }] }),
+    );
+
+    await syncNow();
+
+    expect(await db.entries.get('e5')).toBeUndefined();
+    expect(await db.tags.get('t5')).toBeDefined(); // named by the dump, so still alive
+  });
+
+  it('keeps a doc written while the pull was in flight', async () => {
+    /* The dangerous ordering: the outbox drained, the pull left, and only then did someone write a
+       note. The server's answer was composed before it existed, so the dump cannot name it — and
+       under this branch "not in the dump" otherwise means "delete". Being in the outbox is the only
+       thing that saves it, which is why the outbox is read inside the same transaction. */
+    apiGet.mockImplementation(async () => {
+      await db.entries.put(entryFromDto(entryDto('e6')));
+      await db.outbox.add({ method: 'POST', path: '/entries', body: { id: 'e6' } });
+      return syncResponse({ reset: true });
+    });
+
+    await syncNow();
+
+    expect(await db.entries.get('e6')).toBeDefined();
+  });
+
+  it('leaves unmentioned docs alone on an ordinary delta', async () => {
+    // The regression that would cost someone their diary: a quiet minute's delta names nothing.
+    await db.entries.put(entryFromDto(entryDto('e7')));
+    apiGet.mockResolvedValue(syncResponse({ reset: false }));
+
+    await syncNow();
+
+    expect(await db.entries.get('e7')).toBeDefined();
+  });
+
+  it('treats a cursored response from a server that predates `reset` as a delta', async () => {
+    await setMeta('syncCursor', '2026-08-01T00:00:00.000Z');
+    await db.entries.put(entryFromDto(entryDto('e8')));
+    const { reset: _omitted, ...withoutReset } = syncResponse({});
+    apiGet.mockResolvedValue(withoutReset);
+
+    await syncNow();
+
+    expect(await db.entries.get('e8')).toBeDefined();
+  });
+});
+
 /* A write the server refuses outright has to leave the queue — leaving it there would jam every
    later write behind it forever. What it must not do is leave without a trace: the local copy
    still shows the change as saved, so a silent drop is a divergence the user cannot discover. */
@@ -196,6 +261,53 @@ describe('push: a rejected write', () => {
 
     expect(await db.outbox.count()).toBe(0);
     expect(await db.deadLetter.count()).toBe(0);
+  });
+});
+
+/* Kept, but not without end. Nothing empties this table short of a sign-out, and a write the
+   server rejects *systematically* lands one row per attempt for as long as the app is installed. */
+describe('dead letter: bounded', () => {
+  /** Drive one rejection through, which is what triggers the trim. */
+  const rejectOnce = async () => {
+    await db.outbox.add({ method: 'PATCH', path: '/entries/x', body: { id: 'x' } });
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(422, 'validation'));
+    apiGet.mockResolvedValue(syncResponse({}));
+    await syncNow();
+  };
+
+  const deadLetterRow = (failedAt: string) => ({
+    method: 'PATCH' as const,
+    path: '/entries/old',
+    status: 422,
+    code: 'validation',
+    failedAt,
+  });
+
+  it('keeps only the newest once past the count cap', async () => {
+    // Timestamps ascending, so "the newest 200" is a fact the assertion can name.
+    await db.deadLetter.bulkAdd(
+      Array.from({ length: 250 }, (_, i) =>
+        deadLetterRow(new Date(Date.UTC(2026, 7, 1, 0, i)).toISOString()),
+      ),
+    );
+
+    await rejectOnce();
+
+    expect(await db.deadLetter.count()).toBe(200);
+    const oldest = await db.deadLetter.orderBy('failedAt').first();
+    expect(oldest!.failedAt).toBe(new Date(Date.UTC(2026, 7, 1, 0, 51)).toISOString());
+  });
+
+  it('drops rows older than the age cap', async () => {
+    const ancient = new Date(Date.now() - 200 * 86_400_000).toISOString();
+    const recent = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    await db.deadLetter.bulkAdd([deadLetterRow(ancient), deadLetterRow(recent)]);
+
+    await rejectOnce();
+
+    const kept = (await db.deadLetter.toArray()).map((row) => row.failedAt);
+    expect(kept).not.toContain(ancient);
+    expect(kept).toContain(recent);
   });
 });
 

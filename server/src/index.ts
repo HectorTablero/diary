@@ -7,9 +7,15 @@ import { buildAuth } from './auth';
 import { config } from './config';
 import { captureError, flushTelemetry, telemetryEnabled, trackEvent } from './lib/telemetry';
 import type { AppEnv } from './middleware/session';
+import { ensureTombstoneTtl } from './models/deletion';
 
 async function main() {
   await mongoose.connect(config.mongodbUri);
+  /* Reported and stepped over rather than awaited into a crash. Without the index tombstones only
+     accumulate — every pull stays correct, since the retention window is enforced by the cursor
+     check and not by whether the rows are actually gone. An index tweak failing is not a reason to
+     leave someone unable to open their diary. */
+  await ensureTombstoneTtl().catch((err) => captureError(err, { scope: 'tombstoneTtl' }));
   const db = mongoose.connection.getClient().db();
   const auth = buildAuth(db);
 
