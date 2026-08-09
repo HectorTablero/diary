@@ -73,8 +73,11 @@ vi.mock('./routes/ai', async () => {
 
 const { buildApp } = await import('./app');
 
-const SESSION = { user: { id: 'user_app_test' } };
-const session = vi.hoisted(() => ({ value: null as { user: { id: string } } | null }));
+/* Both halves of what requireAuth reads. `session.createdAt` is when the user last signed in, and
+   DELETE /account refuses one that is not recent — so a stub carrying only the user would 500 the
+   gate rather than pass it, and every assertion in this file would be about that instead. */
+const SESSION = { user: { id: 'user_app_test' }, session: { createdAt: new Date() } };
+const session = vi.hoisted(() => ({ value: null as typeof SESSION | null }));
 
 /** Enough of Better Auth for the gate and the passthrough route. */
 const auth = {

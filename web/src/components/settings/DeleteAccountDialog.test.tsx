@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   apiDelete,
+  ApiErrorMock,
   endSession,
   navigate,
   lock,
@@ -20,8 +21,20 @@ const {
   verifyPasscode,
   saveTextFile,
   syncStatus,
+  googleReauth,
+  resume,
+  markResume,
+  forgetResume,
 } = vi.hoisted(() => ({
   apiDelete: vi.fn(),
+  ApiErrorMock: class ApiError extends Error {
+    constructor(
+      public status: number,
+      public code: string,
+    ) {
+      super(code);
+    }
+  },
   endSession: vi.fn(),
   navigate: vi.fn(),
   lock: { config: null as { biometrics: boolean } | null },
@@ -29,12 +42,22 @@ const {
   verifyPasscode: vi.fn(),
   saveTextFile: vi.fn(),
   syncStatus: { blocker: null as string | null },
+  googleReauth: vi.fn(),
+  resume: { active: false },
+  markResume: vi.fn(),
+  forgetResume: vi.fn(),
 }));
 
 vi.mock('@/db/useSyncStatus', () => ({ useSyncStatus: () => syncStatus }));
 
-vi.mock('@/lib/apiClient', () => ({ apiDelete, API_BASE: '' }));
+vi.mock('@/lib/apiClient', () => ({ apiDelete, ApiError: ApiErrorMock, API_BASE: '' }));
 vi.mock('@/lib/endSession', () => ({ endSession }));
+vi.mock('@/lib/googleSignIn', () => ({ googleReauth }));
+vi.mock('@/lib/deleteAccountResume', () => ({
+  resumingAccountDeletion: () => resume.active,
+  markAccountDeletionResume: markResume,
+  forgetAccountDeletionResume: forgetResume,
+}));
 vi.mock('react-router', () => ({ useNavigate: () => navigate }));
 vi.mock('@/lib/appLock', () => ({
   getLockState: () => lock,
@@ -64,9 +87,21 @@ beforeEach(() => {
   promptBiometrics.mockReset().mockResolvedValue(false);
   verifyPasscode.mockReset();
   saveTextFile.mockReset().mockResolvedValue(undefined);
+  googleReauth.mockReset().mockResolvedValue('signed-in');
+  markResume.mockReset();
+  forgetResume.mockReset();
+  resume.active = false;
   lock.config = null;
   syncStatus.blocker = null;
 });
+
+/** The server refusing once because the session is too old, then accepting. */
+const staleThenFresh = () =>
+  apiDelete
+    .mockRejectedValueOnce(new ApiErrorMock(403, 'errors.reauth_required'))
+    .mockResolvedValue(undefined);
+
+const googleButton = () => screen.getByRole('button', { name: 'Continue with Google' });
 
 /* The request is the only thing here that cannot be done offline — everything else on the settings
    page reads or writes the local store. Letting someone type the word, pass their fingerprint and
@@ -223,6 +258,147 @@ describe('with a device lock', () => {
     await waitFor(() => expect(promptBiometrics).toHaveBeenCalled());
     expect(await screen.findByLabelText('Passcode')).toBeInTheDocument();
     expect(apiDelete).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * Re-authentication.
+ *
+ * The typed word and the device lock are this dialog's own, which means the server cannot see them
+ * and a caller holding a session token is under no obligation to visit them. So the server refuses
+ * a session that isn't minutes old, and everything below is about what the dialog does with that
+ * refusal. The two platforms split here and nowhere else: Android signs in over the app and comes
+ * straight back, the web hands the whole page to Google and has to be reassembled afterwards.
+ */
+describe('when the server says the sign-in is too old', () => {
+  it('deletes nothing and offers the one thing that fixes it', async () => {
+    apiDelete.mockRejectedValue(new ApiErrorMock(403, 'errors.reauth_required'));
+    const user = setup();
+
+    await user.type(screen.getByLabelText('Type DELETE to confirm'), 'DELETE');
+    await user.click(deleteButton());
+
+    expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeEnabled();
+    /* The user has already typed the word and passed the lock, so the copy has to say that the
+       detour costs them nothing — otherwise this reads as the deletion having failed. */
+    expect(screen.getByText(/Nothing has been deleted/)).toBeInTheDocument();
+    expect(endSession).not.toHaveBeenCalled();
+  });
+
+  it('finishes in place once Google confirms, without leaving a resume behind', async () => {
+    staleThenFresh();
+    const user = setup();
+
+    await user.type(screen.getByLabelText('Type DELETE to confirm'), 'DELETE');
+    await user.click(deleteButton());
+    await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+
+    // Native: googleReauth resolved without navigating, so the retry happens here and now.
+    await waitFor(() => expect(apiDelete).toHaveBeenCalledTimes(2));
+    expect(endSession).toHaveBeenCalledWith({ serverSessionGone: true });
+    /* Nothing to come back to, so nothing may be left waiting: a marker outliving a deletion that
+       already happened would reopen this dialog on the next visit to Settings. */
+    expect(forgetResume).toHaveBeenCalled();
+  });
+
+  it('writes down the resume before handing the page to Google', async () => {
+    // The web redirect: googleReauth resolves as the navigation starts, not when the user returns.
+    googleReauth.mockResolvedValue('redirecting');
+    apiDelete.mockRejectedValue(new ApiErrorMock(403, 'errors.reauth_required'));
+    const user = setup();
+
+    await user.type(screen.getByLabelText('Type DELETE to confirm'), 'DELETE');
+    await user.click(deleteButton());
+    await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+
+    await waitFor(() => expect(googleReauth).toHaveBeenCalled());
+    /* Before, not after. There is no line of code following the redirect that is guaranteed to
+       run, so a marker written afterwards is a marker that sometimes isn't. */
+    expect(markResume.mock.invocationCallOrder[0]).toBeLessThan(
+      googleReauth.mock.invocationCallOrder[0],
+    );
+    // And nothing is retried on a page that is leaving.
+    expect(apiDelete).toHaveBeenCalledTimes(1);
+    expect(endSession).not.toHaveBeenCalled();
+  });
+
+  it('hands the attempt back when the sign-in fails', async () => {
+    apiDelete.mockRejectedValue(new ApiErrorMock(403, 'errors.reauth_required'));
+    googleReauth.mockRejectedValue(new Error('cancelled'));
+    const user = setup();
+
+    await user.type(screen.getByLabelText('Type DELETE to confirm'), 'DELETE');
+    await user.click(deleteButton());
+    await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+
+    /* A cancelled Google prompt is not an authorisation and must not be a dead end either: the
+       button stays live, and the marker is picked back up so a later page load isn't ambushed. */
+    await waitFor(() => expect(forgetResume).toHaveBeenCalled());
+    expect(googleButton()).toBeEnabled();
+    expect(apiDelete).toHaveBeenCalledTimes(1);
+    expect(endSession).not.toHaveBeenCalled();
+  });
+
+  it('does not send the user round again on its own', async () => {
+    apiDelete.mockRejectedValue(new ApiErrorMock(403, 'errors.reauth_required'));
+    const user = setup();
+
+    await user.type(screen.getByLabelText('Type DELETE to confirm'), 'DELETE');
+    await user.click(deleteButton());
+    await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+
+    /* A server that refuses a session it has just watched being created is a fault no further
+       round trip can fix. Retrying automatically would bounce the user out to Google and back
+       forever — and on the web each bounce is a page load, so it would survive a reload too. */
+    await waitFor(() => expect(apiDelete).toHaveBeenCalledTimes(2));
+    expect(googleReauth).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('coming back from the web redirect', () => {
+  beforeEach(() => {
+    resume.active = true;
+  });
+
+  it('opens at the last step, with the consequences back on screen', async () => {
+    const user = setup();
+
+    /* The user did not navigate here — the page was rebuilt around them — so the dialog has to say
+       what is about to happen before offering the button that does it. */
+    expect(screen.getByText(/Every entry, person, tag and thread is deleted/)).toBeInTheDocument();
+    expect(screen.getByText(/last step/)).toBeInTheDocument();
+    expect(apiDelete).not.toHaveBeenCalled();
+
+    // The typed word went with the page that was destroyed; it is not asked for again, and the
+    // button it used to gate must not stay disabled waiting for it.
+    await user.click(deleteButton());
+
+    await waitFor(() => expect(apiDelete).toHaveBeenCalledWith('/account'));
+  });
+
+  it('still asks for the device lock', async () => {
+    lock.config = { biometrics: false };
+    const user = setup();
+
+    await user.click(deleteButton());
+
+    /* The Google round trip proves who owns the account. It says nothing about who is holding the
+       phone, which is the other half and the cheap one. */
+    expect(await screen.findByLabelText('Passcode')).toBeInTheDocument();
+    expect(apiDelete).not.toHaveBeenCalled();
+  });
+
+  it('will not set off a second redirect if the server refuses again', async () => {
+    apiDelete.mockRejectedValue(new ApiErrorMock(403, 'errors.reauth_required'));
+    const user = setup();
+
+    await user.click(deleteButton());
+
+    // Arriving here *is* the trip through Google, spent. Offering another would be the same
+    // forever-loop as above, one page load at a time.
+    await waitFor(() => expect(apiDelete).toHaveBeenCalled());
+    expect(googleReauth).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Continue with Google' })).not.toBeInTheDocument();
   });
 });
 

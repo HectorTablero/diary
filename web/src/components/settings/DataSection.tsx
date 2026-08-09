@@ -10,6 +10,7 @@ import { useSyncStatus } from '@/db/useSyncStatus';
 import { useSession } from '@/lib/authClient';
 import { buildBackupEnvelope } from '@/lib/backup/export';
 import { backupEnvelopeSchema } from '@/lib/backup/schema';
+import { resumingAccountDeletion } from '@/lib/deleteAccountResume';
 import { saveTextFile } from '@/lib/fileSave';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { setPreference, usePreferences } from '@/lib/preferences';
@@ -30,7 +31,12 @@ export function DataSection() {
   const serverUnreachable = blocker === 'offline' || blocker === 'unreachable';
   const [exportingBackup, setExportingBackup] = useState(false);
   const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  /* Open on arrival when this page load is the far side of a deletion re-authentication — the web
+     has to leave for Google to prove who it is, and Settings is where it comes back to (see
+     lib/deleteAccountResume.ts). The dialog reads the same marker to decide which stage to open at;
+     all this has to know is that something is waiting. Native never redirects and always gets
+     `false`. */
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(resumingAccountDeletion);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const handleExportBackup = async () => {

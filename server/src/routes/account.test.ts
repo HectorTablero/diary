@@ -14,6 +14,11 @@ import { routeApp, USER_ID } from '../test/routeApp';
  *   - **Scope.** `userId` comes from the verified session and appears in every filter. There is no
  *     id in the path or the body, so the test worth writing is that no filter is ever unscoped —
  *     an unfiltered `deleteMany({})` would erase the whole deployment and answer 204.
+ *
+ * A third is visible only in a status code, and is the one guard here that a refactor could delete
+ * without breaking anything else: the caller has to have signed in recently. Everything else
+ * standing between a tap and an erased diary — the typed word, the device lock — lives in the
+ * client and is invisible from here, so this is the whole of what the server itself insists on.
  */
 
 const Entry = modelDouble();
@@ -170,6 +175,52 @@ describe('DELETE /account', () => {
        same address adopt the deleted user's id. */
     expect(authCollections.has('account')).toBe(true);
     expect(authCollections.has('user')).toBe(true);
+  });
+
+  /* The re-authentication gate. Everything else standing between a tap and an erased diary lives
+     in the client, where this endpoint cannot see it and a caller with a session token is not
+     obliged to visit it. This is the whole of what the server itself insists on. */
+  describe('when the session is not a fresh one', () => {
+    /** Comfortably past the five-minute window, and not so far past that the test is about a date. */
+    const staleApp = routeApp(
+      '/account',
+      accountRouter,
+      USER_ID,
+      new Date(Date.now() - 60 * 60 * 1000),
+    );
+
+    it('refuses with a code the client can act on', async () => {
+      const res = await staleApp.request('/account', { method: 'DELETE' });
+
+      expect(res.status).toBe(403);
+      /* Not 401: the session is perfectly valid and the client must not tear it down. The distinct
+         code is what tells the two clients to send the user through Google and try again, rather
+         than to the login screen. */
+      expect(await res.json()).toEqual({ error: 'errors.reauth_required' });
+    });
+
+    it('deletes nothing at all', async () => {
+      await staleApp.request('/account', { method: 'DELETE' });
+
+      /* The refusal has to be free. A gate that erased the diary and *then* objected, or that got
+         halfway, would be worse than no gate — and the client's retry-after-signing-in only works
+         because a refused attempt costs nothing. */
+      for (const model of Object.values(CONTENT_MODELS)) {
+        expect(model.deleteMany).not.toHaveBeenCalled();
+      }
+      expect(authCollections.size).toBe(0);
+    });
+
+    it('goes through once the user has signed in again', async () => {
+      // A new sign-in inserts a new session, so re-authenticating is visible here as nothing more
+      // exotic than a recent createdAt — which is what makes one rule cover web and Android alike.
+      const freshApp = routeApp('/account', accountRouter, USER_ID, new Date());
+
+      const res = await freshApp.request('/account', { method: 'DELETE' });
+
+      expect(res.status).toBe(204);
+      expect(Entry.deleteMany).toHaveBeenCalledWith({ userId: USER_ID });
+    });
   });
 
   it('takes no input at all, so there is nothing to tamper with', async () => {

@@ -153,8 +153,9 @@ function manualChunks(id: string): string | undefined {
  *
  * The fix is not to hand-place app code in VENDOR_CHUNKS. Membership there is forced rather than
  * inferred, so a rule broad enough to catch `src/lib`'s shared half (apiClient, preferences,
- * notifications, …) would also drag in its route-local half (the jszip-backed backup exporter,
- * the transcription client, the contacts importer) and put all of it in front of first paint.
+ * notifications, …) would also drag in its route-local half (the backup exporter, the archive
+ * writer, the transcription client, the contacts importer) and put all of it in front of first
+ * paint.
  * Rolldown's own analysis is right about where app code goes; it is only wrong about what to
  * call the result. So name the result instead, and leave the graph alone.
  *
