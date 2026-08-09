@@ -14,6 +14,14 @@ interface BootOptions {
   localOnly?: boolean;
   /** Passed to the app-lock module's storage, for the lock spec. */
   appLock?: unknown;
+  /**
+   * Which palette to boot into. Defaults to light.
+   *
+   * Only the accessibility scan passes this today, and it is not a preference there but the subject:
+   * contrast is a property of the theme, so a light-only scan has checked half the colours the app
+   * ships. Never `'auto'` — that would make the result depend on the runner's OS setting.
+   */
+  theme?: 'light' | 'dark';
 }
 
 export async function seedBrowserState(
@@ -21,14 +29,14 @@ export async function seedBrowserState(
   options: BootOptions = {},
 ): Promise<void> {
   await context.addInitScript(
-    ({ user, localOnly, appLock }) => {
+    ({ user, localOnly, appLock, theme }) => {
       /* Belt to `serviceWorkers: 'block'`'s braces. workbox-window feature-detects
          `'serviceWorker' in navigator`, so hiding it makes registerSW a no-op even where the
          context option is unavailable. A worker that claims the page would serve index.html from
          precache and route interception would stop seeing navigations. */
       Object.defineProperty(navigator, 'serviceWorker', { get: () => undefined });
 
-      localStorage.setItem('theme', 'light');
+      localStorage.setItem('theme', theme);
       localStorage.setItem('lang', 'en');
       if (localOnly) {
         localStorage.setItem('diary.localOnly', '1');
@@ -46,6 +54,7 @@ export async function seedBrowserState(
       user: { name: SIGNED_IN_USER.name, email: SIGNED_IN_USER.email, image: null },
       localOnly: options.localOnly ?? false,
       appLock: options.appLock ?? null,
+      theme: options.theme ?? 'light',
     },
   );
 }

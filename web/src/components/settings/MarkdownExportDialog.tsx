@@ -207,7 +207,7 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
             <div className="flex flex-col gap-1.5">
               <Label>{t('settings.markdownExport.type')}</Label>
               <Select value={type} onValueChange={(v) => setType(v as ExportType)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label={t('settings.markdownExport.type')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -376,7 +376,10 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                       value={outputMode}
                       onValueChange={(v) => setOutputMode(v as OutputMode)}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        className="w-full"
+                        aria-label={t('settings.markdownExport.outputMode')}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

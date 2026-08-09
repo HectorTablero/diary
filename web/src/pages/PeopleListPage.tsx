@@ -406,7 +406,10 @@ export default function PeopleListPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-              <SelectTrigger size="sm" className="w-fit">
+              {/* The "Sort by:" span is inside the trigger, which makes this look named already.
+                  It is not — a combobox takes no name from its contents, so that span reads as part
+                  of the *value* and the control itself stays anonymous. */}
+              <SelectTrigger size="sm" className="w-fit" aria-label={t('people.sortBy')}>
                 <span className="text-muted-foreground">{t('people.sortBy')}:</span>
                 <SelectValue />
               </SelectTrigger>

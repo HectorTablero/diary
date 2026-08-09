@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "7.3.0",
+  "version": "7.3.1",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -26,13 +26,17 @@
     "format:check": "prettier --check .",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web && tsc --noEmit -p e2e/tsconfig.json",
     "test": "npm test -w shared && npm test -w server && npm test -w web",
-    "test:e2e": "npm run build -w web && playwright test -c e2e/playwright.config.ts",
-    "test:e2e:run": "playwright test -c e2e/playwright.config.ts"
+    "test:e2e": "npm run build -w web && npm run test:e2e:run",
+    "test:e2e:run": "playwright test -c e2e/playwright.config.ts --grep-invert @a11y",
+    "test:e2e:all": "playwright test -c e2e/playwright.config.ts",
+    "test:a11y": "npm run build -w web && npm run test:a11y:run",
+    "test:a11y:run": "playwright test -c e2e/playwright.config.ts --grep @a11y"
   },
   "engines": {
     "node": ">=24.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.62.1",
     "concurrently": "^10.0.4",
     "prettier": "^3.5.3",
