@@ -72,6 +72,47 @@ window.matchMedia ??= ((query: string) =>
    and that is ~100-200ms per verify here. The components project's testTimeout is raised to suit. */
 Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
 
+/* Node 24's undici validates `RequestInit.signal` by realm identity. In Vitest's jsdom project,
+   AbortController can come from jsdom while Request can be Node's, which throws during
+   react-router navigation (`new Request(..., { signal })`) and cascades into unrelated failures.
+   Keep strict behavior where it already works; only on this exact mismatch, retry without signal. */
+{
+  const requestCtor = globalThis.Request;
+  const testSignal = new AbortController().signal;
+  let needsSignalCompat = false;
+  try {
+    new requestCtor('http://localhost/', { signal: testSignal });
+  } catch (error) {
+    if (error instanceof TypeError && /Expected signal/.test(String(error))) {
+      needsSignalCompat = true;
+    } else {
+      throw error;
+    }
+  }
+
+  if (needsSignalCompat) {
+    class RequestWithSignalCompat extends requestCtor {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        try {
+          super(input, init);
+        } catch (error) {
+          if (init?.signal && error instanceof TypeError && /Expected signal/.test(String(error))) {
+            const { signal: _ignored, ...rest } = init;
+            super(input, rest);
+            return;
+          }
+          throw error;
+        }
+      }
+    }
+    Object.defineProperty(globalThis, 'Request', {
+      value: RequestWithSignalCompat,
+      configurable: true,
+      writable: true,
+    });
+  }
+}
+
 /* A clean database per test, not merely per file. Vitest isolates module registries per file, so
    each file already gets its own in-memory IndexedDB; this is what stops the second test in a file
    from reading the first one's entries. */
