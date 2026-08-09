@@ -346,6 +346,13 @@ export function refreshNotifications(): void {
  * when a person is saved with a checkup interval or a birthday, and when the diary has enough
  * entries for the daily nudge to be interrupting something. Settings keeps its explicit button for
  * anyone who wants to turn reminders on before any of that happens.
+ *
+ * The first-run tour's last step (components/onboarding/steps/RemindersStep) has that same button,
+ * which is not the exception to the above it first looks like: it is still explicit, still pressed
+ * by the user, and it is the one screen where the reason really is on display — the step is *about*
+ * the daily nudge. Note it calls requestNotificationPermission directly rather than
+ * requestPermissionFor('daily'), because the entry-count guard below is by definition unmet on a
+ * device that has not signed in yet and would make the button silently do nothing.
  */
 export async function initLocalNotifications(): Promise<void> {
   if (!isNative) return;

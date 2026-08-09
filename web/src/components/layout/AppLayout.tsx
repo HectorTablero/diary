@@ -34,7 +34,7 @@ import { isCheckupDue } from '@/lib/checkup';
 import { cancelIdle, onIdle } from '@/lib/idle';
 import { isLocalOnly, setLocalOnly } from '@/lib/localOnly';
 import { isNative } from '@/lib/native';
-import { usePreferences } from '@/lib/preferences';
+import { setPreference, usePreferences } from '@/lib/preferences';
 import { preloadLoaders } from '@/lib/preloaders';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
 import { getUpdateState, subscribeToUpdateState, type UpdateState } from '@/lib/liveUpdate';
@@ -448,6 +448,12 @@ export default function AppLayout() {
       setLocalOnly(false);
       kick('signin');
     }
+    /* Reaching this layout at all falsifies the first-run tour's premise, so record it here as
+       well as on the login screen. Without this line the likeliest person to be shown a tour of an
+       app they have used for years is someone who signed out to switch accounts: they land back on
+       /login, where the flag is still false because they upgraded into this build already signed
+       in. `setPreference` no-ops on an unchanged value, so the steady-state cost is a comparison. */
+    if (session?.user || isLocalOnly()) setPreference('onboardingSeen', true);
   }, [session]);
 
   // Warm the route chunk cache once the shell is up and idle, so navigating

@@ -1,6 +1,6 @@
 import { anEntry, aPerson, aTag } from '../../web/src/test/fixtures';
 import { asJson, report, scan, type Finding } from '../support/a11y';
-import type { ApiMock } from '../support/api';
+import { installApiMock, type ApiMock } from '../support/api';
 import { entryRow, expect, seedBrowserState, test, todayKey } from '../support/app';
 import { composer, ROUTES } from '../support/routes';
 
@@ -153,6 +153,51 @@ test(
     findings.push(await scan(page, 'dialog: set passcode'));
 
     await test.info().attach('axe-dialogs.json', {
+      body: asJson(findings),
+      contentType: 'application/json',
+    });
+
+    expect(report(findings)).toBe('');
+  },
+);
+
+/**
+ * The first-run tour, which is partly *about* accessibility and so has to be exemplary.
+ *
+ * It cannot use the `app` fixture: that seeds a cached user, and `/login` redirects a signed-in
+ * visitor straight to the diary — the tour would never render. Hence `firstRun`, which boots a
+ * device with no history at all, and a mock installed by hand so the session call answers "signed
+ * out" rather than the fixture's default.
+ *
+ * Every step is scanned rather than just the first, because they are genuinely different markup:
+ * a radiogroup, two mocked-up diary cards, a level list with a switch. The screen that explains
+ * how to read importance without relying on colour is not one to take on trust.
+ */
+test(
+  'the first-run tour is free of WCAG A/AA violations on every step',
+  { tag: '@a11y' },
+  async ({ page, context }) => {
+    await installApiMock(page, {}, { signedIn: false });
+    await seedBrowserState(context, { firstRun: true });
+
+    const findings: Finding[] = [];
+    await page.goto('/login');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+
+    for (const step of ['language', 'writing', 'importance', 'people']) {
+      findings.push(await scan(page, `onboarding: ${step}`));
+      const next = page.getByRole('button', { name: 'Next' });
+      if (await next.isVisible()) await next.click();
+    }
+
+    // With the shapes on, since that is the state the step exists to offer and the silhouettes are
+    // drawn with clip-path — a different rendering path from the plain dots axe just measured.
+    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('switch').click();
+    findings.push(await scan(page, 'onboarding: importance shapes on'));
+
+    await test.info().attach('axe-onboarding.json', {
       body: asJson(findings),
       contentType: 'application/json',
     });

@@ -64,11 +64,35 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
 const stripPlural = (key: string) => key.replace(PLURAL_SUFFIX, '');
 const baseKeys = (keys: Iterable<string>) => new Set([...keys].map(stripPlural));
 
-/** i18next resolves `key` through `key_one` / `key_other` / `key_many` … for counted strings. */
-const defines = (keys: Iterable<string>, key: string): boolean => {
-  for (const candidate of keys)
+/**
+ * Checks whether a referenced translation key exists.
+ *
+ * For normal keys, this also accepts i18next plural variants:
+ *   "foo" -> "foo", "foo_one", "foo_other", ...
+ *
+ * For array entries, references such as:
+ *   "onboarding.demo.otherTags.3"
+ * resolve against the array stored at:
+ *   "onboarding.demo.otherTags"
+ *
+ * The requested index must exist in every locale.
+ */
+const defines = (locale: Record<string, string | string[]>, key: string): boolean => {
+  // Normal key / plural variant.
+  const keys = Object.keys(locale);
+  for (const candidate of keys) {
     if (candidate === key || candidate.startsWith(`${key}_`)) return true;
-  return false;
+  }
+
+  // Array item reference: e.g. "otherTags.3"
+  const match = key.match(/^(.*)\.(\d+)$/);
+  if (!match) return false;
+
+  const [, parentKey, indexString] = match;
+  const index = Number(indexString);
+  const value = locale[parentKey];
+
+  return Array.isArray(value) && index >= 0 && index < value.length;
 };
 
 const problems: string[] = [];
@@ -94,7 +118,7 @@ for (const file of walk(SRC)) {
 
 for (const [key, file] of used) {
   for (const lang of languages) {
-    if (!defines(Object.keys(locales[lang]), key)) {
+    if (!defines(locales[lang], key)) {
       problems.push(`missing in ${lang}.json: ${key}  (used in ${file})`);
     }
   }

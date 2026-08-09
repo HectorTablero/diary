@@ -1,3 +1,4 @@
+import { createContext, use } from 'react';
 import { usePreferences } from './preferences';
 
 /**
@@ -22,16 +23,29 @@ export const personHref = (personId: string) => `/people/${personId}`;
 export const tagHref = (tagId: string) => `/search?tags=${encodeURIComponent(tagId)}`;
 
 /**
+ * Forces links off for a subtree, whatever the preference says. `null` — the default everywhere —
+ * means "follow the preference", so nothing outside a provider changes behaviour at all.
+ *
+ * The one caller is the onboarding tour, whose entries and chips name people and tags that do not
+ * exist. Suppressing them here rather than threading a prop through EntryRow, EntryContent and
+ * chips.tsx is what keeps the demo rendering through the *same* components the diary uses: a
+ * separate inert copy of them would be free to drift, and the tour would start teaching an
+ * interface the app no longer has.
+ */
+export const EntityLinksContext = createContext<boolean | null>(null);
+
+/**
  * Destination builders that return `undefined` when the user has turned entity links off, so a
  * call site passes the result straight through to a `to` prop and gets inert text back without
  * branching. A hook rather than bare functions, so toggling the preference repaints immediately.
  */
 export function useEntityLinks() {
   const { entityLinks } = usePreferences();
+  const enabled = use(EntityLinksContext) ?? entityLinks;
   return {
-    enabled: entityLinks,
+    enabled,
     personTo: (personId: string | undefined) =>
-      entityLinks && personId ? personHref(personId) : undefined,
-    tagTo: (tagId: string | undefined) => (entityLinks && tagId ? tagHref(tagId) : undefined),
+      enabled && personId ? personHref(personId) : undefined,
+    tagTo: (tagId: string | undefined) => (enabled && tagId ? tagHref(tagId) : undefined),
   };
 }
