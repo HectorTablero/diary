@@ -21,7 +21,7 @@ import { notifyDeviceSaved, Section, ToggleRow } from './Section';
  * than as part of the one above it — the two are the same distance apart as any two settings in
  * the section, so nothing says they belong together.
  */
-function ReminderTime({
+export function ReminderTime({
   value,
   onChange,
   minHour,

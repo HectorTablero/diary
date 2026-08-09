@@ -107,6 +107,46 @@
       "5": "Fatti di ogni giorno e commissioni banali"
     }
   },
+  "onboarding": {
+    "skip": "Salta",
+    "next": "Avanti",
+    "start": "Iniziamo",
+    "progress": "Passo {{current}} di {{total}}",
+    "exampleLabel": "Esempio",
+    "language": {
+      "title": "Ti diamo il benvenuto nel tuo diario",
+      "lede": "Prima una verifica veloce: è questa la lingua giusta?"
+    },
+    "writing": {
+      "title": "Scrivi cosa è successo",
+      "lede": "Una voce è una riga sulla tua giornata. Aggiungi una persona o un argomento per darle più contesto.",
+      "person": "Digita @ e un nome per collegare qualcuno. La voce diventa una storia a cui puoi tornare e che puoi condividere con quella persona in seguito.",
+      "tag": "Digita # per aggiungere un tag a un argomento, così tutto ciò che lo riguarda rimane collegato e facile da trovare.",
+      "subEntries": "Aggiungi delle sotto-voci per tenere i dettagli vicino al momento a cui appartengono."
+    },
+    "importance": {
+      "title": "Quanto è stato importante?",
+      "lede": "Assegna a ogni voce un livello di importanza. I momenti più importanti rimangono rilevanti più a lungo."
+    },
+    "people": {
+      "title": "Cose che vale la pena raccontare",
+      "lede": "Ogni persona che menzioni riceve un elenco delle voci che potrebbero interessarle, così hai sempre qualcosa da cui riprendere la conversazione.",
+      "decay": "L'elenco si riduce naturalmente nel tempo. I momenti meno importanti svaniscono prima, mentre quelli più significativi rimangono più a lungo. Segna qualcosa come raccontato e passerà in secondo piano."
+    },
+    "reminders": {
+      "title": "Un promemoria a fine giornata",
+      "lede": "Ricevi un discreto promemoria se non hai ancora scritto nulla. Puoi modificarlo in qualsiasi momento nelle Impostazioni."
+    },
+    "demo": {
+      "person": "Ana",
+      "colleague": "Luca",
+      "otherPerson": "Giulia",
+      "tag": "lavoro",
+      "entryMeeting": "Riunione di #{{tag}} con @{{person}}",
+      "entryCollaboration": "Abbiamo parlato di una possibile collaborazione tra i nostri team",
+      "otherTags": ["ricerca", "famiglia", "università", "arrampicata"]
+    }
+  },
   "diary": {
     "title": "Diario",
     "newEntry": "Nuova voce",
@@ -380,7 +420,8 @@
       "haptics": "Vibrazione al tocco",
       "hapticsDescription": "Un colpetto leggero quando premi qualcosa.",
       "importanceShapes": "Distingui l’importanza con le forme",
-      "importanceShapesDescription": "Dà a ogni livello una forma oltre al colore, così i punti restano distinguibili anche quando i colori non bastano."
+      "importanceShapesDescription": "Dà a ogni livello una forma oltre al colore, così i punti restano distinguibili anche quando i colori non bastano.",
+      "replayOnboarding": "Rivedi l'introduzione"
     },
     "reminders": {
       "title": "Promemoria",

@@ -1,7 +1,7 @@
 import type { SettingsDto } from '@diary/shared';
 import { DEFAULT_SETTINGS, MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
-import { Hash, Moon, RotateCcw, Sun, SunMoon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Compass, Hash, Moon, RotateCcw, Sun, SunMoon } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { useSaveSettings, useSettings, useTags } from '@/api/hooks';
@@ -45,6 +45,10 @@ import { setPreference, usePreferences } from '@/lib/preferences';
 import { applyTheme, getTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
+/* Same specifier as the one in LoginPage, so both share a chunk and replaying costs nothing extra
+   for anyone who has just been through it. */
+const OnboardingFlow = lazy(() => import('@/components/onboarding/OnboardingFlow'));
+
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -55,6 +59,7 @@ export default function SettingsPage() {
 
   const prefs = usePreferences();
   const markerClass = useImportanceMarkerClass();
+  const [replayingOnboarding, setReplayingOnboarding] = useState(false);
   const [theme, setTheme] = useState<Theme>(getTheme());
   const [draft, setDraft] = useState<SettingsDto | null>(null);
   const [checkupsEnabled, setCheckupsEnabled] = useState(false);
@@ -344,8 +349,27 @@ export default function SettingsPage() {
                 notifyDeviceSaved(t('settings.general.savedOnDevice'));
               }}
             />
+            {/* The way back into the first-run tour, and the reason skipping it is allowed to be
+                one-way: without this, "Skip" would be a decision the user could never revisit.
+                Deliberately writes nothing — the tour is reopened, not re-armed, so `onboardingSeen`
+                stays true and closing this does not queue it up again on the next launch. */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-fit gap-1.5"
+              onClick={() => setReplayingOnboarding(true)}
+            >
+              <Compass className="size-4" />
+              {t('settings.general.replayOnboarding')}
+            </Button>
           </div>
         </Section>
+
+        {replayingOnboarding && (
+          <Suspense fallback={null}>
+            <OnboardingFlow onDone={() => setReplayingOnboarding(false)} />
+          </Suspense>
+        )}
 
         {isNative && <RemindersSection />}
 

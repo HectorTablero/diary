@@ -22,6 +22,14 @@ interface BootOptions {
    * ships. Never `'auto'` — that would make the result depend on the runner's OS setting.
    */
   theme?: 'light' | 'dark';
+  /**
+   * Boot as a device that has never run the app: no cached user, no local-only flag, and the
+   * first-run tour still pending.
+   *
+   * The only state in which `/login` renders anything, since a cached user redirects straight to
+   * the diary — so the onboarding scan cannot use the `app` fixture and has to say this instead.
+   */
+  firstRun?: boolean;
 }
 
 export async function seedBrowserState(
@@ -29,7 +37,7 @@ export async function seedBrowserState(
   options: BootOptions = {},
 ): Promise<void> {
   await context.addInitScript(
-    ({ user, localOnly, appLock, theme }) => {
+    ({ user, localOnly, appLock, theme, firstRun }) => {
       /* Belt to `serviceWorkers: 'block'`'s braces. workbox-window feature-detects
          `'serviceWorker' in navigator`, so hiding it makes registerSW a no-op even where the
          context option is unavailable. A worker that claims the page would serve index.html from
@@ -38,7 +46,15 @@ export async function seedBrowserState(
 
       localStorage.setItem('theme', theme);
       localStorage.setItem('lang', 'en');
-      if (localOnly) {
+      /* The first-run tour is a full-screen modal over /login, so every spec that is not about it
+         has to boot past it. Written as a one-key blob because lib/preferences.ts shallow-merges
+         over its defaults — this cannot go stale as keys are added. */
+      if (!firstRun) localStorage.setItem('preferences', JSON.stringify({ onboardingSeen: true }));
+      if (firstRun) {
+        // A device with no history at all: neither branch below applies, and /login renders.
+        localStorage.removeItem('diary.user');
+        localStorage.removeItem('diary.localOnly');
+      } else if (localOnly) {
         localStorage.setItem('diary.localOnly', '1');
         localStorage.removeItem('diary.user');
       } else {
@@ -55,6 +71,7 @@ export async function seedBrowserState(
       localOnly: options.localOnly ?? false,
       appLock: options.appLock ?? null,
       theme: options.theme ?? 'light',
+      firstRun: options.firstRun ?? false,
     },
   );
 }

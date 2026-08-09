@@ -146,7 +146,7 @@
 
   --secondary-foreground: oklch(0.205 0 0);
 
-  --muted: oklch(0.97 0 0);
+  --muted: oklch(0.984 0 0);
 
   --muted-foreground: oklch(0.556 0 0);
 
@@ -329,6 +329,19 @@ html {
 /* Needs high specificity (added html before) */
 html body[data-scroll-locked] {
   margin-right: 0 !important;
+}
+
+/* A full-bleed overlay wants the viewport, gutter included.
+ *
+ * `scrollbar-gutter: stable` reserves its strip inside the *root scroller's* padding box, which
+ * shrinks the initial containing block — so `position: fixed; inset: 0` stops short of the right
+ * edge, and the first-run tour's footer bar visibly fails to reach it. The gutter exists to stop
+ * the page jumping when a scrollbar comes and goes, and while a modal is open nothing behind it is
+ * scrolling or visible, so here it is reserving space against a shift that cannot happen.
+ *
+ * Set by components/onboarding/OnboardingFlow.tsx for as long as the tour is mounted. */
+html[data-fullbleed] {
+  scrollbar-gutter: auto;
 }
 
 /* Minimal themed scrollbar (desktop) */

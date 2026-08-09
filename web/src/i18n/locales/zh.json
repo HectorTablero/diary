@@ -105,6 +105,46 @@
       "5": "每天都在发生的事和琐碎杂务"
     }
   },
+  "onboarding": {
+    "skip": "跳过",
+    "next": "下一步",
+    "start": "开始使用",
+    "progress": "第 {{current}} 步，共 {{total}} 步",
+    "exampleLabel": "示例",
+    "language": {
+      "title": "欢迎使用你的日记",
+      "lede": "先确认一下：语言选对了吗？"
+    },
+    "writing": {
+      "title": "记下发生的事",
+      "lede": "一条记录就是用一句话记下当天发生的事。添加人物或主题，可以让它包含更多背景信息。",
+      "person": "输入 @ 和姓名即可关联某个人。这条记录会成为一个故事，之后你可以回顾，也可以分享给对方。",
+      "tag": "输入 # 为主题添加标签，让相关内容保持关联并且更容易找到。",
+      "subEntries": "在下面添加子记录，让详细内容留在它所属的那个时刻旁边。"
+    },
+    "importance": {
+      "title": "这件事有多重要？",
+      "lede": "为每条记录设置一个重要程度。越重要的时刻，会在更长时间里保持相关性。"
+    },
+    "people": {
+      "title": "值得分享的事",
+      "lede": "你提到的每个人都会有一份可能让他们感兴趣的记录列表，这样你随时都有话题可以继续聊下去。",
+      "decay": "列表会随着时间自然变短。不那么重要的时刻会更早淡去，而更有意义的时刻会保留更久。把某件事标记为已分享后，它就会退到一边。"
+    },
+    "reminders": {
+      "title": "在一天结束时轻轻提醒你",
+      "lede": "如果你还没有写下任何内容，会收到一次轻柔的提醒。你可以随时在设置中修改。"
+    },
+    "demo": {
+      "person": "小李",
+      "colleague": "小张",
+      "otherPerson": "小周",
+      "tag": "工作",
+      "entryMeeting": "和 @{{person}} 开了个 #{{tag}} 会",
+      "entryCollaboration": "聊到两边团队合作的可能",
+      "otherTags": ["研究", "家庭", "大学", "攀岩"]
+    }
+  },
   "diary": {
     "title": "日记",
     "newEntry": "新建记录",
@@ -355,7 +395,8 @@
       "haptics": "点按振动",
       "hapticsDescription": "按下时轻微振动一下。",
       "importanceShapes": "用形状区分重要程度",
-      "importanceShapesDescription": "为每个级别在颜色之外再加上专属形状，颜色难以分辨时仍能区分。"
+      "importanceShapesDescription": "为每个级别在颜色之外再加上专属形状，颜色难以分辨时仍能区分。",
+      "replayOnboarding": "重看新手引导"
     },
     "reminders": {
       "title": "提醒",

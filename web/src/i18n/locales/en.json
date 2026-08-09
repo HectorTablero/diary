@@ -113,6 +113,46 @@
       "5": "Everyday happenings and trivial chores"
     }
   },
+  "onboarding": {
+    "skip": "Skip",
+    "next": "Next",
+    "start": "Get started",
+    "progress": "Step {{current}} of {{total}}",
+    "exampleLabel": "Example",
+    "language": {
+      "title": "Welcome to your diary",
+      "lede": "First, a quick check — is this the right language?"
+    },
+    "writing": {
+      "title": "Write down what happened",
+      "lede": "An entry is one line about your day. Add a person or topic to give it more context.",
+      "person": "Type @ and a name to link someone. The entry becomes a story you can come back to and share with them later.",
+      "tag": "Type # to tag a topic, so everything about it stays connected and easy to find.",
+      "subEntries": "Add sub-entries underneath to keep the details close to the moment they belong to."
+    },
+    "importance": {
+      "title": "How much did it matter?",
+      "lede": "Give each entry a level of importance. More important moments stay relevant for longer."
+    },
+    "people": {
+      "title": "Things worth telling",
+      "lede": "Anyone you mention gets a list of entries that might interest them, so you always have something to pick up the conversation with.",
+      "decay": "The list naturally gets shorter over time. Less important moments fade sooner, while meaningful ones stay around longer. Mark something as said and it steps aside."
+    },
+    "reminders": {
+      "title": "A nudge at the end of the day",
+      "lede": "Get one quiet reminder if you haven't written anything yet. You can change this any time in Settings."
+    },
+    "demo": {
+      "person": "Ana",
+      "colleague": "Marco",
+      "otherPerson": "Nadia",
+      "tag": "work",
+      "entryMeeting": "Had a #{{tag}} meeting with @{{person}}",
+      "entryCollaboration": "We talked about a possible collaboration between our teams",
+      "otherTags": ["research", "family", "university", "climbing"]
+    }
+  },
   "diary": {
     "title": "Diary",
     "newEntry": "New entry",
@@ -386,7 +426,8 @@
       "haptics": "Vibration on tap",
       "hapticsDescription": "A light tick when you press something.",
       "importanceShapes": "Distinguish importance by shape",
-      "importanceShapesDescription": "Give each level its own shape as well as its colour, so the dots stay apart when the colours don’t."
+      "importanceShapesDescription": "Give each level its own shape as well as its colour, so the dots stay apart when the colours don’t.",
+      "replayOnboarding": "Replay the intro"
     },
     "reminders": {
       "title": "Reminders",

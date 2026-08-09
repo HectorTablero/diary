@@ -1,5 +1,5 @@
 import { BookOpen } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
@@ -9,14 +9,26 @@ import { notifyError } from '@/lib/notify';
 import { useSession } from '@/lib/authClient';
 import { googleSignIn } from '@/lib/googleSignIn';
 import { setLocalOnly } from '@/lib/localOnly';
+import { setPreference, usePreferences } from '@/lib/preferences';
+
+/* Lazy, unlike everything else this page imports. LoginPage is eager in the main bundle (it is the
+   one route that has to render before anything is known about the session), and the tour drags in
+   five step components, framer-motion's presence machinery and a fake diary — none of which the
+   overwhelming majority of loads, which have already seen it, should pay for. */
+const OnboardingFlow = lazy(() => import('@/components/onboarding/OnboardingFlow'));
 
 export default function LoginPage() {
   const { data: session, isPending } = useSession();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [signingIn, setSigningIn] = useState(false);
+  const { onboardingSeen } = usePreferences();
 
   if (isPending) return <FullScreenSpinner />;
+  /* Above the onboarding gate below, and that order is load-bearing: someone with a session who
+     lands here — a deep link, a stale tab — is on their way to the diary, and must not be shown a
+     frame of a first-run tour on the way. It is also what makes this gate invisible to everyone
+     upgrading to this build, since a signed-in user never renders past this line. */
   if (session?.user) return <Navigate to="/diary" replace />;
 
   const handleSignIn = async () => {
@@ -59,6 +71,15 @@ export default function LoginPage() {
           {t('auth.continueWithoutAccount')}
         </button>
       </div>
+      {/* Over this screen rather than in front of it, so finishing the tour reveals a sign-in
+          decision made by someone who now knows what they are signing in to — including whether
+          they want an account at all. `fallback={null}` because the chunk resolves in a frame or
+          two and a spinner between the login screen and a modal would only flicker. */}
+      {!onboardingSeen && (
+        <Suspense fallback={null}>
+          <OnboardingFlow onDone={() => setPreference('onboardingSeen', true)} />
+        </Suspense>
+      )}
     </div>
   );
 }

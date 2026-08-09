@@ -70,6 +70,16 @@ export interface Preferences {
       build time; this is whether to. Device-local like everything else here, and deliberately
       outside the synced settings so opting out on a phone can't be undone by a laptop. */
   telemetry: boolean;
+  /** Whether the first-run tour has been shown on this device. Here rather than in the synced
+      settings for the same reason as the reminders above, and the consequence is worse: signing out
+      runs clearLocalData(), so a synced flag would reset to false and greet someone with a
+      three-year diary as a new user. It is also set on reaching AppLayout — see the comment there —
+      because anyone who has used the app has falsified the tour's premise.
+
+      Note that resetPreferences() clears this and would replay the tour, which is correct: it is a
+      device preference and "reset everything on this device" honestly includes it. The Settings
+      page's own "reset to defaults" resets the synced SettingsDto instead and does not touch it. */
+  onboardingSeen: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -98,6 +108,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // On by default: this is the only way a crash on someone else's device is ever seen, and the
   // switch below is one tap away for anyone who would rather it weren't.
   telemetry: true,
+  // False: a device that has never stored a preference blob has, by definition, never run the app.
+  onboardingSeen: false,
 };
 
 const STORAGE_KEY = 'preferences';

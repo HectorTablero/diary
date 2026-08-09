@@ -111,6 +111,46 @@
       "5": "Sucesos cotidianos y tareas triviales"
     }
   },
+  "onboarding": {
+    "skip": "Saltar",
+    "next": "Siguiente",
+    "start": "Empezar",
+    "progress": "Paso {{current}} de {{total}}",
+    "exampleLabel": "Ejemplo",
+    "language": {
+      "title": "Te damos la bienvenida a tu diario",
+      "lede": "Primero, una comprobación rápida: ¿es este el idioma correcto?"
+    },
+    "writing": {
+      "title": "Escribe lo que ha pasado",
+      "lede": "Una entrada es una línea sobre tu día. Añade una persona o un tema para darle más contexto.",
+      "person": "Escribe @ y un nombre para vincular a alguien. La entrada se convierte en una historia a la que puedes volver y compartir con esa persona más adelante.",
+      "tag": "Escribe # para etiquetar un tema, de modo que todo lo relacionado quede conectado y sea fácil de encontrar.",
+      "subEntries": "Añade subentradas debajo para mantener los detalles cerca del momento al que pertenecen."
+    },
+    "importance": {
+      "title": "¿Cuánto importó?",
+      "lede": "Dale a cada entrada un nivel de importancia. Los momentos más importantes siguen siendo relevantes durante más tiempo."
+    },
+    "people": {
+      "title": "Cosas que vale la pena contar",
+      "lede": "Cada persona que mencionas recibe una lista de entradas que podrían interesarle, para que siempre tengas algo con lo que retomar la conversación.",
+      "decay": "La lista se reduce de forma natural con el tiempo. Los momentos menos importantes desaparecen antes, mientras que los más significativos permanecen más tiempo. Marca algo como contado y dejará paso a lo siguiente."
+    },
+    "reminders": {
+      "title": "Un aviso al final del día",
+      "lede": "Recibe un discreto recordatorio si aún no has escrito nada. Puedes cambiarlo en cualquier momento desde Ajustes."
+    },
+    "demo": {
+      "person": "Ana",
+      "colleague": "Javi",
+      "otherPerson": "Lucía",
+      "tag": "trabajo",
+      "entryMeeting": "Reunión de #{{tag}} con @{{person}}",
+      "entryCollaboration": "Hablamos de una posible colaboración entre nuestros equipos",
+      "otherTags": ["buceo", "familia", "universidad", "escalada"]
+    }
+  },
   "diary": {
     "title": "Diario",
     "newEntry": "Nueva entrada",
@@ -381,7 +421,8 @@
       "haptics": "Vibración al pulsar",
       "hapticsDescription": "Un toque suave al pulsar algo.",
       "importanceShapes": "Distinguir la importancia por forma",
-      "importanceShapesDescription": "Da a cada nivel una forma propia además del color, para que los puntos se distingan aunque los colores no lo hagan."
+      "importanceShapesDescription": "Da a cada nivel una forma propia además del color, para que los puntos se distingan aunque los colores no lo hagan.",
+      "replayOnboarding": "Volver a ver la introducción"
     },
     "reminders": {
       "title": "Recordatorios",
