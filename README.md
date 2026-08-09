@@ -341,6 +341,12 @@ The **server**'s pair are plain runtime env vars — set `BETTERSTACK_SOURCE_TOK
 - `npm test` — every workspace. In `web/` this is three things: `checkI18n.ts` (below), the
   `logic` vitest project (pure functions, Node) and the `components` one (jsdom + Testing
   Library, `*.test.tsx`)
+- `npm run test:e2e` — the behaviour suite: real Chromium over the built SPA, `/api/**` answered by
+  route interception. Builds `web/` first; `test:e2e:run` skips the build
+- `npm run test:a11y` — the same suite's `@a11y` specs: axe (WCAG 2.0/2.1 A and AA) across every
+  route in both themes, plus the open dialogs. Split out from `test:e2e` so the two report
+  separately; `test:e2e:all` runs both in one pass. It lives in Playwright rather than vitest
+  because contrast and visibility rules need real layout, which jsdom does not compute
 - `npx tsx src/scripts/syncSmoke.ts` (from `server/`) — sync-foundation smoke tests against local MongoDB
 - `npx tsx scripts/dbSmoke.ts` (from `web/`) — local-first data layer smoke tests (Node + fake-indexeddb)
 

@@ -7,3 +7,30 @@
 # The login page is the only thing that would otherwise be indexed, and it says nothing useful.
 User-agent: *
 Disallow: /
+
+# Link unfurlers are the exception, and they have to be one. Twitterbot, Slackbot, Discordbot and
+# LinkedInBot all read this file before fetching, so the rule above is enough on its own to make
+# the og: tags in index.html unreachable — a shared link would arrive as a bare URL and the tags
+# would look broken rather than blocked. "Nothing meant to be found by anyone who was not sent a
+# link" is the line above, and someone who was sent the link is exactly who this serves.
+#
+# Letting them fetch is not letting them index. The two are separate controls: robots.txt decides
+# whether the page is *retrieved*, `<meta name="robots" content="noindex">` decides whether what
+# came back may be listed — and a noindex can only be obeyed by something allowed to read it, so
+# blanket-disallowing here would actually be the weaker of the two. Applebot is the case that
+# needs the split spelled out, since it backs both iMessage previews and Apple's search index: it
+# is let in here and told noindex on the page itself.
+#
+# /api stays shut to all of them. There is nothing behind it to preview, and it answers 401 to
+# everything anyway.
+User-agent: Twitterbot
+User-agent: Slackbot
+User-agent: Slackbot-LinkExpanding
+User-agent: facebookexternalhit
+User-agent: WhatsApp
+User-agent: Discordbot
+User-agent: TelegramBot
+User-agent: LinkedInBot
+User-agent: Applebot
+Allow: /
+Disallow: /api/

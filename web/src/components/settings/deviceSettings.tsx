@@ -46,7 +46,7 @@ export function WeekStartSetting() {
           notifyDeviceSaved(t('settings.general.savedOnDevice'));
         }}
       >
-        <SelectTrigger className="w-48">
+        <SelectTrigger className="w-48" aria-label={t('settings.general.weekStart')}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -127,7 +127,7 @@ export function LanguageSetting() {
           announce(changeLanguage(lng as LanguageCode), () => setAutomatic(false));
         }}
       >
-        <SelectTrigger className="w-48">
+        <SelectTrigger className="w-48" aria-label={t('settings.general.language')}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -201,7 +201,7 @@ export function HourCycleSetting() {
           notifyDeviceSaved(t('settings.general.savedOnDevice'));
         }}
       >
-        <SelectTrigger className="w-48">
+        <SelectTrigger className="w-48" aria-label={t('settings.general.timeFormat')}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -402,7 +402,10 @@ export default function SettingsPage() {
                     requestCommit();
                   }}
                 >
-                  <SelectTrigger className="w-56">
+                  <SelectTrigger
+                    className="w-56"
+                    aria-label={t('settings.entries.defaultImportance')}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -507,7 +510,7 @@ export default function SettingsPage() {
                     requestCommit();
                   }}
                 >
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-48" aria-label={t('settings.memories.threshold')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

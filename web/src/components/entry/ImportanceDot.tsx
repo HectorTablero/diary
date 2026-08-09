@@ -67,6 +67,11 @@ export function ImportanceDot({
       <TooltipTrigger asChild>
         <span
           className={cn('inline-block size-2.5 shrink-0', markerClass(importance), className)}
+          /* `role="img"` is what makes the aria-label below legal, and it is not a formality: ARIA
+             forbids a name on a generic element, so a bare `<span aria-label>` is stripped by the
+             accessibility tree — the level was announced to nobody. The dot is a graphic carrying
+             meaning that appears nowhere else on the row, which is exactly what role="img" is for. */
+          role="img"
           aria-label={t(`importance.levels.${importance}`)}
         />
       </TooltipTrigger>

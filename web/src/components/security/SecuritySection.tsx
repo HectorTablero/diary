@@ -242,7 +242,7 @@ export function SecuritySection() {
                   updateLockOptions({ graceSeconds: Number(value) as GraceSeconds })
                 }
               >
-                <SelectTrigger className="w-56">
+                <SelectTrigger className="w-56" aria-label={t('security.lockAfter')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

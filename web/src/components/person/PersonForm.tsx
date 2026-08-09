@@ -365,7 +365,9 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
             onChange={(e) => setBirthdayDay(e.target.value)}
           />
           <Select value={birthdayMonth} onValueChange={(value) => setBirthdayMonth(value)}>
-            <SelectTrigger className="min-w-0 flex-1">
+            {/* No visible <Label> beside this one — the placeholder is doing that job, and a
+                placeholder is not a name (it disappears the moment a month is chosen). */}
+            <SelectTrigger className="min-w-0 flex-1" aria-label={t('people.birthdayMonth')}>
               <SelectValue placeholder={t('people.birthdayMonth')} />
             </SelectTrigger>
             <SelectContent>

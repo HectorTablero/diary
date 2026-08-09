@@ -22,14 +22,27 @@ function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.V
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
-function SelectTrigger({
-  className,
-  size = 'default',
-  children,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
+/**
+ * A trigger that cannot be built without an accessible name.
+ *
+ * The union is the whole point, and it encodes a rule that is easy to get wrong precisely because
+ * the markup looks fine: Radix renders this as `<button role="combobox">`, and ARIA gives combobox
+ * *name from author only*. A plain `<button>` would be named by its own text, so the visible
+ * "Automatic (Sunday)" inside the trigger looks like it names the control — it does not. That text
+ * is the combobox's **value**. Without `aria-label` or `aria-labelledby` the control announces as an
+ * unnamed combobox, and a screen-reader user hears the current setting with no idea which setting
+ * it is.
+ *
+ * Requiring one of the two here rather than documenting it means a new picker fails to compile
+ * instead of failing an audit — which is the difference between a rule and a hope. The `<Label>`
+ * these usually sit under stays where it is: it is the visible label, and passing the same
+ * translation key to `aria-label` keeps the two identical by construction (WCAG 2.5.3).
+ */
+type SelectTriggerProps = React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: 'sm' | 'default';
-}) {
+} & ({ 'aria-label': string } | { 'aria-labelledby': string });
+
+function SelectTrigger({ className, size = 'default', children, ...props }: SelectTriggerProps) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
