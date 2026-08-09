@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { Spinner } from '@/components/common/Spinner';
+import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,11 +16,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSyncStatus } from '@/db/useSyncStatus';
-import { apiDelete } from '@/lib/apiClient';
+import { ApiError, apiDelete } from '@/lib/apiClient';
 import { biometryAvailable, getLockState, promptBiometrics, verifyPasscode } from '@/lib/appLock';
 import { buildBackupEnvelope } from '@/lib/backup/export';
+import {
+  forgetAccountDeletionResume,
+  markAccountDeletionResume,
+  resumingAccountDeletion,
+} from '@/lib/deleteAccountResume';
 import { endSession } from '@/lib/endSession';
 import { saveTextFile } from '@/lib/fileSave';
+import { googleReauth } from '@/lib/googleSignIn';
 import { notifyError } from '@/lib/notify';
 
 /**
@@ -37,10 +44,31 @@ import { notifyError } from '@/lib/notify';
  * - **The device lock, if there is one.** With a passcode set, this asks for it (or biometry) before
  *   anything is sent. Someone holding an unlocked phone is the threat the lock exists for, and
  *   erasing the diary is a worse outcome than reading it.
+ * - **The Google account behind it all.** The two guards above are this dialog's, which means the
+ *   server cannot see them and anything holding a session token can skip straight past. So the
+ *   server keeps one of its own — the session has to be minutes old — and this dialog answers a
+ *   refusal by sending the user back through Google. See `signInAgain` and lib/googleSignIn.ts.
  * - **No promises it can't keep.** The copy says other devices keep what they've already downloaded
  *   until they sign out, because they do — after this there is no account for them to sync against
  *   and nothing that can reach them.
+ *
+ * The order the four are in is not arbitrary. The two free, instant, local guards come first, so
+ * the expensive one — a whole sign-in round trip, on the web a redirect out of the app — is only
+ * ever spent by someone who has already typed the word and passed the lock.
  */
+
+/** The server's answer to a session too old to be trusted with this. Not a 401: the session is
+    perfectly valid and must not be torn down, it just is not recent enough. */
+const REAUTH_REQUIRED = 'errors.reauth_required';
+
+/**
+ * `confirm` collects the typed word; `lock` asks the device passcode or biometry; `signin` sends
+ * the user back through Google after the server has refused a stale session; `resumed` is where the
+ * web lands on its way back from that redirect. Deleting spans all four, so the dialog can't be
+ * dismissed while a request is in flight.
+ */
+type Stage = 'confirm' | 'lock' | 'signin' | 'resumed';
+
 export function DeleteAccountDialog({
   open,
   onOpenChange,
@@ -53,14 +81,20 @@ export function DeleteAccountDialog({
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
   const [phrase, setPhrase] = useState('');
-  /* 'confirm' collects the typed word; 'reauth' asks the device lock. Deleting spans both, so the
-     dialog can't be dismissed while a request is in flight. */
-  const [stage, setStage] = useState<'confirm' | 'reauth'>('confirm');
+  /* Read at the first render rather than in an effect: it is a fact about the page load, decided
+     before this component existed, and the dialog has to open already showing the right stage. */
+  const [stage, setStage] = useState<Stage>(() =>
+    resumingAccountDeletion() ? 'resumed' : 'confirm',
+  );
   const [passcode, setPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
   const [canUseBiometrics, setCanUseBiometrics] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const passcodeRef = useRef<HTMLInputElement>(null);
+  /* One trip through Google per attempt. Arriving on a resume counts as having taken it, which is
+     what stops a server that keeps refusing from bouncing the user out to Google and back forever —
+     a loop that would survive page loads, since each one would look like a first attempt. */
+  const reauthAttempted = useRef(resumingAccountDeletion());
 
   const confirmWord = t('settings.data.deleteAccount.confirmWord');
   const phraseMatches = phrase.trim().toLowerCase() === confirmWord.toLowerCase();
@@ -71,8 +105,9 @@ export function DeleteAccountDialog({
   const { blocker } = useSyncStatus();
   const serverUnreachable = blocker === 'offline' || blocker === 'unreachable';
 
-  // A fresh dialog every time it opens: a half-typed word or a reached reauth stage left over from
-  // a cancelled attempt would mean the next one starts further along than the user expects.
+  // A fresh dialog every time it opens: a half-typed word, a reached stage, or a spent trip through
+  // Google left over from a cancelled attempt would mean the next one starts further along than the
+  // user expects — and, in the last case, further along than it is allowed to.
   useEffect(() => {
     if (open) return;
     setPhrase('');
@@ -80,6 +115,8 @@ export function DeleteAccountDialog({
     setPasscodeError(false);
     setStage('confirm');
     setExported(false);
+    reauthAttempted.current = false;
+    forgetAccountDeletionResume();
   }, [open]);
 
   const handleExport = async () => {
@@ -104,10 +141,17 @@ export function DeleteAccountDialog({
     setDeleting(true);
     try {
       await apiDelete('/account');
-    } catch {
+    } catch (err) {
       // Nothing has been deleted, so the dialog stays exactly where it is and can be retried.
       setDeleting(false);
-      notifyError(t('settings.data.deleteAccount.failed'));
+      const sessionTooOld = err instanceof ApiError && err.code === REAUTH_REQUIRED;
+      /* The server is the only thing that knows how old a session may be, so the age is never
+         checked here — this waits to be told, and then offers the one thing that fixes it. */
+      if (sessionTooOld && !reauthAttempted.current) {
+        setStage('signin');
+        return;
+      }
+      notifyError(t(sessionTooOld ? REAUTH_REQUIRED : 'settings.data.deleteAccount.failed'));
       return;
     }
     /* Past this point the account is gone and there is nothing to roll back, so the teardown is not
@@ -118,6 +162,38 @@ export function DeleteAccountDialog({
     navigate('/login', { replace: true });
   };
 
+  /**
+   * Prove the Google account is still ours, then finish what was started.
+   *
+   * The marker goes down *before* the call, because on the web there is no line of code after the
+   * redirect starts that is guaranteed to run. Native never leaves, so it picks the marker straight
+   * back up and carries on in place — the platform difference lives entirely in the outcome
+   * googleReauth reports, and this function reads the same on both.
+   */
+  const signInAgain = async () => {
+    reauthAttempted.current = true;
+    setDeleting(true);
+    markAccountDeletionResume();
+    let outcome: Awaited<ReturnType<typeof googleReauth>>;
+    try {
+      outcome = await googleReauth('/settings');
+    } catch {
+      /* Cleared, and the attempt handed back: a sign-in that failed is not a sign-in that was
+         used up, and leaving this armed would strand the user on a stage whose only button no
+         longer does anything. */
+      forgetAccountDeletionResume();
+      reauthAttempted.current = false;
+      setDeleting(false);
+      notifyError(t('settings.data.deleteAccount.signInFailed'));
+      return;
+    }
+    // The page is on its way to Google. The marker is what brings this dialog back afterwards, and
+    // nothing after this line is reliably reached.
+    if (outcome === 'redirecting') return;
+    forgetAccountDeletionResume();
+    await runDeletion();
+  };
+
   const tryBiometrics = async () => {
     if (
       await promptBiometrics(t('settings.data.deleteAccount.biometricsReason'), 'delete_account')
@@ -126,19 +202,23 @@ export function DeleteAccountDialog({
     }
   };
 
-  /** The typed word is in: either hand over to the device lock, or delete. */
+  /** The typed word is in — or, on a resume, the word and the lock were passed before the redirect
+      and the Google account has since been re-presented. Either way: hand over to the device lock,
+      or delete. The lock is asked again after a resume on purpose. It guards this device rather
+      than the account, the round trip through Google says nothing about who is holding the phone,
+      and it is the cheap half of the pair. */
   const handleConfirm = () => {
     if (!getLockState().config) {
       void runDeletion();
       return;
     }
-    setStage('reauth');
+    setStage('lock');
   };
 
-  // Entering the reauth stage offers biometry immediately when it's on, the same as the lock screen
+  // Entering the lock stage offers biometry immediately when it's on, the same as the lock screen
   // does — making the user tap a button to be shown a prompt spends the whole convenience of it.
   useEffect(() => {
-    if (stage !== 'reauth') return;
+    if (stage !== 'lock') return;
     const { config } = getLockState();
     if (!config?.biometrics) return;
     void biometryAvailable().then((available) => {
@@ -159,6 +239,24 @@ export function DeleteAccountDialog({
     await runDeletion();
   };
 
+  const description = {
+    confirm: t('settings.data.deleteAccount.description'),
+    lock: t('settings.data.deleteAccount.lockDescription'),
+    signin: t('settings.data.deleteAccount.signInDescription'),
+    resumed: t('settings.data.deleteAccount.resumedDescription'),
+  }[stage];
+
+  /* On the last press as much as the first. A resume rebuilds this dialog from nothing in a page
+     the user did not navigate to themselves, so the consequences have to be back on screen before
+     the button that causes them is. */
+  const consequences = (
+    <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+      <li>{t('settings.data.deleteAccount.bulletContent')}</li>
+      <li>{t('settings.data.deleteAccount.bulletAccount')}</li>
+      <li>{t('settings.data.deleteAccount.bulletDevices')}</li>
+    </ul>
+  );
+
   return (
     <Dialog open={open} onOpenChange={(next) => !deleting && onOpenChange(next)}>
       <DialogContent className="max-w-md">
@@ -167,20 +265,12 @@ export function DeleteAccountDialog({
             <AlertTriangle className="size-4 shrink-0" />
             {t('settings.data.deleteAccount.title')}
           </DialogTitle>
-          <DialogDescription>
-            {stage === 'confirm'
-              ? t('settings.data.deleteAccount.description')
-              : t('settings.data.deleteAccount.reauthDescription')}
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {stage === 'confirm' ? (
+        {stage === 'confirm' && (
           <div className="flex flex-col gap-4">
-            <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
-              <li>{t('settings.data.deleteAccount.bulletContent')}</li>
-              <li>{t('settings.data.deleteAccount.bulletAccount')}</li>
-              <li>{t('settings.data.deleteAccount.bulletDevices')}</li>
-            </ul>
+            {consequences}
 
             <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/40 p-3">
               <Button
@@ -229,7 +319,9 @@ export function DeleteAccountDialog({
               )}
             </div>
           </div>
-        ) : (
+        )}
+
+        {stage === 'lock' && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="delete-passcode">{t('security.passcode')}</Label>
@@ -275,24 +367,45 @@ export function DeleteAccountDialog({
           </div>
         )}
 
+        {/* Nothing but the reassurance. The description above says what is about to happen and that
+            nothing has been deleted yet; a stage that also repeated the consequences would bury the
+            one sentence the user needs here, which is that they have not lost anything by getting
+            this far. */}
+        {stage === 'signin' && (
+          <p className="text-sm text-muted-foreground">
+            {t('settings.data.deleteAccount.signInWhy')}
+          </p>
+        )}
+
+        {stage === 'resumed' && consequences}
+
         <DialogFooter className="gap-2">
           <Button variant="outline" disabled={deleting} onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
-          {stage === 'confirm' ? (
+          {stage === 'signin' ? (
+            <Button className="gap-1.5" disabled={deleting} onClick={() => void signInAgain()}>
+              {deleting ? <Spinner className="size-3.5" /> : <GoogleIcon />}
+              {t('auth.signInWithGoogle')}
+            </Button>
+          ) : stage === 'lock' ? (
             <Button
               variant="destructive"
-              disabled={!phraseMatches || serverUnreachable}
-              onClick={handleConfirm}
+              className="gap-1.5"
+              disabled={!passcode || deleting || serverUnreachable}
+              onClick={() => void submitPasscode()}
             >
+              {deleting && <Spinner className="size-3.5" />}
               {t('settings.data.deleteAccount.confirm')}
             </Button>
           ) : (
             <Button
               variant="destructive"
               className="gap-1.5"
-              disabled={!passcode || deleting || serverUnreachable}
-              onClick={() => void submitPasscode()}
+              /* The typed word only gates the stage that collects it. On a resume it was typed
+                 before the redirect and the field it was typed into no longer exists. */
+              disabled={(stage === 'confirm' && !phraseMatches) || deleting || serverUnreachable}
+              onClick={handleConfirm}
             >
               {deleting && <Spinner className="size-3.5" />}
               {t('settings.data.deleteAccount.confirm')}

@@ -33,18 +33,51 @@ import { UserSettings } from '../models/userSettings';
  * someone else's account. That is the whole authorisation model here, and it is why this route
  * takes no input at all.
  *
- * **What still protects it, and what doesn't.** In front of this sit `requireAuth`, the CORS
- * allowlist, and `requireTrustedOrigin` (middleware/origin.ts) — between them a hostile page cannot
- * reach this endpoint, whatever it does to a logged-in user's browser. What none of them stop is a
- * caller holding a genuine session token: the typed word and the biometric prompt are the *client's*
- * gates and this endpoint cannot see them, so anything with the token can call it directly. The
- * usual answer is a re-authentication step immediately before the delete, which needs a credential
- * to re-present — and this deployment's only one is Google OAuth, so it would mean a full sign-in
- * round trip. Left undone deliberately rather than overlooked; a stolen session is already able to
- * read the entire diary, which is the loss this app is really guarding against.
+ * **What protects it.** In front of this sit `requireAuth`, the CORS allowlist, and
+ * `requireTrustedOrigin` (middleware/origin.ts) — between them a hostile page cannot reach this
+ * endpoint, whatever it does to a logged-in user's browser. What none of them stop is a caller
+ * holding a genuine session token, and the typed word and the biometric prompt are the *client's*
+ * gates, which this endpoint cannot see. So it keeps one of its own, and it is the only guard here
+ * that is actually the server's: the session has to be a recent one. See `REAUTH_MAX_AGE_MS`.
  */
+
+/**
+ * How recently the caller must have signed in for the delete to go through.
+ *
+ * This is the re-authentication requirement, expressed the only way this deployment can express
+ * one. Google OAuth is the sole credential — there is no password to re-enter and no mailer to
+ * confirm through — so "re-authenticate" can only mean another sign-in round trip, and the evidence
+ * that one happened is a session younger than this window. That evidence is trustworthy for a
+ * reason worth stating: every sign-in *inserts* a session rather than refreshing one, so a caller
+ * cannot keep an old session alive into the window by using it (see `sessionCreatedAt` in
+ * middleware/session.ts).
+ *
+ * Five minutes is chosen against the two ways the number can be wrong. Too long and it stops being
+ * a gate at all — a token lifted shortly after its owner signed in would still be inside it. Too
+ * short and it starts refusing honest attempts, which matters more here than it looks: the Android
+ * app re-authenticates in place, but the web has to leave for Google and come back, and a slow
+ * page load, an account chooser, a two-factor prompt and a person who actually reads the final
+ * confirmation all have to fit inside the same window. Being refused *after* re-authenticating is
+ * the one failure that would teach someone the feature is broken.
+ *
+ * What it buys, and what it does not: a session token on its own can no longer erase the diary,
+ * which is worth insisting on because it is the only loss here that nothing can undo. It does
+ * nothing about a token stolen minutes after a sign-in, and was never going to — that token can
+ * already read the whole diary, which is a different loss needing a different answer.
+ */
+const REAUTH_MAX_AGE_MS = 5 * 60 * 1000;
+
 export const accountRouter = new Hono<AppEnv>().delete('/', async (c) => {
   const userId = c.get('userId');
+
+  /* Ahead of every delete below, so a refusal costs the caller nothing and the same request can
+     simply be sent again after signing in. The clients are expected to attempt the delete and
+     re-authenticate on *this* response rather than pre-emptively counting minutes themselves —
+     which keeps the rule stated once, here, instead of duplicated into two clients that would
+     drift from it and from each other. */
+  if (Date.now() - c.get('sessionCreatedAt').getTime() > REAUTH_MAX_AGE_MS) {
+    return c.json({ error: 'errors.reauth_required' }, 403);
+  }
 
   await Promise.all([
     Entry.deleteMany({ userId }),

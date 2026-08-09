@@ -20,11 +20,24 @@ export const USER_ID = 'user_under_test';
 /** A second identity, for asserting that one user's id never appears in another's query. */
 export const OTHER_USER_ID = 'user_somebody_else';
 
-export function routeApp(path: string, router: Hono<AppEnv>, userId: string = USER_ID) {
+/**
+ * @param sessionCreatedAt When the caller last signed in. Every route but one is indifferent to it,
+ * so it defaults to a session created the instant the request is made; DELETE /account refuses a
+ * session older than a few minutes, and its tests are the only ones that pass a date.
+ */
+export function routeApp(
+  path: string,
+  router: Hono<AppEnv>,
+  userId: string = USER_ID,
+  sessionCreatedAt?: Date,
+) {
   const app = new Hono<AppEnv>();
   app.onError(handleError);
   app.use('*', async (c, next) => {
     c.set('userId', userId);
+    // Read per request rather than captured once, so the default never goes stale partway through
+    // a slow suite and quietly starts testing the refusal path instead.
+    c.set('sessionCreatedAt', sessionCreatedAt ?? new Date());
     await next();
   });
   app.route(path, router);

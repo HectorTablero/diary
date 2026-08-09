@@ -35,6 +35,7 @@ import {
   type PersonMarkdownOptions,
 } from '@/lib/markdownExport/person';
 import { fuzzyIncludes } from '@/lib/tokens';
+import { zipTextFiles } from '@/lib/zip';
 
 type ExportType = 'entries' | 'people';
 type OutputMode = 'merge' | 'zip';
@@ -62,6 +63,25 @@ const PERSON_OPTION_KEYS = [
   'saidTimeline',
   'unsaidCount',
 ] as const satisfies readonly (keyof PersonMarkdownOptions)[];
+
+/* Person names are free text; archive entry names are not.
+ *
+ * Two people can share a name, and a name can contain characters that mean something to a
+ * filesystem. JSZip papered over both by keying its files by name, so a second "Ana" silently
+ * replaced the first and a slash quietly became a directory. Writing the archive directly means
+ * neither is handled for us — duplicate entries are legal ZIP that unzippers disagree about — so
+ * the names are made distinct and inert here, where we still know they came from people. */
+function zipEntryNames(names: string[]): string[] {
+  const used = new Set<string>();
+  return names.map((name) => {
+    // Path separators, the characters Windows rejects outright, and control codes.
+    const base = name.replace(/[\\/:*?"<>|\x00-\x1f]/g, '-').trim() || 'person';
+    let candidate = base;
+    for (let n = 2; used.has(candidate); n++) candidate = `${base} (${n})`;
+    used.add(candidate);
+    return `${candidate}.md`;
+  });
+}
 
 interface MarkdownExportDialogProps {
   open: boolean;
@@ -170,18 +190,17 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
               : `briefings-${Date.now()}.md`;
           await saveTextFile(filename, markdown, 'text/markdown');
         } else {
-          /* Loaded here rather than imported at the top: JSZip is ~95 kB and is needed only when
-             exporting more than one person as separate files, which is the rarer half of a screen
-             most users never open. */
-          const { default: JSZip } = await import('jszip');
-          const zip = new JSZip();
-          for (const { person, said, unsaidCount } of results) {
-            zip.file(
-              `${person.name}.md`,
-              buildPersonMarkdown(person, said, unsaidCount, personOptions),
-            );
-          }
-          const base64 = await zip.generateAsync({ type: 'base64' });
+          /* Imported at the top rather than lazily: lib/zip is ~1 kB of archive headers over the
+             browser's own DEFLATE, so it rides along in this already-lazy route's chunk instead of
+             costing a second round trip on click. JSZip, which it replaced, was 96 kB and had to
+             be fetched on demand. */
+          const filenames = zipEntryNames(results.map(({ person }) => person.name));
+          const base64 = await zipTextFiles(
+            results.map(({ person, said, unsaidCount }, index) => ({
+              name: filenames[index],
+              content: buildPersonMarkdown(person, said, unsaidCount, personOptions),
+            })),
+          );
           await saveBinaryFile(`briefings-${Date.now()}.zip`, base64, 'application/zip');
         }
       }
