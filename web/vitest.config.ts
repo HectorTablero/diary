@@ -51,6 +51,10 @@ export default defineConfig({
           environment: 'jsdom',
           include: ['src/**/*.test.tsx'],
           setupFiles: ['./src/test/setup.ts'],
+          /* The app lock derives at 210,000 PBKDF2 iterations by design, which is ~100-200ms per
+             verify under Node's webcrypto; a test that sets a passcode and then checks it pays that
+             twice, on top of mounting a Radix dialog. Comfortably over 5s on a cold CI runner. */
+          testTimeout: 10_000,
         },
       },
     ],

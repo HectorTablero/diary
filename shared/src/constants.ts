@@ -119,12 +119,19 @@ export const LOGO_STROKE_WIDTH = 50;
 export const LOGO_VIEWBOX = '0 0 500 500';
 export const LOGO_DISPLACED_VIEWBOX = '-10 0 490 500';
 
+/** My (Héctor Tablero) personal's portfolio and brand logo, resembling a tab icon (->|)
+    In every one of my apps, the logo transforms between the brand and the app logo on different
+    moments. In Diary, it does so on sidebar logo hover (web version, tablet+ width) and on the
+    Android app's splash screen.
+*/
 export const BRAND_LOGO_PATHS = [
   { d: 'M 375 250 L 50 250' },
   { d: 'M 300 125 L 375 250 L 300 375' },
   { d: 'M 450 100 L 450 400' },
 ] as const;
 
+/** App path, matching the number of path corners per path in the brand logo so browsers can
+    smoothly transition between them (d property). */
 export const APP_LOGO_PATHS = [
   { d: 'M 100 100 L 100 400' },
   { d: 'M 175 100 L 400 250 L 175 400' },
