@@ -1,8 +1,21 @@
+/* MUST be the first import in this file, and this file is the components project's only setupFile.
+ *
+ * Dexie captures its `indexedDB` binding when *dexie itself* is evaluated, not lazily at open time.
+ * The imports below reach `../i18n`, which transitively reaches `@/db/db`, which constructs the
+ * Dexie singleton — so anything ordered ahead of this line means Dexie captures `undefined` and no
+ * test file can recover, whatever it imports or mocks afterwards. Hence global rather than
+ * per-file: there is no such thing here as a component test that doesn't drag the store in, and the
+ * ordering trap should not have to be rediscovered once per file. */
+import 'fake-indexeddb/auto';
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { webcrypto } from 'node:crypto';
+import { toast } from 'sonner';
+import { afterEach, beforeEach } from 'vitest';
 import i18n from '../i18n';
 import en from '../i18n/locales/en.json';
+import { queryClient } from '../lib/queryClient';
+import { resetDb } from './seed';
 
 /* Shared setup for the component suite.
 
@@ -31,7 +44,49 @@ Element.prototype.hasPointerCapture ??= () => false;
 Element.prototype.setPointerCapture ??= () => {};
 Element.prototype.releasePointerCapture ??= () => {};
 Element.prototype.scrollIntoView ??= () => {};
+// cmdk and Radix's scroll areas call this on the list container when the active item moves.
+Element.prototype.scrollTo ??= () => {};
+
+/* jsdom does not implement matchMedia at all, and `lib/theme.ts` calls it at *module scope* — so
+   without this, importing anything whose graph reaches the theme (SettingsPage does) throws before
+   a test body runs. Both listener APIs are stubbed because the modern one is what the app uses and
+   the legacy `addListener` pair is what some dependencies still call. */
+window.matchMedia ??= ((query: string) =>
+  ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+    dispatchEvent: () => false,
+  }) as unknown as MediaQueryList) as typeof window.matchMedia;
+
+/* jsdom 27 does implement `crypto.randomUUID` (apiClient.ts calls it at module scope and is fine),
+   but not `crypto.subtle` — which lib/appLock.ts needs for PBKDF2. Node's webcrypto is a strict
+   superset of what jsdom provides, so swapping the whole object is simpler and safer than patching
+   one method onto it.
+
+   Worth knowing when a lock test feels slow: the app derives at 210,000 iterations, deliberately,
+   and that is ~100-200ms per verify here. The components project's testTimeout is raised to suit. */
+Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+
+/* A clean database per test, not merely per file. Vitest isolates module registries per file, so
+   each file already gets its own in-memory IndexedDB; this is what stops the second test in a file
+   from reading the first one's entries. */
+beforeEach(resetDb);
 
 // Testing Library's auto-cleanup only registers itself with globals enabled; this suite doesn't
 // use them, so unmount between tests explicitly or the DOM accumulates across files.
 afterEach(cleanup);
+
+afterEach(() => {
+  /* Sonner keeps its toasts in a module-level store that RTL's cleanup knows nothing about, so
+     without this a toast raised in one test is still on screen for the next one — and `getByText`
+     finding a toast from a previous test is about the most misleading pass available. */
+  toast.dismiss();
+  /* The harness renders against the app's singleton QueryClient on purpose (see
+     renderWithProviders), which means cached queries outlive a test unless they are cleared here. */
+  queryClient.clear();
+});

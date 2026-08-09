@@ -56,14 +56,53 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Three workspaces. In web/ this also runs checkI18n.ts, which fails on a key used but
+      # Three workspaces — shared, then server, then web — chained with `&&`, so the first failure
+      # stops the rest. In web/ this also runs checkI18n.ts, which fails on a key used but
       # undefined or present in one locale and not another — load-bearing, because each locale is
       # a separate chunk and fallbackLng points at a bundle that may not be loaded.
       #
       # Runs with no .env, deliberately: config.ts reads its required variables through getters, so
       # importing a module never demands a credential and this needs no secrets.
+      #
+      # The server half includes the route tests, and those need no MongoDB either — they mount one
+      # Hono router at a time over doubles for the Mongoose models (server/src/test), so what they
+      # assert is what the routes decide: the status a miss becomes, which errors are conflicts, and
+      # above all that every query carries the session's own userId. Keeping that database-free is
+      # what lets this step stay a plain `npm test` with no service container behind it.
       - name: Test
         run: npm test
+
+      # The e2e suite drives a real Chromium against the *built* SPA, with /api/** answered by
+      # Playwright's route interception — so it needs the bundle and a browser, and nothing else:
+      # no MongoDB, no OAuth, no server process, no secrets. Deliberately not folded into
+      # `npm test`, which stays unit-only and fast for local use.
+      #
+      # No Better Stack build args here on purpose: without them the bundle's telemetry module is
+      # console-only, so the suite makes no outbound requests of its own.
+      - name: Build the web app for e2e
+        run: npm run build -w web
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # Unconditional even on a cache hit: the cache holds the browser binary, but the system
+      # libraries `--with-deps` installs live outside that path and are gone on a fresh runner.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e:run
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
 
       # Catches a dependency advisory before it ships rather than at the next manual audit.
       # Production dependencies only: a devDependency finding does not reach users, and failing

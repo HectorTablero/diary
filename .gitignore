@@ -9,5 +9,8 @@ deploy.bat
 node_modules/
 dist/
 dev-dist/
+# Playwright output: the HTML report and per-run traces/screenshots.
+playwright-report/
+test-results/
 *.ps1
 codebase.md

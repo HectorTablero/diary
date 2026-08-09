@@ -14,6 +14,11 @@ COPY web/package.json web/
 # this stage installs deps ahead of the full COPY to keep the layer cached. It no-ops here
 # anyway: .git is .dockerignore'd, and there are no hooks to install in an image.
 COPY scripts/ scripts/
+# @playwright/test is a root devDependency (the e2e suite), and its `install` script downloads
+# ~150 MB of browsers. This stage runs with lifecycle scripts enabled — it has to, for `prepare` —
+# so without this every image build would pay for browsers the image never runs. The runtime stage
+# below sidesteps it differently, with --ignore-scripts.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci --no-audit --no-fund
 COPY . .
 # Vite inlines these into the web bundle, so they have to be present at build time, not runtime.
