@@ -8,6 +8,7 @@ import { trackEvent, userHash } from '../lib/telemetry';
 import { Deletion, isCursorStale } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
+import { PluginRecord } from '../models/pluginRecord';
 import { Tag } from '../models/tag';
 import { Thread } from '../models/thread';
 import { issueWsTicket } from '../services/liveSync';
@@ -16,10 +17,12 @@ import {
   ENTRY_POPULATE,
   entryToDto,
   personToDto,
+  pluginRecordToDto,
   tagToDto,
   threadToDto,
   type LeanEntry,
   type LeanPerson,
+  type LeanPluginRecord,
   type LeanTag,
   type LeanThread,
 } from '../dto';
@@ -53,7 +56,7 @@ export const syncRouter = new Hono<AppEnv>()
     const changedSince = reset ? {} : { updatedAt: { $gt: cursor } };
 
     const queryStartedAt = performance.now();
-    const [entries, people, tags, threads, settings, deletions] = await Promise.all([
+    const [entries, people, tags, threads, pluginRecords, settings, deletions] = await Promise.all([
       Entry.find({ userId, ...changedSince })
         .populate(ENTRY_POPULATE)
         .lean(),
@@ -62,6 +65,9 @@ export const syncRouter = new Hono<AppEnv>()
         .lean(),
       Tag.find({ userId, ...changedSince }).lean(),
       Thread.find({ userId, ...changedSince }).lean(),
+      /* The one collection whose delta is served by a real index on updatedAt rather than a
+         userId-prefix scan — see the note on the index in models/pluginRecord. */
+      PluginRecord.find({ userId, ...changedSince }).lean(),
       getSettings(userId),
       // A full state names every doc that exists; the ones it doesn't name are the deletions.
       reset ? Promise.resolve([]) : Deletion.find({ userId, deletedAt: { $gt: cursor } }).lean(),
@@ -91,6 +97,7 @@ export const syncRouter = new Hono<AppEnv>()
         people: people.length,
         tags: tags.length,
         threads: threads.length,
+        plugin_records: pluginRecords.length,
         query_ms: queryMs,
       });
     } else if (queryMs >= 250) {
@@ -99,7 +106,8 @@ export const syncRouter = new Hono<AppEnv>()
       trackEvent('sync_delta_slow', {
         user: userHash(userId),
         query_ms: queryMs,
-        changed: entries.length + people.length + tags.length + threads.length,
+        changed:
+          entries.length + people.length + tags.length + threads.length + pluginRecords.length,
         deletions: deletions.length,
       });
     }
@@ -111,6 +119,11 @@ export const syncRouter = new Hono<AppEnv>()
       people: (people as unknown as LeanPerson[]).map(personToDto),
       tags: (tags as unknown as LeanTag[]).map(tagToDto),
       threads: (threads as unknown as LeanThread[]).map(threadToDto),
+      /* Always sent, never omitted when empty. Under `reset` the client deletes every local id the
+         response did not name, so "absent" and "none" must not look alike — a client reading
+         absence as emptiness would delete the account's entire plugin history. The client's own
+         tolerance for a server that predates this field is to skip the sweep, not to run it. */
+      pluginRecords: (pluginRecords as unknown as LeanPluginRecord[]).map(pluginRecordToDto),
       settings,
       deletions: (deletions as unknown as LeanDeletion[]).map((d) => ({
         coll: d.coll,

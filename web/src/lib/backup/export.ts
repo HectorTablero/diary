@@ -13,11 +13,16 @@ import { BACKUP_VERSION, type BackupEnvelope } from './schema';
  * the device rather than the diary.
  */
 export async function buildBackupEnvelope(): Promise<BackupEnvelope> {
-  const [entries, people, tags, threads, settings] = await Promise.all([
+  const [entries, people, tags, threads, pluginRecords, settings] = await Promise.all([
     db.entries.toArray(),
     db.people.toArray(),
     db.tags.toArray(),
     db.threads.toArray(),
+    /* Every plugin's rows, including plugins not installed on this device. A backup's job is to be
+       complete: dropping rows because the code that understands them happens to be absent here
+       would quietly turn a restore into a partial one. `config` rows come too — see the importer,
+       which offers them as their own section rather than applying them silently. */
+    db.pluginRecords.toArray(),
     getSettings(),
   ]);
 
@@ -28,6 +33,7 @@ export async function buildBackupEnvelope(): Promise<BackupEnvelope> {
     people,
     tags,
     threads,
+    pluginRecords,
     settings,
   };
 }

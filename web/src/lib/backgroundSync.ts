@@ -29,7 +29,11 @@ async function runBackgroundSync(): Promise<void> {
   // still falls through to the reconcile below — which is the half that matters offline anyway,
   // since a rolled-over day changes which reminders should be armed with no server involved.
   await syncNow({ trigger: 'background' });
-  await refreshNotificationsNow();
+  /* A tighter budget for plugins than a foreground pass gets. The OS closes this window when the
+     task reports done and kills it if we outstay it — and a killed reconcile is worse than a slow
+     one, because `schedule()` may have run while `cancel()` has not. A plugin that overruns simply
+     keeps the alarms it already had until the next pass. */
+  await refreshNotificationsNow({ pluginTimeoutMs: 2_000 });
 }
 
 /** Call once at app bootstrap, before the first render — Android may launch the app straight into

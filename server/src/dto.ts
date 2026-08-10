@@ -3,6 +3,8 @@ import type {
   PersonDto,
   PersonEventDto,
   PersonRefDto,
+  PluginRecordDto,
+  PluginScope,
   SaidMark,
   TagDto,
   ThreadDto,
@@ -106,6 +108,30 @@ export const threadToDto = (thread: LeanThread): ThreadDto => ({
   name: thread.name,
   createdAt: thread.createdAt.toISOString(),
   updatedAt: thread.updatedAt.toISOString(),
+});
+
+export interface LeanPluginRecord {
+  _id: Types.ObjectId;
+  pluginId: string;
+  scope: PluginScope;
+  dateKey: string;
+  data: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/* `data` passes through untouched — the server has no idea what any plugin stores, by design.
+   The `??` defaults are the usual read-time tolerance for a document written by a build that
+   predated a field, which for this collection also covers a row whose Mixed blob came back as
+   null after some other write cleared it. */
+export const pluginRecordToDto = (record: LeanPluginRecord): PluginRecordDto => ({
+  id: record._id.toString(),
+  pluginId: record.pluginId,
+  scope: record.scope ?? 'record',
+  dateKey: record.dateKey ?? '',
+  data: record.data ?? {},
+  createdAt: record.createdAt.toISOString(),
+  updatedAt: record.updatedAt.toISOString(),
 });
 
 export const personRefToDto = (person: { _id: Types.ObjectId; name: string }): PersonRefDto => ({

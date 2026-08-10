@@ -32,6 +32,27 @@ export default defineConfig({
   define,
   resolve: { alias },
   test: {
+    /**
+     * Cap the worker pool, because this suite is bound by memory rather than by CPU.
+     *
+     * Vitest sizes the pool from the core count, and every jsdom worker stands up React, i18next
+     * and a Dexie over fake-indexeddb — around half a gigabyte each. On a machine with many cores
+     * and ordinary RAM (20 and 13.7 GB is where this was found) that asks for more memory than
+     * exists; the OS starts compressing pages, and timing-sensitive tests begin losing races —
+     * `waitFor` windows expire, PBKDF2 derivations overrun their timeout.
+     *
+     * The symptom is worth recognising, because it looks nothing like its cause: failures spread
+     * across unrelated files, moving on every run, each passing in isolation, and the whole suite
+     * green under `--no-file-parallelism`. Nothing in it points at memory.
+     *
+     * Measured rather than guessed: at full width the suite was reliably flaky, six left about one
+     * failure per run once the file count passed fifty, four is stable, and fully serial takes
+     * ~380s against ~120s here. It has to live at the root — pool sizing is not a per-project
+     * setting, and placed inside `projects` it is silently ignored.
+     *
+     * It only binds on wide machines; a 4-core runner never reaches it.
+     */
+    maxWorkers: 4,
     projects: [
       {
         define,
@@ -53,7 +74,9 @@ export default defineConfig({
           setupFiles: ['./src/test/setup.ts'],
           /* The app lock derives at 210,000 PBKDF2 iterations by design, which is ~100-200ms per
              verify under Node's webcrypto; a test that sets a passcode and then checks it pays that
-             twice, on top of mounting a Radix dialog. Comfortably over 5s on a cold CI runner. */
+             twice, on top of mounting a Radix dialog. Comfortably over 5s on a cold CI runner.
+
+             Note this is not the knob that fixes a contended run — see maxWorkers at the root. */
           testTimeout: 10_000,
         },
       },

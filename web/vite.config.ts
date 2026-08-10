@@ -165,6 +165,55 @@ function manualChunks(id: string): string | undefined {
  */
 const MANUAL_CHUNK_NAMES = new Set(Object.keys(VENDOR_CHUNKS));
 
+/* Plugin locale files, given a directory of their own so the service worker can tell them apart.
+ *
+ * The default `assetFileNames` flattens everything into `assets/[name]-[hash][extname]`, which is
+ * fine until two files share a basename and need *opposite* caching. That is exactly the case here:
+ * `src/i18n/locales/en.json` and `src/plugins/<id>/locales/en.json` both emit as
+ * `assets/en-<hash>.json`, and `workbox.globPatterns` includes `json` because the core locales must
+ * be precached or the app comes up offline with no strings at all. Precaching plugin locales the
+ * same way would put ~10 kB per plugin, in five languages, in front of every visitor — including
+ * everyone who never enables a plugin. No `globIgnores` pattern can separate them while the names
+ * are identical, so separate the paths instead.
+ *
+ * This is the Noto reasoning from the workbox block below, applied to a second asset kind: precache
+ * what everyone needs, runtime-cache what only some do. Content hashing is unaffected.
+ */
+const PLUGIN_LOCALE_DIR = 'assets/plugin-locales';
+/* `(?:^|[\\/])` and not just `[\\/]`: the two hooks below are handed the same file in two different
+   forms — `assetFileNames` gets a *root-relative* `src/plugins/…` with no leading separator, while
+   `assetsInlineLimit` gets an absolute path. Requiring a leading separator matched only the second,
+   which is the quiet half: the files stopped being inlined and then simply landed in `assets/`
+   under the same `en-<hash>.json` name as the core locales, precached along with them. */
+const PLUGIN_LOCALE_SOURCE =
+  /(?:^|[\\/])src[\\/]plugins[\\/][^\\/]+[\\/]locales[\\/][^\\/]+\.json$/;
+
+/**
+ * Keep plugin locales out of the JS, as files.
+ *
+ * Vite inlines any asset under `assetsInlineLimit` (4 kB by default) as a base64 data URI, and a
+ * plugin's locale file is a few hundred bytes. The result was the exact inversion of the intent:
+ * because the `import.meta.glob` that references them lives in `plugins/i18n.ts`, all five
+ * languages of every plugin were inlined into the *day page* chunk — downloaded by everyone with a
+ * diary, plugins enabled or not, and growing with every plugin that ships.
+ *
+ * Nothing about that is visible in the build output, either. The files simply aren't in `dist`, and
+ * the directory this config so carefully routes them to comes out empty. Forcing them to stay
+ * external is what makes the rest of the pipeline — the directory, the globIgnores, the runtime
+ * cache — apply to anything at all.
+ */
+function assetsInlineLimit(filePath: string): boolean | undefined {
+  // `false` = never inline. `undefined` = fall back to the default byte limit.
+  return PLUGIN_LOCALE_SOURCE.test(filePath) ? false : undefined;
+}
+
+function assetFileNames(asset: { names?: string[]; originalFileNames?: string[] }): string {
+  const source = asset.originalFileNames?.[0];
+  return source && PLUGIN_LOCALE_SOURCE.test(source)
+    ? `${PLUGIN_LOCALE_DIR}/[name]-[hash][extname]`
+    : 'assets/[name]-[hash][extname]';
+}
+
 function chunkFileNames(chunk: {
   name: string;
   isEntry: boolean;
@@ -259,8 +308,27 @@ export default defineConfig(({ mode }) => {
            second use. A ja/zh reader pays once for the handful of subsets their text touches;
            everyone else pays nothing. */
           globPatterns: ['**/*.{js,css,html,ico,png,svg,json,woff2}'],
-          globIgnores: ['**/noto-sans-{jp,sc}-*.woff2'],
+          /* Plugin locales are the `json` counterpart to the Noto exclusion, and for the same
+             reason: `json` is in the pattern above so the *core* locales are precached, but a
+             plugin's five files are needed only by the people who enable it, and precaching them
+             would charge every visitor for every plugin that has ever shipped. They are picked up
+             at runtime instead — see the CacheFirst rule below — which costs one fetch on enable
+             and is offline-durable from then on. See assetFileNames above for why they need their
+             own directory before this line can work at all. */
+          globIgnores: ['**/noto-sans-{jp,sc}-*.woff2', 'assets/plugin-locales/**'],
           runtimeCaching: [
+            {
+              urlPattern: /\/assets\/plugin-locales\/[^/]*\.json$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'plugin-locales',
+                // Hashed filenames, so an entry is immutable and only ever falls out on eviction.
+                // Five languages per plugin; the cap is generous enough that an enabled plugin's
+                // strings are never the thing evicted.
+                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
             {
               urlPattern: /\/assets\/noto-sans-(jp|sc)-[^/]*\.woff2$/,
               handler: 'CacheFirst',
@@ -307,10 +375,12 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      assetsInlineLimit,
       rollupOptions: {
         output: {
           manualChunks,
           chunkFileNames,
+          assetFileNames,
         },
       },
     },

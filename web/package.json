@@ -6,13 +6,14 @@
   "scripts": {
     "dev": "vite",
     "generate:logos": "tsx scripts/generateLogos.ts",
-    "build": "tsc --noEmit && vite build",
-    "build:app": "tsc --noEmit && vite build --mode app && cap sync android",
+    "build": "tsc --noEmit && vite build && tsx scripts/checkBundle.ts",
+    "build:app": "tsc --noEmit && vite build --mode app && tsx scripts/checkBundle.ts && cap sync android",
     "app:open": "cap open android",
     "typecheck": "tsc --noEmit",
     "test": "tsx scripts/checkI18n.ts && vitest run",
     "preview": "vite preview",
-    "check:i18n": "tsx scripts/checkI18n.ts"
+    "check:i18n": "tsx scripts/checkI18n.ts",
+    "check:bundle": "tsx scripts/checkBundle.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",

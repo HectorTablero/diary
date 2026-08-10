@@ -5,7 +5,14 @@ import { ageOn, daysUntilBirthday, nextOccurrence } from './birthday';
 import { CHECKUP_DAY_MS } from './checkup';
 import { toDateKey } from './dates';
 import { isNative } from './native';
+import {
+  birthdayNotificationId,
+  CHECKUP_DIGEST_ID,
+  checkupNotificationId,
+  DAILY_REMINDER_ID,
+} from './notificationIds';
 import { birthdayFireAt, nextDailyReminderAt, nextWakingTime } from './notificationSchedule';
+import { collectPluginNotifications, isProtectedId } from '@/plugins/notifications';
 import { getPreferences, type Preferences } from './preferences';
 
 /* Native-only local notifications for checkup reminders, birthdays, and the daily "add
@@ -17,10 +24,9 @@ import { getPreferences, type Preferences } from './preferences';
    pending notification it didn't just ask for, so a per-kind refresh would cancel the other
    kinds' notifications on every run. */
 
-const DAILY_REMINDER_ID = 1;
 /** Several overdue checkups at once become one digest instead of a burst — importing an address
-    book and coming back a month later otherwise buzzes once per person, all in the same second. */
-const CHECKUP_DIGEST_ID = 0;
+    book and coming back a month later otherwise buzzes once per person, all in the same second.
+    (The id itself lives in ./notificationIds with every other id in the scheme.) */
 const CHECKUP_DIGEST_THRESHOLD = 3;
 /** Names listed in the digest body before it stops enumerating. */
 const CHECKUP_DIGEST_NAMES = 3;
@@ -30,31 +36,6 @@ const CATCH_UP_DELAY_MS = 5_000;
 /** Don't book an alarm months out: Android caps pending exact alarms, and refreshNotifications
     runs on every app resume, mutation and sync — so a birthday is always armed well in time. */
 const BIRTHDAY_LOOKAHEAD_DAYS = 30;
-
-function fnv1a(str: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
-
-/* Each kind hashes into its own half of the id space. They must not overlap: the reconcile
-   below cancels any pending id it didn't just schedule, so a birthday landing on a checkup's
-   id would make the two silently evict each other. Both halves stay under 2^31. */
-const ID_SPACE = 0x3ffffffe;
-const CHECKUP_ID_BASE = 2;
-const BIRTHDAY_ID_BASE = 0x40000000;
-
-/** Stable id per person, disjoint from the two fixed ids (0 and 1) and from birthdays. */
-function checkupNotificationId(personId: string): number {
-  return CHECKUP_ID_BASE + (fnv1a(personId) % ID_SPACE);
-}
-
-function birthdayNotificationId(personId: string): number {
-  return BIRTHDAY_ID_BASE + (fnv1a(personId) % ID_SPACE);
-}
 
 /**
  * Which occurrence of a recurring reminder has already been announced, per person.
@@ -282,25 +263,37 @@ async function collectDailyReminder(prefs: Preferences): Promise<LocalNotificati
 }
 
 /** Schedule everything that should exist right now, and cancel everything pending that shouldn't. */
-async function reconcileNotifications(): Promise<void> {
+async function reconcileNotifications(pluginTimeoutMs?: number): Promise<void> {
   const people = await db.people.toArray();
-  // Read once, so all three collectors see the same snapshot even if a preference changes mid-pass.
+  // Read once, so every collector sees the same snapshot even if a preference changes mid-pass.
   const prefs = getPreferences();
-  const [checkups, birthdays, daily] = await Promise.all([
+  const [checkups, birthdays, daily, plugins] = await Promise.all([
     collectCheckupNotifications(people, prefs),
     collectBirthdayNotifications(people, prefs),
     collectDailyReminder(prefs),
+    /* Plugins join the same pass rather than running their own — a second scheduler would cancel
+       whatever this one had just armed. `collectPluginNotifications` never rejects: a plugin that
+       fails contributes nothing and instead hands back its slice of the id space to be left alone
+       below, so one broken plugin can neither take down this pass nor disarm its own reminders. */
+    collectPluginNotifications(pluginTimeoutMs),
   ]);
 
-  const desired = [...checkups, ...birthdays, ...daily];
+  const desired = [...checkups, ...birthdays, ...daily, ...plugins.notifications];
   if (desired.length) await LocalNotifications.schedule({ notifications: desired });
 
   // Anything still pending that we didn't just ask for is stale: a person deleted, a checkup
-  // marked done, a birthday cleared. Because this sees all three kinds at once it can no longer
+  // marked done, a birthday cleared. Because this sees every kind at once it can no longer
   // cancel one kind while refreshing another.
   const desiredIds = new Set(desired.map((notification) => notification.id));
   const pending = await LocalNotifications.getPending();
-  const stale = pending.notifications.filter((notification) => !desiredIds.has(notification.id));
+  const stale = pending.notifications.filter(
+    (notification) =>
+      !desiredIds.has(notification.id) &&
+      /* The exception to "unasked-for means stale": a plugin that could not be loaded said nothing
+         about its alarms, which is not the same as saying they should go. Sweeping them would mean
+         a chunk missing from the cache silently cancelling a reminder the user set up weeks ago. */
+      !isProtectedId(notification.id, plugins.protectedRanges),
+  );
   if (stale.length) {
     await LocalNotifications.cancel({ notifications: stale.map((n) => ({ id: n.id })) });
   }
@@ -316,10 +309,12 @@ let reconcileChain: Promise<void> = Promise.resolve();
 /** Awaitable refresh — resolves once *this* caller's reconcile has finished (any earlier queued
     pass included). Background work must use this: the OS closes the wake-up window as soon as the
     task reports done, and a half-written schedule is worse than none. */
-export function refreshNotificationsNow(): Promise<void> {
+export function refreshNotificationsNow(options?: { pluginTimeoutMs?: number }): Promise<void> {
   if (!isNative) return Promise.resolve();
   reconcileChain = reconcileChain.then(() =>
-    reconcileNotifications().catch((err) => console.warn('notifications: refresh failed', err)),
+    reconcileNotifications(options?.pluginTimeoutMs).catch((err) =>
+      console.warn('notifications: refresh failed', err),
+    ),
   );
   return reconcileChain;
 }

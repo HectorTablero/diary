@@ -115,6 +115,56 @@ export function subscribeSyncStatus(cb: () => void): () => void {
   return () => statusListeners.delete(cb);
 }
 
+/**
+ * Resolve once the outbox has emptied, or once it is clear it won't.
+ *
+ * For the one flow that has to *wait* for the network rather than merely tolerate it: restoring a
+ * backup. Everything else in this app is deliberately fire-and-forget — you write, it saves
+ * locally, it syncs when it can — but a restore is different in two ways. It can queue thousands of
+ * writes at once, and it is the one action a user takes precisely because they are worried about
+ * losing data, so leaving the page while it is still going and being told nothing is the wrong
+ * shape entirely.
+ *
+ * `blocked` rather than an error when the network gives out: the writes are safe in the outbox and
+ * will replay, so the honest report is "this will finish later", not "this failed". The timeout is
+ * the third case — a queue that is neither draining nor blocked, which shouldn't happen and must
+ * still not hang a button forever.
+ */
+export async function waitForOutboxDrain(timeoutMs = 120_000): Promise<'drained' | 'blocked'> {
+  /* Counted from the table, never from `status.pending`. That figure is a snapshot refreshed during
+     a sync pass, so immediately after a big enqueue it still reads whatever it read before — and a
+     caller that trusted it would be told a queue of several thousand writes had drained, instantly,
+     before a single one had been sent. The status is right about *blockers*, which is what it is
+     consulted for below; it is merely stale about the count. */
+  const drained = async () => (await db.outbox.count()) === 0;
+  if (await drained()) return 'drained';
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let unsubscribe: (() => void) | undefined;
+    const finish = (result: 'drained' | 'blocked') => {
+      if (settled) return; // the count is read asynchronously, so checks can overlap
+      settled = true;
+      clearTimeout(timer);
+      unsubscribe?.();
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish('blocked'), timeoutMs);
+
+    const check = () => {
+      void (async () => {
+        if (await drained()) finish('drained');
+        // A blocker means the queue has stopped moving for a reason the user can act on (or wait
+        // out); either way there is nothing left for this promise to wait for.
+        else if (getSyncStatus().blocker || getSyncStatus().needsAuth) finish('blocked');
+      })();
+    };
+
+    unsubscribe = subscribeSyncStatus(check);
+    check(); // in case it drained between the count above and the subscription
+  });
+}
+
 /** Fires after a pull applied server changes locally (used to refresh queries). */
 export function onSyncApplied(cb: () => void): () => void {
   dataListeners.add(cb);
@@ -156,6 +206,10 @@ const ROUTE_SEGMENTS = new Set([
   'people',
   'tags',
   'threads',
+  // The route is flat (/plugin-records/:id) rather than /plugins/:pluginId/records, so that
+  // dirtyIds below still finds the document id in the second segment. The pluginId travels in the
+  // body; it is deliberately not part of the shape, being far higher cardinality than a route.
+  'plugin-records',
   'settings',
   'sync',
   'checkup',
@@ -226,8 +280,20 @@ async function pushOutbox(): Promise<boolean> {
         if (sampled(0.1)) trackEvent('sync_conflict', { path: routeShape(op.path) });
         continue;
       }
-      if (err.status === 404 && op.method !== 'POST') {
+      /* Already gone is not a loss.
+         For everything but a create that is unconditional: a PATCH or DELETE against a document
+         the server no longer has asks for a state it is already in.
+         For a create it takes `tolerate404`, which only the backup importer sets — a restore of an
+         old file legitimately posts things whose parent has since been deleted, and reporting those
+         as unsaved changes would be reporting data loss for data that was deleted on purpose. Every
+         other POST 404 is a real loss and falls through to the dead letter below. */
+      if (err.status === 404 && (op.method !== 'POST' || op.tolerate404)) {
         await db.outbox.delete(op.seq!);
+        // Sampled, so a restore quietly dropping *everything* — a wrong base URL, an API that moved
+        // — is still visible as a rate rather than vanishing into a tolerated branch.
+        if (op.tolerate404 && sampled(0.1)) {
+          trackEvent('sync_tolerated_404', { path: routeShape(op.path) });
+        }
         continue;
       }
       /* Any other 4xx would jam the queue forever, so it has to leave the queue — but it must not
@@ -290,6 +356,7 @@ async function removeLocalDoc(op: OutboxOp) {
   else if (op.path.startsWith('/people')) await db.people.delete(id);
   else if (op.path.startsWith('/tags')) await db.tags.delete(id);
   else if (op.path.startsWith('/threads')) await db.threads.delete(id);
+  else if (op.path.startsWith('/plugin-records')) await db.pluginRecords.delete(id);
 }
 
 /* Live channel: a WebSocket per open client. The server nudges the user's
@@ -424,6 +491,7 @@ async function pull(): Promise<PullSummary> {
   const fetchMs = Math.round(performance.now() - fetchStartedAt);
 
   const threads = res.threads ?? []; // tolerates a server that predates threads (stale deploy)
+  const pluginRecords = res.pluginRecords ?? []; // ditto — see `acknowledged` below
   /* Whether this response is the whole server state rather than a delta — see SyncResponse.reset.
      The `?? !since` mirrors the threads line above for a server that predates the field: without a
      cursor the client can reach the same conclusion on its own, and that is the only case where it
@@ -448,7 +516,24 @@ async function pull(): Promise<PullSummary> {
     person: new Set(res.people.map((p) => p.id)),
     tag: new Set(res.tags.map((t) => t.id)),
     thread: new Set(threads.map((t) => t.id)),
+    pluginRecord: new Set(pluginRecords.map((r) => r.id)),
   };
+
+  /* Which collections this response actually *spoke about*, as opposed to spoke about and had
+     nothing to say.
+
+     The reset branch below deletes every local id the response did not name, so those two cases
+     must not be conflated — and `res.x ?? []` conflates them exactly. A client talking to a server
+     from before a collection existed (a staggered deploy, or an Android build that outran the
+     server) reads the missing key as an empty array, concludes the account owns none of them, and
+     deletes the lot. Nothing about that looks like a failure from either end.
+
+     So absence means "this server cannot speak for that collection", and the sweep skips it. The
+     cost of being wrong that way is a locally-deleted row lingering until the next pull from a
+     server that does know; the cost of being wrong the other way is the data. */
+  const acknowledged = new Set<SyncCollection>(['entry', 'person', 'tag']);
+  if (res.threads !== undefined) acknowledged.add('thread');
+  if (res.pluginRecords !== undefined) acknowledged.add('pluginRecord');
 
   /* db.outbox joins the transaction so `dirty` can be read *inside* it.
      Reading it beforehand left a window: a mutation enqueued between that read and this
@@ -467,7 +552,7 @@ async function pull(): Promise<PullSummary> {
 
   await db.transaction(
     'rw',
-    [db.entries, db.people, db.tags, db.threads, db.outbox, db.meta],
+    [db.entries, db.people, db.tags, db.threads, db.pluginRecords, db.outbox, db.meta],
     async () => {
       const dirty = await dirtyIds();
       const clean = <T extends { id: string }>(docs: T[]) => {
@@ -480,11 +565,13 @@ async function pull(): Promise<PullSummary> {
       await db.people.bulkPut(clean(res.people).map(personFromDto));
       await db.tags.bulkPut(clean(res.tags));
       await db.threads.bulkPut(clean(threads));
+      await db.pluginRecords.bulkPut(clean(pluginRecords));
       const tables: Record<SyncCollection, SyncTable> = {
         entry: db.entries,
         person: db.people,
         tag: db.tags,
         thread: db.threads,
+        pluginRecord: db.pluginRecords,
       };
       for (const del of res.deletions) {
         if (dirty.has(del.docId)) {
@@ -502,7 +589,9 @@ async function pull(): Promise<PullSummary> {
          only what changed, so treating an unmentioned id as deleted there would wipe the entire
          local database on the first quiet minute. */
       if (reset) {
-        for (const coll of Object.keys(tables) as SyncCollection[]) {
+        // `acknowledged`, not every key of `tables`: a collection this server didn't mention is one
+        // it cannot speak for, and "unmentioned" is the delete signal here. See its definition.
+        for (const coll of acknowledged) {
           const local = await tables[coll].toCollection().primaryKeys();
           const gone = local.filter((id) => !alive[coll].has(id) && !dirty.has(id));
           orphaned += gone.length;
@@ -523,6 +612,7 @@ async function pull(): Promise<PullSummary> {
         res.people.length ||
         res.tags.length ||
         threads.length ||
+        pluginRecords.length ||
         res.deletions.length
       ) {
         applied = true;
@@ -540,7 +630,12 @@ async function pull(): Promise<PullSummary> {
   setStatus({ blocker: null, needsAuth: false, lastSyncAt: new Date().toISOString() });
   stopReconnectProbe(); // reached the server through some other trigger
 
-  const received = res.entries.length + res.people.length + res.tags.length + threads.length;
+  const received =
+    res.entries.length +
+    res.people.length +
+    res.tags.length +
+    threads.length +
+    pluginRecords.length;
 
   /* A reset with a cursor is the one branch in this file that deletes local documents the user
      never asked to delete, and it is never sampled.

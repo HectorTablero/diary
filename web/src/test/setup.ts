@@ -8,7 +8,7 @@
  * ordering trap should not have to be rediscovered once per file. */
 import 'fake-indexeddb/auto';
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { webcrypto } from 'node:crypto';
 import { toast } from 'sonner';
 import { afterEach, beforeEach } from 'vitest';
@@ -30,6 +30,24 @@ import { resetDb } from './seed';
    test id, and that a missing key fails a test instead of rendering as itself. */
 i18n.addResourceBundle('en', 'translation', en, true, true);
 await i18n.changeLanguage('en');
+
+/**
+ * How long `waitFor` and `findBy*` keep retrying before giving up.
+ *
+ * Testing Library's default is one second, which is generous for a re-render and much too tight for
+ * two things this app does on purpose. The app lock derives at 210,000 PBKDF2 iterations, so a test
+ * that saves a passcode and then verifies it spends most of a second on arithmetic that is *meant*
+ * to be slow; and several screens wait on a Dexie read behind a query cache. Both are comfortably
+ * under a second on an idle machine and neither is under contention.
+ *
+ * Raising it costs nothing when tests pass — `waitFor` returns the moment its condition holds, so
+ * this only changes how long a *failing* one is retried before it is called a failure. What it buys
+ * is that a loaded machine stops producing failures that move from file to file between runs and
+ * vanish when the file is run alone, which is the least debuggable shape a red suite can take.
+ *
+ * Kept well below the 10s test timeout, so a genuinely stuck test still fails as a stuck test.
+ */
+configure({ asyncUtilTimeout: 5_000 });
 
 /* jsdom implements neither, and Radix uses both — ResizeObserver to measure poppers, pointer
    capture for its dismissable layers. Absent, any test touching a popover or dialog throws before

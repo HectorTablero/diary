@@ -1,6 +1,6 @@
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import AppLayout from './components/layout/AppLayout';
 import ExploreLayout from './components/layout/ExploreLayout';
@@ -24,6 +24,10 @@ import {
   TagsPage,
   ThreadsPage,
 } from './pages/lazyPages';
+
+/* Its own lazy import rather than an entry in lazyPages, because AppLayout warms every entry of
+   that map on idle — a plugin page registered there would download for everyone, enabled or not. */
+const PluginPage = lazy(() => import('./plugins/PluginPage'));
 
 function withSuspense(element: React.ReactNode) {
   return <Suspense fallback={<FullScreenSpinner />}>{element}</Suspense>;
@@ -55,6 +59,10 @@ export const router = createBrowserRouter([
       },
       { path: 'settings', element: withSuspense(<SettingsPage />) },
       { path: 'settings/import-backup', element: withSuspense(<ImportBackupPage />) },
+      /* One parameterised route for every plugin, not one each: the router walks this table on
+         every navigation. PluginPage resolves the id against the registry and redirects an unknown
+         or disabled one to the diary. Deliberately not in pages/lazyPages — see the note there. */
+      { path: 'plugins/:pluginId', element: withSuspense(<PluginPage />) },
       { path: '*', element: <Navigate to="/diary" replace /> },
     ],
   },

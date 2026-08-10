@@ -12,7 +12,8 @@
     "tags": "标签",
     "threads": "话题",
     "settings": "设置",
-    "more": "更多"
+    "more": "更多",
+    "allPlugins": "全部插件"
   },
   "auth": {
     "signInWithGoogle": "使用 Google 继续",
@@ -561,7 +562,13 @@
     },
     "signOutPendingTitle_other": "还有 {{count}} 项更改尚未保存到账号，确定退出登录吗？",
     "signOutPendingDescription": "退出登录会清空本设备的数据。仍在等待同步的内容将永久丢失。如需保留，请重新联网并等待同步完成。",
-    "signOutDiscard": "退出并丢弃"
+    "signOutDiscard": "退出并丢弃",
+    "plugins": {
+      "title": "插件",
+      "description": "可以开启的可选功能。启用后会应用到所有设备。",
+      "hasData": "已关闭 — 此账户中有 {{count}} 条数据",
+      "saveFailed": "无法更改该插件。"
+    }
   },
   "errors": {
     "unauthorized": "需要先登录",
@@ -686,7 +693,18 @@
     "allClear": "没有需要处理的冲突",
     "allClearDescription": "这份备份中的内容对本设备都是新的，不会覆盖或合并任何内容。随时可以导入。",
     "allResolved": "所有冲突均已处理。",
-    "resolvedProgress": "{{total}} 项中的 {{resolved}} 项"
+    "resolvedProgress": "{{total}} 项中的 {{resolved}} 项",
+    "saving": "正在恢复…",
+    "syncing": "正在上传…",
+    "syncingHint": "请保持此页面打开，直到上传完成。",
+    "syncLater": "已保存在本设备。恢复联网后会继续上传。",
+    "plugins": "插件",
+    "pluginRows": "{{count}} 条",
+    "pluginSettingsDiffer": "此账户：{{current}}。备份：{{incoming}}。",
+    "pluginOn": "已开启，{{count}} 项设置",
+    "pluginOff": "已关闭",
+    "pluginKeepCurrent": "保留当前",
+    "pluginUseBackup": "使用备份"
   },
   "security": {
     "title": "安全",

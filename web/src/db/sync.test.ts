@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import type { EntryDto, SyncResponse } from '@diary/shared';
+import type { EntryDto, PluginRecordDto, SyncResponse } from '@diary/shared';
 import { DEFAULT_SETTINGS } from '@diary/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,7 +52,8 @@ vi.mock('@/lib/preferences', () => ({
 vi.mock('@/lib/network', () => ({ isMeteredConnection: () => network.metered }));
 
 const { db, entryFromDto, setMeta } = await import('./db');
-const { forceSyncNow, getSyncStatus, onRejected, onSyncApplied, syncNow } = await import('./sync');
+const { forceSyncNow, getSyncStatus, onRejected, onSyncApplied, syncNow, waitForOutboxDrain } =
+  await import('./sync');
 
 const DELETED_AT = '2026-08-07T10:00:00.000Z';
 const RESTORED_AT = '2026-08-07T10:00:03.000Z';
@@ -73,6 +74,17 @@ const entryDto = (id: string): EntryDto => ({
   updatedAt: RESTORED_AT,
 });
 
+const pluginRecordDto = (id: string, patch: Partial<PluginRecordDto> = {}): PluginRecordDto => ({
+  id,
+  pluginId: 'habits',
+  scope: 'record',
+  dateKey: '2026-08-07',
+  data: {},
+  createdAt: '2026-08-07T09:00:00.000Z',
+  updatedAt: RESTORED_AT,
+  ...patch,
+});
+
 const syncResponse = (patch: Partial<SyncResponse>): SyncResponse => ({
   serverTime: '2026-08-07T10:00:05.000Z',
   // Defaults to a delta, which is what all but the reset block below is about. The server sets it
@@ -82,6 +94,7 @@ const syncResponse = (patch: Partial<SyncResponse>): SyncResponse => ({
   people: [],
   tags: [],
   threads: [],
+  pluginRecords: [],
   settings: DEFAULT_SETTINGS,
   deletions: [],
   ...patch,
@@ -93,12 +106,13 @@ beforeEach(async () => {
   prefs.syncOnWifiOnly = false;
   network.metered = false;
   await Promise.all([
-    // All four synced tables, not just the two the tombstone cases use: a reset prunes every one
-    // of them, so a row left behind by an earlier test would be deleted by a later one.
+    // Every synced table, not just the two the tombstone cases use: a reset prunes all of them,
+    // so a row left behind by an earlier test would be deleted by a later one.
     db.entries.clear(),
     db.people.clear(),
     db.tags.clear(),
     db.threads.clear(),
+    db.pluginRecords.clear(),
     db.outbox.clear(),
     db.deadLetter.clear(),
     db.meta.clear(),
@@ -163,13 +177,95 @@ describe('pull: tombstones', () => {
 
   it('applies tombstones across every collection', async () => {
     await db.tags.put({ id: 't1', name: 'travel', color: '#fff' });
+    await db.pluginRecords.put(pluginRecordDto('pr1'));
     apiGet.mockResolvedValue(
-      syncResponse({ deletions: [{ coll: 'tag', docId: 't1', deletedAt: DELETED_AT }] }),
+      syncResponse({
+        deletions: [
+          { coll: 'tag', docId: 't1', deletedAt: DELETED_AT },
+          { coll: 'pluginRecord', docId: 'pr1', deletedAt: DELETED_AT },
+        ],
+      }),
     );
 
     await syncNow();
 
     expect(await db.tags.get('t1')).toBeUndefined();
+    expect(await db.pluginRecords.get('pr1')).toBeUndefined();
+  });
+});
+
+/* Plugin records ride the same machinery as everything else, which is the point of the shared
+   collection — but they were the reason two of its rules had to be tightened, and those are what
+   these pin. */
+describe('pull: plugin records', () => {
+  it('does not resurrect a row whose delete is still queued', async () => {
+    /* The case that decided the route's shape. A queued DELETE carries no body, so the only place
+       its document id can be read from is the path — and dirtyIds takes the *second* segment. Under
+       a nested /plugins/habits/records/:id that segment would be 'habits', the real id would never
+       enter the dirty set, and this pull would put the deleted row straight back.
+
+       Queued from inside the fetch, because a pull only runs once the outbox has drained: this is
+       the in-flight window the dirty set exists for. */
+    apiGet.mockImplementation(async () => {
+      await db.outbox.add({ method: 'DELETE', path: '/plugin-records/pr2', body: undefined });
+      return syncResponse({ pluginRecords: [pluginRecordDto('pr2')] });
+    });
+
+    await syncNow();
+
+    expect(await db.pluginRecords.get('pr2')).toBeUndefined();
+  });
+
+  it('drops the phantom local row when a create comes back conflicted', async () => {
+    // 409: this plugin already has a config row under another id — two devices enabled it offline.
+    // The local create never reached the server, so the row it wrote is a phantom.
+    await db.pluginRecords.put(pluginRecordDto('pr3', { scope: 'config' }));
+    await db.outbox.add({
+      method: 'POST',
+      path: '/plugin-records',
+      body: { id: 'pr3', pluginId: 'habits', scope: 'config', data: { enabled: true } },
+    });
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(409, 'pluginRecord.duplicate_config'));
+    apiGet.mockResolvedValue(syncResponse({}));
+
+    await syncNow();
+
+    expect(await db.pluginRecords.get('pr3')).toBeUndefined();
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('does NOT sweep plugin records when the server never mentioned them', async () => {
+    /* A staggered deploy: a client that knows about plugin records talking to a server that does
+       not. `res.pluginRecords` is undefined, which must NOT be read as "the account owns none" —
+       under reset that would delete the entire plugin history, silently and successfully.
+
+       The same rule now covers threads, which carried this hazard latently before plugins existed. */
+    await db.pluginRecords.put(pluginRecordDto('pr4'));
+    await db.threads.put({
+      id: 'th4',
+      name: 'Job hunt',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    });
+    const { pluginRecords, threads, ...withoutEither } = syncResponse({ reset: true });
+    void pluginRecords;
+    void threads;
+    apiGet.mockResolvedValue(withoutEither);
+
+    await syncNow();
+
+    expect(await db.pluginRecords.get('pr4')).toBeDefined();
+    expect(await db.threads.get('th4')).toBeDefined();
+  });
+
+  it('does sweep them once the server does mention them', async () => {
+    // The other half of the rule: an acknowledged-but-empty collection prunes exactly as before.
+    await db.pluginRecords.put(pluginRecordDto('pr5'));
+    apiGet.mockResolvedValue(syncResponse({ reset: true, pluginRecords: [] }));
+
+    await syncNow();
+
+    expect(await db.pluginRecords.get('pr5')).toBeUndefined();
   });
 });
 
@@ -261,6 +357,90 @@ describe('push: a rejected write', () => {
 
     expect(await db.outbox.count()).toBe(0);
     expect(await db.deadLetter.count()).toBe(0);
+  });
+
+  it('keeps a 404 on a create — an entry the server refused is a real loss', async () => {
+    await db.outbox.add({ method: 'POST', path: '/entries', body: { id: 'e3' } });
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(404, 'entry.not_found'));
+    apiGet.mockResolvedValue(syncResponse({}));
+
+    await syncNow();
+
+    // The local copy still shows it as saved, so a silent drop would be a divergence the user
+    // could only discover on another device, months later or never.
+    expect(await db.deadLetter.count()).toBe(1);
+  });
+
+  it('tolerates a 404 on a create the backup importer queued', async () => {
+    /* Restoring a file written months ago legitimately posts things whose parent has since been
+       deleted. Nothing is lost — the target was gone before the restore began — so reporting it as
+       an unsaved change would be reporting data loss for data deleted on purpose. */
+    await db.outbox.add({
+      method: 'POST',
+      path: '/entries',
+      body: { id: 'e4' },
+      tolerate404: true,
+    });
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(404, 'entry.not_found'));
+    apiGet.mockResolvedValue(syncResponse({}));
+    const announced: number[] = [];
+    const off = onRejected((count) => announced.push(count));
+
+    await syncNow();
+    off();
+
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.deadLetter.count()).toBe(0);
+    expect(announced).toEqual([]); // and no "N changes couldn't be saved" toast
+  });
+
+  it('still dead-letters a tolerated op the server refused for another reason', async () => {
+    // `tolerate404` forgives exactly one status. A 422 is still a write the server threw away.
+    await db.outbox.add({
+      method: 'POST',
+      path: '/entries',
+      body: { id: 'e5' },
+      tolerate404: true,
+    });
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(422, 'validation'));
+    apiGet.mockResolvedValue(syncResponse({}));
+
+    await syncNow();
+
+    expect(await db.deadLetter.count()).toBe(1);
+  });
+});
+
+/* Restoring a backup is the one flow that waits for the network instead of merely tolerating it:
+   it queues thousands of writes at once, and it is the action people take precisely because they
+   are anxious about their data. */
+describe('waiting for the outbox to drain', () => {
+  it('resolves at once when there is nothing queued', async () => {
+    await expect(waitForOutboxDrain()).resolves.toBe('drained');
+  });
+
+  it('resolves once the queue empties', async () => {
+    await db.outbox.add({ method: 'POST', path: '/tags', body: { id: 't9' } });
+    apiCall.mockResolvedValue(undefined);
+    apiGet.mockResolvedValue(syncResponse({}));
+
+    const waiting = waitForOutboxDrain();
+    await syncNow();
+
+    await expect(waiting).resolves.toBe('drained');
+  });
+
+  it('gives up as soon as the queue is blocked, rather than hanging', async () => {
+    await db.outbox.add({ method: 'POST', path: '/tags', body: { id: 't10' } });
+    apiCall.mockRejectedValue(new ApiErrorMock(0, 'offline'));
+
+    const waiting = waitForOutboxDrain();
+    await syncNow();
+
+    /* 'blocked', not an error: the writes are safe in the outbox and will replay. The caller's job
+       is to say "this will finish later", which is a different sentence from "this failed". */
+    await expect(waiting).resolves.toBe('blocked');
+    expect(await db.outbox.count()).toBe(1);
   });
 });
 

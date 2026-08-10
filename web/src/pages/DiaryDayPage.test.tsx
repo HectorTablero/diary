@@ -127,5 +127,29 @@ describe('DiaryDayPage', () => {
     // carries the same leading @ an inline mention would.
     expect(await screen.findByRole('link', { name: '@Ana' })).toHaveAttribute('href', '/people/p1');
     expect(screen.getByText(/36/)).toBeInTheDocument();
+
+    /* In its own card, under a heading, like every other band of the day page — it used to be a
+       pink-tinted banner, the one coloured panel in the app, which read as an alert about something
+       needing attention rather than as a fact about the day. */
+    expect(screen.getByRole('heading', { name: 'Birthdays' })).toBeInTheDocument();
+  });
+
+  it('puts the birthday card below the composer, not between the entries and it', async () => {
+    await seed({
+      people: [aPerson({ id: 'p1', name: 'Ana', birthday: '1990-08-01' })],
+      entries: [anEntry({ id: 'e1', content: 'Something', dateKey: DAY })],
+    });
+
+    renderDay(DAY);
+
+    /* Writing is the page's primary action and must keep its position: however many people share a
+       birthday, the box you came here to type in does not move down the screen. */
+    const birthdays = await screen.findByRole('heading', { name: 'Birthdays' });
+    // By placeholder: the composer's textarea carries role="combobox" for its @/# autocomplete, so
+    // it is not findable as a textbox.
+    const composer = screen.getByPlaceholderText('What happened? Use @person and #tag…');
+    expect(composer.compareDocumentPosition(birthdays) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 });

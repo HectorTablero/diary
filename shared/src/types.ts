@@ -230,7 +230,38 @@ export interface ApiError {
   error: string;
 }
 
-export type SyncCollection = 'entry' | 'person' | 'tag' | 'thread';
+/**
+ * What a plugin record is for.
+ *
+ * `config` is exactly one row per plugin, holding `{ enabled, settings }` — the half of a plugin's
+ * configuration that follows the account rather than the device. (Reminders are the other half and
+ * live in localStorage; see web/src/lib/preferences.ts for why anything that arms an alarm must.)
+ * It is a row rather than a field on SettingsDto so that two devices enabling two different plugins
+ * are two independent writes: settings are PUT whole and would clobber each other.
+ *
+ * `record` is everything else — the plugin's actual data.
+ */
+export type PluginScope = 'config' | 'record';
+
+/**
+ * One row belonging to one plugin.
+ *
+ * `data` is opaque to the server, which never reads it; the owning plugin parses it on the client
+ * with its own schema, in the same defensive posture the backup importer takes toward a file it
+ * did not write.
+ */
+export interface PluginRecordDto {
+  id: string;
+  pluginId: string;
+  scope: PluginScope;
+  /** `YYYY-MM-DD`, or UNDATED_KEY (`''`) for a row that isn't about a particular day. */
+  dateKey: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SyncCollection = 'entry' | 'person' | 'tag' | 'thread' | 'pluginRecord';
 
 export interface SyncDeletion {
   coll: SyncCollection;
@@ -254,6 +285,16 @@ export interface SyncResponse {
   people: PersonDto[];
   tags: TagDto[];
   threads: ThreadDto[];
+  /**
+   * Always present, even when empty — never omitted as an optimisation.
+   *
+   * Under `reset` the client deletes every local id the response did not name, so "the key is
+   * absent" and "the account has none" must not look alike: a new client talking to a server that
+   * predates this field would read absence as emptiness and delete the lot. The client tolerates
+   * `undefined` for exactly that case (a staggered deploy) by *skipping* the sweep for this
+   * collection rather than running it — see the `acknowledged` set in web/src/db/sync.ts.
+   */
+  pluginRecords: PluginRecordDto[];
   settings: SettingsDto;
   deletions: SyncDeletion[];
 }

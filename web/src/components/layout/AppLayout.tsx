@@ -5,6 +5,7 @@ import {
   CloudOff,
   GitBranch,
   MoreHorizontal,
+  Puzzle,
   Search,
   ServerOff,
   Settings,
@@ -25,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { forceSyncNow, kick, type SyncBlocker } from '@/db/sync';
@@ -41,6 +43,7 @@ import { getUpdateState, subscribeToUpdateState, type UpdateState } from '@/lib/
 import { dismissUpdate, isDismissed } from '@/lib/updateCheck';
 import { cn } from '@/lib/utils';
 import { pageLoaders } from '@/pages/lazyPages';
+import { usePluginNav } from '@/plugins/usePluginNav';
 
 interface NavItem {
   to: string;
@@ -90,7 +93,17 @@ const TAB_NAV: NavItem[] = [
   { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
-function SidebarLink({ item, badge = 0 }: { item: NavItem; badge?: number }) {
+/** `label` overrides `item.labelKey` — plugin names come from the plugin's own locale bundle, which
+    is fetched with the plugin, so they arrive as a string rather than as a key. */
+function SidebarLink({
+  item,
+  badge = 0,
+  label,
+}: {
+  item: NavItem;
+  badge?: number;
+  label?: string;
+}) {
   const { t } = useTranslation();
   return (
     <NavLink
@@ -105,7 +118,7 @@ function SidebarLink({ item, badge = 0 }: { item: NavItem; badge?: number }) {
       }
     >
       <item.icon className="size-4.5 shrink-0" />
-      <span className="flex-1">{t(item.labelKey)}</span>
+      <span className="flex-1 truncate">{label ?? t(item.labelKey)}</span>
       {badge > 0 && (
         <span className="flex h-5 items-center gap-0.5 rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white">
           <span className="sr-only">{t('people.checkupsPending', { count: badge })}</span>
@@ -119,6 +132,11 @@ function SidebarLink({ item, badge = 0 }: { item: NavItem; badge?: number }) {
 
 function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
   const { t } = useTranslation();
+  /* Injected at render, not appended to the SECONDARY_NAV constant: that array is module-level and
+     shared, so pushing into it would leak between renders — and keeping it static is what stops the
+     entry chunk from carrying plugin nav at all. Above Settings, below Tags and Threads: a plugin
+     is more like a place in the app than like a setting. */
+  const pluginNav = usePluginNav();
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r bg-sidebar px-3 py-5 md:flex">
       <NavLink to="/diary" className="mb-6 flex items-center gap-2.5 px-3">
@@ -134,9 +152,22 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
           />
         ))}
         <div className="mt-auto flex flex-col gap-1">
-          {SECONDARY_NAV.map((item) => (
-            <SidebarLink key={item.to} item={item} />
-          ))}
+          {SECONDARY_NAV.map((item) =>
+            item.to === '/settings' ? (
+              <Fragment key={item.to}>
+                {pluginNav.map((plugin) => (
+                  <SidebarLink
+                    key={plugin.to}
+                    item={{ to: plugin.to, icon: plugin.icon, labelKey: '' }}
+                    label={plugin.label}
+                  />
+                ))}
+                <SidebarLink item={item} />
+              </Fragment>
+            ) : (
+              <SidebarLink key={item.to} item={item} />
+            ),
+          )}
         </div>
       </nav>
     </aside>
@@ -186,12 +217,28 @@ function TabSlotBody({
 const TAB_SLOT =
   'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors relative';
 
-/** The fourth slot: opens upward over the bar and names Search, Tags and Threads outright. */
+/**
+ * The fourth slot: opens upward over the bar and names Search, Tags and Threads outright — plus any
+ * plugin screens, in a group of their own below a separator.
+ *
+ * A group, and specifically *not* three more EXPLORE_SEGMENTS entries. That array also drives
+ * ExploreLayout's segmented switcher, which is `grid-cols-3` because a third of a phone's width is
+ * already the entire budget for one label ("Etiquetas", "スレッド"). A fourth column truncates all
+ * four, and it would do so on a screen the plugin has nothing to do with. Here there is vertical
+ * room, so the menu is where plugins can grow and the switcher stays fixed.
+ *
+ * Capped all the same: this opens over a phone screen, and a menu that runs off the top of it is no
+ * more usable than a truncated tab. Past the cap, Settings' Plugins card is the full list.
+ */
+const MAX_PLUGIN_MENU_ITEMS = 4;
+
 function MoreTabSlot() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const active = isExplorePath(pathname);
+  const pluginNav = usePluginNav();
+  const shown = pluginNav.slice(0, MAX_PLUGIN_MENU_ITEMS);
+  const active = isExplorePath(pathname) || pathname.startsWith('/plugins/');
 
   return (
     <DropdownMenu>
@@ -209,6 +256,19 @@ function MoreTabSlot() {
             {t(segment.labelKey)}
           </DropdownMenuItem>
         ))}
+        {shown.length > 0 && <DropdownMenuSeparator />}
+        {shown.map((plugin) => (
+          <DropdownMenuItem key={plugin.to} onSelect={() => void navigate(plugin.to)}>
+            <plugin.icon className="size-4" />
+            {plugin.label}
+          </DropdownMenuItem>
+        ))}
+        {pluginNav.length > shown.length && (
+          <DropdownMenuItem onSelect={() => void navigate('/settings')}>
+            <Puzzle className="size-4" />
+            {t('nav.allPlugins')}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

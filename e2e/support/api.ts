@@ -5,6 +5,7 @@ import type {
   SettingsDto,
   SyncResponse,
   TagDto,
+  PluginRecordDto,
   ThreadDto,
 } from '@diary/shared';
 import { DEFAULT_SETTINGS } from '@diary/shared';
@@ -30,6 +31,7 @@ interface ApiState {
   people: PersonDto[];
   tags: TagDto[];
   threads: ThreadDto[];
+  pluginRecords: PluginRecordDto[];
   settings: SettingsDto;
   deletions: SyncResponse['deletions'];
 }
@@ -95,6 +97,7 @@ export async function installApiMock(
     people: [],
     tags: [],
     threads: [],
+    pluginRecords: [],
     settings: { ...DEFAULT_SETTINGS },
     deletions: [],
     ...seed,
@@ -174,6 +177,7 @@ export async function installApiMock(
       people: state.people,
       tags: state.tags,
       threads: state.threads,
+      pluginRecords: state.pluginRecords,
       settings: state.settings,
       // A reset carries no tombstones — the ids it omits *are* the deletions.
       deletions: reset ? [] : state.deletions,

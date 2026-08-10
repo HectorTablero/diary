@@ -5,6 +5,7 @@ import type { AppEnv } from '../middleware/session';
 import { Deletion } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
+import { PluginRecord } from '../models/pluginRecord';
 import { Tag } from '../models/tag';
 import { Thread } from '../models/thread';
 import { UserSettings } from '../models/userSettings';
@@ -84,6 +85,7 @@ export const accountRouter = new Hono<AppEnv>().delete('/', async (c) => {
     Person.deleteMany({ userId }),
     Tag.deleteMany({ userId }),
     Thread.deleteMany({ userId }),
+    PluginRecord.deleteMany({ userId }),
     UserSettings.deleteMany({ userId }),
     // Including the tombstones: they describe documents that no longer exist for an account that
     // is about to stop existing, and nothing will ever pull them.

@@ -105,6 +105,62 @@ describe('schema upgrades from v1', () => {
     const byThread = await db.entries.where('threadIds').equals('t1').toArray();
     expect(byThread.map((e) => e.id)).toEqual(['e1']);
 
+    // v6: the plugin table exists and is empty. It needs no upgrade for exactly that reason —
+    // there is nothing in a v1 database to backfill it from — so what's worth asserting is that
+    // the v1 rows above survived a version bump that touched a table they know nothing about.
+    expect(await db.pluginRecords.count()).toBe(0);
+    expect(await db.entries.count()).toBe(1);
+    expect(await db.people.count()).toBe(2);
+
+    db.close();
+  });
+});
+
+/* The plugin table's indexes, asserted because one of them cannot be trusted to work by inspection.
+   IndexedDB has no null key, and a compound index requires *every* keypath to hold a valid one — so
+   a row storing `dateKey: null` for "not about a day" would vanish from `[pluginId+dateKey]` while
+   sitting in plain sight in the table. That is why undated rows carry `''`, and this is the test
+   that says so. */
+describe('plugin record indexes', () => {
+  const record = (patch: Record<string, unknown>) => ({
+    pluginId: 'habits',
+    scope: 'record' as const,
+    dateKey: '',
+    data: {},
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+    ...patch,
+  });
+
+  it('finds dated, undated and config rows through the index each one is read by', async () => {
+    const { db } = await import('./db');
+    await db.open();
+    await db.pluginRecords.bulkPut([
+      record({ id: 'r1', dateKey: '2026-08-01', data: { water: true } }),
+      record({ id: 'r2', dateKey: '2026-08-02' }),
+      // A habit *definition*: real data, but not about any particular day.
+      record({ id: 'd1' }),
+      // The plugin's synced config — enablement and settings.
+      record({ id: 'c1', scope: 'config', data: { enabled: true } }),
+      record({ id: 'other', pluginId: 'mood', dateKey: '2026-08-01' }),
+    ]);
+
+    const day = await db.pluginRecords.where('[pluginId+dateKey]').equals(['habits', '2026-08-01']);
+    expect((await day.toArray()).map((r) => r.id)).toEqual(['r1']);
+
+    // The undated rows — reachable only because dateKey is '' and not null.
+    const undated = await db.pluginRecords.where('[pluginId+dateKey]').equals(['habits', '']);
+    expect((await undated.toArray()).map((r) => r.id).sort()).toEqual(['c1', 'd1']);
+
+    // The boot-path query: every plugin's config in one read, without a lookup per plugin.
+    const configs = await db.pluginRecords.where('scope').equals('config').toArray();
+    expect(configs.map((r) => r.id)).toEqual(['c1']);
+
+    // A plugin's own rows, without matching another plugin's.
+    const mine = await db.pluginRecords.where('[pluginId+scope]').equals(['habits', 'record']);
+    expect((await mine.toArray()).map((r) => r.id).sort()).toEqual(['d1', 'r1', 'r2']);
+
+    await db.pluginRecords.clear();
     db.close();
   });
 });

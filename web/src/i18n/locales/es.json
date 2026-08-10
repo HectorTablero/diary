@@ -12,7 +12,8 @@
     "tags": "Etiquetas",
     "threads": "Hilos",
     "settings": "Ajustes",
-    "more": "Más"
+    "more": "Más",
+    "allPlugins": "Todos los complementos"
   },
   "auth": {
     "signInWithGoogle": "Continuar con Google",
@@ -589,7 +590,14 @@
     "signOutPendingTitle_many": "¿Cerrar sesión con {{count}} cambios sin guardar en tu cuenta?",
     "signOutPendingTitle_other": "¿Cerrar sesión con {{count}} cambios sin guardar en tu cuenta?",
     "signOutPendingDescription": "Al cerrar sesión se borra este dispositivo. Lo que quede pendiente de sincronizar se perderá para siempre. Vuelve a conectarte y deja que termine si quieres conservarlo.",
-    "signOutDiscard": "Cerrar sesión y descartar"
+    "signOutDiscard": "Cerrar sesión y descartar",
+    "plugins": {
+      "title": "Complementos",
+      "description": "Funciones opcionales que puedes activar. Al activar una se aplica en todos los dispositivos.",
+      "hasData_one": "Desactivado — {{count}} registro guardado en esta cuenta",
+      "hasData_other": "Desactivado — {{count}} registros guardados en esta cuenta",
+      "saveFailed": "No se pudo cambiar ese complemento."
+    }
   },
   "errors": {
     "unauthorized": "Necesitas iniciar sesión",
@@ -727,7 +735,20 @@
     "allClear": "Nada que resolver",
     "allClearDescription": "Todo lo que hay en esta copia es nuevo en este dispositivo, así que no se sobrescribirá ni se fusionará nada. Impórtala cuando quieras.",
     "allResolved": "Todos los conflictos resueltos.",
-    "resolvedProgress": "{{resolved}} de {{total}}"
+    "resolvedProgress": "{{resolved}} de {{total}}",
+    "saving": "Restaurando…",
+    "syncing": "Subiendo…",
+    "syncingHint": "Mantén esta página abierta hasta que termine la subida.",
+    "syncLater": "Guardado en este dispositivo. Terminará de subirse cuando vuelvas a tener conexión.",
+    "plugins": "Complementos",
+    "pluginRows_one": "{{count}} registro",
+    "pluginRows_other": "{{count}} registros",
+    "pluginSettingsDiffer": "Esta cuenta: {{current}}. Copia: {{incoming}}.",
+    "pluginOn": "activado, {{count}} opción",
+    "pluginOn_other": "activado, {{count}} opciones",
+    "pluginOff": "desactivado",
+    "pluginKeepCurrent": "Mantener actual",
+    "pluginUseBackup": "Usar la copia"
   },
   "security": {
     "title": "Seguridad",

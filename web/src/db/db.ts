@@ -2,12 +2,14 @@ import type {
   EntryDto,
   PersonDto,
   PersonEventDto,
+  PluginRecordDto,
   SaidMark,
   TagDto,
   ThreadDto,
 } from '@diary/shared';
 import { normalizeBirthday } from '@diary/shared';
 import Dexie, { type EntityTable } from 'dexie';
+import { clearEnabledMirror } from '@/plugins/enabledMirror';
 
 /* Local-first store: the source of truth the UI reads from. Entries and people
    are stored normalized (ids only) and joined with tags/people at read time, so
@@ -58,6 +60,21 @@ export interface OutboxOp {
   method: 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   path: string;
   body?: unknown;
+  /**
+   * A 404 from the server is expected for this op, and is not a lost write.
+   *
+   * Set only by the backup importer. Restoring a file written months ago legitimately references
+   * things the server no longer has — an entry attached to a person since deleted, a sub-resource
+   * whose parent is gone — and those writes come back 404. Nothing was lost: the target stopped
+   * existing before the restore began, and no amount of retrying will bring it back.
+   *
+   * Without this the queue's normal rule applies, and a POST 404 becomes a dead letter and a
+   * "5 changes couldn't be saved" toast — a report of data loss for data that was already deleted
+   * on purpose. The flag is opt-in and per-op rather than a blanket tolerance because outside a
+   * restore a POST 404 is a genuine loss: an entry whose parent doesn't exist is an entry the user
+   * wrote and the server refused, and that is exactly what the dead-letter table is for.
+   */
+  tolerate404?: boolean;
 }
 
 /**
@@ -90,6 +107,9 @@ export const db = new Dexie('diary') as Dexie & {
   people: EntityTable<LocalPerson, 'id'>;
   tags: EntityTable<TagDto, 'id'>;
   threads: EntityTable<ThreadDto, 'id'>;
+  /* Stored as the DTO, like tags and threads: a plugin record references nothing, so there is
+     nothing to normalize and no join to keep fresh on rename. */
+  pluginRecords: EntityTable<PluginRecordDto, 'id'>;
   outbox: EntityTable<OutboxOp, 'seq'>;
   deadLetter: EntityTable<DeadLetterOp, 'id'>;
   meta: EntityTable<MetaRow, 'key'>;
@@ -202,6 +222,33 @@ db.version(5).stores({
   meta: 'key',
 });
 
+/* v6 adds the shared plugin-record table: one store carrying every plugin's rows, so that adding a
+   plugin is a client-only change rather than a full-stack one. No `.upgrade()`, for the same reason
+   v5 needed none — the table starts empty by definition, and there is nothing in an older database
+   to backfill it from.
+
+   Three indexes on a table most users will never write to, which is worth justifying:
+     - `scope` alone answers the one query on the boot path — "which plugins are enabled" is every
+       config row at once, rather than a lookup per registered plugin.
+     - `[pluginId+dateKey]` is the day lookup a day-scoped plugin's widget makes.
+     - `[pluginId+scope]` is a plugin reading its own undated rows without matching another's.
+
+   Note what `dateKey` must never be: IndexedDB cannot index null, and a compound index requires
+   *every* keypath to hold a valid key, so a null dateKey would drop the row out of
+   `[pluginId+dateKey]` entirely — present in the table, invisible to the query. Undated rows carry
+   UNDATED_KEY (`''`), which is a valid key and sorts before every real date. The server refuses
+   null at the edge so this cannot arrive from a sync either. */
+db.version(6).stores({
+  entries: 'id, dateKey, parentId, *tagIds, *peopleIds, *threadIds',
+  people: 'id, name, *aliases, contactId',
+  tags: 'id, name',
+  threads: 'id, name',
+  pluginRecords: 'id, pluginId, scope, [pluginId+dateKey], [pluginId+scope]',
+  outbox: '++seq',
+  deadLetter: '++id, failedAt',
+  meta: 'key',
+});
+
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
   content: dto.content,
@@ -267,15 +314,31 @@ export async function setMeta(key: string, value: unknown): Promise<void> {
 
 /** Wipe everything local (used on sign-out). Keeps the database usable afterwards. */
 export async function clearLocalData(): Promise<void> {
+  /* Not a Dexie table, and that is exactly why it is easy to miss: which plugins are enabled is
+     cached in localStorage so the day page has an answer on its first frame, and localStorage
+     survives sign-out. Left behind, the next account on a shared device starts with the previous
+     account's plugins switched on. Imported from the leaf module rather than plugins/enabled to
+     avoid the cycle db → enabled → pluginRecords → db. */
+  clearEnabledMirror();
   await db.transaction(
     'rw',
-    [db.entries, db.people, db.tags, db.threads, db.outbox, db.deadLetter, db.meta],
+    [
+      db.entries,
+      db.people,
+      db.tags,
+      db.threads,
+      db.pluginRecords,
+      db.outbox,
+      db.deadLetter,
+      db.meta,
+    ],
     async () => {
       await Promise.all([
         db.entries.clear(),
         db.people.clear(),
         db.tags.clear(),
         db.threads.clear(),
+        db.pluginRecords.clear(),
         db.outbox.clear(),
         db.deadLetter.clear(),
         db.meta.clear(),
