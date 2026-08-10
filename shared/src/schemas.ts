@@ -18,7 +18,11 @@ import {
   MAX_THREADS_PER_ENTRY,
   MAX_WECHAT_ID_LENGTH,
   normalizeBirthday,
+  MAX_PLUGIN_DATA_BYTES,
+  MAX_PLUGIN_DATA_DEPTH,
   OBJECT_ID_REGEX,
+  PLUGIN_ID_REGEX,
+  UNDATED_KEY,
 } from './constants';
 
 export const objectIdSchema = z.string().regex(OBJECT_ID_REGEX, 'invalid id');
@@ -173,6 +177,81 @@ export const threadUpdateSchema = z.object({
   name: z.string().trim().min(1).max(MAX_THREAD_NAME_LENGTH).optional(),
 });
 
+// --- Plugin records ---
+
+export const pluginIdSchema = z.string().regex(PLUGIN_ID_REGEX, 'expected a lowercase plugin id');
+
+/** `YYYY-MM-DD`, or the undated sentinel. See UNDATED_KEY for why it is `''` and not null. */
+export const pluginDateKeySchema = z.union([dateKeySchema, z.literal(UNDATED_KEY)]);
+
+/**
+ * The bounds that stand in for a schema the server doesn't have.
+ *
+ * Checked in this order because each rule assumes the previous one held: depth and key shape are
+ * walked over a structure already known to be JSON-ish, and the size cap is measured last so the
+ * error a caller sees is the most specific one that applies.
+ */
+function validatePluginData(data: unknown, ctx: z.RefinementCtx): void {
+  const reject = (message: string) => ctx.addIssue({ code: 'custom', message });
+
+  const walk = (value: unknown, depth: number, topLevel: boolean): boolean => {
+    if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
+      // NaN and Infinity survive a Mongo round-trip but not a JSON one, so a row containing them
+      // would read back as null and the plugin would see a value it never wrote.
+      if (typeof value === 'number' && !Number.isFinite(value)) {
+        reject('data: numbers must be finite');
+        return false;
+      }
+      return true;
+    }
+    if (depth >= MAX_PLUGIN_DATA_DEPTH) {
+      reject(`data: nested deeper than ${MAX_PLUGIN_DATA_DEPTH}`);
+      return false;
+    }
+    if (Array.isArray(value)) return value.every((item) => walk(item, depth + 1, false));
+    if (typeof value !== 'object') {
+      // undefined, functions, symbols — anything JSON cannot carry.
+      reject('data: values must be JSON');
+      return false;
+    }
+    return Object.entries(value as Record<string, unknown>).every(([key, child]) => {
+      /* `$`-prefixed and dotted keys are storable in modern Mongo but poison every `$set` path and
+         aggregation expression built from them later. Rejected at the top level only, which is
+         where an update path would ever be constructed from a key. */
+      if (topLevel && (key.startsWith('$') || key.includes('.'))) {
+        reject(`data: key "${key}" may not start with $ or contain a dot`);
+        return false;
+      }
+      return walk(child, depth + 1, false);
+    });
+  };
+
+  if (!walk(data, 0, true)) return;
+
+  if (JSON.stringify(data).length > MAX_PLUGIN_DATA_BYTES) {
+    reject(`data: larger than ${MAX_PLUGIN_DATA_BYTES} bytes serialized`);
+  }
+}
+
+export const pluginDataSchema = z.record(z.string(), z.unknown()).superRefine(validatePluginData);
+
+export const pluginRecordCreateSchema = z.object({
+  id: objectIdSchema.optional(),
+  createdAt: isoDateTimeSchema.optional(),
+  pluginId: pluginIdSchema,
+  scope: z.enum(['config', 'record']).default('record'),
+  dateKey: pluginDateKeySchema.default(UNDATED_KEY),
+  data: pluginDataSchema,
+});
+
+/* `pluginId` and `scope` are absent on purpose: they are the row's identity, not its contents, and
+   a row that could change which plugin owns it would let one plugin's write land in another's
+   query. Re-scoping means deleting and re-creating. */
+export const pluginRecordUpdateSchema = z.object({
+  dateKey: pluginDateKeySchema.optional(),
+  data: pluginDataSchema.optional(),
+});
+
 // --- Settings ---
 
 const halfLifeRange = z.number().min(1).max(3650);
@@ -246,5 +325,7 @@ export type TagCreateInput = z.infer<typeof tagCreateSchema>;
 export type TagUpdateInput = z.infer<typeof tagUpdateSchema>;
 export type ThreadCreateInput = z.infer<typeof threadCreateSchema>;
 export type ThreadUpdateInput = z.infer<typeof threadUpdateSchema>;
+export type PluginRecordCreateInput = z.infer<typeof pluginRecordCreateSchema>;
+export type PluginRecordUpdateInput = z.infer<typeof pluginRecordUpdateSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
 export type AiSuggestionsRequestInput = z.infer<typeof aiSuggestionsRequestSchema>;

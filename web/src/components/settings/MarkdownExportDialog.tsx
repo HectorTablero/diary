@@ -36,6 +36,8 @@ import {
 } from '@/lib/markdownExport/person';
 import { fuzzyIncludes } from '@/lib/tokens';
 import { zipTextFiles } from '@/lib/zip';
+import { useEnabledPlugins } from '@/plugins/enabled';
+import { collectPluginMarkdown } from '@/plugins/markdown';
 
 type ExportType = 'entries' | 'people';
 type OutputMode = 'merge' | 'zip';
@@ -106,6 +108,7 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
   const [outputMode, setOutputMode] = useState<OutputMode>('merge');
   const [personOptions, setPersonOptions] = useState<PersonMarkdownOptions>(DEFAULT_PERSON_OPTIONS);
   const [exporting, setExporting] = useState(false);
+  const enabledPlugins = useEnabledPlugins();
 
   const toggleTag = (id: string) =>
     setTagIds((prev) =>
@@ -170,7 +173,13 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
       if (type === 'entries') {
         const entries = await getEntriesInRange(from || null, to || null, tagIds);
         const markdown = buildEntriesMarkdown(entries, { from: from || null, to: to || null });
-        await saveTextFile(`diary-entries-${Date.now()}.md`, markdown, 'text/markdown');
+        /* Appended to the same document rather than downloaded beside it. Plugin data is day-scoped
+           — a habit log is another thing that happened on the days these entries describe — so two
+           files would just hand the reader something to line up by date themselves. A plugin that
+           fails to load contributes nothing and the export goes ahead without it. */
+        const pluginSections = await collectPluginMarkdown(enabledPlugins);
+        const full = [markdown, ...pluginSections.map((section) => section.markdown)].join('\n\n');
+        await saveTextFile(`diary-entries-${Date.now()}.md`, full, 'text/markdown');
       } else if (personIds.length > 0) {
         const results = await Promise.all(
           personIds.map(async (id) => {

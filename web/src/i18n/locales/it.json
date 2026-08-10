@@ -12,7 +12,8 @@
     "tags": "Etichette",
     "threads": "Filoni",
     "settings": "Impostazioni",
-    "more": "Altro"
+    "more": "Altro",
+    "allPlugins": "Tutti i moduli"
   },
   "auth": {
     "signInWithGoogle": "Continua con Google",
@@ -588,7 +589,14 @@
     "signOutPendingTitle_many": "Uscire con {{count}} modifiche non ancora salvate sul tuo account?",
     "signOutPendingTitle_other": "Uscire con {{count}} modifiche non ancora salvate sul tuo account?",
     "signOutPendingDescription": "Uscendo si cancella questo dispositivo. Tutto ciò che è in attesa di sincronizzazione andrà perso definitivamente. Riconnettiti e lascia che finisca se vuoi conservarlo.",
-    "signOutDiscard": "Esci e scarta"
+    "signOutDiscard": "Esci e scarta",
+    "plugins": {
+      "title": "Moduli",
+      "description": "Funzioni opzionali che puoi attivare. Attivandone una vale su tutti i dispositivi.",
+      "hasData_one": "Disattivato — {{count}} voce salvata su questo account",
+      "hasData_other": "Disattivato — {{count}} voci salvate su questo account",
+      "saveFailed": "Impossibile modificare quel modulo."
+    }
   },
   "errors": {
     "unauthorized": "Devi accedere",
@@ -726,7 +734,20 @@
     "allClear": "Niente da risolvere",
     "allClearDescription": "Tutto ciò che contiene questo backup è nuovo su questo dispositivo, quindi non verrà sovrascritto né unito nulla. Importalo quando vuoi.",
     "allResolved": "Tutti i conflitti risolti.",
-    "resolvedProgress": "{{resolved}} su {{total}}"
+    "resolvedProgress": "{{resolved}} su {{total}}",
+    "saving": "Ripristino…",
+    "syncing": "Caricamento…",
+    "syncingHint": "Tieni aperta questa pagina finché il caricamento non è finito.",
+    "syncLater": "Salvato su questo dispositivo. Il caricamento finirà quando tornerai online.",
+    "plugins": "Moduli",
+    "pluginRows_one": "{{count}} voce",
+    "pluginRows_other": "{{count}} voci",
+    "pluginSettingsDiffer": "Questo account: {{current}}. Backup: {{incoming}}.",
+    "pluginOn": "attivo, {{count}} opzione",
+    "pluginOn_other": "attivo, {{count}} opzioni",
+    "pluginOff": "disattivato",
+    "pluginKeepCurrent": "Mantieni attuale",
+    "pluginUseBackup": "Usa il backup"
   },
   "security": {
     "title": "Sicurezza",

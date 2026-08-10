@@ -27,6 +27,7 @@ import { peopleRouter } from './routes/people';
 import { settingsRouter } from './routes/settings';
 import { syncRouter } from './routes/sync';
 import { tagsRouter } from './routes/tags';
+import { pluginRecordsRouter } from './routes/pluginRecords';
 import { threadsRouter } from './routes/threads';
 
 // serveStatic resolves relative to process.cwd(); compute the path to web/dist
@@ -139,6 +140,9 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   api.route('/people', peopleRouter);
   api.route('/tags', tagsRouter);
   api.route('/threads', threadsRouter);
+  /* Flat, not nested under a plugin id — see the note at the top of routes/pluginRecords.ts: the
+     client's dirty-id tracking reads the second path segment as the document id. */
+  api.route('/plugin-records', pluginRecordsRouter);
   api.route('/settings', settingsRouter);
   api.route('/sync', syncRouter);
   // DELETE only: erases the diary and the account behind it. See routes/account.ts.

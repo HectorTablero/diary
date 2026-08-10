@@ -49,6 +49,104 @@ on the person's profile and a badge in the people list, not as a notification.
 All of it lives in `localStorage` rather than the synced settings, so signing out cannot silently
 switch an alarm back on.
 
+## Plugins
+
+Optional features that live in the same repo but are **invisible to anyone who hasn't enabled
+them** — no code, no strings, no storage, no requests. That property is the whole point of the
+system, and it is not something the idea gives you for free: it is a handful of rules that are easy
+to break by accident and that fail silently when broken.
+
+A plugin fills any of five **surfaces**, all optional (`web/src/plugins/types.ts`):
+
+| Surface         | What it is                                               |
+| --------------- | -------------------------------------------------------- |
+| `day`           | a card on the diary's day page, below the composer       |
+| `page`          | its own screen at `/plugins/<id>`                        |
+| `settings`      | a card in Settings                                       |
+| `notifications` | reminders contributed to the app's single reconcile pass |
+| `export`        | Markdown files added to the export archive               |
+
+`web/src/plugins/registry.ts` is the catalogue and the only plugin file the entry chunk may reach:
+an id, an icon, the surfaces list, and a dynamic-import thunk. The surfaces are declared **outside**
+the chunk on purpose — that is what lets a day-page slot skip a plugin with no day widget for the
+price of an array lookup instead of a network round-trip that ends in `undefined`. Slots must check
+`enabled`, then `surfaces`, then `load()`, in that order.
+
+Two checkers guard it, because none of this is observable from inside a running app:
+`plugins/registry.test.ts` and `registry.surfaces.test.tsx` for what can be asserted in-process
+(import paths are literals and point at the folder named by the id; declared surfaces match exported
+members), and `web/scripts/checkBundle.ts` against real build output, for what cannot — plugin code
+reaching the entry chunk, or plugin locales being precached for everyone. Both have caught real
+regressions; the bundle one exists because Vite once inlined every plugin's strings, in all five
+languages, into the day-page chunk as base64, and `dist` looked clean.
+
+**Enablement syncs; reminders don't.** A plugin being on is a property of the diary, not of one
+device, so it lives in a synced `config` row — one row per plugin, so two devices enabling different
+plugins offline cannot clobber each other the way a merged settings document would. Anything that
+arms an alarm stays in `localStorage` (`plugins/reminders.ts`), for the same reason as the rest of
+the reminders: signing out must not resurrect a switched-off alarm.
+
+**Storage.** Plugins write to one collection, `pluginRecord`, which rides the normal offline/sync
+path. Each row is `{ pluginId, scope: 'record' | 'config', dateKey, data }`, where `dateKey` is a day
+or `UNDATED_KEY` (`''`) for rows that aren't about one. **The server never inspects `data`** — that
+is exactly what makes adding a plugin a client-only change — so it is validated on read, by the
+plugin, in the same parse-don't-trust posture the backup importer takes. What the server does
+enforce is shape and volume: `MAX_PLUGINS_PER_USER` (32), `MAX_PLUGIN_RECORDS_PER_PLUGIN` (20,000),
+`MAX_PLUGIN_DATA_BYTES` (4096) and `MAX_PLUGIN_DATA_DEPTH` (3), since `pluginId` is deliberately
+open and would otherwise be a way to grow the collection without bound.
+
+Strings live in the plugin (`plugins/<id>/locales/{en,es,it,ja,zh}.json`, with
+`plugins/<id>/translation-context.json` beside them), are fetched on enable, and merge under
+`plugins.<id>.` — so a key written as `title` is used as `t('plugins.habits.title')`. `checkI18n`
+holds each plugin to the same four rules as the core bundle, as its own key universe.
+
+Adding one: a folder under `plugins/<id>/` with an `index.ts` default-exporting a `PluginModule`,
+its locale files, and one entry in the registry. Nothing else in the app changes — in particular
+**not** `pages/lazyPages.ts` (AppLayout warms every entry of that map on idle) and **not**
+`VENDOR_CHUNKS` in `vite.config.ts` (naming a plugin's library hoists it in front of everyone's
+first paint).
+
+### Habits
+
+The one plugin that ships, and the one the API was shaped around. A habit is one of five kinds,
+differing only in how a day's number is entered and read, never in how it is stored: `binary` (a
+button), `numeric` (a stepper — push-ups, glasses of water), `time` (a stopwatch _and_ a stepper),
+`scale` (a dragged track, for something judged rather than counted) and `mood` (five faces).
+
+Every kind stores a plain number, which is what makes "did this happen" one question rather than
+five. Time is stored in **seconds** because the stopwatch produces them — pausing at 14:09 and
+resuming has to resume from 14:09 — and rounded only at the point of display. Zero is stored as
+absence, never as `0`.
+
+Three decisions are worth knowing before touching it:
+
+- **Two row shapes, told apart by `dateKey`.** A _definition_ is undated, one row per habit; a _day_
+  is dated, one row holding every habit's value for that day. One row per habit (rather than one
+  list) means renaming on the phone and adding on the laptop are writes to different rows and cannot
+  collide; one row per day (rather than per habit-day) keeps five habits over five years at 1,800
+  rows instead of 9,000.
+- **A goal is a property of a habit _on a day_, not of the habit.** Raising a target from 50 to 100
+  would otherwise retroactively un-meet every day you hit 50 — three weeks of history rewritten by
+  one edit. So each edit banks the configuration it replaced with the day it stopped applying
+  (`revisions`), and everything that judges a day asks `configAt(habit, dateKey)`. The habit's own
+  page shows that log, because the grid alone would misrepresent it.
+- **Streaks and the day card's `M/N` count goals _reached_, not habits touched.** Twelve of a hundred
+  push-ups is progress worth recording and it is not a day of the habit. The day page computes the
+  run ending _yesterday_ once per habit and adds today's answer itself, so the badge is arithmetic on
+  local state — it cannot flicker while a debounced write and the sync it triggers go past. Today
+  being blank never breaks a streak; only yesterday can.
+
+The stopwatch persists the _instant it started_, device-local and keyed by day, so a timer survives
+a reload, a lock screen or a discarded tab, and one left running past midnight is banked against the
+day it began. Recording is debounced (600 ms) and coalesced, because every enqueue kicks a sync and
+a full notification reconcile — running down a checklist must not be one of those per tap.
+
+Surfaces: the day card (record only — nothing is created or destroyed there), `/plugins/habits`
+(create, retire, and a three-week grid), a Settings card for the device-local daily nudge,
+`habits.md` in the export, and a one-line `describeRecord` so a backup import review shows habit
+names rather than opaque blobs. A habit that was ever recorded can only be **retired**, not deleted:
+those days are diary history.
+
 ## Security and privacy
 
 - **App lock** — an optional passcode (PBKDF2, device-local) in front of the diary, with the
@@ -347,8 +445,6 @@ The **server**'s pair are plain runtime env vars — set `BETTERSTACK_SOURCE_TOK
   route in both themes, plus the open dialogs. Split out from `test:e2e` so the two report
   separately; `test:e2e:all` runs both in one pass. It lives in Playwright rather than vitest
   because contrast and visibility rules need real layout, which jsdom does not compute
-- `npx tsx src/scripts/syncSmoke.ts` (from `server/`) — sync-foundation smoke tests against local MongoDB
-- `npx tsx scripts/dbSmoke.ts` (from `web/`) — local-first data layer smoke tests (Node + fake-indexeddb)
 
 ## Translations
 

@@ -37,7 +37,8 @@
       "where": "Sidebar on desktop, bottom tab bar on phones. The tightest space in the app — one or two words, no verbs.",
       "keys": {
         "diary": "Labels the entry list; distinct from app.name so the tab can be shorter than the product name.",
-        "threads": "See the threads namespace for the concept and the term chosen per language."
+        "threads": "See the threads namespace for the concept and the term chosen per language.",
+        "allPlugins": "Last item in the phone \"More\" menu when more plugins are enabled than fit in it; goes to the Plugins list in Settings."
       }
     },
     "auth": {
@@ -185,7 +186,9 @@
         "ai": "Optional voice-to-entry assistant. Provider names and key prefixes are literal; apiKeyHint and its siblings end mid-sentence because a link follows in the UI — keep them ending in a way that a URL can follow.",
         "markdownExport": "Exports part of the diary as Markdown intended to be pasted into an AI agent, not read as a backup.",
         "data": "Backup, restore and export. \"Backup\" as a noun may stay a loanword where that's what people say.",
-        "deleteAccount": "The one irreversible action in the app: it erases the diary from the server and closes the account. Precision over softness everywhere — a euphemism here costs someone their diary. Say plainly that it cannot be undone, and keep bulletDevices honest: other devices really do keep their copy until they sign out, and the string must not imply this reaches them. confirmWord is TYPED BY THE USER before the button unlocks, so it has to be something the language’s ordinary keyboard produces directly: Latin-script languages use their own word (DELETE, BORRAR, ELIMINA), but Japanese and Chinese deliberately keep the Latin \"DELETE\" rather than 削除/删除, because typing those needs an IME conversion and a confirmation nobody can type is a lockout, not a safeguard. If you change confirmWord, typeToConfirm shows it in {{word}} and the input placeholder repeats it, so they stay in step automatically. biometricsReason is shown by the operating system in its own biometric prompt, so it must stand alone with no app context around it. The deletion asks for the Google account again when the sign-in behind it has gone stale, and that flow owns four keys. signInDescription and signInWhy are the ask: state plainly that nothing has been deleted yet, because this appears *after* the user has already typed the word and passed the device lock, and an unexplained detour to Google at that moment reads as a failure. resumedDescription is what the web comes back to after that detour, so it must sound like an arrival rather than a fresh start — the user did not navigate here and needs to recognise where they are in one line. signInFailed is a dead end and must say, as failed says, that nothing was deleted. lockDescription is the device passcode, which is a different check from the Google one and should not borrow its wording."
+        "deleteAccount": "The one irreversible action in the app: it erases the diary from the server and closes the account. Precision over softness everywhere — a euphemism here costs someone their diary. Say plainly that it cannot be undone, and keep bulletDevices honest: other devices really do keep their copy until they sign out, and the string must not imply this reaches them. confirmWord is TYPED BY THE USER before the button unlocks, so it has to be something the language’s ordinary keyboard produces directly: Latin-script languages use their own word (DELETE, BORRAR, ELIMINA), but Japanese and Chinese deliberately keep the Latin \"DELETE\" rather than 削除/删除, because typing those needs an IME conversion and a confirmation nobody can type is a lockout, not a safeguard. If you change confirmWord, typeToConfirm shows it in {{word}} and the input placeholder repeats it, so they stay in step automatically. biometricsReason is shown by the operating system in its own biometric prompt, so it must stand alone with no app context around it. The deletion asks for the Google account again when the sign-in behind it has gone stale, and that flow owns four keys. signInDescription and signInWhy are the ask: state plainly that nothing has been deleted yet, because this appears *after* the user has already typed the word and passed the device lock, and an unexplained detour to Google at that moment reads as a failure. resumedDescription is what the web comes back to after that detour, so it must sound like an arrival rather than a fresh start — the user did not navigate here and needs to recognise where they are in one line. signInFailed is a dead end and must say, as failed says, that nothing was deleted. lockDescription is the device passcode, which is a different check from the Google one and should not borrow its wording.",
+        "plugins.description": "Under the Plugins heading in Settings. Says the switch follows the account, because the reminder switches inside each plugin do not — that distinction is the one thing about plugins a user has to know.",
+        "plugins.hasData": "Shown instead of the description for a plugin that is switched OFF but already has data on the account — usually because it was enabled on another device. Neutral, not a prompt to enable it."
       }
     },
     "errors": {
@@ -254,7 +257,18 @@
         "setAll": "Label in front of a row of buttons that apply one decision to every conflict in a section at once. The buttons after it are the section's own words (merge/keepBoth/addAsNew/overwrite), so this must read as the start of a phrase they complete — \"Set all → Merge\". Very short; it sits on one line with the buttons.",
         "entriesSkipped": "Counted. Reported after the import, alongside `orphaned`. These entries were already on the device, so the import deliberately left them untouched rather than adding a second copy — reassurance that nothing was lost, not a warning.",
         "done": "Eight counts in one sentence. Feel free to restructure into clauses that read naturally; keep every placeholder.",
-        "orphaned": "Counted. An imported sub-entry whose parent wasn't imported gets promoted to the top level."
+        "orphaned": "Counted. An imported sub-entry whose parent wasn't imported gets promoted to the top level.",
+        "saving": "Label on the restore button while the file is being written to the local database. Present continuous.",
+        "syncing": "Label on the same button during the slower second half, uploading to the server. Distinct from `saving` on purpose — this is the phase the user might otherwise interrupt.",
+        "syncingHint": "Under the button during the upload, and read aloud when it appears. Explains why the page is holding them there.",
+        "syncLater": "Toast when the upload could not finish (offline, server unreachable). Reassuring, not an error: nothing was lost and it will retry by itself.",
+        "plugins": "Heading of the plugins section in the backup review.",
+        "pluginRows": "Row count per plugin in that section. Data rows only — settings are counted separately because they are the ones that can clash.",
+        "pluginSettingsDiffer": "Explains a settings clash by describing both sides. Interpolates `pluginOn`/`pluginOff` — keep the sentence short, it sits under a plugin name in a small card.",
+        "pluginOn": "One side of that sentence: the plugin is enabled, with N synced options. Not a sentence on its own.",
+        "pluginOff": "The other side: the plugin is switched off. No count — an off plugin’s options are not in play.",
+        "pluginKeepCurrent": "Button: keep the settings this account already has, discarding the backup’s.",
+        "pluginUseBackup": "Button: replace them with the backup’s. Note this applies to every device, since plugin settings sync."
       }
     },
     "security": {

@@ -32,8 +32,20 @@ afterEach(() => {
   resetPreferences();
 });
 
+/* The router needs a `/diary/:date` route to land on, even though nothing here asserts against it.
+   Clicking a day navigates, and without a matching route react-router raises a navigational 404 —
+   which does not fail any assertion but is reported as an unhandled error, intermittently turning
+   the whole suite red on a file whose own tests all pass. */
 const setup = () =>
-  ({ user: userEvent.setup(), ...renderWithProviders(<CalendarPage />) }) as const;
+  ({
+    user: userEvent.setup(),
+    ...renderWithProviders(null, {
+      routes: [
+        { path: '/', element: <CalendarPage /> },
+        { path: '/diary/:date', element: <div /> },
+      ],
+    }),
+  }) as const;
 
 /** The day buttons, in grid order. Blank leading/trailing cells are plain divs, so they are out. */
 const dayCells = () =>

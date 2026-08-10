@@ -14,7 +14,10 @@ import {
   objectIdSchema,
   organizationSchema,
   phoneSchema,
+  PLUGIN_ID_REGEX,
+  pluginDataSchema,
   settingsSchema,
+  UNDATED_KEY,
   wechatIdSchema,
 } from '@diary/shared';
 import { z } from 'zod';
@@ -80,18 +83,39 @@ export const threadRowSchema = z.object({
   updatedAt: isoDateTimeSchema,
 });
 
-/** What buildBackupEnvelope writes. Bumped to 2 when threads arrived. */
-export const BACKUP_VERSION = 2;
+/**
+ * One plugin row, as it sits in Dexie.
+ *
+ * `data` is validated only for the shape the collection guarantees — JSON-ish, bounded — and not
+ * for what any particular plugin means by it. That is the same posture the server takes, and for
+ * the same reason: the importer cannot know which plugins the file came from, and refusing to
+ * restore a row because a plugin that wrote it is not installed here would lose data the user
+ * explicitly asked to keep. The owning plugin parses it on read (see plugins/habits/model.ts).
+ */
+export const pluginRecordRowSchema = z.object({
+  id: objectIdSchema,
+  pluginId: z.string().regex(PLUGIN_ID_REGEX, 'invalid plugin id'),
+  scope: z.enum(['config', 'record']),
+  dateKey: z.union([dateKeySchema, z.literal(UNDATED_KEY)]),
+  data: pluginDataSchema,
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+/** What buildBackupEnvelope writes. 2 when threads arrived, 3 when plugins did. */
+export const BACKUP_VERSION = 3;
 
 export const backupEnvelopeSchema = z.object({
-  // Version 1 (pre-threads) still imports: `threads` and every row's `threadIds` default to
-  // empty, so an older file restores as a diary with no threads rather than refusing to load.
-  version: z.union([z.literal(1), z.literal(2)]),
+  /* Older files still import. Version 1 predates threads and version 2 predates plugins; both
+     default to empty, so an older file restores as a diary without those things rather than
+     refusing to load at all. */
+  version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   exportedAt: isoDateTimeSchema,
   entries: z.array(localEntrySchema),
   people: z.array(localPersonSchema),
   tags: z.array(tagRowSchema),
   threads: z.array(threadRowSchema).default([]),
+  pluginRecords: z.array(pluginRecordRowSchema).default([]),
   settings: settingsSchema,
 });
 
@@ -99,4 +123,5 @@ export type EntryBackupRow = z.infer<typeof localEntrySchema>;
 export type PersonBackupRow = z.infer<typeof localPersonSchema>;
 export type TagBackupRow = z.infer<typeof tagRowSchema>;
 export type ThreadBackupRow = z.infer<typeof threadRowSchema>;
+export type PluginRecordBackupRow = z.infer<typeof pluginRecordRowSchema>;
 export type BackupEnvelope = z.infer<typeof backupEnvelopeSchema>;

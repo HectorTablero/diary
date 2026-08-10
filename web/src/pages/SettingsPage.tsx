@@ -19,6 +19,7 @@ import { ApiKeyField } from '@/components/settings/ApiKeyField';
    components/settings, so this file is the draft, its save path, and the order of the sections. */
 import { RemindersSection } from '@/components/settings/RemindersSection';
 import { notifyDeviceSaved, Section, SubToggleRow, ToggleRow } from '@/components/settings/Section';
+import { PluginSettingsSections, PluginsSection } from '@/components/settings/PluginsSection';
 import { VersionFooter } from '@/components/settings/VersionFooter';
 import {
   HourCycleSetting,
@@ -779,6 +780,13 @@ export default function SettingsPage() {
             </div>
           )}
         </Section>
+
+        {/* Plugins, then whatever settings the enabled ones bring — after the app's own sections
+            and before the account: they are features of the diary rather than of the account, and a
+            plugin's card is meaningless above the switch that turns it on. */}
+        <PluginsSection />
+
+        <PluginSettingsSections />
 
         <div className="flex items-center justify-end">
           <Button

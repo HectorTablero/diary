@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ageOn, birthdaysOn } from '@/lib/birthday';
 import { formatDateKey, parseDateKey, toDateKey, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
+import { PluginDaySlot } from '@/plugins/PluginDaySlot';
 
 export default function DiaryDayPage() {
   const { date } = useParams<{ date: string }>();
@@ -105,42 +106,78 @@ export default function DiaryDayPage() {
         />
       )}
 
-      {celebrating.length > 0 && (
-        <section className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-pink-500/30 bg-pink-500/[0.06] px-3 py-2 text-sm">
-          <Cake className="size-4 shrink-0 text-pink-500 dark:text-pink-400" />
-          {celebrating.map((person, index) => {
-            // Age on the day being viewed, not today — browsing back to a past birthday should
-            // show how old they turned then.
-            const age = ageOn(person.birthday, parseDateKey(dateKey));
-            return (
-              <span key={person.id}>
-                {index > 0 && <span className="mr-1.5 text-muted-foreground">·</span>}
-                {/* Trans, not t(): the sentence wraps the name differently per language
-                    ("@Ana's birthday" vs "Cumpleaños de @Ana"), so the link has to be placed by
-                    the translation rather than concatenated around it. */}
-                <Trans
-                  i18nKey={age === null ? 'diary.birthdayLine' : 'diary.birthdayLineWithAge'}
-                  values={{ name: person.name, age }}
-                  components={{
-                    // Same colour and weight segmentContent gives an @mention inside entry text,
-                    // so a birthday reads like any other mention of that person.
-                    mention: (
-                      <Link
-                        to={`/people/${person.id}`}
-                        className="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
-                      />
-                    ),
-                  }}
-                />
-              </span>
-            );
-          })}
-        </section>
-      )}
-
       <div className="mt-8 rounded-xl border bg-card p-3 shadow-xs">
         <EntryComposer key={dateKey} dateKey={dateKey} />
       </div>
+
+      {/**
+       * Whose birthday it is, in the same card the habit checklist uses.
+       *
+       * It used to be a pink-tinted banner above the composer, which was wrong twice. It looked like
+       * nothing else on the page — the one coloured panel in an app whose surfaces are all the same
+       * card — so it read as an alert about something needing attention rather than as a fact about
+       * the day. And it sat between the entries and the composer, where it pushed the writing box
+       * down by however many people happened to share a birthday.
+       *
+       * Below the composer it joins the band of things that are *about* the day rather than the day
+       * itself, above the habits for the same reason the habits are below the composer: writing
+       * comes first, and what is fixed about the day comes before what you are still filling in.
+       */}
+      {celebrating.length > 0 && (
+        <section
+          className="mt-6 rounded-xl border bg-card p-4 shadow-xs"
+          aria-labelledby="birthdays-day-title"
+        >
+          <div className="flex items-center gap-2">
+            <Cake className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <h2 id="birthdays-day-title" className="flex-1 text-sm font-medium">
+              {t('diary.birthdays')}
+            </h2>
+          </div>
+
+          {/* Plainer than the habit card's list, because these lines are plainer than its rows:
+              there is nothing to press, so nothing needs a row of its own to be pressed in, and the
+              rules and padding that keep a checkbox apart from a stopwatch would here be dividing
+              one short sentence from another. A gap does the whole job.
+
+              Each line still says "birthday" under a heading that already does, because a line has
+              to stand on its own: it is what a screen reader reads when it lands there, and what
+              the eye returns to after scrolling the heading off a phone. */}
+          <ul className="mt-2 flex flex-col gap-1 text-sm">
+            {celebrating.map((person) => {
+              // Age on the day being viewed, not today — browsing back to a past birthday should
+              // show how old they turned then.
+              const age = ageOn(person.birthday, parseDateKey(dateKey));
+              return (
+                <li key={person.id}>
+                  {/* Trans, not t(): the sentence wraps the name differently per language
+                      ("@Ana's birthday" vs "Cumpleaños de @Ana"), so the link has to be placed by
+                      the translation rather than concatenated around it. */}
+                  <Trans
+                    i18nKey={age === null ? 'diary.birthdayLine' : 'diary.birthdayLineWithAge'}
+                    values={{ name: person.name, age }}
+                    components={{
+                      // Same colour and weight segmentContent gives an @mention inside entry text,
+                      // so a birthday reads like any other mention of that person.
+                      mention: (
+                        <Link
+                          to={`/people/${person.id}`}
+                          className="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                        />
+                      ),
+                    }}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* Below the composer, so writing an entry keeps its position on the page and a plugin chunk
+          that resolves late can't reflow the textarea out from under a cursor already in it.
+          Renders null, and loads nothing at all, when no plugin with a day widget is enabled. */}
+      <PluginDaySlot dateKey={dateKey} />
     </PageContainer>
   );
 }

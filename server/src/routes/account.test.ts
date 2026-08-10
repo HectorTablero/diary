@@ -25,6 +25,7 @@ const Entry = modelDouble();
 const Person = modelDouble();
 const Tag = modelDouble();
 const Thread = modelDouble();
+const PluginRecord = modelDouble();
 const UserSettings = modelDouble();
 const Deletion = modelDouble();
 
@@ -70,6 +71,7 @@ vi.mock('../models/entry', () => ({ Entry }));
 vi.mock('../models/person', () => ({ Person }));
 vi.mock('../models/tag', () => ({ Tag }));
 vi.mock('../models/thread', () => ({ Thread }));
+vi.mock('../models/pluginRecord', () => ({ PluginRecord }));
 vi.mock('../models/userSettings', () => ({ UserSettings }));
 vi.mock('../models/deletion', () => ({ Deletion }));
 
@@ -77,7 +79,7 @@ const { accountRouter } = await import('./account');
 
 const app = routeApp('/account', accountRouter);
 
-const CONTENT_MODELS = { Entry, Person, Tag, Thread, UserSettings, Deletion };
+const CONTENT_MODELS = { Entry, Person, Tag, Thread, PluginRecord, UserSettings, Deletion };
 
 beforeEach(() => {
   resetModels(...Object.values(CONTENT_MODELS));
@@ -108,8 +110,8 @@ describe('DELETE /account', () => {
     await app.request('/account', { method: 'DELETE' });
 
     for (const model of Object.values(CONTENT_MODELS)) {
-      /* The whole authorisation model, asserted six times. An unscoped `deleteMany({})` here would
-         erase every user's diary on the deployment and still answer 204. */
+      /* The whole authorisation model, asserted once per collection. An unscoped `deleteMany({})`
+         here would erase every user's diary on the deployment and still answer 204. */
       expect(model.deleteMany).toHaveBeenCalledWith({ userId: USER_ID });
     }
   });

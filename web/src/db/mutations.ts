@@ -30,6 +30,7 @@ import type { BackupResolution } from '@/lib/backup/conflicts';
 import type {
   EntryBackupRow,
   PersonBackupRow,
+  PluginRecordBackupRow,
   TagBackupRow,
   ThreadBackupRow,
 } from '@/lib/backup/schema';
@@ -1445,6 +1446,9 @@ export interface BackupImportPlan {
   threads: ThreadImportItem[];
   people: PersonImportItem[];
   entries: EntryImportItem[];
+  /** Plugin rows to restore. Already filtered by the review screen — `config` rows only appear here
+      if the user opted in, since restoring one switches a plugin on across every device. */
+  pluginRecords: PluginRecordBackupRow[];
 }
 
 export interface BackupImportSummary {
@@ -1454,6 +1458,55 @@ export interface BackupImportSummary {
   /** `merged` is entries overwritten in place; `skipped` is rows that were already here and were
       left exactly as they are. */
   entries: { created: number; merged: number; skipped: number; orphaned: number };
+  pluginRecords: { created: number; merged: number };
+}
+
+/**
+ * Restore plugin rows.
+ *
+ * Ids are kept rather than remapped, unlike tags and people. Those are remapped because a backup's
+ * tag "travel" and this account's tag "travel" are the *same idea* under two ids, and merging them
+ * is the whole point of the review screen. A plugin row has no such identity — nothing names it, it
+ * is referenced only by its own id from inside another row's payload (a day's ticks name habit ids)
+ * — so remapping would silently break those references, and the honest operation is a straight
+ * upsert: same id, same row.
+ *
+ * `bulkPut` rather than `add`, so re-importing the same file twice is idempotent instead of a
+ * duplicate-key failure halfway through.
+ */
+async function importPluginRecords(rows: PluginRecordBackupRow[]) {
+  if (!rows.length) return { created: 0, merged: 0, ops: [] as OutboxOp[] };
+
+  const existing = new Set(
+    (await db.pluginRecords.bulkGet(rows.map((row) => row.id)))
+      .filter((row) => row !== undefined)
+      .map((row) => row.id),
+  );
+
+  await db.pluginRecords.bulkPut(rows);
+
+  const ops: OutboxOp[] = rows.map((row) =>
+    existing.has(row.id)
+      ? { method: 'PATCH', path: `/plugin-records/${row.id}`, body: { data: row.data } }
+      : {
+          method: 'POST',
+          path: '/plugin-records',
+          body: {
+            id: row.id,
+            createdAt: row.createdAt,
+            pluginId: row.pluginId,
+            scope: row.scope,
+            dateKey: row.dateKey,
+            data: row.data,
+          },
+        },
+  );
+
+  return {
+    created: rows.length - existing.size,
+    merged: existing.size,
+    ops,
+  };
 }
 
 /** Applies a fully-resolved backup import plan: tags and threads first, then people (their tagIds
@@ -1470,13 +1523,23 @@ export async function importBackup(plan: BackupImportPlan): Promise<BackupImport
     peopleResult.personIdMap,
     threadsResult.threadIdMap,
   );
+  // Last, and independent of the id maps above: plugin rows reference nothing the others own.
+  const pluginResult = await importPluginRecords(plan.pluginRecords);
 
-  await enqueueBatch([
-    ...tagsResult.ops,
-    ...threadsResult.ops,
-    ...peopleResult.ops,
-    ...entriesResult.ops,
-  ]);
+  /* `tolerate404` on every op: a backup is a snapshot of how things were, and restoring one onto an
+     account that has moved on legitimately references people, entries and threads the server has
+     since deleted. Those writes come back 404, and they are not failures worth reporting — nothing
+     was lost, the target was already gone. Without the flag they become dead letters and a
+     "N changes couldn't be saved" toast about data the user deleted on purpose. See OutboxOp. */
+  await enqueueBatch(
+    [
+      ...tagsResult.ops,
+      ...threadsResult.ops,
+      ...peopleResult.ops,
+      ...entriesResult.ops,
+      ...pluginResult.ops,
+    ].map((op) => ({ ...op, tolerate404: true })),
+  );
 
   return {
     tags: { created: tagsResult.created, merged: tagsResult.merged },
@@ -1488,5 +1551,6 @@ export async function importBackup(plan: BackupImportPlan): Promise<BackupImport
       skipped: entriesResult.skipped,
       orphaned: entriesResult.orphaned,
     },
+    pluginRecords: { created: pluginResult.created, merged: pluginResult.merged },
   };
 }

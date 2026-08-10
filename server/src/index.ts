@@ -14,6 +14,7 @@ import {
 } from './lib/telemetry';
 import type { AppEnv } from './middleware/session';
 import { ensureTombstoneTtl, tombstoneGauges } from './models/deletion';
+import { ensurePluginRecordIndexes, pluginRecordGauges } from './models/pluginRecord';
 import { liveSyncGauges } from './services/liveSync';
 
 async function main() {
@@ -31,6 +32,11 @@ async function main() {
      check and not by whether the rows are actually gone. An index tweak failing is not a reason to
      leave someone unable to open their diary. */
   await ensureTombstoneTtl().catch((err) => captureError(err, { scope: 'tombstoneTtl' }));
+  /* Same tolerance, for the same reason: without these indexes plugin sync still answers correctly,
+     it just scans instead of seeking. A slow delta is not a reason to refuse to start. */
+  await ensurePluginRecordIndexes().catch((err) =>
+    captureError(err, { scope: 'pluginRecordIndexes' }),
+  );
   const db = mongoose.connection.getClient().db();
   const auth = buildAuth(db);
 
@@ -51,7 +57,11 @@ async function main() {
      source has to know the other exists — and so lib/telemetry.ts keeps importing no model and no
      service, which is what stops it from being part of an import cycle with the things it reports
      on (liveSync already imports it). */
-  startRuntimeMetrics(async () => ({ ...liveSyncGauges(), ...(await tombstoneGauges()) }));
+  startRuntimeMetrics(async () => ({
+    ...liveSyncGauges(),
+    ...(await tombstoneGauges()),
+    ...(await pluginRecordGauges()),
+  }));
 
   // A crash or a container stop shouldn't take buffered telemetry with it.
   process.on('uncaughtException', (err) => captureError(err, { scope: 'uncaughtException' }));

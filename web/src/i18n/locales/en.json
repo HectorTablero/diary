@@ -12,7 +12,8 @@
     "tags": "Tags",
     "threads": "Threads",
     "settings": "Settings",
-    "more": "More"
+    "more": "More",
+    "allPlugins": "All plugins"
   },
   "auth": {
     "signInWithGoogle": "Continue with Google",
@@ -593,7 +594,14 @@
     "signOutPendingTitle_one": "Sign out with {{count}} change not yet saved to your account?",
     "signOutPendingTitle_other": "Sign out with {{count}} changes not yet saved to your account?",
     "signOutPendingDescription": "Signing out clears this device. Anything still waiting to sync will be lost for good. Reconnect and let it finish first if you want to keep it.",
-    "signOutDiscard": "Sign out and discard"
+    "signOutDiscard": "Sign out and discard",
+    "plugins": {
+      "title": "Plugins",
+      "description": "Optional features you can switch on. Enabling one applies to every device.",
+      "hasData_one": "Off — {{count}} entry saved on this account",
+      "hasData_other": "Off — {{count}} entries saved on this account",
+      "saveFailed": "Couldn't change that plugin."
+    }
   },
   "errors": {
     "unauthorized": "You need to sign in",
@@ -731,7 +739,20 @@
     "allClear": "Nothing to resolve",
     "allClearDescription": "Everything in this backup is new to this device, so nothing will be overwritten or merged. Import it whenever you are ready.",
     "allResolved": "Every conflict resolved.",
-    "resolvedProgress": "{{resolved}} of {{total}}"
+    "resolvedProgress": "{{resolved}} of {{total}}",
+    "saving": "Restoring…",
+    "syncing": "Uploading…",
+    "syncingHint": "Keep this page open until the upload finishes.",
+    "syncLater": "Saved on this device. It will finish uploading once you are back online.",
+    "plugins": "Plugins",
+    "pluginRows_one": "{{count}} entry",
+    "pluginRows_other": "{{count}} entries",
+    "pluginSettingsDiffer": "This account: {{current}}. Backup: {{incoming}}.",
+    "pluginOn": "on, {{count}} option",
+    "pluginOn_other": "on, {{count}} options",
+    "pluginOff": "off",
+    "pluginKeepCurrent": "Keep current",
+    "pluginUseBackup": "Use backup"
   },
   "security": {
     "title": "Security",

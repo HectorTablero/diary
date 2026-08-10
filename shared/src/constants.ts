@@ -170,6 +170,47 @@ export const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 export const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 export const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
+/* --- Plugin records ----------------------------------------------------------------------------
+
+   One collection carries every plugin's rows, so that adding a plugin is a client-only change: no
+   model, no route, no sync wiring, no Dexie version. The price is that the server cannot know what
+   any given `data` blob is *supposed* to look like — it never reads one — so what would normally be
+   a schema's job is done by the bounds below instead.
+
+   Deliberately no closed enum of plugin ids. Requiring one would put a `shared/` change and a server
+   deploy in front of every new plugin, which is the entire thing this collection exists to avoid.
+   MAX_PLUGINS_PER_USER is what keeps that openness from being a way to grow the collection without
+   limit. */
+
+/** Plugin ids appear in an index key and a localStorage key, so: lowercase, no separators that
+    collide with the i18n key path (`.`) or an i18next namespace (`:`). */
+export const PLUGIN_ID_REGEX = /^[a-z][a-z0-9-]{0,31}$/;
+
+/** Distinct plugin ids one account may hold rows for. Generous against the number of plugins that
+    will ever ship, small enough that an open `pluginId` can't be used to sprawl the collection. */
+export const MAX_PLUGINS_PER_USER = 32;
+
+/** Rows one account may hold for one plugin. A day-scoped plugin writes one row per day, so this is
+    roughly 50 years of daily use — reached only by something writing rows it shouldn't. */
+export const MAX_PLUGIN_RECORDS_PER_PLUGIN = 20_000;
+
+/** Serialized size cap on a single row's `data`. Enforced on the JSON text rather than on the
+    object, because that is the thing that actually costs storage and bandwidth, and it holds even
+    for a shape no per-field rule anticipated. */
+export const MAX_PLUGIN_DATA_BYTES = 4096;
+
+/** How deep a `data` blob may nest. Plugin data is settings and per-day values; anything deeper is
+    a document, and documents belong in entries. */
+export const MAX_PLUGIN_DATA_DEPTH = 3;
+
+/** The sentinel `dateKey` for a row that isn't about a particular day.
+ *
+ * Empty string rather than null, and this is not cosmetic: IndexedDB cannot index null, and a
+ * compound index requires *every* keypath to hold a valid key. A null here would silently drop the
+ * row out of Dexie's `[pluginId+dateKey]` index — the row would exist, and every query through that
+ * index would behave as though it did not. `''` is a valid key and sorts before every real date. */
+export const UNDATED_KEY = '';
+
 /** `YYYY-MM-DD`, or vCard-style `--MM-DD` when the year is unknown — phone contacts very
     often store a birthday without one, so the year can never be required.
     Note the alternation covers the trailing dash: it's `YYYY-` or `--`, then `MM-DD`. */

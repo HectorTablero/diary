@@ -33,6 +33,13 @@ import {
   type TagImportItem,
   type ThreadImportItem,
 } from '@/db/mutations';
+import { PluginImportSection } from '@/components/settings/PluginImportSection';
+import { forceSyncNow, waitForOutboxDrain } from '@/db/sync';
+import {
+  applyPluginSettingsChoices,
+  usePluginSettingsConflicts,
+  type PluginSettingsResolution,
+} from '@/plugins/importConflicts';
 import { bulkActions, type BulkCandidate } from '@/lib/backup/bulk';
 import {
   backupMergeTargets,
@@ -145,7 +152,32 @@ export default function ImportBackupPage() {
   const [threadResolutions, setThreadResolutions] = useState<Record<string, BackupResolution>>({});
   const [personResolutions, setPersonResolutions] = useState<Record<string, BackupResolution>>({});
   const [entryResolutions, setEntryResolutions] = useState<Record<string, BackupResolution>>({});
-  const [importing, setImporting] = useState(false);
+  /**
+   * Where the import has got to.
+   *
+   * Two phases and not one, because the second is the slow half and used to be invisible. Writing
+   * to Dexie is fast; pushing thousands of queued writes to the server is not, and the page used to
+   * navigate away the moment the local half finished. The upload then continued in the background
+   * with nothing on screen tied to it — so a restore looked instantaneous, and anything it had to
+   * report arrived as a toast on some later screen, detached from the thing that caused it.
+   *
+   * A restore is also the one action people take *because* they are anxious about their data. It is
+   * the wrong moment to be told "done" while the work is still going.
+   */
+  const [phase, setPhase] = useState<'idle' | 'saving' | 'syncing'>('idle');
+  const importing = phase !== 'idle';
+
+  /* Plugin settings restore like everything else, but they *replace* what this account uses on
+     every device — so where the file and the account disagree, the user picks. Unconflicted
+     settings need no decision and are simply applied. See plugins/importConflicts. */
+  const pluginRows = useMemo(() => envelope?.pluginRecords ?? [], [envelope]);
+  const { conflicts: pluginConflicts } = usePluginSettingsConflicts(pluginRows);
+  const [pluginResolutions, setPluginResolutions] = useState<
+    Record<string, PluginSettingsResolution>
+  >({});
+  const unresolvedPlugins = pluginConflicts.filter(
+    (conflict) => !pluginResolutions[conflict.pluginId],
+  ).length;
 
   /* A backup import always brings in everything — there's no per-category opt-out, no per-row skip
      and nothing here edits what is in the file, only "resolved via insertion or merge" (see
@@ -213,12 +245,18 @@ export default function ImportBackupPage() {
      Leaving them out of the total made the footer read "288 of 288" under tiles adding up to 384,
      which reads as a page that has lost track of a category rather than as one that is finished. */
   const totalUnresolved =
-    unresolvedTags.length + unresolvedThreads.length + unresolvedPeople.length;
+    unresolvedTags.length +
+    unresolvedThreads.length +
+    unresolvedPeople.length +
+    // Plugin settings gate the button like any other clash: silently keeping one side would be
+    // choosing for the user about settings that then sync to every device.
+    unresolvedPlugins;
   const totalConflicts =
     conflictedTags.length +
     conflictedThreads.length +
     conflictedPeople.length +
-    conflictedEntries.length;
+    conflictedEntries.length +
+    pluginConflicts.length;
 
   /* Section-wide buttons, built from the same three facts each row exposes to its own buttons —
      what it can merge into, whether "keep both" is legal for it, whether it can be overwritten — so
@@ -295,6 +333,10 @@ export default function ImportBackupPage() {
       variant="ghost"
       size="sm"
       className="gap-1.5"
+      /* Held shut while the restore runs. Leaving does not *lose* anything — the writes are in the
+         outbox either way — but it abandons the only screen that says what is happening, and this
+         is the one flow where being unsure whether it finished is the actual harm. */
+      disabled={importing}
       onClick={() => void navigate('/settings')}
     >
       <ArrowLeft className="size-4" />
@@ -325,7 +367,7 @@ export default function ImportBackupPage() {
   }
 
   const runImport = async () => {
-    setImporting(true);
+    setPhase('saving');
     try {
       const tags: TagImportItem[] = tagRows.map((row) => ({
         row,
@@ -343,7 +385,21 @@ export default function ImportBackupPage() {
         row,
         resolution: entryResolutionFor(row.id),
       }));
-      const summary = await importBackup({ tags, threads, people, entries });
+      const pluginRecords = applyPluginSettingsChoices(
+        pluginRows,
+        pluginConflicts,
+        pluginResolutions,
+      );
+      const summary = await importBackup({ tags, threads, people, entries, pluginRecords });
+
+      /* Everything is now safely in Dexie, so nothing below can lose it — but it is still only on
+         this device, and that is not what someone restoring a backup means by "done". Push, and
+         stay on this screen until the queue is empty. `forceSyncNow` rather than `syncNow`: this is
+         an explicit action, so it goes ahead even when the user has asked to sync on Wi-Fi only. */
+      setPhase('syncing');
+      void forceSyncNow();
+      const outcome = await waitForOutboxDrain();
+
       notifySuccess(
         t('importBackup.done', {
           tagsCreated: summary.tags.created,
@@ -363,6 +419,12 @@ export default function ImportBackupPage() {
       if (summary.entries.orphaned > 0) {
         toast.info(t('importBackup.orphaned', { count: summary.entries.orphaned }));
       }
+      /* Not an error: the writes are in the outbox and will replay. Said plainly so the user can
+         leave knowing the restore is safe but not yet on the server — which is the one thing they
+         would otherwise have no way to tell apart from a finished one. */
+      if (outcome === 'blocked') {
+        toast.info(t('importBackup.syncLater'));
+      }
       void navigate('/settings');
     } catch (err) {
       /* The toast can only ever say "something went wrong" — by this point the user has spent real
@@ -371,7 +433,7 @@ export default function ImportBackupPage() {
          without it the failure leaves no trace of which write threw. */
       console.error('backup: import failed', err);
       notifyError(t('errors.unknown'));
-      setImporting(false);
+      setPhase('idle');
     }
   };
 
@@ -547,6 +609,17 @@ export default function ImportBackupPage() {
         </ConflictSection>
       )}
 
+      {/* Not a ConflictSection: plugin rows have no name to clash on, so there is nothing to
+          resolve — only the one decision about whether settings come with them. */}
+      <PluginImportSection
+        rows={pluginRows}
+        conflicts={pluginConflicts}
+        resolutions={pluginResolutions}
+        onResolve={(pluginId, resolution) =>
+          setPluginResolutions((prev) => ({ ...prev, [pluginId]: resolution }))
+        }
+      />
+
       <div className="sticky bottom-0 flex flex-col gap-2 border-t bg-background/95 py-3 backdrop-blur">
         {totalConflicts > 0 && (
           /* A bar, not just a sentence. "Resolve 12 conflicts to continue" is the same message on
@@ -590,8 +663,21 @@ export default function ImportBackupPage() {
           onClick={() => void runImport()}
         >
           {importing && <Spinner className="size-3.5" />}
-          {t('importBackup.confirm')}
+          {/* The label names the phase rather than staying "Restore" behind a spinner. The upload
+              is the long one and it is the one people are most likely to interrupt, so it has to
+              say what it is waiting for — a spinner alone reads as a hung button. */}
+          {phase === 'saving'
+            ? t('importBackup.saving')
+            : phase === 'syncing'
+              ? t('importBackup.syncing')
+              : t('importBackup.confirm')}
         </Button>
+        {phase === 'syncing' && (
+          // aria-live, so a screen reader is told why the button stopped responding.
+          <p className="text-center text-xs text-muted-foreground" role="status">
+            {t('importBackup.syncingHint')}
+          </p>
+        )}
       </div>
     </PageContainer>
   );
