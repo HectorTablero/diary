@@ -42,9 +42,10 @@ final class HabitsWidgetStore {
      * because an unrecognised version is deliberately treated as *absent* rather than parsed
      * optimistically. Change one, change the other, in the same commit.
      *
-     * 3 added `timerStartedAt`; 2 added `min`/`max` and split `ratio` into `scale` and `mood`.
+     * 4 added `streakBefore`; 3 added `timerStartedAt`; 2 added `min`/`max` and split `ratio` into
+     * `scale` and `mood`.
      */
-    private static final int SUPPORTED_VERSION = 3;
+    private static final int SUPPORTED_VERSION = 4;
 
     private HabitsWidgetStore() {}
 

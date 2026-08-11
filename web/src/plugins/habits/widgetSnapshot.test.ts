@@ -179,7 +179,7 @@ describe('buildSnapshot', () => {
   it('stamps the day it describes, so the provider can refuse to present it as another one', () => {
     const snapshot = buildSnapshot('2026-08-11', [habit()], { h1: 1 }, new Map(), strings);
     expect(snapshot.dateKey).toBe('2026-08-11');
-    expect(snapshot.v).toBe(3);
+    expect(snapshot.v).toBe(4);
   });
 
   it('reads a missing value as zero rather than dropping the row', () => {
@@ -198,6 +198,22 @@ describe('buildSnapshot', () => {
       strings,
     );
     expect(snapshot.rows.map((r) => r.streak)).toEqual([4, 0]);
+  });
+
+  it('ships streakBefore separately, so a widget press can add today without a new snapshot', () => {
+    // 'a' is met today (value 1 on a binary habit); the streak crosses from 4 to 5. 'b' is unmet, so
+    // its streakBefore and streak agree — the split only shows up once today's own answer is yes.
+    const snapshot = buildSnapshot(
+      '2026-08-11',
+      [habit({ id: 'a' }), habit({ id: 'b' })],
+      { a: 1 },
+      new Map([['a', 4]]),
+      strings,
+    );
+    expect(snapshot.rows.map((r) => ({ streakBefore: r.streakBefore, streak: r.streak }))).toEqual([
+      { streakBefore: 4, streak: 5 },
+      { streakBefore: 0, streak: 0 },
+    ]);
   });
 
   it('produces an empty row list rather than omitting the snapshot when nothing applies', () => {

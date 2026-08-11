@@ -344,7 +344,11 @@ public class HabitsWidgetProvider extends AppWidgetProvider {
         );
         strip.setTextViewText(R.id.session_label, row.optString("label"));
 
-        final int streak = row.optInt("streak");
+        /* The running session counts toward met here too — a stretch that crosses its goal mid-timer
+           is done the moment it crosses it, not only once paused, and the streak badge above the
+           clock should not lag the goal bar below it. */
+        final boolean met = HabitsWidgetRow.isMet(row, banked + (int) (sessionMs / 1000L));
+        final int streak = HabitsWidgetRow.streakFor(row, met);
         if (streak >= HabitsWidgetRow.STREAK_MIN) {
             strip.setViewVisibility(R.id.session_streak, View.VISIBLE);
             strip.setTextViewText(R.id.session_streak_count, String.valueOf(streak));

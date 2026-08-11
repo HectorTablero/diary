@@ -22,7 +22,7 @@ import {
   valueData,
   type Habit,
 } from './model';
-import { currentStreak, dateKeyWindow, STREAK_WINDOW_DAYS } from './streaks';
+import { dateKeyWindow, streakBefore, STREAK_WINDOW_DAYS } from './streaks';
 import { buildSnapshot, type WidgetSnapshot, type WidgetStrings } from './widgetSnapshot';
 
 /**
@@ -158,8 +158,11 @@ const metDays = (
  * thing on the card that cannot be answered from today's row alone — and it is one indexed scan of
  * small rows, run on resume rather than on a timer.
  *
- * Streaks include today (`currentStreak`, not `streakBefore`), because unlike the day card there is
- * no local optimistic value to add on top: the widget is drawing settled state.
+ * Ships `streakBefore`, not today's full streak, and for the day card's own reason: today's own
+ * answer is the one thing that can still change after this snapshot is written — a press on the
+ * widget itself, with the app not running to draw a new one — so `toRow` derives it from `met`
+ * instead, which the provider already recomputes live. Shipping the inclusive number here would be
+ * exactly the staleness `streakBefore` exists to route around.
  */
 async function readSnapshot(): Promise<WidgetSnapshot> {
   const dateKey = todayKey();
@@ -178,8 +181,8 @@ async function readSnapshot(): Promise<WidgetSnapshot> {
      today, which cannot happen for a real clock but can for a device whose date was wound back. */
   const active = habits.filter((habit) => !isArchived(habit) && habitAppliesOn(habit, dateKey));
 
-  const streaks = new Map(
-    active.map((habit) => [habit.id, currentStreak(metDays(habit, history), dateKey)]),
+  const streaksBefore = new Map(
+    active.map((habit) => [habit.id, streakBefore(metDays(habit, history), dateKey)]),
   );
 
   const timers = await readTimers();
@@ -198,7 +201,7 @@ async function readSnapshot(): Promise<WidgetSnapshot> {
     dateKey,
     active,
     values,
-    streaks,
+    streaksBefore,
     { ...text, empty: habits.length === 0 ? text.empty : text.nothingToday },
     running,
   );
