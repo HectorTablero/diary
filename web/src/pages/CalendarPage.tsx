@@ -62,15 +62,19 @@ function heatmapBg(count: number, maxImportance: number, isDark: boolean): strin
   return colors[maxImportance] ?? colors[3];
 }
 
-/* A single hue, deliberately outside the five used for importance above — a cell tinted violet
-   reads at a glance as "not the entries heatmap" without needing a caption to say so, whichever
-   plugin's data happens to be showing. Opacity still carries the same "how much" the entries
-   heatmap uses opacity for, just against `level` (0..1) rather than a raw count. */
+/* The default for a plugin whose manifest doesn't declare its own hue (see PluginManifest.hue) — a
+   cell tinted violet reads at a glance as "not the entries heatmap" without needing a caption to
+   say so, whichever plugin's data happens to be showing. Opacity still carries the same "how much"
+   the entries heatmap uses opacity for, just against `level` (0..1) rather than a raw count. */
 const PLUGIN_HEATMAP_RGB = { light: '124, 58, 237', dark: '196, 165, 255' };
 
-function pluginHeatmapBg(level: number, isDark: boolean): string {
+function pluginHeatmapBg(
+  level: number,
+  isDark: boolean,
+  hue: { light: string; dark: string } = PLUGIN_HEATMAP_RGB,
+): string {
   const opacity = Math.min(0.55, 0.12 + Math.max(0, level) * 0.43);
-  return `rgba(${isDark ? PLUGIN_HEATMAP_RGB.dark : PLUGIN_HEATMAP_RGB.light}, ${opacity})`;
+  return `rgba(${isDark ? hue.dark : hue.light}, ${opacity})`;
 }
 
 function isHighDensity(count: number): boolean {
@@ -100,6 +104,10 @@ export default function CalendarPage() {
   const pluginViews = usePluginCalendarViews();
   const [view, setView] = useState<string>(ENTRIES_VIEW);
   const activePlugin = view === ENTRIES_VIEW ? undefined : findPlugin(view);
+  // Read once per render rather than inline at each of the two spots that need it — `findPlugin`
+  // promises a manifest, not a stable reference, so recomputing it a second time is a fresh object
+  // for no reason a plain variable doesn't already cover.
+  const legendHue = activePlugin?.hue ?? PLUGIN_HEATMAP_RGB;
 
   // A plugin disabled (or a chunk that failed) while its tab was open falls back to the entries
   // view rather than leaving the switcher pointed at a tab that no longer exists.
@@ -117,14 +125,28 @@ export default function CalendarPage() {
   }, [cursor, year, month]);
 
   const [pluginData, setPluginData] = useState<ReadonlyMap<string, PluginCalendarDay> | null>(null);
-  // Cleared on every switch — of tab or of month — so a cell never shows last month's, or another
-  // plugin's, data for the beat before the new one arrives. Keyed on `view` itself rather than on
-  // `activePlugin`: `findPlugin` promises a manifest, not a stable *reference* to one across calls,
-  // and this effect would otherwise re-arm on every render whose lookup happened to return a new
-  // object — wiping out `onData` in the same tick it just delivered data.
-  useEffect(() => {
+  /* Cleared on every switch — of tab or of month — so a cell never shows last month's, or another
+     plugin's, data for the beat before the new one arrives.
+
+     Reset *during render*, guarded by a key comparison, rather than in a `useEffect`. An
+     effect-based reset here used to race a CalendarView that computes its data synchronously from
+     state it already held (rather than kicking off a fresh async read on every `start`/`end`
+     change): both the reset and the view's own `onData` report are passive effects of the *same*
+     commit, and effects fire child-before-parent, so the freshly reported data landed first and
+     this effect then fired right after and wiped it straight back out to null — nothing was ever
+     wrong with the data, it was overwritten a beat after arriving. Resetting inline during render
+     sidesteps the race entirely: React settles the cleared state before any effect for the new
+     `start`/`end` gets a chance to run at all. See
+     https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes.
+
+     Keyed on `view` itself rather than on `activePlugin`: `findPlugin` promises a manifest, not a
+     stable *reference* to one across calls, and comparing objects here would reset every render. */
+  const pluginDataKey = `${view}:${monthStart}:${monthEnd}`;
+  const [loadedPluginDataKey, setLoadedPluginDataKey] = useState(pluginDataKey);
+  if (loadedPluginDataKey !== pluginDataKey) {
+    setLoadedPluginDataKey(pluginDataKey);
     setPluginData(null);
-  }, [view, monthStart, monthEnd]);
+  }
 
   const cells = useMemo(() => {
     const first = startOfMonth(cursor);
@@ -243,7 +265,10 @@ export default function CalendarPage() {
         {cells.map((dateKey, i) => {
           if (!dateKey) return <div key={i} className="h-10" />;
 
-          const celebrating = birthdaysByDate.get(dateKey);
+          // Birthdays are the entries heatmap's own marker — a plugin's tab shades by its own data,
+          // and a Cake icon borrowed from an unrelated view would read as this plugin's own claim
+          // about the day.
+          const celebrating = view === ENTRIES_VIEW ? birthdaysByDate.get(dateKey) : undefined;
           const entryDay = view === ENTRIES_VIEW ? byDate.get(dateKey) : undefined;
           const pluginDay = view === ENTRIES_VIEW ? undefined : pluginData?.get(dateKey);
 
@@ -255,7 +280,7 @@ export default function CalendarPage() {
                   ? heatmapBg(entryDay.count, entryDay.maxImportance, isDark)
                   : undefined
                 : pluginDay
-                  ? pluginHeatmapBg(pluginDay.level, isDark)
+                  ? pluginHeatmapBg(pluginDay.level, isDark, legendHue)
                   : undefined;
 
           const bold =
@@ -340,7 +365,7 @@ export default function CalendarPage() {
                         ? isDark
                           ? `rgba(255, 255, 255, ${op})`
                           : `rgba(23, 23, 23, ${op})`
-                        : `rgba(${isDark ? PLUGIN_HEATMAP_RGB.dark : PLUGIN_HEATMAP_RGB.light}, ${op})`,
+                        : `rgba(${isDark ? legendHue.dark : legendHue.light}, ${op})`,
                   borderColor: 'var(--border)',
                 }}
               />
@@ -349,9 +374,9 @@ export default function CalendarPage() {
           <span className="text-[11px] text-muted-foreground">{t('common.more')}</span>
         </div>
         <div className="flex max-w-3/5 flex-wrap justify-center gap-x-3 gap-y-1">
-          {/* The importance dots only mean something against the entries heatmap they were drawn
-              for — a plugin's "level" has no such breakdown, so the legend below it drops to just
-              the opacity gradient and (still relevant either way) the birthday marker. */}
+          {/* The importance dots and the birthday marker are both the entries heatmap's own —
+              neither means anything against a plugin's "level", which has no such breakdown, so the
+              legend below a plugin's tab drops to just the opacity gradient. */}
           {view === ENTRIES_VIEW &&
             [1, 2, 3, 4, 5].map((level) => (
               <div key={level} className="flex items-center gap-1">
@@ -361,7 +386,7 @@ export default function CalendarPage() {
                 </span>
               </div>
             ))}
-          {birthdaysByDate.size > 0 && (
+          {view === ENTRIES_VIEW && birthdaysByDate.size > 0 && (
             <div className="flex items-center gap-1">
               <Cake className="size-3 text-pink-500 dark:text-pink-400" />
               <span className="text-[10px] text-muted-foreground">{t('diary.birthdays')}</span>

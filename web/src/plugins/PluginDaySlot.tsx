@@ -30,9 +30,12 @@ export function PluginDaySlot({ dateKey }: { dateKey: string }) {
 
   // Filter on `enabled` first: it is the check that is false for almost everyone, so it is the one
   // that should short-circuit. `surfaces` narrows what is left to plugins that actually draw here.
+  // Sorted by `dayOrder` — a display concern, independent of `PLUGINS`' own append-only order (see
+  // the field's doc comment in registry.ts). `.filter()` already returns a fresh array, so sorting
+  // it in place doesn't touch `PLUGINS` itself.
   const active = PLUGINS.filter(
     (plugin) => enabled.has(plugin.id) && plugin.surfaces.includes('day'),
-  );
+  ).sort((a, b) => (a.dayOrder ?? 0) - (b.dayOrder ?? 0));
   if (!active.length) return null;
 
   return (
