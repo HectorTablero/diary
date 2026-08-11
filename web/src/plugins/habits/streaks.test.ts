@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentStreak, dateKeyWindow, streakBefore } from './streaks';
+import { currentStreak, dateKeysBetween, dateKeyWindow, streakBefore } from './streaks';
 
 /* Date arithmetic, which is where this feature's bugs would live and where none of them would be
    visible: a streak that is silently one short reads as a user's own misremembering. */
@@ -115,6 +115,31 @@ describe('dateKeyWindow', () => {
       '2026-02-28',
       '2026-03-01',
       '2026-03-02',
+    ]);
+  });
+});
+
+describe('dateKeysBetween', () => {
+  it('returns every day from start to end, inclusive, oldest first', () => {
+    expect(dateKeysBetween('2026-08-01', '2026-08-05')).toEqual([
+      '2026-08-01',
+      '2026-08-02',
+      '2026-08-03',
+      '2026-08-04',
+      '2026-08-05',
+    ]);
+  });
+
+  it('handles a single-day range', () => {
+    expect(dateKeysBetween('2026-08-10', '2026-08-10')).toEqual(['2026-08-10']);
+  });
+
+  it("crosses a month boundary — the calendar view's actual use case", () => {
+    expect(dateKeysBetween('2026-01-30', '2026-02-02')).toEqual([
+      '2026-01-30',
+      '2026-01-31',
+      '2026-02-01',
+      '2026-02-02',
     ]);
   });
 });

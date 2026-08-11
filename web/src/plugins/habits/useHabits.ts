@@ -13,6 +13,8 @@ import { onSyncApplied } from '@/db/sync';
 import {
   habitData,
   configChanged,
+  habitAppliesOn,
+  habitCreatedBy,
   isArchived,
   MAX_HABITS,
   metTarget,
@@ -24,7 +26,13 @@ import {
   type HabitConfig,
 } from './model';
 import { todayKey } from '@/lib/dates';
-import { currentStreak, dateKeyWindow, streakBefore, STREAK_WINDOW_DAYS } from './streaks';
+import {
+  currentStreak,
+  dateKeysBetween,
+  dateKeyWindow,
+  streakBefore,
+  STREAK_WINDOW_DAYS,
+} from './streaks';
 
 const PLUGIN_ID = 'habits';
 
@@ -86,6 +94,17 @@ export interface HabitsDay {
   loading: boolean;
   /** Any habit at all, archived or not — the difference between "nothing set up" and "all done". */
   hasAnyHabit: boolean;
+  /**
+   * Whether *any* habit had already been created by this day — regardless of whether it has since
+   * been retired, and regardless of whether it was retired *before* this day too.
+   *
+   * The distinction the day card needs when both lists come up empty: a habit archived before this
+   * day still means something happened here once, and the card should say so ("every habit is
+   * retired"); a day that predates the very first habit means the question was never asked at all,
+   * and the card should not appear rather than explain an emptiness that isn't really about
+   * anything. See `habitCreatedBy` in model.ts.
+   */
+  anyHabitCreatedByThatDay: boolean;
   setValue: (habitId: string, value: number) => void;
 }
 
@@ -163,7 +182,11 @@ export function useHabitsDay(dateKey: string): HabitsDay {
     return result;
   }, [habits, history, dateKey]);
 
-  const active = habits.filter((habit) => !isArchived(habit));
+  // `habitCreatedBy` rather than just `!isArchived`: a habit created after this day was not being
+  // asked about on it, and showing it as an unchecked box would be asking the day a question it
+  // never actually posed. (The archival half of `habitAppliesOn` is a no-op here, since
+  // `!isArchived` already excludes every currently-retired habit.)
+  const active = habits.filter((habit) => !isArchived(habit) && habitCreatedBy(habit, dateKey));
   const archivedWithProgress = habits.filter(
     (habit) => isArchived(habit) && (values[habit.id] ?? 0) > 0,
   );
@@ -175,6 +198,11 @@ export function useHabitsDay(dateKey: string): HabitsDay {
     priorStreaks,
     loading,
     hasAnyHabit: habits.length > 0,
+    // Distinguishes "every habit is retired" from "no habit created yet" — both leave the card's
+    // two lists empty, but one is a fact worth stating and the other is a question this day never
+    // asked. `habitCreatedBy` rather than `habitAppliesOn`: a habit archived before this day still
+    // counts here, so its retirement gets said out loud instead of the card vanishing.
+    anyHabitCreatedByThatDay: habits.some((habit) => habitCreatedBy(habit, dateKey)),
     setValue,
   };
 }
@@ -334,4 +362,56 @@ export function useHabitsLibrary(today: string): HabitsLibrary {
     setArchived,
     deleteHabit,
   };
+}
+
+/* --- The calendar view ------------------------------------------------------------------------- */
+
+/** One day's ratio, before it becomes a `PluginCalendarDay` — kept as plain numbers here so this
+    file stays free of `t()`, same split as everywhere else in the plugin: data here, strings in
+    the component. */
+export interface HabitDayRatio {
+  met: number;
+  total: number;
+}
+
+/**
+ * Each day of a month range, scored as "how many of that day's habits were met".
+ *
+ * Bounded by `start`/`end` rather than counting back from today, since the calendar can be any
+ * month — and a range read is one indexed scan, the same shape as the window `useHabitsDay` reads
+ * for streaks. Only habits `habitAppliesOn` that day count toward the denominator, which is what
+ * keeps a day before a habit existed, or after it was retired, from watering down every other day's
+ * ratio.
+ */
+export function useHabitsCalendar(start: string, end: string): ReadonlyMap<string, HabitDayRatio> {
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [history, setHistory] = useState<Map<string, Record<string, number>>>(new Map());
+
+  const load = useCallback(async () => {
+    const [definitions, days] = await Promise.all([
+      getUndatedRecords(PLUGIN_ID),
+      getDayRecords(PLUGIN_ID, start, end),
+    ]);
+    setHabits(definitionsOf(definitions));
+    setHistory(new Map(days.map((row) => [row.dateKey, parseValues(row)])));
+  }, [start, end]);
+
+  useEffect(() => {
+    void load();
+    return onSyncApplied(() => void load());
+  }, [load]);
+
+  return useMemo(() => {
+    const data = new Map<string, HabitDayRatio>();
+    for (const day of dateKeysBetween(start, end)) {
+      const applicable = habits.filter((habit) => habitAppliesOn(habit, day));
+      if (!applicable.length) continue; // nothing was being tracked yet — not a day of zero
+      const recorded = history.get(day) ?? {};
+      const met = applicable.filter((habit) =>
+        metTarget(habit, recorded[habit.id] ?? 0, day),
+      ).length;
+      data.set(day, { met, total: applicable.length });
+    }
+    return data;
+  }, [habits, history, start, end]);
 }

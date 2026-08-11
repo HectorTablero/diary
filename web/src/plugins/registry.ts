@@ -54,7 +54,7 @@ export const PLUGINS: readonly PluginManifest[] = [
   {
     id: 'habits',
     icon: CircleCheckBig,
-    surfaces: ['day', 'page', 'settings', 'notifications', 'export'],
+    surfaces: ['day', 'page', 'settings', 'notifications', 'export', 'calendar'],
     load: () => import('./habits'),
   },
 ];

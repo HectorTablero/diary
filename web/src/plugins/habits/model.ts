@@ -292,6 +292,38 @@ export function metTarget(habit: Habit, value: number, dateKey?: string): boolea
   return target ? value >= target : true;
 }
 
+/**
+ * Whether a habit had been created by a given day — regardless of whether it has since been
+ * retired.
+ *
+ * Judged from the same trail an edit already leaves — the earliest banked revision if there is
+ * one, `since` otherwise — so a habit's reach into the past is exactly as defensible as
+ * `configAt`'s reading of it elsewhere. Kept separate from `habitAppliesOn`: "did this habit exist
+ * yet" and "is this habit still being asked about" are different questions, with different
+ * answers wanted for them — a day after a habit was retired should still say *something* about it
+ * having existed, where a day before it was ever created should not.
+ */
+export function habitCreatedBy(habit: Habit, dateKey: string): boolean {
+  const origin = habit.revisions[0]?.since || habit.since;
+  return !origin || dateKey >= origin;
+}
+
+/**
+ * Whether a habit should be judged on a given day at all — it existed, and had not yet been
+ * retired, as of that day.
+ *
+ * For the calendar view, which scores a whole *day* rather than one habit: a day before a habit was
+ * created, or after it was archived, is not a day it fell short on, it is a day the question wasn't
+ * being asked, and counting it either way would water down every other day's ratio.
+ */
+export function habitAppliesOn(habit: Habit, dateKey: string): boolean {
+  if (!habitCreatedBy(habit, dateKey)) return false;
+  // A habit archived *on* dateKey was still live for most of it, so only days strictly after the
+  // archive day are excluded — the day it happened on stays judged, like everywhere else in the plugin.
+  if (habit.archivedAt && habit.archivedAt.slice(0, 10) < dateKey) return false;
+  return true;
+}
+
 /** What was recorded on a day, per habit id. Absent means nothing; there is no stored zero. */
 export function parseValues(record: PluginRecordDto | undefined): Record<string, number> {
   if (!record) return {};

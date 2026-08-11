@@ -162,7 +162,8 @@
       "where": "The month calendar and its day summaries, and the shared date picker that replaced every native date input.",
       "keys": {
         "previous": "Screen-reader label on the month arrows, shared by the Calendar page and the date picker. \"Month\", not \"page\".",
-        "onThisDay": "Entries written on this same date in previous years — any year, not specifically last year. Most languages have a set media phrase for this: Italian Accadde oggi, Chinese 那年今日, Japanese 過去の今日."
+        "onThisDay": "Entries written on this same date in previous years — any year, not specifically last year. Most languages have a set media phrase for this: Italian Accadde oggi, Chinese 那年今日, Japanese 過去の今日.",
+        "entries": "Label on the calendar's default tab, beside a book icon, in a row of tabs that otherwise names one enabled plugin each (\"Habits\", say) — each plugin replaces the calendar's shading with its own per-day data when picked. This is the tab that switches back to it, so it has to read as a peer of those plugin names: a plain noun for \"what's in the diary itself\", matching entriesCount's word for the same thing rather than something like \"Diary\" or \"Default\"."
       }
     },
     "search": {

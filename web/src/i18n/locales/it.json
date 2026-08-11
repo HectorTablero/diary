@@ -376,6 +376,7 @@
     "previous": "Mese precedente",
     "next": "Mese successivo",
     "onThisDay": "Accadde oggi",
+    "entries": "Voci",
     "entriesCount": "{{count}} voce",
     "entriesCount_other": "{{count}} voci",
     "birthdayOf": "compleanno di {{name}}",

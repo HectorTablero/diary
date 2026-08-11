@@ -3,7 +3,7 @@
   "about": "The habit tracker plugin: a checklist of daily habits shown on the diary's day page, below the entry composer. These strings are fetched only when the user enables the plugin, and are merged into the app's main bundle under the `plugins.habits.` prefix — so a key written here as \"title\" is referenced in code as plugins.habits.title. Keys not listed under `keys` below still need translating; the notes exist for the ones whose meaning is not obvious from the English.",
   "namespaces": {
     "habits": {
-      "where": "A card on the diary’s day page below the composer, where habits are recorded but never created; the plugin’s own page at /plugins/habits, where they are created, retired and reviewed as a three-week grid; and its name, description and reminder settings in the Plugins list in Settings.",
+      "where": "A card on the diary’s day page below the composer, where habits are recorded but never created; the plugin’s own page at /plugins/habits, where they are created, retired and reviewed as a three-week grid; its name, description and reminder settings in the Plugins list in Settings; and, once its name appears as a tab, the Calendar page's own month grid, shaded by how many of that day's habits were met. The day card also carries a padlock on any day but today — every day except the one being lived opens read-only, and the padlock is what lets someone deliberately go back and correct one.",
       "keys": {
         "name": "The plugin's name in the Plugins list in Settings. A noun, not a sentence; the word a user would use for the feature.",
         "description": "One line under the name in the Plugins list, explaining what enabling it does.",
@@ -31,7 +31,7 @@
         "turnOffDescription": "Body of it. The reassurance is the point — nothing is deleted, and the switch is reversible — because turning a plugin off syncs to every device.",
         "allRetired": "Shown on the day card when habits exist but every one of them is retired and none was recorded on this day.",
         "newHabit": "Button on the plugin page that opens the creation form.",
-        "doneOf": "Progress counter in the day card’s header, e.g. 2/5. Digits and a slash in every language.",
+        "doneOf": "Progress counter in the day card’s header, e.g. 2/5. Digits and a slash in every language. Reused verbatim in the calendar page's tooltip for a day, once its \"Habits\" tab is picked — same numbers, same meaning, so it has to keep reading correctly there too, without the visible \"Habits\" heading beside it that the day card has.",
         "typeLabel": "Label above the kind selector in the creation form.",
         "unitLabel": "Optional label for what a count is measured in.",
         "unitPlaceholder": "Example unit. Very short — it is shown beside the number on the day card.",
@@ -85,7 +85,12 @@
         "noGoal": "Stands in for a goal that was not set, inside changeGoal. Lower case — it sits mid-sentence.",
         "changesHeading": "Heading of the edit-history section in the Markdown export, under the habit table.",
         "notSet": "Announced by a rating slider that has no value yet. Visually this is an em dash; the string is what distinguishes “not answered” from “rated lowest” for a screen reader.",
-        "edit": "Accessible label for the value itself, which is a button that turns into a text field when pressed. Never displayed — the number is what is shown."
+        "edit": "Accessible label for the value itself, which is a button that turns into a text field when pressed. Never displayed — the number is what is shown.",
+        "unlock": "Accessible name (and, on a pointer device, tooltip trigger) for the padlock button on any day but today, while it is locked. An action, not a description — \"Unlock this day\", not \"Locked\".",
+        "lock": "The same button's accessible name once tapped unlocked, offering to lock it again. \"Lock this day\", the mirror of `unlock`.",
+        "dayLockedPast": "Tooltip shown while the padlock is locked and the day being viewed is before today. Explains *why* editing is blocked and what tapping the button does, since the icon alone only shows the state, not the reason. Read on hover on the web; on the native app there is no tooltip, so `unlock`'s accessible name is what a screen reader gets instead — this string only needs to work as an on-hover explanation.",
+        "dayLockedFuture": "As above, for a day after today. A different reason (it hasn't happened yet, not that it's history), so a different sentence rather than one that tries to cover both.",
+        "dayUnlockedHint": "Tooltip once the day has been unlocked, on either side of today — the reason it was locked stops being the point once you can edit it, so this doesn't distinguish past from future."
       }
     }
   },

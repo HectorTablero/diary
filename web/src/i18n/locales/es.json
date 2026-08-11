@@ -377,6 +377,7 @@
     "previous": "Mes anterior",
     "next": "Mes siguiente",
     "onThisDay": "Tal día como hoy",
+    "entries": "Entradas",
     "entriesCount": "{{count}} entrada",
     "entriesCount_other": "{{count}} entradas",
     "birthdayOf": "Cumpleaños de {{name}}",

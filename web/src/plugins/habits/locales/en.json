@@ -87,5 +87,10 @@
   "noGoal": "none",
   "changesHeading": "Changes",
   "notSet": "Not set",
-  "edit": "Edit {{name}}"
+  "edit": "Edit {{name}}",
+  "unlock": "Unlock this day",
+  "lock": "Lock this day",
+  "dayLockedPast": "This day is in the past, so values are locked. Tap to make changes.",
+  "dayLockedFuture": "This day hasn't happened yet, so values are locked. Tap to make changes.",
+  "dayUnlockedHint": "Unlocked for editing. Tap to lock this day again."
 }

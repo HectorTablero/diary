@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { notifySuccess } from '@/lib/notify';
@@ -58,9 +58,13 @@ export function Section({
 }
 
 /** Label, optional explanation, and a switch on the right — the shape every on/off setting on this
-    page had been repeating. `children` hangs an extra control under the row when one is on. */
+    page had been repeating. `children` hangs an extra control under the row when one is on.
+    `icon` is optional and used only where a row is one of several naming a *thing* rather than a
+    single yes/no preference — the Plugins list, say, where each row is its own feature and the
+    icon is what a user already recognises it by from the day page or its nav entry. */
 export function ToggleRow({
   id,
+  icon: Icon,
   label,
   description,
   checked,
@@ -69,6 +73,7 @@ export function ToggleRow({
   children,
 }: {
   id: string;
+  icon?: LucideIcon;
   label: string;
   description?: string;
   checked: boolean;
@@ -79,9 +84,12 @@ export function ToggleRow({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <Label htmlFor={id}>{label}</Label>
-          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        <div className="flex min-w-0 items-center gap-2.5">
+          {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <Label htmlFor={id}>{label}</Label>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          </div>
         </div>
         <Switch id={id} disabled={disabled} checked={checked} onCheckedChange={onCheckedChange} />
       </div>

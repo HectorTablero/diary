@@ -359,6 +359,7 @@
     "previous": "前の月",
     "next": "次の月",
     "onThisDay": "過去の今日",
+    "entries": "記録",
     "entriesCount": "記録{{count}}件",
     "birthdayOf": "{{name}}さんの誕生日",
     "birthdayOfWithAge": "{{name}}さんが{{age}}歳になります"
