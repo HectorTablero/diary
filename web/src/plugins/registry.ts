@@ -1,4 +1,4 @@
-import { CircleCheckBig, type LucideIcon } from 'lucide-react';
+import { CircleCheckBig, Droplet, type LucideIcon } from 'lucide-react';
 import type { PluginModule, PluginSurface } from './types';
 
 /**
@@ -46,6 +46,26 @@ export interface PluginManifest {
    * `undefined`.
    */
   surfaces: readonly PluginSurface[];
+  /**
+   * Where this plugin's `day` widget sits among other plugins' — low to high, ties broken by
+   * registration order. Purely a display concern, deliberately kept apart from position in `PLUGINS`
+   * itself: that position also fixes the notification-id slice above, which the comment on
+   * `pluginSlot` asks to keep append-only, so it must stay free to answer a different question
+   * (arrival order) without the day page's preferred order dragging on it. Defaults to `0` — a
+   * plugin that doesn't care sorts before one that asked to come later, after one that asked to
+   * come earlier.
+   */
+  dayOrder?: number;
+  /**
+   * The colour a `calendar` surface's cells shade with, in place of the default violet every plugin
+   * used to share. Declared here rather than reported through `PluginCalendarDay` because it is a
+   * property of the *plugin*, not of a day — one fixed choice, not a per-cell field repeated across
+   * a month of data — and because CalendarPage needs it to paint before (and even without) that
+   * plugin's chunk ever loading, the same reason `icon` lives on the manifest rather than the module.
+   *
+   * Optional: a plugin with no calendar view, or one content with the shared violet, leaves it unset.
+   */
+  hue?: { light: string; dark: string };
   /** Literal path. See rule 2. */
   load: () => Promise<{ default: PluginModule }>;
 }
@@ -56,6 +76,18 @@ export const PLUGINS: readonly PluginManifest[] = [
     icon: CircleCheckBig,
     surfaces: ['day', 'page', 'settings', 'notifications', 'export', 'calendar', 'widget'],
     load: () => import('./habits'),
+  },
+  {
+    id: 'period-tracker',
+    icon: Droplet,
+    surfaces: ['day', 'page', 'settings', 'notifications', 'export', 'calendar'],
+    // Above habits' day widget: a period warrants the more prominent slot.
+    dayOrder: -1,
+    // A reddish hue distinct from habits' violet, so the two plugins' tabs don't read as the same
+    // kind of thing shaded two different amounts. Brighter in dark mode for the same reason the
+    // entries heatmap's own five colours are, further down this file's CalendarPage counterpart.
+    hue: { light: '220, 38, 38', dark: '248, 113, 113' },
+    load: () => import('./period-tracker'),
   },
 ];
 

@@ -1,0 +1,61 @@
+{
+  "plugin": "period-tracker",
+  "about": "A period tracker: mark the days a period happened, see a reddish shading on the calendar for logged and predicted days, add a forgotten period retroactively from the plugin's own page, and get an approximate heads-up on the diary's day page before one is due. These strings are fetched only once the user enables the plugin, and are merged into the app's main bundle under the `plugins.period-tracker.` prefix — a key written here as \"title\" is referenced in code as plugins.period-tracker.title.",
+  "namespaces": {
+    "period-tracker": {
+      "where": "A card on the diary's day page below the composer — shown only when there is something to say about that particular day, never as a constant fixture; the plugin's own page at /plugins/period-tracker, listing past cycles (each expandable into its individual days) with their averages, and offering one shared form to both add a forgotten period and edit an existing one; its name, description and reminder settings in the Plugins list in Settings; and, once its name appears as a tab, the Calendar page's own month grid, shaded reddish by how heavy a logged day was or how likely a predicted one is.",
+      "keys": {
+        "name": "The plugin's name in the Plugins list in Settings. A noun phrase, not a sentence.",
+        "description": "One line under the name in the Plugins list, explaining what enabling it does.",
+        "title": "Heading of the card on the day page, the plugin's own page, and the Markdown export's heading. Usually identical to `name`, kept separate for a language that wants a longer form as a heading than as a list label.",
+        "flowLabel": "Both a visible caption beside the merged three-button flow pill (light/medium/heavy) on the day card, and the accessible name for the whole choice's radiogroup, including the separate \"no period\" button beside the pill. A short noun phrase, not an instruction — \"Flow intensity\", not \"Select the intensity\" — matching how every other short field caption in this app reads (habits' \"Daily goal\", \"Lowest\"/\"Highest\").",
+        "flowLight": "One of three flow levels. Shown nowhere as visible text — it is the tooltip and accessible name of an icon-only button, both on the day card and in the plugin page's per-day list — and reused as the word for that level in the calendar tooltip and the Markdown export.",
+        "flowMedium": "As above, the middle of the three.",
+        "flowHeavy": "As above, the heaviest of the three.",
+        "flowOff": "Tooltip and accessible name for the standalone \"no period\" button beside the flow pill — the choice that unmarks a day. Deliberately not part of the merged pill visually: it is not a fourth intensity, it is the absence of the other three. Not offered in the plugin page's per-day list when adding a past period, since every day listed there is a period day by construction — see `addPeriodDescription`.",
+        "approaching": "Shown on the day card for today, when a predicted period is within a few days but has not started (or at least not been marked). Deliberately approximate — \"about\" — since this is a guess built from an average, not a countable number of days until an event that is certain to happen. Also shown, unchanged, on a future day within the same predicted window — but a future day never shows the buttons this text sits above, only the words.",
+        "due": "Shown on the day card for today once the predicted window has opened (or shortly after it was predicted to have opened) and today has not been marked. Deliberately does not say which day of the predicted period this might be — a prediction is a guess at a window, not at a position within it, and naming one would state a precision this plugin does not have. Soft, not alarming: this is a normal, expected event, not a warning. Also shown on a future day within the window, buttonless, same as `approaching`.",
+        "confirmedLabel": "The calendar tooltip's text for a day that was actually logged, and the label a backup-import review shows for one of this plugin's rows. {{flow}} arrives already translated — one of flowLight/flowMedium/flowHeavy — so this only needs to wrap it into a short phrase naming the day itself.",
+        "predictedLabel": "The calendar tooltip's text for a day inside the predicted window that was never marked. Distinct wording from `due` on the day card, but the same idea: an estimate, stated as one.",
+        "unlock": "Accessible name (and, on a pointer device, tooltip trigger) for the padlock button on a past marked day, while it is locked. An action, not a description — \"Unlock this day\", not \"Locked\". Only ever shown on a day before today: a future day never carries a control to lock, and today is never locked at all.",
+        "lock": "The same button's accessible name once tapped unlocked, offering to lock it again.",
+        "dayLockedPast": "Tooltip shown while the padlock is locked. Explains why editing is blocked and what tapping the button does. Unlike habits' own version of this string, there is no `dayLockedFuture` counterpart — a future day here never shows the flow control at all, only predictive text, so the padlock only ever needs one reason to give.",
+        "dayUnlockedHint": "Tooltip once the day has been unlocked.",
+        "remindersTitle": "Heading of the plugin's own settings card, below the Plugins list. Native app only.",
+        "remindersDescription": "Under that heading. Says plainly that this is per-device, unlike the switch that enables the plugin.",
+        "reminder": "Switch label for the heads-up notification.",
+        "reminderDescription": "Under the switch: what the notification is for and roughly when it fires.",
+        "reminderTime": "Label beside the time picker for the reminder.",
+        "reminderTitle": "Title of the Android notification. Just the feature name — the body carries the content.",
+        "reminderBody": "Body of that notification. Soft and factual, matching `due` — this is an expected event, not an alert.",
+        "empty": "Shown on the plugin's own page when no day has ever been marked. Matter-of-fact.",
+        "emptyPageDescription": "Second line of the plugin page's empty state, pointing at the two ways to end up with something recorded: adding a past period right there, or marking a new one from the day page once it starts.",
+        "avgCycleLengthLabel": "Label under the average-cycle-length figure on the plugin's own page. A short noun phrase — the number beside it already carries the unit.",
+        "avgDurationLabel": "As above, for the average period length.",
+        "daysCount": "A plain day count, reused for a cycle's own duration and for both average figures on the plugin's page. Digits and a unit, nothing else.",
+        "cycleLength": "One cycle's length in days, shown beside a past period's duration on the plugin's page as \"{{count}}-day cycle\". Not shown for the earliest cycle on record, which has no previous start to measure a length from.",
+        "deleteCycle": "Visible label, and accessible name, of the button that deletes a past period on the plugin's page.",
+        "deleteCycleTitle": "Title of the confirmation dialog that button opens.",
+        "deleteCycleDescription": "Body of that dialog. States plainly that this erases recorded days and cannot be undone.",
+        "addPeriod": "Button opening the add-a-past-period form in \"add\" mode (in the page header and in the empty state), and that form's own title in the same mode. The one way left to record a period the day card never got a chance to.",
+        "addPeriodDescription": "Under the dialog's title, in \"add\" mode. Explains the two fields below it and that every day in the chosen range starts at a medium flow until adjusted.",
+        "editPeriod": "Visible label (and accessible name) of the \"Edit\" button on a past period, on the plugin's page, and the same form's title when opened that way instead of via `addPeriod`.",
+        "editPeriodDescription": "Under the dialog's title, in \"edit\" mode — the same form as `addPeriodDescription` describes, opened on an existing period's dates and flows instead of blank ones.",
+        "startDateLabel": "Label above the first date field in the add/edit-period form.",
+        "endDateLabel": "Label above the second date field. Cannot fall before the start date, and neither field can fall after today — a period that hasn't happened yet is not one this form can record.",
+        "perDayToggle": "Label on a disclosure, collapsed state, that expands a list of days with a flow button for each. Three places use it: the add/edit-period form (every day in the chosen range, for refining the default flow day by day) and each past period's own card on the plugin page (that period's already-recorded days, editable in place).",
+        "perDayToggleHide": "The same disclosure's label once open, wherever `perDayToggle` appears.",
+        "dateColumn": "Header of the first column in the Markdown export table. One word.",
+        "flowColumn": "Header of the second column in the Markdown export table. One word."
+      }
+    }
+  },
+  "tone": "Same as the main app, and especially close to habits': plain, calm, second person, no exclamation marks. A period is an ordinary, expected event — the tone should read as matter-of-fact and reassuring, never clinical, never alarmed, and a prediction should always sound like the estimate it is rather than a diagnosis.",
+  "languageNotes": {
+    "en": "Reference language; source strings are authored here.",
+    "es": "Tú, not usted, matching the rest of the app.",
+    "it": "Tu, not Lei, matching the rest of the app.",
+    "ja": "です・ます, matching the rest of the app. Only the unsuffixed `approaching`/`daysCount` keys are needed — Japanese has a single plural category.",
+    "zh": "Simplified Chinese, matching the rest of the app. Only the unsuffixed `approaching`/`daysCount` keys are needed — Chinese has a single plural category."
+  }
+}
