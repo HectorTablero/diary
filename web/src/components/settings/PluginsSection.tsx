@@ -72,6 +72,7 @@ export function PluginsSection() {
           <ToggleRow
             key={plugin.id}
             id={`plugin-${plugin.id}`}
+            icon={plugin.icon}
             // Before the locales land the switch would read as its own key, so hold the row back.
             label={ready ? t(`plugins.${plugin.id}.name`) : '…'}
             description={

@@ -20,6 +20,7 @@ const MEMBER_FOR: Record<PluginSurface, keyof PluginModule> = {
   settings: 'SettingsSection',
   notifications: 'collectNotifications',
   export: 'exportMarkdown',
+  calendar: 'CalendarView',
 };
 
 describe('declared surfaces match what each plugin exports', () => {

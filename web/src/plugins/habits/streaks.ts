@@ -77,3 +77,16 @@ export function dateKeyWindow(from: string, days: number): string[] {
 /** How far back the day widget reads. Long enough that a displayed streak is never truncated by
     the window rather than by a missed day — and if one ever is, it is capped honestly at 90. */
 export const STREAK_WINDOW_DAYS = 90;
+
+/** Every date key from `start` to `end`, inclusive, oldest first. The calendar view's read range —
+    a bounded span rather than a window counting back from today, since a month can be any month. */
+export function dateKeysBetween(start: string, end: string): string[] {
+  const keys: string[] = [];
+  let cursor = parseDateKey(start);
+  const last = parseDateKey(end);
+  while (cursor <= last) {
+    keys.push(toDateKey(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return keys;
+}

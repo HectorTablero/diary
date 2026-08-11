@@ -1,11 +1,67 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { CircleCheckBig } from 'lucide-react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PluginCalendarDay } from '@/plugins/types';
 import { anEntry, aPerson } from '@/test/fixtures';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { seed } from '@/test/seed';
 import { resetPreferences, setPreference } from '@/lib/preferences';
-import CalendarPage from './CalendarPage';
+
+/* The plugin view switcher, isolated from the plugin machinery it sits on top of.
+ *
+ * `usePluginCalendarViews` and `PluginCalendarSlot` each have their own tests for the loading,
+ * gating and failure behaviour that is *their* job (usePluginCalendarViews.test.tsx,
+ * PluginCalendarSlot.test.tsx) — real plugin locale fetch and dynamic import are never exercised
+ * in a test, matching every other page that sits on a plugin surface (PluginPage.test.tsx,
+ * PluginDaySlot.test.tsx). What belongs here is only what CalendarPage itself does with the
+ * result: show a tab per view, and redraw the grid from whichever one is picked. */
+const pluginViews = vi.hoisted(() => ({
+  value: [] as { id: string; icon: typeof CircleCheckBig; label: string }[],
+}));
+const pluginSlotData = vi.hoisted(() => ({
+  value: null as ReadonlyMap<string, PluginCalendarDay> | null,
+}));
+
+vi.mock('@/plugins/usePluginCalendarViews', () => ({
+  usePluginCalendarViews: () => pluginViews.value,
+}));
+
+vi.mock('@/plugins/PluginCalendarSlot', async () => {
+  const react = await import('react');
+  return {
+    // Delivers `onData` a tick later, on purpose: the real slot only ever does after an async chunk
+    // fetch, and CalendarPage's own effect that clears `pluginData` back to null on a fresh switch
+    // fires in the *same* commit as this mount. Calling `onData` synchronously here would race that
+    // reset in a way the real, always-async component never does.
+    PluginCalendarSlot: ({
+      onData,
+    }: {
+      onData: (data: ReadonlyMap<string, PluginCalendarDay>) => void;
+    }) => {
+      react.useEffect(() => {
+        if (!pluginSlotData.value) return;
+        let cancelled = false;
+        void Promise.resolve().then(() => {
+          if (!cancelled) onData(pluginSlotData.value!);
+        });
+        return () => {
+          cancelled = true;
+        };
+      }, [onData]);
+      return null;
+    },
+  };
+});
+
+vi.mock('@/plugins/registry', () => ({
+  findPlugin: (id: string) =>
+    id === 'habits'
+      ? { id: 'habits', icon: CircleCheckBig, surfaces: ['calendar'], load: vi.fn() }
+      : undefined,
+}));
+
+const { default: CalendarPage } = await import('./CalendarPage');
 
 /* The month grid.
  *
@@ -25,6 +81,8 @@ beforeEach(() => {
   // Date only — user-event and waitFor need their timers real. See PeopleListPage.test.tsx.
   vi.useFakeTimers({ toFake: ['Date'], now: new Date(`${TODAY}T12:00:00.000Z`) });
   resetPreferences();
+  pluginViews.value = [];
+  pluginSlotData.value = null;
 });
 
 afterEach(() => {
@@ -176,5 +234,52 @@ describe('CalendarPage · what the grid shows', () => {
 
     expect(await screen.findByText('Moved house')).toBeInTheDocument();
     expect(screen.queryByText('Did the washing')).not.toBeInTheDocument();
+  });
+});
+
+describe('CalendarPage · the plugin view switcher', () => {
+  it('shows no switcher at all when no plugin has a calendar view', async () => {
+    await seed({});
+    setup();
+
+    await screen.findByText('August 2026');
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+
+  it('offers a tab per plugin, alongside the diary’s own entries', async () => {
+    pluginViews.value = [{ id: 'habits', icon: CircleCheckBig, label: 'Habits' }];
+    await seed({});
+    setup();
+
+    await screen.findByText('August 2026');
+    expect(screen.getByRole('tab', { name: 'Entries' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByRole('tab', { name: 'Habits' })).toBeInTheDocument();
+  });
+
+  it('redraws the grid from the picked plugin’s data instead of the entries heatmap', async () => {
+    pluginViews.value = [{ id: 'habits', icon: CircleCheckBig, label: 'Habits' }];
+    pluginSlotData.value = new Map([['2026-08-03', { level: 1, label: '2/2 habits met' }]]);
+    // An entry on the 4th, so the two views can be told apart by which day is shaded.
+    await seed({ entries: [anEntry({ id: 'e1', content: 'Bought milk', dateKey: '2026-08-04' })] });
+    const { user } = setup();
+
+    await screen.findByText('August 2026');
+    // Before switching, the 3rd (the plugin's day) is bare and the 4th (the entry) is shaded.
+    expect(
+      dayCells()
+        .find((c) => c.textContent === '3')
+        ?.getAttribute('style') ?? '',
+    ).not.toContain('background-color');
+
+    await user.click(screen.getByRole('tab', { name: 'Habits' }));
+
+    await waitFor(() => {
+      const third = dayCells().find((c) => c.textContent === '3');
+      expect(third?.getAttribute('style') ?? '').toContain('background-color');
+    });
+    // And the entries heatmap is gone — the 4th no longer carries the importance marker either,
+    // since a plugin's "level" has no such breakdown to draw one from.
+    const fourth = dayCells().find((c) => c.textContent === '4')!;
+    expect(fourth.getAttribute('style') ?? '').not.toContain('background-color');
   });
 });

@@ -364,18 +364,19 @@ export function HabitControl({
   const step = target && target >= 50 ? 5 : 1;
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {!readOnly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 rounded-full sm:size-8"
-          disabled={value <= 0}
-          aria-label={t('plugins.habits.decrease', { name: habit.name })}
-          onClick={() => onChange?.(Math.max(0, value - step))}
-        >
-          <Minus className="size-3.5" />
-        </Button>
-      )}
+      {/* Disabled rather than unmounted, like every other kind's controls: `readOnly` toggles live
+          now that a day can be unlocked mid-visit, and a stepper that appears and disappears would
+          shift the row under whatever was about to be tapped. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7 rounded-full sm:size-8"
+        disabled={readOnly || value <= 0}
+        aria-label={t('plugins.habits.decrease', { name: habit.name })}
+        onClick={() => onChange?.(Math.max(0, value - step))}
+      >
+        <Minus className="size-3.5" />
+      </Button>
       <EditableValue
         display={formatHabitValue(habit, value, dateKey)}
         draftOf={() => String(value)}
@@ -385,17 +386,16 @@ export function HabitControl({
         disabled={readOnly}
         className={cn('text-sm', done ? 'font-medium' : 'text-muted-foreground')}
       />
-      {!readOnly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 rounded-full sm:size-8"
-          aria-label={t('plugins.habits.increase', { name: habit.name })}
-          onClick={() => onChange?.(value + step)}
-        >
-          <Plus className="size-3.5" />
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7 rounded-full sm:size-8"
+        disabled={readOnly}
+        aria-label={t('plugins.habits.increase', { name: habit.name })}
+        onClick={() => onChange?.(value + step)}
+      >
+        <Plus className="size-3.5" />
+      </Button>
     </div>
   );
 }
@@ -446,31 +446,31 @@ function TimeControl({
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {!readOnly && (
-        <Button
-          variant={running ? 'default' : 'ghost'}
-          size="icon"
-          className="size-7 rounded-full sm:size-8"
-          aria-label={t(running ? 'plugins.habits.pause' : 'plugins.habits.start', {
-            name: habit.name,
-          })}
-          onClick={toggle}
-        >
-          {running ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-        </Button>
-      )}
-      {!readOnly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 rounded-full sm:size-8"
-          disabled={running || committed <= 0}
-          aria-label={t('plugins.habits.decrease', { name: habit.name })}
-          onClick={() => onChange?.(Math.max(0, committed - step))}
-        >
-          <Minus className="size-3.5" />
-        </Button>
-      )}
+      {/* Disabled rather than unmounted, like every other kind's controls: `readOnly` toggles live
+          now that a day can be unlocked mid-visit, and a control that appears and disappears would
+          shift the row under whatever was about to be tapped. */}
+      <Button
+        variant={running ? 'default' : 'ghost'}
+        size="icon"
+        className="size-7 rounded-full sm:size-8"
+        disabled={readOnly}
+        aria-label={t(running ? 'plugins.habits.pause' : 'plugins.habits.start', {
+          name: habit.name,
+        })}
+        onClick={toggle}
+      >
+        {running ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7 rounded-full sm:size-8"
+        disabled={readOnly || running || committed <= 0}
+        aria-label={t('plugins.habits.decrease', { name: habit.name })}
+        onClick={() => onChange?.(Math.max(0, committed - step))}
+      >
+        <Minus className="size-3.5" />
+      </Button>
       {/* Live, and not editable while running: typing into a number that ticks every second would
           fight the tick. Pause, then correct it — the same element, so nothing moves. Seconds always
           show while running, because a timer whose display does not move is indistinguishable from
@@ -496,18 +496,16 @@ function TimeControl({
               : 'text-muted-foreground',
         )}
       />
-      {!readOnly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 rounded-full sm:size-8"
-          disabled={running}
-          aria-label={t('plugins.habits.increase', { name: habit.name })}
-          onClick={() => onChange?.(committed + step)}
-        >
-          <Plus className="size-3.5" />
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7 rounded-full sm:size-8"
+        disabled={readOnly || running}
+        aria-label={t('plugins.habits.increase', { name: habit.name })}
+        onClick={() => onChange?.(committed + step)}
+      >
+        <Plus className="size-3.5" />
+      </Button>
     </div>
   );
 }

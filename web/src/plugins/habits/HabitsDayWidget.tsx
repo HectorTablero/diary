@@ -1,7 +1,8 @@
-import { CircleCheckBig, ListPlus, PowerOff, X } from 'lucide-react';
-import { useState } from 'react';
+import { CircleCheckBig, ListPlus, Lock, LockOpen, PowerOff, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { todayKey } from '@/lib/dates';
 import { notifyError } from '@/lib/notify';
 import { captureError } from '@/lib/telemetry';
 import { cn } from '@/lib/utils';
@@ -38,8 +40,35 @@ import { useHabitsDay } from './useHabits';
  */
 export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
   const { t } = useTranslation();
-  const { active, archivedWithProgress, values, priorStreaks, loading, hasAnyHabit, setValue } =
-    useHabitsDay(dateKey);
+  const {
+    active,
+    archivedWithProgress,
+    values,
+    priorStreaks,
+    loading,
+    hasAnyHabit,
+    anyHabitCreatedByThatDay,
+    setValue,
+  } = useHabitsDay(dateKey);
+
+  const today = todayKey();
+  const isToday = dateKey === today;
+
+  /**
+   * Every day but today opens read-only, with a lock the day can be unlocked from — a deliberate
+   * extra step before touching a day that is not the one actually being lived. Today never needs
+   * it: recording as you go is the whole point of the card, and gating that behind an unlock would
+   * turn the one action this screen exists for into two.
+   *
+   * Local state, not persisted and not remembered between days: reopening a past day, or simply
+   * turning the phone off and on, starts locked again. The point is friction at the moment of
+   * editing history, not a setting to configure once.
+   */
+  const [unlocked, setUnlocked] = useState(false);
+  useEffect(() => {
+    setUnlocked(false);
+  }, [dateKey]);
+  const locked = !isToday && !unlocked;
 
   /**
    * What the badge reads, for a habit, right now.
@@ -57,6 +86,17 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
      start and break. Reserved only when at least one row will use it, so a list that never streaks
      doesn't carry an empty gutter. */
   const anyStreak = active.some((habit) => streakOf(habit) >= STREAK_MIN);
+
+  /* A day that predates every habit the account has ever had gets no card at all, rather than a
+     card explaining that it is empty — the day did not skip a question this feature never asked
+     it. `anyHabitCreatedByThatDay` rather than deriving this from `active`: a habit archived
+     *before* this day is neither in `active` nor newly-created, but it did exist once, so that
+     case still falls through to the "every habit is retired" message below instead of vanishing.
+     Gated on `!loading` so this is a decision made once the answer is actually known, not a flash
+     of the card disappearing after the skeleton. */
+  if (!loading && hasAnyHabit && !anyHabitCreatedByThatDay && archivedWithProgress.length === 0) {
+    return null;
+  }
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-xs" aria-labelledby="habits-day-title">
@@ -76,6 +116,13 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
               total: active.length,
             })}
           </span>
+        )}
+        {!loading && !isToday && active.length > 0 && (
+          <DayLockButton
+            locked={locked}
+            past={dateKey < today}
+            onToggle={() => setUnlocked((current) => !current)}
+          />
         )}
       </div>
 
@@ -101,13 +148,16 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
                   streak={streakOf(habit)}
                   reserveStreak={anyStreak}
                   onChange={(next) => setValue(habit.id, next)}
+                  readOnly={locked}
                 />
               ))}
             </ul>
           )}
 
           {/* Every habit retired but this day has none of them recorded: not an empty state — the
-              habits exist, they are simply all in the past. */}
+              habits exist, they are simply all in the past. The other way a list can end up empty
+              here — a day before any habit existed — never reaches this render at all; see the
+              early return above. */}
           {active.length === 0 && archivedWithProgress.length === 0 && (
             <p className="mt-1 text-sm text-muted-foreground">{t('plugins.habits.allRetired')}</p>
           )}
@@ -135,6 +185,47 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The lock guarding every day but today.
+ *
+ * A tap toggles it — no confirmation, because unlocking changes nothing by itself, only what the
+ * *next* tap on a control is allowed to do, and locking back up is exactly as free. The explanation
+ * of *why* a day opened locked lives in the tooltip rather than on the button itself, which only
+ * ever shows the current state: past and future are locked for different reasons (one is history,
+ * the other hasn't happened), so the tooltip's wording depends on which side of today the day falls
+ * on, but the icon and the action underneath it do not.
+ */
+function DayLockButton({
+  locked,
+  past,
+  onToggle,
+}: {
+  locked: boolean;
+  /** Which side of today the day falls on — irrelevant once unlocked, since the reason a day was
+      locked stops mattering the moment it no longer is. */
+  past: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const reason = locked
+    ? t(past ? 'plugins.habits.dayLockedPast' : 'plugins.habits.dayLockedFuture')
+    : t('plugins.habits.dayUnlockedHint');
+
+  return (
+    <HintTooltip content={reason}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7 shrink-0 text-muted-foreground"
+        aria-label={t(locked ? 'plugins.habits.unlock' : 'plugins.habits.lock')}
+        onClick={onToggle}
+      >
+        {locked ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5" />}
+      </Button>
+    </HintTooltip>
   );
 }
 

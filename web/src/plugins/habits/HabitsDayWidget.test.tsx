@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { UNDATED_KEY } from '@diary/shared';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db/db';
 import { createPluginRecord } from '@/db/pluginRecords';
 import i18n from '@/i18n';
@@ -13,7 +13,12 @@ import { habitData, type Habit } from './model';
 
 /* The day card records; it never creates or destroys. Everything asserted here is either about
    recording, or about the boundary — that a habit cannot be made or lost from this screen, and that
-   a retired one still shows on the days it actually happened. */
+   a retired one still shows on the days it actually happened.
+ *
+ * DATE is pinned as *today* with fake timers for the whole file: every one of these tests predates
+ * the lock feature and was written assuming a day is editable by default, which is only true of
+ * today now that every other day opens locked. HabitsDayWidget.lock.test.tsx covers the lock
+ * itself, against both a past and a future day, so this file stays about recording. */
 
 const DATE = '2026-08-10';
 
@@ -40,6 +45,12 @@ beforeEach(async () => {
   i18n.addResourceBundle('en', 'translation', { plugins: { habits: en } }, true, true);
   await db.pluginRecords.clear();
   await db.outbox.clear();
+  // Date only — user-event and waitFor need their timers real. See PeopleListPage.test.tsx.
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date(`${DATE}T12:00:00.000Z`) });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('with no habits at all', () => {
@@ -212,6 +223,34 @@ describe('streaks', () => {
     // Back to the run that does not depend on today — and still not zero, because a blank today is
     // not yet a missed day.
     expect(screen.getByLabelText('2 days in a row')).toBeInTheDocument();
+  });
+});
+
+describe('which habits are shown', () => {
+  it('leaves off a habit created after this day', async () => {
+    await seed({ name: 'Read', since: '2026-01-01' });
+    await seed({ name: 'Meditate', since: '2026-08-11' }); // the day after DATE
+
+    renderWithProviders(<HabitsDayWidget dateKey={DATE} />);
+
+    expect(await screen.findByText('Read')).toBeInTheDocument();
+    expect(screen.queryByText('Meditate')).not.toBeInTheDocument();
+    // Not "every habit retired" either — Meditate exists, it just hasn't started yet, which is a
+    // different fact from having been retired.
+    expect(screen.queryByText('Every habit is retired.')).not.toBeInTheDocument();
+  });
+
+  it('renders no card at all on a day before any habit had been created', async () => {
+    await seed({ name: 'Read', since: '2026-08-11' }); // the day after DATE
+
+    const { container } = renderWithProviders(<HabitsDayWidget dateKey={DATE} />);
+
+    // Waits for loading to settle (the skeleton is the loading state) before asserting on emptiness
+    // — the card must not flash away only after briefly rendering something.
+    await waitFor(() => expect(screen.queryByRole('heading')).not.toBeInTheDocument());
+    // Scoped to the widget's own section rather than the whole render container, which also holds
+    // the app's (unrelated, always-present) toast region.
+    expect(container.querySelector('[aria-labelledby="habits-day-title"]')).not.toBeInTheDocument();
   });
 });
 

@@ -5,7 +5,28 @@ import type { PluginRecordDto } from '@diary/shared';
 /* Type-only. Nothing here emits a byte, which is why the manifest can describe a plugin's shape
    without any of its code being reachable from the entry chunk. */
 
-export type PluginSurface = 'day' | 'page' | 'settings' | 'notifications' | 'export';
+export type PluginSurface = 'day' | 'page' | 'settings' | 'notifications' | 'export' | 'calendar';
+
+/**
+ * One day's worth of a plugin's calendar data — just enough to colour and label a cell.
+ *
+ * `level` is 0 (nothing to show) to 1 (fully met), on the same scale regardless of what the plugin
+ * actually tracks, because the calendar page owns the colour and only needs a number to drive it
+ * with. `label` is read out in the cell's tooltip, so it has to stand alone — the tab that picked
+ * this view is the only other context a screen reader will have given first.
+ */
+export interface PluginCalendarDay {
+  level: number;
+  label: string;
+}
+
+export interface PluginCalendarViewProps {
+  /** The visible month's first and last date key, inclusive. */
+  start: string;
+  end: string;
+  /** Reports this plugin's per-day data for [start, end]. Call again whenever it changes. */
+  onData: (data: ReadonlyMap<string, PluginCalendarDay>) => void;
+}
 
 /**
  * What a plugin's module may export. Every member is optional: a plugin fills the surfaces it
@@ -32,6 +53,16 @@ export interface PluginModule {
   collectNotifications?: (context: PluginNotificationContext) => Promise<LocalNotificationSchema[]>;
   /** Markdown files to add to the export archive. */
   exportMarkdown?: () => Promise<{ filename: string; markdown: string }[]>;
+  /**
+   * A view in the calendar page's switcher: replaces the diary's own entry heatmap with this
+   * plugin's data when picked.
+   *
+   * Headless, like `collectNotifications` — it computes and reports data through `onData` rather
+   * than drawing cells itself. The calendar page owns the cell (today's ring, the tap target, the
+   * birthday marker); a plugin that drew its own grid on top is how the calendar would end up
+   * wearing a different icon per plugin instead of one switcher that scales to any number of them.
+   */
+  CalendarView?: ComponentType<PluginCalendarViewProps>;
   /** A one-line, human-readable description of a row, for the backup import review — which
       otherwise has nothing to show but an opaque blob. */
   describeRecord?: (record: PluginRecordDto) => string;

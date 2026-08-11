@@ -87,5 +87,10 @@
   "noGoal": "nessuno",
   "changesHeading": "Modifiche",
   "notSet": "Non impostato",
-  "edit": "Modifica {{name}}"
+  "edit": "Modifica {{name}}",
+  "unlock": "Sblocca questo giorno",
+  "lock": "Blocca questo giorno",
+  "dayLockedPast": "Questo giorno è passato, quindi i valori sono bloccati. Tocca per modificarli.",
+  "dayLockedFuture": "Questo giorno non è ancora arrivato, quindi i valori sono bloccati. Tocca per modificarli.",
+  "dayUnlockedHint": "Sbloccato per la modifica. Tocca per bloccare di nuovo questo giorno."
 }

@@ -81,5 +81,10 @@
   "noGoal": "无",
   "changesHeading": "变更记录",
   "notSet": "未设置",
-  "edit": "编辑{{name}}"
+  "edit": "编辑{{name}}",
+  "unlock": "解锁这一天",
+  "lock": "锁定这一天",
+  "dayLockedPast": "这一天已经过去，数值已锁定。点按即可修改。",
+  "dayLockedFuture": "这一天还没到，数值已锁定。点按即可修改。",
+  "dayUnlockedHint": "已解锁，可以编辑。点按可重新锁定这一天。"
 }

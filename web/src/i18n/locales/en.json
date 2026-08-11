@@ -382,6 +382,7 @@
     "previous": "Previous month",
     "next": "Next month",
     "onThisDay": "On this day",
+    "entries": "Entries",
     "entriesCount": "{{count}} entry",
     "entriesCount_other": "{{count}} entries",
     "birthdayOf": "{{name}}'s birthday",

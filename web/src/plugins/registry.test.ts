@@ -37,6 +37,14 @@ describe('the manifest', () => {
     expect(findPlugin('habits')?.id).toBe('habits');
     expect(findPlugin('nope')).toBeUndefined();
   });
+
+  it('never lets a plugin claim the calendar page\'s reserved "entries" id', () => {
+    // CalendarPage.tsx uses "entries" as the view-switcher's default tab, sharing the `view` state
+    // with every plugin's own id. A plugin registered under that id would silently take over the
+    // diary's own heatmap tab instead of getting one of its own — a collision `PLUGIN_ID_REGEX`
+    // has no way to catch, since "entries" is a perfectly well-formed id.
+    expect(findPlugin('entries')).toBeUndefined();
+  });
 });
 
 /* Rule 2. A template-literal import path makes Rolldown emit a chunk for every directory under

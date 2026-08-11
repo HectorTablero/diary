@@ -87,5 +87,10 @@
   "noGoal": "ninguna",
   "changesHeading": "Cambios",
   "notSet": "Sin valor",
-  "edit": "Editar {{name}}"
+  "edit": "Editar {{name}}",
+  "unlock": "Desbloquear este día",
+  "lock": "Bloquear este día",
+  "dayLockedPast": "Este día ya pasó, así que los valores están bloqueados. Toca para cambiarlos.",
+  "dayLockedFuture": "Este día aún no ha llegado, así que los valores están bloqueados. Toca para cambiarlos.",
+  "dayUnlockedHint": "Desbloqueado para editar. Toca para volver a bloquear este día."
 }

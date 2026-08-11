@@ -353,6 +353,7 @@
     "previous": "上个月",
     "next": "下个月",
     "onThisDay": "那年今日",
+    "entries": "记录",
     "entriesCount": "{{count}} 条记录",
     "birthdayOf": "{{name}}的生日",
     "birthdayOfWithAge": "{{name}}就要 {{age}} 岁了"
