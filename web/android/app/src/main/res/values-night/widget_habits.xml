@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The dark half of the widget's palette. Colours only — every string and dimension is shared with
+    values/widget_habits.xml.
+
+    This file is what makes dark mode work, and the reason it *can* work is that nothing in the
+    widget sets a colour from Java. RemoteViews are inflated in the launcher's process against the
+    launcher's configuration, so a resource reference resolves to whatever the host is currently
+    showing; a colour resolved in this app's process would follow this app's configuration and could
+    disagree with the home screen around it.
+
+    Note that `primary` inverts between themes rather than staying put — light on dark, dark on
+    light — because in a chroma-zero palette contrast is the only thing that can mark something as
+    done. Any widget that hardcoded a "brand" fill would be wrong in exactly one of the two themes.
+
+        card             oklch(0.205 0 0)  #171717
+        foreground       oklch(0.985 0 0)  #FAFAFA
+        primary          oklch(0.922 0 0)  #E5E5E5
+        muted-foreground oklch(0.708 0 0)  #A1A1A1
+        border           oklch(1 0 0 / 10%)
+        accent           oklch(0.269 0 0)  #262626
+-->
+<resources>
+    <color name="widget_disabled">#80FAFAFA</color>
+    <color name="widget_logo_ink">@color/widget_foreground</color>
+    <color name="widget_faint">#4DFAFAFA</color>
+    <color name="widget_card">#FF171717</color>
+    <color name="widget_foreground">#FFFAFAFA</color>
+    <color name="widget_muted">#FFA1A1A1</color>
+    <!-- White at 10%, as the token literally is, rather than a flattened grey: it has to sit over
+         the card without looking like a second surface. -->
+    <color name="widget_border">#1AFFFFFF</color>
+    <color name="widget_primary">#FFE5E5E5</color>
+    <color name="widget_primary_foreground">#FF171717</color>
+    <color name="widget_primary_soft">#99E5E5E5</color>
+    <color name="widget_primary_wash">#26E5E5E5</color>
+    <color name="widget_accent">#FF262626</color>
+    <!-- amber-400 rather than amber-700: the app lightens this one for dark mode, because a dark
+         amber on a dark card is unreadable. -->
+    <color name="widget_streak">#FFFBBF24</color>
+    <color name="widget_streak_wash">#1AF59E0B</color>
+</resources>

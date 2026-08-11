@@ -6,6 +6,7 @@ import { HabitsSettingsSection } from './HabitsSettingsSection';
 import { exportHabitsMarkdown } from './markdown';
 import { parseHabit } from './model';
 import { collectHabitNotifications } from './notifications';
+import { syncHabitsWidget } from './widgetBridge';
 
 /* The habit tracker — the first plugin, and the one the plugin API was shaped around.
 
@@ -23,6 +24,10 @@ const habits: PluginModule = {
   collectNotifications: collectHabitNotifications,
   exportMarkdown: exportHabitsMarkdown,
   CalendarView: HabitsCalendarView,
+  /* The Android home-screen widget's two directions in one call: bank whatever was pressed on it
+     while the app was closed, then restate today for it to draw. Headless and native-only — off a
+     device it is a no-op, which is what lets every lifecycle hook call it unconditionally. */
+  syncNativeWidget: syncHabitsWidget,
   /* What a row is, in one line, for the backup review — which otherwise has nothing to show but an
      opaque blob. A definition names itself; a day names its date. */
   describeRecord: (record) => parseHabit(record)?.name ?? record.dateKey,

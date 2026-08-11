@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Diary mark, from web/public/favicon.svg - the same three strokes, the same 500-unit
+    viewport, the same round caps.
+
+    Drawn in @color/widget_logo_ink rather than a literal, so the mark's colour is one token to
+    change. It currently resolves to the widget's foreground - black on a light home screen, white
+    on a dark one - so the mark sits on the same optical line as the title beside it instead of
+    being the only saturated thing on an otherwise chroma-zero card. Setting that token to
+    #FF0072FF restores the brand blue used by the launcher icon and the splash.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="500"
+    android:viewportHeight="500">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/widget_logo_ink"
+        android:strokeWidth="50"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 100 100 L 100 400" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/widget_logo_ink"
+        android:strokeWidth="50"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 175 100 L 400 250 L 175 400" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/widget_logo_ink"
+        android:strokeWidth="50"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 200 250 L 100 250" />
+</vector>

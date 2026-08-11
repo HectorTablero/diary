@@ -6,6 +6,7 @@ import { notifyError } from '@/lib/notify';
 import { captureError } from '@/lib/telemetry';
 import { setPluginEnabled, useEnabledPlugins } from '@/plugins/enabled';
 import { ensurePluginLocales } from '@/plugins/i18n';
+import { syncNativeWidgets } from '@/plugins/nativeWidgets';
 import { PLUGINS } from '@/plugins/registry';
 
 /**
@@ -57,6 +58,12 @@ export function PluginsSection() {
   const toggle = async (pluginId: string, value: boolean) => {
     try {
       await setPluginEnabled(pluginId, value);
+      /* A plugin with a home-screen widget has one surface that does not re-render when this
+         screen does, because it is not rendered by this app at all. Switching a plugin off has to
+         reach it — otherwise the widget sits on the home screen showing the habits of a plugin
+         that is no longer on, and nothing ever comes back to correct it. `alsoInclude` is what
+         gets a just-disabled plugin one final pass; see plugins/nativeWidgets.ts. */
+      void syncNativeWidgets({ alsoInclude: pluginId });
     } catch (err) {
       captureError(err, { scope: 'plugins.toggle', plugin: pluginId });
       notifyError(t('settings.plugins.saveFailed'));

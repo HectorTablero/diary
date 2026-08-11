@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- `variant="ghost" size="icon"`. Transparent at rest, which is what the app actually shows on a
+     phone: `hover:bg-accent` never fires without a pointer, so drawing that circle permanently
+     made the widget's steppers heavier than the ones on the day card they were copying. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@android:color/transparent" />
+</shape>

@@ -19,6 +19,7 @@ import { notifyError, notifySuccess } from './lib/notify';
 import { initLocalNotifications, refreshNotifications } from './lib/notifications';
 import { subscribePreferences } from './lib/preferences';
 import { queryClient } from './lib/queryClient';
+import { initPlugins } from './plugins/lifecycle';
 import { initReducedMotion, useReducedMotion } from './lib/reducedMotion';
 import { initTelemetry } from './lib/telemetry';
 import { logVersion } from './lib/version';
@@ -72,6 +73,11 @@ onSyncApplied(() => queryClient.invalidateQueries());
 // Remote-origin changes (another device) can affect who's due for a checkup
 // or whether today already has an entry, so re-arm reminders too.
 onSyncApplied(() => refreshNotifications());
+/* Which plugins are on is a property of the account, so a sync can change it — and a home-screen
+   widget is drawn by a native provider that cannot notice anything for itself. `initPlugins` owns
+   both, in that order, and also does the startup pass that lets a fresh device discover the plugins
+   the account already has switched on. See plugins/lifecycle.ts for the bug this fixes. */
+initPlugins();
 // Turning a reminder off has to cancel the alarm that's already armed for tonight, and changing a
 // time has to move it — neither happens until a reconcile runs.
 subscribePreferences(() => refreshNotifications());

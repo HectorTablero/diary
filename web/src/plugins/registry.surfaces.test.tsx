@@ -21,6 +21,7 @@ const MEMBER_FOR: Record<PluginSurface, keyof PluginModule> = {
   notifications: 'collectNotifications',
   export: 'exportMarkdown',
   calendar: 'CalendarView',
+  widget: 'syncNativeWidget',
 };
 
 describe('declared surfaces match what each plugin exports', () => {

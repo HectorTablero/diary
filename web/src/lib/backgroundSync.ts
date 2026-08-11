@@ -1,5 +1,6 @@
 import { BackgroundFetch } from '@transistorsoft/capacitor-background-fetch';
 import { syncNow } from '@/db/sync';
+import { syncNativeWidgets } from '@/plugins/nativeWidgets';
 import { isNative } from './native';
 import { refreshNotificationsNow } from './notifications';
 import { captureError, trackEvent } from './telemetry';
@@ -34,6 +35,12 @@ async function runBackgroundSync(): Promise<void> {
      one, because `schedule()` may have run while `cancel()` has not. A plugin that overruns simply
      keeps the alarms it already had until the next pass. */
   await refreshNotificationsNow({ pluginTimeoutMs: 2_000 });
+  /* Home-screen widgets last, because they restate what the two passes above have just settled.
+     This is also the only thing that keeps a widget current across midnight: the provider notices
+     the day has turned over (ACTION_DATE_CHANGED) but cannot read Dexie to find out what today
+     looks like, so it shows a "open the app" line until one of these wake-ups replaces the
+     snapshot — normally within the quarter hour rather than at the user's next launch. */
+  await syncNativeWidgets();
 }
 
 /** Call once at app bootstrap, before the first render — Android may launch the app straight into

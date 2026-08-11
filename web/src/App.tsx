@@ -11,6 +11,7 @@ import { todayKey } from './lib/dates';
 import { routeForUrl } from './lib/deepLinks';
 import { isNative } from './lib/native';
 import { refreshNotifications } from './lib/notifications';
+import { refreshPlugins } from './plugins/lifecycle';
 import LoginPage from './pages/LoginPage';
 import {
   CalendarPage,
@@ -100,6 +101,16 @@ if (isNative) {
   // no true native background poll), so re-arm reminders on every foreground.
   void CapApp.addListener('appStateChange', ({ isActive }) => {
     if (isActive) refreshNotifications();
+    /* Both edges, and they do different jobs. On resume this banks whatever was pressed on the home
+       screen while the app was closed — the widget's presses live in SharedPreferences until
+       something reads them into Dexie, and this is the first moment anything can. On the way out it
+       restates today, so the widget is correct for the whole time the app is *not* running, which
+       is most of a widget's life.
+
+       `refreshPlugins` rather than the widget alone, because a background sync can apply while the
+       app is suspended: a plugin switched on from the laptop should be on when the phone comes
+       back, not one sync later. */
+    void refreshPlugins();
   });
 
   /* App Links: a diary.tablerus.es URL opens here rather than in the browser.

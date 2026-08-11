@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The habits card, as the day page draws it: `rounded-xl border bg-card p-4`, a mark and a title
+    with a counter on their right, then the list.
+
+    The list is a ListView backed by HabitsWidgetService, not a container the provider fills. That
+    is the whole reason it scrolls: a LinearLayout grown with addView is as tall as it is, and a
+    launcher with less room than that crops it — which is what squashed the last habit and then
+    sliced through it. `setEmptyView` points at the message below, so "nothing to show" is the
+    launcher's own decision from an empty adapter rather than a second visibility rule to keep in
+    step.
+
+    Every colour comes from a resource and none is set from Java. That is what makes dark mode
+    correct rather than approximately correct: RemoteViews are inflated in the launcher's process
+    against the launcher's configuration, so `@color/…` resolves to whatever the home screen is
+    currently showing. A colour resolved in this app's process and baked in with `setTextColor`
+    would survive a theme change unchanged while everything around it flipped — which is why the
+    two label variants in the row layout are toggled by visibility rather than recoloured.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_card"
+    android:padding="@dimen/widget_padding">
+
+    <!-- The tap target for opening the app. Deliberately the header rather than the root: a
+         root-level click would swallow taps meant for the list, and a widget whose ± buttons open
+         the app instead of recording is worse than one that cannot be tapped at all. -->
+    <LinearLayout
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="@dimen/widget_header_gap">
+
+        <ImageView
+            android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_logo"
+            android:layout_height="@dimen/widget_logo"
+            android:layout_marginEnd="7dp"
+            android:src="@drawable/widget_logo"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textStyle="bold"
+            android:textColor="@color/widget_foreground"
+            android:text="@string/widget_habits_title" />
+
+        <!-- "3/5" — goals reached over goals asked, the same bar the day card's counter uses. -->
+        <TextView
+            android:id="@+id/widget_counter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="8dp"
+            android:paddingEnd="0dp"
+            android:textSize="12sp"
+            android:fontFamily="@font/geist_sans"
+            android:fontFeatureSettings="tnum"
+            android:textColor="@color/widget_muted" />
+    </LinearLayout>
+
+    <!--
+        Running stopwatches, lifted out of the list.
+
+        A container the provider fills with `RemoteViews.addView`, one child per running session
+        (widget_habits_session.xml). Filled rather than pre-declared because there is no fixed number
+        of them: nothing stops two habits being timed at once, and the alternative — one strip, and
+        every other play button disabled — would refuse a thing the day card allows.
+
+        Outside the ListView, and that is the point. A Chronometer inside a collection item is
+        recycled by the launcher's adapter and stops ticking; added here it is an ordinary view in
+        the widget's own hierarchy and keeps time by itself. See widget_habits_session.xml.
+    -->
+    <LinearLayout
+        android:id="@+id/widget_sessions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <!-- Splits the lifted rows from the list they came out of, in the card's own hairline colour so
+         it reads as the same kind of edge the day page draws between habits rather than a new one.
+         Visible only while something is running: with nothing lifted there are no two sections to
+         separate, and a rule under the header would just be a second border beside the card's. -->
+    <!-- An empty LinearLayout, not a `<View>`, and that distinction is load-bearing.
+
+         RemoteViews inflates with a LayoutInflater.Filter whose whole implementation is
+         `clazz.isAnnotationPresent(RemoteView.class)`. Only a fixed set of classes carry that
+         annotation — LinearLayout, FrameLayout, RelativeLayout, GridLayout, ListView, GridView,
+         StackView, ViewFlipper, AdapterViewFlipper, and among leaves TextView, ImageView, Button,
+         ImageButton, ProgressBar, Chronometer, AnalogClock, TextClock, ViewStub. `android.view.View`
+         does not, so a one-pixel `<View>` divider — the ordinary way to draw a rule anywhere else in
+         Android — throws InflateException and the launcher replaces the entire widget with "Can't
+         load widget". A LinearLayout with no children is the same pixels and is allowed. -->
+    <LinearLayout
+        android:id="@+id/widget_session_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@color/widget_border" />
+
+    <ListView
+        android:id="@+id/widget_rows"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:scrollbars="none"
+        android:clipToPadding="false" />
+
+    <!-- The empty, loading and stale states. The launcher swaps this in for the list itself. -->
+    <TextView
+        android:id="@+id/widget_message"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingTop="8dp"
+        android:textSize="13sp"
+        android:fontFamily="@font/geist_sans"
+        android:textColor="@color/widget_muted" />
+</LinearLayout>

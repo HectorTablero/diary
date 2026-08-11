@@ -31,6 +31,11 @@ android {
         versionCode appVersionCode
         versionName appVersionNameValue
         manifestPlaceholders = [appHost: appHostValue]
+        /* The same host, reachable from code. The habits widget builds the https:// link it opens
+           the app with, and it has to be the host the App Links intent-filter above claims or the
+           link would not route — one property, two consumers, rather than the string appearing
+           twice and drifting. */
+        resValue "string", "app_host", appHostValue
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

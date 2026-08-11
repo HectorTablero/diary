@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shown in a row's place while the launcher fetches the real one. Deliberately empty and
+     deliberately not null: returning null makes the launcher draw nothing at all, so a list being
+     refreshed collapses and springs back. This holds the shape and says nothing. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="42dp"
+    android:orientation="vertical" />
