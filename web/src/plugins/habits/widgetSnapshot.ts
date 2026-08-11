@@ -51,11 +51,13 @@ import {
  *
  * 2 added `min`/`max` and split `ratio` into `scale` and `mood`, so that every kind has a control
  * rather than only the countable ones. 3 added `timerStartedAt`, so a running stopwatch is visible
- * to the widget. An older APK reading a newer snapshot treats it as absent and draws its empty
- * state, which is the right failure: the web layer updates over the air while the provider only
- * changes when a new APK is installed, so this pairing is genuinely allowed to skew.
+ * to the widget. 4 added `streakBefore`, so a streak reached by a press made on the widget itself
+ * shows without the app having run — see the note on `streakBefore` below. An older APK reading a
+ * newer snapshot treats it as absent and draws its empty state, which is the right failure: the web
+ * layer updates over the air while the provider only changes when a new APK is installed, so this
+ * pairing is genuinely allowed to skew.
  */
-export const WIDGET_SNAPSHOT_VERSION = 3;
+export const WIDGET_SNAPSHOT_VERSION = 4;
 
 export type WidgetRowFormat = 'count' | 'duration' | 'binary' | 'scale' | 'mood';
 
@@ -110,7 +112,27 @@ export interface WidgetRow {
    */
   showSeconds: boolean;
   met: boolean;
+  /**
+   * The streak as of when this snapshot was written — `streakBefore + (met ? 1 : 0)` at that moment.
+   *
+   * Kept for anyone reading the JSON directly (a debug dump, a future export); the provider does not
+   * read it, because it goes stale the instant a press on the widget changes `met` — see
+   * `streakBefore`.
+   */
   streak: number;
+  /**
+   * The run of met days *not counting* `dateKey` — `streakBefore` from streaks.ts, restated for a
+   * day the widget already knows the answer for.
+   *
+   * This is what the provider actually draws from, and the split exists for the reason
+   * `streakBefore` exists there: it does not move when a press changes today's own answer. `met` is
+   * already recomputed in Java after every press (`HabitsWidgetRow.isMet`, run against the banked
+   * total plus whatever has not been drained yet) — pairing it with a number that cannot go stale
+   * mid-session is what lets a streak reached from the home screen show immediately, rather than
+   * waiting for the app to next write a snapshot. Java restates the one line this implies,
+   * `streakBefore + (met ? 1 : 0)`, wherever a streak is drawn.
+   */
+  streakBefore: number;
 }
 
 /**
@@ -165,7 +187,8 @@ export function toRow(
   habit: Habit,
   value: number,
   dateKey: string,
-  streak: number,
+  /** The run of met days before `dateKey` — see `streakBefore` on `WidgetRow`. */
+  streakBefore: number,
   strings: WidgetStrings,
   /** Epoch ms this habit's stopwatch was started at, if one is running. Duration habits only. */
   timerStartedAt = 0,
@@ -178,7 +201,8 @@ export function toRow(
     label: config.name,
     raw: value,
     met,
-    streak,
+    streak: streakBefore + (met ? 1 : 0),
+    streakBefore,
     showSeconds: false,
     unit: '',
     timerStartedAt: 0,
@@ -250,7 +274,8 @@ export function buildSnapshot(
   dateKey: string,
   habits: readonly Habit[],
   values: Record<string, number>,
-  streaks: ReadonlyMap<string, number>,
+  /** Each habit's `streakBefore` — the run of met days *not counting* `dateKey`. */
+  streaksBefore: ReadonlyMap<string, number>,
   strings: WidgetStrings,
   /** Running stopwatches, by habit id. Absent for every habit that has none. */
   timers?: ReadonlyMap<string, number>,
@@ -263,7 +288,7 @@ export function buildSnapshot(
         habit,
         values[habit.id] ?? 0,
         dateKey,
-        streaks.get(habit.id) ?? 0,
+        streaksBefore.get(habit.id) ?? 0,
         strings,
         timers?.get(habit.id) ?? 0,
       ),

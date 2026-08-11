@@ -54,6 +54,20 @@ final class HabitsWidgetRow {
         return target > 0 ? value >= target : value > 0;
     }
 
+    /**
+     * The streak to draw, given whatever this process currently knows `met` to be.
+     *
+     * `row.streak` is only ever the answer as of when the snapshot was written — a press made on the
+     * widget itself changes `met` without a new snapshot to go with it, since the app is not running
+     * to write one. `streakBefore` does not have that problem: it is the run of met days *not*
+     * counting today, so it stays correct across a press, and today's own contribution is exactly the
+     * one bit `isMet` already recomputes live for the rest of the row. Mirrors `currentStreak` in
+     * streaks.ts, restated as the one line that implies.
+     */
+    static int streakFor(final JSONObject row, final boolean met) {
+        return row.optInt("streakBefore") + (met ? 1 : 0);
+    }
+
     static RemoteViews build(
         final Context context,
         final JSONObject row,
@@ -94,7 +108,7 @@ final class HabitsWidgetRow {
         item.setTextViewText(
             started ? R.id.row_label_done : R.id.row_label_todo, row.optString("label"));
 
-        final int streak = row.optInt("streak");
+        final int streak = streakFor(row, met);
         if (streak >= STREAK_MIN) {
             item.setViewVisibility(R.id.row_streak, View.VISIBLE);
             item.setTextViewText(R.id.row_streak_count, String.valueOf(streak));
