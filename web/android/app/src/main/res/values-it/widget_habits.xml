@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The four widget strings the snapshot cannot supply, in one of the app's languages.
+
+    These follow the *system* locale rather than the app's, and that is right for what they are.
+    Two are content descriptions, read aloud by TalkBack, which itself speaks the system language.
+    The other two are what the widget says when there is no trustworthy snapshot — precisely the
+    moments when the app's own language preference cannot be read. Every string that depends on
+    diary content travels in the snapshot instead; see widget_habits.xml in values/.
+-->
+<resources>
+    <string name="widget_habits_title">Abitudini</string>
+    <string name="widget_habits_loading">Apri Diary per configurarlo.</string>
+    <string name="widget_habits_stale">Apri Diary per vedere oggi.</string>
+    <string name="widget_habits_decrease">Riduci</string>
+    <string name="widget_habits_increase">Aumenta</string>
+    <string name="widget_habits_description">Le abitudini di oggi, con i progressi e la registrazione rapida.</string>
+    <string name="widget_habits_preview_counter">2/3</string>
+    <string name="widget_habits_preview_one">Leggere</string>
+    <string name="widget_habits_preview_two">Flessioni</string>
+    <string name="widget_habits_preview_three">Umore</string>
+    <string name="widget_habits_preview_done">Segna fatto</string>
+    <string name="widget_habits_preview_value">40</string>
+    <string name="widget_habits_start">Avvia cronometro</string>
+    <string name="widget_habits_pause">Metti in pausa</string>
+</resources>

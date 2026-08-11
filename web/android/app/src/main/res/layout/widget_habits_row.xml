@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One habit: a name, whatever control its kind takes, and a goal bar underneath.
+
+    Inflated once per row and appended with addView, so the ids repeat across rows — which is the
+    point, not a problem: each row is addressed through its own RemoteViews object rather than
+    through a unique id in a shared layout.
+
+    ## Why the label exists twice
+
+    The day card dims the name of a habit nothing has been recorded for (`done ? 'text-foreground' :
+    'text-muted-foreground'`), and that is the row's quietest but most-scanned signal. Two TextViews
+    toggled by visibility rather than one recoloured from Java, because `setTextColor` bakes a
+    resolved int into the RemoteViews: the launcher re-inflates on a theme change, so every
+    XML-referenced colour flips and that one would not, leaving dark-mode labels in light-mode ink
+    until the next refresh. Every dynamic colour in this widget is expressed as a swap for that
+    reason.
+
+    ## The control slot
+
+    Three mutually exclusive children — a stepper, a pill, and nothing — chosen by the provider from
+    the row's `format`. Mood is the one kind that doesn't fit here and has its own layout.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/widget_row_gap"
+    android:paddingBottom="@dimen/widget_row_gap">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/row_label_done"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textColor="@color/widget_foreground" />
+
+        <TextView
+            android:id="@+id/row_label_todo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textColor="@color/widget_muted" />
+
+        <!-- StreakBadge: a flame and a number on `bg-amber-500/10`. Hidden below two days, where a
+             streak is just "you did it today" and the row already says so. -->
+        <LinearLayout
+            android:id="@+id/row_streak"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginStart="6dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="@drawable/widget_streak_badge">
+
+            <ImageView
+                android:scaleType="fitCenter"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="2dp"
+                android:src="@drawable/widget_flame"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/row_streak_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:fontFamily="@font/geist_sans"
+            android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_streak" />
+        </LinearLayout>
+
+        <!-- Counts, durations and scales: `−  value  +`, the app's ghost icon buttons. -->
+        <LinearLayout
+            android:id="@+id/row_stepper"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginStart="4dp">
+
+            <!-- Duration habits only: play, then pause once it is running. Two views toggled by
+                 visibility rather than one whose drawable is swapped, so each keeps a static tint
+                 the launcher resolves — the rule every state in this widget follows. -->
+            <ImageButton
+                android:id="@+id/row_timer_play"
+                android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_button"
+                android:layout_height="@dimen/widget_button"
+                android:padding="@dimen/widget_button_inset"
+                android:visibility="gone"
+                android:src="@drawable/widget_play"
+                android:background="@drawable/widget_ghost_button"
+                android:contentDescription="@string/widget_habits_start" />
+
+            <ImageButton
+                android:id="@+id/row_timer_pause"
+                android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_button"
+                android:layout_height="@dimen/widget_button"
+                android:padding="@dimen/widget_button_inset"
+                android:visibility="gone"
+                android:src="@drawable/widget_pause"
+                android:background="@drawable/widget_timer_running"
+                android:contentDescription="@string/widget_habits_pause" />
+
+            <ImageButton
+                android:id="@+id/row_minus"
+                android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_button"
+                android:layout_height="@dimen/widget_button"
+                android:padding="@dimen/widget_button_inset"
+                android:src="@drawable/widget_minus"
+                android:background="@drawable/widget_ghost_button"
+                android:contentDescription="@string/widget_habits_decrease" />
+
+            <TextView
+                android:id="@+id/row_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="44dp"
+                android:gravity="center"
+                android:maxLines="1"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp"
+                android:textSize="14sp"
+                android:fontFamily="@font/geist_sans"
+            android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_foreground" />
+
+
+            <ImageButton
+                android:id="@+id/row_plus"
+                android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_button"
+                android:layout_height="@dimen/widget_button"
+                android:padding="@dimen/widget_button_inset"
+                android:src="@drawable/widget_plus"
+                android:background="@drawable/widget_ghost_button"
+                android:contentDescription="@string/widget_habits_increase" />
+        </LinearLayout>
+
+        <!--
+            Yes/no: one labelled pill, filled once ticked. Not a tick-box — a 20px box is under half
+            what a finger is reliably accurate to, which is the same reason the day card replaced its
+            checkbox with a button. Both states carry the same word, so the row's width does not
+            change as it is pressed.
+
+            Declared twice, filled and outlined, rather than once with its background swapped from
+            Java. `setInt(id, "setBackgroundResource", …)` would do it in one view, but it is a
+            ReflectionAction, and a ReflectionAction that fails does not degrade — it throws out of
+            RemoteViews.apply and the launcher replaces the entire widget with "Problem loading
+            widget". Two views cost a few lines of XML and cannot fail that way, which is the same
+            trade every other state in this widget already makes.
+        -->
+        <LinearLayout
+            android:id="@+id/row_pill_on"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginStart="6dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:background="@drawable/widget_pill_on">
+
+            <ImageView
+                android:scaleType="fitCenter"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="4dp"
+                android:src="@drawable/widget_check_on"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/row_pill_label_on"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:textSize="13sp"
+                android:fontFamily="@font/geist_sans"
+                android:textStyle="bold"
+                android:textColor="@color/widget_primary_foreground" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/row_pill_off"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginStart="6dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:background="@drawable/widget_pill_off">
+
+            <!-- `opacity-30` on the tick while unticked: present, so the button's content width does
+                 not change as it is pressed, but plainly not the answer yet. -->
+            <ImageView
+                android:scaleType="fitCenter"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="4dp"
+                android:src="@drawable/widget_check_off"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/row_pill_label_off"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:textSize="13sp"
+                android:fontFamily="@font/geist_sans"
+                android:textColor="@color/widget_foreground" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- HabitProgress. Only for the two kinds that can fall short of something: a rating *is* its
+         value and a yes/no is either ticked or not, where a bar would be decoration pretending to
+         be information. -->
+    <ProgressBar
+        android:id="@+id/row_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="5dp"
+        android:max="100"
+        android:progressDrawable="@drawable/widget_progress" />
+</LinearLayout>

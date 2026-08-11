@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The four widget strings the snapshot cannot supply, in one of the app's languages.
+
+    These follow the *system* locale rather than the app's, and that is right for what they are.
+    Two are content descriptions, read aloud by TalkBack, which itself speaks the system language.
+    The other two are what the widget says when there is no trustworthy snapshot — precisely the
+    moments when the app's own language preference cannot be read. Every string that depends on
+    diary content travels in the snapshot instead; see widget_habits.xml in values/.
+-->
+<resources>
+    <string name="widget_habits_title">习惯</string>
+    <string name="widget_habits_loading">打开 Diary 进行设置。</string>
+    <string name="widget_habits_stale">打开 Diary 查看今天。</string>
+    <string name="widget_habits_decrease">减少</string>
+    <string name="widget_habits_increase">增加</string>
+    <string name="widget_habits_description">今天的习惯，含进度与快速记录。</string>
+    <string name="widget_habits_preview_counter">2/3</string>
+    <string name="widget_habits_preview_one">阅读</string>
+    <string name="widget_habits_preview_two">俯卧撑</string>
+    <string name="widget_habits_preview_three">心情</string>
+    <string name="widget_habits_preview_done">标记完成</string>
+    <string name="widget_habits_preview_value">40</string>
+    <string name="widget_habits_start">开始计时</string>
+    <string name="widget_habits_pause">暂停计时</string>
+</resources>

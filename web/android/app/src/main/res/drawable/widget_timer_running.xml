@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pause button while a session is running: `variant="default"`, filled. TimeControl does the
+     same thing - play is a ghost button and pause is a solid one - so the single control that is
+     currently *doing* something is the only filled thing in the row. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/widget_primary" />
+</shape>

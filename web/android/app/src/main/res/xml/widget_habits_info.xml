@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What the launcher needs to know before it will offer this widget in the picker.
+
+    `updatePeriodMillis` is 0 on purpose. Android floors it at 30 minutes, which is far too slow to
+    be the mechanism behind a ± press and far too often to be worth waking the device for otherwise.
+    Every repaint this widget does is pushed instead: by the app after it writes a snapshot
+    (HabitsWidgetPlugin.refresh), by the provider itself after a press, and by ACTION_DATE_CHANGED
+    at midnight — see the intent-filter in AndroidManifest.xml. Nothing is left to a poll.
+
+    `previewLayout` deliberately points at a layout of its own rather than at the real one. The real
+    one is a title above an *empty* container — its rows only exist once the provider has a snapshot
+    to build them from, and nothing runs a provider to render a picker entry — so pointing this at
+    it produced a correct, working, entirely blank card. See widget_habits_preview.xml.
+
+    `previewImage` is the pre-31 fallback and is deliberately not set: it would have to be a raster,
+    which cannot follow the launcher's dark mode and goes stale the moment a colour changes. Older
+    launchers show the app icon instead, which is honest rather than wrong.
+
+    The minimum size is about three habits. `resizeMode` matters more than the minimum here: a habits
+    list is exactly the kind of thing people want to stretch to the height of their actual list, and
+    the layout has no fixed row count to fight it.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_habits"
+    android:previewLayout="@layout/widget_habits_preview"
+    android:description="@string/widget_habits_description"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

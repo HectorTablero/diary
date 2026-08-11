@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import i18n, { LANGUAGES } from '@/i18n';
+import i18n, { LANGUAGES, seedCoreLanguage } from '@/i18n';
 import es from '@/i18n/locales/es.json';
 import { getPreferences, resetPreferences } from '@/lib/preferences';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -20,9 +20,14 @@ import OnboardingFlow from './OnboardingFlow';
  */
 
 /* Spanish is preloaded so the picker can actually switch. `changeLanguage` fetches a locale by URL,
-   which in jsdom reaches nothing — with the bundle already in i18next, `ensureLanguage` short-
-   circuits and the switch is the pure state change this file is about. */
-i18n.addResourceBundle('es', 'translation', es, true, true);
+   which in jsdom reaches nothing — seeded here, `ensureLanguage` has nothing left to fetch and the
+   switch is the pure state change this file is about.
+
+   `seedCoreLanguage` rather than a bare `addResourceBundle`: the two are not interchangeable any
+   more, and the difference is a real bug's worth of meaning. Plugin strings share this bundle, so
+   "some resources exist for `es`" stopped implying "the app's own `es` strings are loaded" —
+   see the note on `coreLoaded` in i18n/index.ts. */
+seedCoreLanguage('es', es);
 
 const setup = () => {
   const onDone = vi.fn();

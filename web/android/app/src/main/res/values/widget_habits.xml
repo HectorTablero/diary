@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The widget's palette, and it is the app's palette rather than something chosen to look like it.
+
+    Every value is a token from web/src/index.css, converted once. The theme is shadcn "neutral",
+    which is `oklch(L 0 0)` throughout — chroma zero, so every colour is a pure grey and there is no
+    accent hue anywhere in the product. A widget with a blue progress bar does not read as a slightly
+    different shade of this app, it reads as a different app.
+
+    The conversion is Oklab lightness to sRGB: linear = L³, then the sRGB transfer curve. It lands
+    exactly on Tailwind's neutral ramp, which is the arithmetic confirming itself.
+
+        card             oklch(1     0 0)  #FFFFFF
+        foreground       oklch(0.145 0 0)  #0A0A0A
+        primary          oklch(0.205 0 0)  #171717
+        muted-foreground oklch(0.556 0 0)  #737373
+        border           oklch(0.922 0 0)  #E5E5E5
+        accent           oklch(0.97  0 0)  #F5F5F5
+
+    The dark half lives in values-night/ and is resolved by the launcher as it inflates, which is the
+    only place it can be resolved correctly — see the note at the top of widget_habits.xml in layout/.
+
+    The three strings here are the three the snapshot cannot supply: what to say when there is no
+    snapshot, and what to say when the one there is describes a day that has ended. Everything else
+    the widget draws travels in the snapshot, in the app's language rather than the system's. The
+    content descriptions are resources because TalkBack speaks the system language, which for a
+    spoken label is the right one to follow.
+-->
+<resources>
+    <color name="widget_disabled">#800A0A0A</color>
+    <!--
+        The logo's ink.
+
+        A token rather than a literal inside the vector, so the mark can follow the UI or stand
+        apart from it by editing one line. It points at `widget_foreground`, which means the mark
+        is black on a light home screen and white on a dark one, in step with the title beside it.
+
+        To put the brand blue back instead, set this to #FF0072FF here and in values-night — the
+        colour web/public/favicon.svg and the launcher icon use. Kept as two entries rather than one
+        shared literal precisely because a fixed brand colour needs no night variant while a
+        theme-following one does.
+    -->
+    <color name="widget_logo_ink">@color/widget_foreground</color>
+    <color name="widget_faint">#4D0A0A0A</color>
+    <color name="widget_card">#FFFFFFFF</color>
+    <color name="widget_foreground">#FF0A0A0A</color>
+    <color name="widget_muted">#FF737373</color>
+    <color name="widget_border">#FFE5E5E5</color>
+    <!-- Fills a met progress bar and a ticked pill. Near-black in light mode: this theme has no
+         accent hue, and contrast is the only thing that marks something as done. -->
+    <color name="widget_primary">#FF171717</color>
+    <color name="widget_primary_foreground">#FFFAFAFA</color>
+    <!-- `bg-primary/60`: progress short of its goal, so the bar distinguishes "some" from "all". -->
+    <color name="widget_primary_soft">#99171717</color>
+    <!-- `bg-primary/15` behind the chosen mood face. -->
+    <color name="widget_primary_wash">#26171717</color>
+    <!-- The unfilled part of a goal bar, and a ghost button's resting circle (`hover:bg-accent`). -->
+    <color name="widget_accent">#FFF5F5F5</color>
+    <!-- StreakBadge: amber-700 on amber-500/10. The one place the app allows a hue, and it is
+         carrying meaning rather than decoration, so the widget keeps it. -->
+    <color name="widget_streak">#FFB45309</color>
+    <color name="widget_streak_wash">#1AF59E0B</color>
+
+    <!-- `rounded-xl` = radius 0.625rem x 1.4 = 14dp, the diary's own card. -->
+    <dimen name="widget_corner">14dp</dimen>
+    <!-- `p-4` on the card, matching the day page's section. -->
+    <dimen name="widget_padding">16dp</dimen>
+    <dimen name="widget_header_gap">1dp</dimen>
+    <dimen name="widget_row_gap">7dp</dimen>
+    <!-- HabitControl's stepper is `size-7 rounded-full sm:size-8` around a `size-3.5` glyph. The
+         widget is always at the narrow end of that, so it takes the small one: a 28dp target with a
+         14dp glyph, which is the 7dp inset below. -->
+    <dimen name="widget_button">28dp</dimen>
+    <dimen name="widget_button_inset">7dp</dimen>
+    <!-- MoodControl is `size-8.5` with a `size-5.5` glyph: a 34dp target around a 22dp
+         face, which is the 6dp inset baked into widget_face_N_on.xml. -->
+    <dimen name="widget_face">34dp</dimen>
+    <!-- The mark beside the title. Sized to the cap height of a 14sp bold
+         heading so the two sit on one optical line. -->
+    <dimen name="widget_logo">17dp</dimen>
+
+    <string name="widget_habits_title">Habits</string>
+    <!-- Before the app has ever written a snapshot: a fresh install, or the moments after one. Not
+         an error — there is genuinely nothing to show yet. -->
+    <string name="widget_habits_loading">Open Diary to set this up.</string>
+    <!-- Between midnight and the app's next run, when the stored snapshot describes yesterday.
+         Presenting it as today would be wrong, and guessing today's values from it would be wrong in
+         a way that looks right. Background sync usually resolves this within the quarter hour. -->
+    <string name="widget_habits_stale">Open Diary to see today.</string>
+    <string name="widget_habits_decrease">Decrease</string>
+    <string name="widget_habits_increase">Increase</string>
+    <string name="widget_habits_rate">Rate</string>
+    <string name="widget_habits_description">Today\'s habits, with progress and quick recording.</string>
+    <string name="widget_habits_preview_counter">2/3</string>
+    <string name="widget_habits_preview_one">Read</string>
+    <string name="widget_habits_preview_two">Push-ups</string>
+    <string name="widget_habits_preview_three">Mood</string>
+    <string name="widget_habits_preview_done">Mark done</string>
+    <string name="widget_habits_preview_value">40</string>
+    <string name="widget_habits_start">Start timer</string>
+    <string name="widget_habits_pause">Pause timer</string>
+</resources>

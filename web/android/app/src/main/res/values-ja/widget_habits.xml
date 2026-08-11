@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The four widget strings the snapshot cannot supply, in one of the app's languages.
+
+    These follow the *system* locale rather than the app's, and that is right for what they are.
+    Two are content descriptions, read aloud by TalkBack, which itself speaks the system language.
+    The other two are what the widget says when there is no trustworthy snapshot — precisely the
+    moments when the app's own language preference cannot be read. Every string that depends on
+    diary content travels in the snapshot instead; see widget_habits.xml in values/.
+-->
+<resources>
+    <string name="widget_habits_title">習慣</string>
+    <string name="widget_habits_loading">Diary を開いて設定してください。</string>
+    <string name="widget_habits_stale">Diary を開いて今日を表示してください。</string>
+    <string name="widget_habits_decrease">減らす</string>
+    <string name="widget_habits_increase">増やす</string>
+    <string name="widget_habits_description">今日の習慣。進捗の表示とすばやい記録。</string>
+    <string name="widget_habits_preview_counter">2/3</string>
+    <string name="widget_habits_preview_one">読書</string>
+    <string name="widget_habits_preview_two">腕立て伏せ</string>
+    <string name="widget_habits_preview_three">気分</string>
+    <string name="widget_habits_preview_done">完了にする</string>
+    <string name="widget_habits_preview_value">40</string>
+    <string name="widget_habits_start">タイマーを開始</string>
+    <string name="widget_habits_pause">タイマーを一時停止</string>
+</resources>

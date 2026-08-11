@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A mood habit on a narrow widget: the name on one line, MoodControl's five faces on the next.
+
+    Five 30dp targets and a label do not share a line on a two-cell widget, and the alternative to
+    wrapping is five targets too small to hit. On a wider widget they do fit, and wrapping would
+    waste a line for nothing — that is widget_habits_row_mood_inline.xml, chosen by the factory from
+    the width the launcher actually reports for this instance.
+
+    No "4/5" anywhere. The chosen face already says which level it is, and says it more precisely
+    than a fraction does; the number was restating the control beside it.
+
+    Each face's chosen and unchosen states are single drawables (see widget_face_N_on.xml), so the
+    row swaps one resource and gets the tint and the `bg-primary/15` circle together — both still
+    resolved by the launcher, which is what keeps them correct in dark mode.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/widget_row_gap"
+    android:paddingBottom="@dimen/widget_row_gap">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/row_label_done"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textColor="@color/widget_foreground" />
+
+        <TextView
+            android:id="@+id/row_label_todo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textColor="@color/widget_muted" />
+
+        <LinearLayout
+            android:id="@+id/row_streak"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginStart="6dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="@drawable/widget_streak_badge">
+
+            <ImageView
+                android:scaleType="fitCenter"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="2dp"
+                android:src="@drawable/widget_flame"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/row_streak_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:fontFamily="@font/geist_sans"
+            android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_streak" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="3dp">
+
+        <ImageView android:id="@+id/row_face_1"
+            android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+            android:layout_weight="1" android:scaleType="fitCenter"
+            android:src="@drawable/widget_face_1_off"
+            android:contentDescription="@string/widget_habits_rate" />
+        <ImageView android:id="@+id/row_face_2"
+            android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+            android:layout_weight="1" android:scaleType="fitCenter"
+            android:src="@drawable/widget_face_2_off"
+            android:contentDescription="@string/widget_habits_rate" />
+        <ImageView android:id="@+id/row_face_3"
+            android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+            android:layout_weight="1" android:scaleType="fitCenter"
+            android:src="@drawable/widget_face_3_off"
+            android:contentDescription="@string/widget_habits_rate" />
+        <ImageView android:id="@+id/row_face_4"
+            android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+            android:layout_weight="1" android:scaleType="fitCenter"
+            android:src="@drawable/widget_face_4_off"
+            android:contentDescription="@string/widget_habits_rate" />
+        <ImageView android:id="@+id/row_face_5"
+            android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+            android:layout_weight="1" android:scaleType="fitCenter"
+            android:src="@drawable/widget_face_5_off"
+            android:contentDescription="@string/widget_habits_rate" />
+    </LinearLayout>
+</LinearLayout>

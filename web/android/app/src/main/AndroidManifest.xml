@@ -50,6 +50,41 @@
             </intent-filter>
         </activity>
 
+        <!-- The habits home-screen widget.
+
+             `exported="true"` is required rather than optional: the launcher is a different app,
+             and it is what sends ACTION_APPWIDGET_UPDATE. The only other action accepted here is
+             DATE_CHANGED, a protected broadcast only the system can send, and the widget's own
+             ± presses arrive through PendingIntents this app created — so nothing a third party
+             can send reaches anything that writes.
+
+             DATE_CHANGED is what stops the widget presenting yesterday's ticks as today's. It
+             cannot refresh the data (only the app can read Dexie), but it lets the provider notice
+             the day has turned over and say so; see HabitsWidgetProvider.build. -->
+        <receiver
+            android:name=".HabitsWidgetProvider"
+            android:label="@string/widget_habits_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_habits_info" />
+        </receiver>
+
+        <!-- Serves the widget's habit list to the launcher, which binds it across processes.
+
+             `BIND_REMOTEVIEWS` is a signature-level permission only the system holds, so this is
+             what stops any other installed app binding the service and reading the diary's habit
+             names, values and streaks straight out of it. Not exported beyond that: a
+             RemoteViewsService is reachable only by the launcher that was granted the binding. -->
+        <service
+            android:name=".HabitsWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

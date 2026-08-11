@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- lucide widget_face_3_off. Stroked, 2px, round caps - the same geometry the app renders, so the
+     widget and the day card are drawing one icon set rather than two similar ones. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="@color/widget_muted">
+    <path
+        android:pathData="M12 2 a10 10 0 1 0 0 20 a10 10 0 1 0 0 -20"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path
+        android:pathData="M15 10 V9"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path
+        android:pathData="M8 16 H16"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path
+        android:pathData="M9 10 V9"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

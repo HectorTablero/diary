@@ -65,6 +65,27 @@ i18n
     },
   });
 
+/**
+ * Which languages the *app's own* strings have been fetched for.
+ *
+ * Tracked here rather than asked of i18next, and that distinction is the whole of a bug worth
+ * remembering. This used to be `i18n.hasResourceBundle(code, 'translation')`, which read as an
+ * obviously equivalent question — and was, until a plugin shipped.
+ *
+ * Plugin strings are merged into this same `translation` bundle under a `plugins.<id>.` prefix
+ * (deliberately a prefix rather than an i18next namespace, so `scripts/checkI18n.ts` can still see
+ * the keys — see plugins/i18n.ts). `ensurePluginLocales` then fetches *every* language in the
+ * background so a later switch works offline. Between them, one notification reconcile at boot is
+ * enough to make `hasResourceBundle` answer `true` for all five languages while this app's own
+ * strings are loaded for exactly one.
+ *
+ * `ensureLanguage` would then short-circuit and load nothing, and the failure was quiet and very
+ * odd-looking: the plugin's labels switched instantly — its strings genuinely were loaded — while
+ * the entire app around them stayed in the previous language until a reload, where this runs from
+ * bootstrap before any plugin has touched the bundle. Pinned by i18n/coreBundle.test.tsx.
+ */
+const coreLoaded = new Set<LanguageCode>();
+
 async function loadLanguage(code: LanguageCode): Promise<void> {
   const url = localeUrl(code);
   if (!url) throw new Error(`i18n: no locale file for "${code}"`);
@@ -73,7 +94,28 @@ async function loadLanguage(code: LanguageCode): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`i18n: ${code} returned HTTP ${res.status}`);
   const strings = (await res.json()) as Record<string, unknown>;
+  // deep + overwrite, so this merges over whatever a plugin has already registered for this
+  // language rather than replacing it — the two halves of the bundle must coexist in both orders.
   i18n.addResourceBundle(code, 'translation', strings, true, true);
+  coreLoaded.add(code);
+}
+
+/**
+ * Test seam: register a language's strings as though they had been fetched.
+ *
+ * Tests that exercise a language *switch* need the strings present without a network — jsdom has
+ * no server to answer `loadLanguage`'s fetch. They used to do this with a bare
+ * `addResourceBundle`, and relied on `ensureLanguage` short-circuiting on `hasResourceBundle`,
+ * which is exactly the conflation that let a plugin's background locale pass silently starve the
+ * app of its own strings. Now that `ensureLanguage` keeps its own record, a test has to say the
+ * true thing rather than a thing that happened to look the same.
+ *
+ * Deliberately not `export`ed for production use: nothing outside a test should be asserting that
+ * strings are loaded without having loaded them.
+ */
+export function seedCoreLanguage(code: LanguageCode, strings: Record<string, unknown>): void {
+  i18n.addResourceBundle(code, 'translation', strings, true, true);
+  coreLoaded.add(code);
 }
 
 /* Coalesces a load already in progress, so the offline probe and a user picking that same language
@@ -91,7 +133,8 @@ const inFlight = new Map<LanguageCode, Promise<void>>();
     the rejection is genuinely transient: calling again after the network returns re-requests. */
 export function ensureLanguage(lng: string): Promise<void> {
   const code = resolveLanguage(lng);
-  if (i18n.hasResourceBundle(code, 'translation')) return Promise.resolve();
+  // `coreLoaded`, never `hasResourceBundle` — a plugin's strings live in the same bundle. See above.
+  if (coreLoaded.has(code)) return Promise.resolve();
   const existing = inFlight.get(code);
   if (existing) return existing;
   const load = loadLanguage(code).finally(() => inFlight.delete(code));
@@ -134,7 +177,7 @@ export function ensureLanguage(lng: string): Promise<void> {
    under the user's cursor on the way to deciding it was fine. */
 
 /* Only refusals are recorded. A probe that *succeeds* needs no bookkeeping at all: it went through
-   ensureLanguage, so the bundle is in memory and `hasResourceBundle` already answers for it. */
+   ensureLanguage, so the strings are in memory and `coreLoaded` already answers for it. */
 const refused = new Set<LanguageCode>();
 let probeVersion = 0;
 const probeListeners = new Set<() => void>();
@@ -145,7 +188,7 @@ function bumpProbeVersion() {
 }
 
 async function probeLanguage(code: LanguageCode): Promise<void> {
-  if (refused.has(code) || i18n.hasResourceBundle(code, 'translation')) return;
+  if (refused.has(code) || coreLoaded.has(code)) return;
   try {
     // ensureLanguage rather than a bare import: a probe that succeeds has already paid for the
     // strings, so keeping them makes the switch the user is probably about to make instant.
@@ -210,11 +253,12 @@ export function useLanguageAvailability(): (code: LanguageCode) => boolean {
 
   // Unprobed and in-flight both read as available, so the list never flickers a language out from
   // under the user's cursor on the way to deciding it was fine.
-  return (code) =>
-    i18n.hasResourceBundle(code, 'translation') ||
-    isNative ||
-    canFetchStrings ||
-    !refused.has(code);
+  /* `coreLoaded` rather than `hasResourceBundle` here too, and for a sharper reason than
+     correctness of bookkeeping: a plugin's background locale pass would otherwise mark every
+     language as already-present, so the picker would offer all five offline even where the app's
+     own strings were genuinely unreachable — turning the honest answer this hook exists to give
+     back into the guess it replaced. */
+  return (code) => coreLoaded.has(code) || isNative || canFetchStrings || !refused.has(code);
 }
 
 /**

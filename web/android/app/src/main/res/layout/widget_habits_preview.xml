@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What the widget picker shows.
+
+    `previewLayout` used to point at widget_habits.xml, which is why the picker looked broken: that
+    layout is a title and an *empty* container, because the rows only exist once the provider has a
+    snapshot to build them from — and nothing renders a provider for a preview. So the picker was
+    being handed a correct, working, entirely blank card.
+
+    A separate layout with plausible content is the documented answer, and it has to be static: no
+    ids the provider addresses, nothing that could be mistaken for live data. The numbers below are
+    invented and deliberately ordinary — one habit met, one part-way, one untouched — so the preview
+    shows what the widget is *for* rather than an idealised all-complete state.
+
+    Kept in step with widget_habits_row.xml by hand. That is the cost of a preview being a separate
+    layout, and it is the recommended trade: the alternative, `previewImage`, is a raster that goes
+    stale the moment any colour changes and cannot follow the launcher's dark mode at all.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/widget_card"
+    android:padding="@dimen/widget_padding">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="@dimen/widget_header_gap">
+
+        <ImageView
+            android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_logo"
+            android:layout_height="@dimen/widget_logo"
+            android:layout_marginEnd="7dp"
+            android:src="@drawable/widget_logo"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textStyle="bold"
+            android:textColor="@color/widget_foreground"
+            android:text="@string/widget_habits_title" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:fontFamily="@font/geist_sans"
+            android:textColor="@color/widget_muted"
+            android:text="@string/widget_habits_preview_counter" />
+    </LinearLayout>
+
+    <!-- Met: a filled pill, and the name in full-strength ink. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="@dimen/widget_row_gap"
+        android:paddingBottom="@dimen/widget_row_gap">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textColor="@color/widget_foreground"
+            android:text="@string/widget_habits_preview_one" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="10dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:background="@drawable/widget_pill_on">
+
+            <ImageView
+                android:scaleType="fitCenter"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="4dp"
+                android:src="@drawable/widget_check_on"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:fontFamily="@font/geist_sans"
+                android:textStyle="bold"
+                android:textColor="@color/widget_primary_foreground"
+                android:text="@string/widget_habits_preview_done" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Part-way: a stepper and a half-filled goal bar. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/widget_row_gap"
+        android:paddingBottom="@dimen/widget_row_gap">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textSize="14sp"
+                android:fontFamily="@font/geist_sans"
+                android:textColor="@color/widget_muted"
+                android:text="@string/widget_habits_preview_two" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_button"
+                    android:layout_height="@dimen/widget_button"
+                    android:padding="@dimen/widget_button_inset"
+                    android:src="@drawable/widget_minus"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="44dp"
+                    android:gravity="center"
+                    android:textSize="14sp"
+                    android:fontFamily="@font/geist_sans"
+                    android:textColor="@color/widget_foreground"
+                    android:text="@string/widget_habits_preview_value" />
+
+                <ImageView
+                    android:scaleType="fitCenter"
+                android:layout_width="@dimen/widget_button"
+                    android:layout_height="@dimen/widget_button"
+                    android:padding="@dimen/widget_button_inset"
+                    android:src="@drawable/widget_plus"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ProgressBar
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="5dp"
+            android:max="100"
+            android:progress="60"
+            android:progressDrawable="@drawable/widget_progress" />
+    </LinearLayout>
+
+    <!-- A mood, mid-scale, so the picker shows that ratings are answerable here too. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/widget_row_gap">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:fontFamily="@font/geist_sans"
+            android:textColor="@color/widget_foreground"
+            android:text="@string/widget_habits_preview_three" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="3dp">
+
+            <ImageView android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+                android:layout_weight="1" android:scaleType="fitCenter"
+                android:src="@drawable/widget_face_1_off" android:contentDescription="@null" />
+            <ImageView android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+                android:layout_weight="1" android:scaleType="fitCenter"
+                android:src="@drawable/widget_face_2_off" android:contentDescription="@null" />
+            <ImageView android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+                android:layout_weight="1" android:scaleType="fitCenter"
+                android:src="@drawable/widget_face_3_off" android:contentDescription="@null" />
+            <ImageView android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+                android:layout_weight="1" android:scaleType="fitCenter"
+                android:src="@drawable/widget_face_4_on" android:contentDescription="@null" />
+            <ImageView android:layout_width="@dimen/widget_face" android:layout_height="@dimen/widget_face"
+                android:layout_weight="1" android:scaleType="fitCenter"
+                android:src="@drawable/widget_face_5_off" android:contentDescription="@null" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -5,7 +5,8 @@ import type { PluginRecordDto } from '@diary/shared';
 /* Type-only. Nothing here emits a byte, which is why the manifest can describe a plugin's shape
    without any of its code being reachable from the entry chunk. */
 
-export type PluginSurface = 'day' | 'page' | 'settings' | 'notifications' | 'export' | 'calendar';
+export type PluginSurface =
+  'day' | 'page' | 'settings' | 'notifications' | 'export' | 'calendar' | 'widget';
 
 /**
  * One day's worth of a plugin's calendar data — just enough to colour and label a cell.
@@ -63,6 +64,23 @@ export interface PluginModule {
    * wearing a different icon per plugin instead of one switcher that scales to any number of them.
    */
   CalendarView?: ComponentType<PluginCalendarViewProps>;
+  /**
+   * Bring this plugin's Android home-screen widget up to date.
+   *
+   * Headless, like `collectNotifications`, and for a stronger version of the same reason: there is
+   * no React on the other side of this at all. A home-screen widget is drawn by a native provider in
+   * a process with no WebView, so a plugin cannot render it — it can only restate its data somewhere
+   * the provider can read, and say when.
+   *
+   * Called on boot, on resume, after a sync applies and on each background-fetch wake-up, so it must
+   * be cheap, idempotent, and safe to call when no widget has been placed at all. It must also never
+   * throw: the callers are lifecycle hooks doing several other things, and a widget that failed to
+   * repaint is not a reason for any of them to stop.
+   *
+   * Both directions belong here, not just the outbound one. A widget that can be pressed collects
+   * changes while the app is closed, and this is the hook that banks them — see `syncHabitsWidget`.
+   */
+  syncNativeWidget?: () => Promise<void>;
   /** A one-line, human-readable description of a row, for the backup import review — which
       otherwise has nothing to show but an opaque blob. */
   describeRecord?: (record: PluginRecordDto) => string;

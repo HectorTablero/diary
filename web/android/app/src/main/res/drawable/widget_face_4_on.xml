@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The chosen face: `bg-primary/15` behind a primary-tinted glyph, exactly as MoodControl draws
+     it. Composed as a layer-list rather than as a background swapped from Java, so one
+     setImageViewResource changes the tint and the circle together - and both still resolve in the
+     launcher's process, which is what keeps dark mode correct. The 6dp inset is the difference
+     between the app's size-8.5 target and its size-5.5 glyph. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/widget_primary_wash" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/widget_face_4_glyph_on"
+        android:left="6dp" android:top="6dp" android:right="6dp" android:bottom="6dp" />
+</layer-list>

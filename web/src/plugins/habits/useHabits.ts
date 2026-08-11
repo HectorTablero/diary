@@ -33,6 +33,7 @@ import {
   streakBefore,
   STREAK_WINDOW_DAYS,
 } from './streaks';
+import { refreshHabitsWidget } from './widgetBridge';
 
 const PLUGIN_ID = 'habits';
 
@@ -126,6 +127,11 @@ export function useHabitsDay(dateKey: string): HabitsDay {
     pending.current = null;
     if (!write) return;
     await putPluginRecord(PLUGIN_ID, 'record', write.dateKey, valueData(write.values));
+    /* Hung off the flush rather than off `setValue`, so the debounce covers this too: running down
+       the checklist is one widget repaint at the end, not one per tap. Not awaited and never
+       throwing — the home screen catching up a moment late is not worth delaying the write, and a
+       widget that failed to repaint is not a reason for a recorded habit to fail. */
+    void refreshHabitsWidget();
   }, []);
 
   const load = useCallback(async () => {
@@ -248,6 +254,12 @@ export function useHabitsLibrary(today: string): HabitsLibrary {
     setHabits(definitionsOf(undated));
     setHistory(new Map(days.map((row) => [row.dateKey, parseValues(row)])));
     setLoading(false);
+    /* Here rather than in each of the four mutations below, all of which end by calling this. The
+       home screen has to follow a habit being created, renamed, retired or brought back, not just
+       being ticked — a widget still listing a habit that was retired an hour ago is the kind of
+       staleness people report as data loss. The cost of also firing on mount is one repaint on a
+       page that was opened deliberately. */
+    void refreshHabitsWidget();
   }, []);
 
   useEffect(() => {

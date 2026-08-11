@@ -10,10 +10,11 @@
     "build:app": "tsc --noEmit && vite build --mode app && tsx scripts/checkBundle.ts && cap sync android",
     "app:open": "cap open android",
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/checkI18n.ts && vitest run",
+    "test": "tsx scripts/checkI18n.ts && tsx scripts/checkWidgetLayouts.ts && vitest run",
     "preview": "vite preview",
     "check:i18n": "tsx scripts/checkI18n.ts",
-    "check:bundle": "tsx scripts/checkBundle.ts"
+    "check:bundle": "tsx scripts/checkBundle.ts",
+    "check:widget": "tsx scripts/checkWidgetLayouts.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",

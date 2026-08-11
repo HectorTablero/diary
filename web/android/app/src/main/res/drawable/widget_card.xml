@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- `rounded-xl border bg-card` - the exact shape of the section the habits list sits in on the
+     day page. The stroke is what makes it read as the app's card rather than as a floating slab;
+     shadcn cards are defined by their hairline, not by elevation. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_card" />
+    <corners android:radius="@dimen/widget_corner" />
+    <stroke android:width="1dp" android:color="@color/widget_border" />
+</shape>
