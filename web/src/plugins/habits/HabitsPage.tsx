@@ -266,6 +266,8 @@ function HabitCard({
   /* A habit that was never recorded has no history to protect, so it can simply go. One that was
      can only be retired — the days it happened on are diary history, and there is no undo. */
   const deletable = recorded === 0;
+  const todayValue = library.history.get(today)?.[habit.id] ?? 0;
+  const todayCompleted = metTarget(habit, todayValue, today);
 
   return (
     <section
@@ -289,7 +291,7 @@ function HabitCard({
             {t('plugins.habits.recordedDays', { count: recorded })}
           </p>
         </div>
-        <StreakBadge streak={library.streaks.get(habit.id) ?? 0} />
+        <StreakBadge streak={library.streaks.get(habit.id) ?? 0} completed={todayCompleted} />
       </div>
 
       {/* Oldest on the left. Each cell carries its own label, because a row of coloured squares
