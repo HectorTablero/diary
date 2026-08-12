@@ -25,10 +25,10 @@ const DOT_CLASSES: Record<number, string> = {
  */
 const SHAPE_CLASSES: Record<number, string> = {
   1: 'rounded-full',
-  2: '[clip-path:polygon(50%_0%,100%_100%,0%_100%)]',
-  3: 'rounded-[1px]',
-  4: '[clip-path:polygon(50%_0%,100%_50%,50%_100%,0%_50%)]',
-  5: '[clip-path:polygon(0%_32%,100%_32%,100%_68%,0%_68%)]',
+  2: 'scale-[1.025] [clip-path:polygon(50%_0%,100%_100%,0%_100%)]',
+  3: 'scale-[0.9] rounded-[1px]',
+  4: 'scale-[1.05] [clip-path:polygon(50%_0%,100%_50%,50%_100%,0%_50%)]',
+  5: '[clip-path:polygon(0%_36%,100%_36%,100%_64%,0%_64%)]',
 };
 
 const level = (importance: number) => (importance >= 1 && importance <= 5 ? importance : 3);
