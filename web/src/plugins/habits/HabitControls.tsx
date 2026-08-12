@@ -77,12 +77,17 @@ export function HiddenSection({
  * column for the whole list: without it every row's controls would sit at a different x depending
  * on whether that particular habit happened to be on a streak.
  */
-export function StreakBadge({ streak }: { streak: number }) {
+export function StreakBadge({ streak, completed = true }: { streak: number; completed?: boolean }) {
   const { t } = useTranslation();
   if (streak < STREAK_MIN) return null;
   return (
     <span
-      className="flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 tabular-nums dark:text-amber-400"
+      className={cn(
+        'flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums transition-colors',
+        completed
+          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+          : 'bg-muted text-muted-foreground',
+      )}
       aria-label={t('plugins.habits.streak', { count: streak })}
     >
       <Flame className="size-3" aria-hidden />

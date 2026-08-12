@@ -251,7 +251,7 @@ function PeriodControl({
                   className={cn(
                     'flex size-8 items-center justify-center rounded-full transition-colors',
                     selected
-                      ? 'bg-background text-foreground shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-muted-foreground hover:text-foreground',
                     disabled && 'pointer-events-none opacity-60',
                   )}
