@@ -185,17 +185,16 @@ test(
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 20_000 });
 
-    for (const step of ['language', 'writing', 'importance', 'people']) {
+    for (const step of ['language', 'writing', 'importance', 'people', 'threads', 'plugins']) {
       findings.push(await scan(page, `onboarding: ${step}`));
+      if (step === 'importance') {
+        await page.getByRole('switch').click();
+        findings.push(await scan(page, 'onboarding: importance shapes on'));
+        await page.getByRole('switch').click();
+      }
       const next = page.getByRole('button', { name: 'Next' });
       if (await next.isVisible()) await next.click();
     }
-
-    // With the shapes on, since that is the state the step exists to offer and the silhouettes are
-    // drawn with clip-path — a different rendering path from the plain dots axe just measured.
-    await page.getByRole('button', { name: 'Back' }).click();
-    await page.getByRole('switch').click();
-    findings.push(await scan(page, 'onboarding: importance shapes on'));
 
     await test.info().attach('axe-onboarding.json', {
       body: asJson(findings),
