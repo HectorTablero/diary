@@ -249,6 +249,7 @@ function HabitRow({
   const { t } = useTranslation();
   const live = useLiveHabitValue(habit, value, dateKey);
   const done = live.total > 0;
+  const completed = metTarget(habit, live.total, dateKey);
 
   /**
    * Clearing a habit back to "not recorded", with an undo.
@@ -331,7 +332,7 @@ function HabitRow({
       <div className="flex shrink-0 items-center gap-0.5 self-center">
         {reserveStreak && (
           <span className="flex w-10 justify-end">
-            <StreakBadge streak={streak} />
+            <StreakBadge streak={streak} completed={completed} />
           </span>
         )}
         {!readOnly && done ? (
