@@ -43,7 +43,7 @@ describe('demoData · the tour teaches the sigils in every language', () => {
   for (const [lang, bundle] of Object.entries(BUNDLES)) {
     describe(lang, () => {
       const demo = demoData(tFor(bundle));
-      const entries = [demo.entry, ...demo.entry.children];
+      const entries = [demo.entry, ...demo.entry.children, ...demo.threadEntries];
 
       it('leaves no @ or # stranded outside a matched token', () => {
         for (const entry of entries) {
@@ -62,6 +62,15 @@ describe('demoData · the tour teaches the sigils in every language', () => {
         );
         expect(kinds).toContain('person');
         expect(kinds).toContain('tag');
+      });
+
+      it('keeps the tag glued to its # in every thread entry', () => {
+        for (const entry of demo.threadEntries) {
+          const kinds = segmentContent(entry.content, entry.people, entry.tags).map(
+            (segment) => segment.kind,
+          );
+          expect(kinds).toContain('tag');
+        }
       });
 
       it('gives every token an id, so it resolves to something real', () => {

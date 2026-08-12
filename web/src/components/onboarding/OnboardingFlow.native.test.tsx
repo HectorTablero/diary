@@ -39,7 +39,7 @@ const setup = () => {
 };
 
 const toLastStep = async (user: ReturnType<typeof userEvent.setup>) => {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('status');
   }
@@ -60,12 +60,15 @@ afterEach(() => {
 });
 
 describe('OnboardingFlow · on a phone', () => {
-  it('adds a fifth step and counts it', async () => {
+  it('adds a seventh step and counts it', async () => {
     const { user } = setup();
-    expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 5');
+    expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 7');
     await toLastStep(user);
-    expect(screen.getByRole('status')).toHaveTextContent('Step 5 of 5');
-    // Still the hand-off, not a sixth step.
+    expect(screen.getByRole('status')).toHaveTextContent('Step 6 of 7');
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Extend your diary with Plugins')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Step 7 of 7');
+    // Still the hand-off, not a seventh step.
     expect(screen.getByRole('button', { name: 'Get started' })).toBeInTheDocument();
   });
 

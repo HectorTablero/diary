@@ -144,6 +144,15 @@
       "title": "A nudge at the end of the day",
       "lede": "Get one quiet reminder if you haven't written anything yet. You can change this any time in Settings."
     },
+    "threads": {
+      "title": "One topic, many days",
+      "lede": "A thread groups entries about the same project or subject into a single story you can look back on — or catch someone up on all at once."
+    },
+    "plugins": {
+      "title": "Extend your diary with Plugins",
+      "lede": "Optional features like habit tracking or period logging are built as plugins. Activate them anytime from Settings.",
+      "settingsNote": "Turn plugins on or off anytime in Settings → Plugins."
+    },
     "demo": {
       "person": "Ana",
       "colleague": "Marco",
@@ -151,7 +160,14 @@
       "tag": "work",
       "entryMeeting": "Had a #{{tag}} meeting with @{{person}}",
       "entryCollaboration": "We talked about a possible collaboration between our teams",
-      "otherTags": ["research", "family", "university", "climbing"]
+      "otherTags": ["research", "family", "university", "climbing"],
+      "thread": "Diary project",
+      "projectTag": "project",
+      "threadWidgets": "Added Widgets to the Diary #{{tag}}",
+      "threadPlugins": "Added Plugins to the Diary #{{tag}}",
+      "threadAesthetic": "Aesthetic changes to the Diary #{{tag}}",
+      "threadFeature": "Added the threads feature to the Diary #{{tag}}",
+      "profilePerson": "Lena"
     }
   },
   "diary": {

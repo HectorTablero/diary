@@ -66,18 +66,24 @@ describe('OnboardingFlow · moving through it', () => {
     expect(heading()).toHaveFocus();
   });
 
-  it('walks four steps on the web and ends by handing off', async () => {
+  it('walks six steps on the web and ends by handing off', async () => {
     const { user, onDone } = setup();
 
-    expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 4');
+    expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 6');
     await next(user);
     expect(await screen.findByText('Write down what happened')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Step 2 of 4');
+    expect(screen.getByRole('status')).toHaveTextContent('Step 2 of 6');
     await next(user);
     expect(await screen.findByText('How much did it matter?')).toBeInTheDocument();
     await next(user);
     expect(await screen.findByText('Things worth telling')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Step 4 of 4');
+    expect(screen.getByRole('status')).toHaveTextContent('Step 4 of 6');
+    await next(user);
+    expect(await screen.findByText('One topic, many days')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Step 5 of 6');
+    await next(user);
+    expect(await screen.findByText('Extend your diary with Plugins')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Step 6 of 6');
 
     // The last step's button points at the app, not at another step.
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
@@ -169,7 +175,7 @@ describe('OnboardingFlow · the language step', () => {
     await user.keyboard('{ArrowDown}');
     expect(second).toHaveFocus();
     // Still on step one: the arrow was consumed by the group.
-    expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 4');
+    expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 6');
   });
 });
 
@@ -180,6 +186,7 @@ describe('OnboardingFlow · the demo is contained', () => {
       'Write down what happened',
       'How much did it matter?',
       'Things worth telling',
+      'One topic, many days',
     ]) {
       expect(screen.queryAllByRole('link')).toHaveLength(0);
       await next(user);
@@ -266,6 +273,33 @@ describe('OnboardingFlow · the demo is contained', () => {
 
     await user.click(screen.getByRole('button', { name: /Hide sub-entries/ }));
     expect(dialog).not.toHaveTextContent('possible collaboration');
+  });
+
+  it('gathers the shared # tag across days into one thread', async () => {
+    const { user } = setup();
+    await next(user);
+    await screen.findByText('Write down what happened');
+    await next(user);
+    await screen.findByText('How much did it matter?');
+    await next(user);
+    await screen.findByText('Things worth telling');
+    await next(user);
+    await screen.findByText('One topic, many days');
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('Diary project');
+    expect(dialog).toHaveTextContent('4 entries');
+    // Each day is one line of the same story, and the #project token highlights in each.
+    expect(dialog).toHaveTextContent('Added Widgets to the Diary #project');
+    expect(dialog).toHaveTextContent('Added Plugins to the Diary #project');
+    expect(dialog).toHaveTextContent('Aesthetic changes to the Diary #project');
+    expect(dialog).toHaveTextContent('Added the threads feature to the Diary #project');
+    // The dates are the demonstration: a thread is what holds these days together, drawn as plain
+    // text rather than the real row's date link — nothing in the tour may navigate anywhere.
+    expect(dialog).toHaveTextContent('11 Aug 2026');
+    expect(dialog).toHaveTextContent('10 Aug 2026');
+    expect(dialog).toHaveTextContent('31 Jul 2026');
+    expect(dialog).toHaveTextContent('25 Jul 2026');
   });
 });
 

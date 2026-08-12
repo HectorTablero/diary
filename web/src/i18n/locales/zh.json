@@ -136,6 +136,15 @@
       "title": "在一天结束时轻轻提醒你",
       "lede": "如果你还没有写下任何内容，会收到一次轻柔的提醒。你可以随时在设置中修改。"
     },
+    "threads": {
+      "title": "一个话题，许多天",
+      "lede": "话题线将同一项目或主题的条目汇聚成一个完整故事，便于回顾或一次性给别人说清楚来龙去脉。"
+    },
+    "plugins": {
+      "title": "用插件扩展你的日记",
+      "lede": "习惯追踪等可选功能均以插件形式提供，随时可在设置中开启。",
+      "settingsNote": "可在 设置 → 插件 中随时开启或关闭插件。"
+    },
     "demo": {
       "person": "小李",
       "colleague": "小张",
@@ -143,7 +152,14 @@
       "tag": "工作",
       "entryMeeting": "和 @{{person}} 开了个 #{{tag}} 会",
       "entryCollaboration": "聊到两边团队合作的可能",
-      "otherTags": ["研究", "家庭", "大学", "攀岩"]
+      "otherTags": ["研究", "家庭", "大学", "攀岩"],
+      "thread": "日记项目",
+      "projectTag": "项目",
+      "threadWidgets": "给日记添加了小部件 #{{tag}}",
+      "threadPlugins": "给日记添加了插件 #{{tag}}",
+      "threadAesthetic": "对日记做了一些外观调整 #{{tag}}",
+      "threadFeature": "给日记添加了话题功能 #{{tag}}",
+      "profilePerson": "小陈"
     }
   },
   "diary": {

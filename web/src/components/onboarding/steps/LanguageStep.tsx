@@ -82,7 +82,7 @@ export function LanguageStep() {
       role="radiogroup"
       aria-label={t('settings.general.language')}
       onKeyDown={onKeyDown}
-      className="flex flex-col gap-1.5"
+      className="flex flex-col gap-1.5 lg:grid lg:grid-cols-2 lg:gap-2"
     >
       {LANGUAGES.map((language) => {
         const available = isAvailable(language.code);

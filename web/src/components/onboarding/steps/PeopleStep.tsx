@@ -1,5 +1,5 @@
 import type { EntryDto, PersonRefDto, TagDto } from '@diary/shared';
-import { Check, ChevronDown, ChevronRight, MessageCircle, Tag as TagIcon } from 'lucide-react';
+import { Check, ChevronRight, MessageCircle, Tag as TagIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TagChip } from '@/components/entry/chips';
@@ -112,7 +112,7 @@ export function PeopleStep() {
   const [subEntry] = demo.entry.children;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-4">
       <DemoCard className="bg-background p-3">
         <div className="mb-2.5 flex items-center gap-2">
           <h3 className="font-heading text-base font-semibold">{t('people.title')}</h3>
@@ -153,7 +153,10 @@ export function PeopleStep() {
       </DemoCard>
 
       {/* The two panels are one screen and the screen after it; this is the tap between them. */}
-      <ChevronDown aria-hidden className="mx-auto size-4 shrink-0 text-muted-foreground" />
+      <ChevronRight
+        aria-hidden
+        className="mx-auto size-4 shrink-0 -rotate-90 text-muted-foreground lg:rotate-0"
+      />
 
       <DemoCard className="bg-background p-3">
         <div className="mb-2.5 flex items-center gap-2.5">
@@ -218,7 +221,9 @@ export function PeopleStep() {
       </DemoCard>
 
       {/* Where step 3 pays off: importance is not a label, it is how long this stays on the list. */}
-      <p className="text-sm text-muted-foreground">{t('onboarding.people.decay')}</p>
+      <p className="mx-auto w-full max-w-md text-sm text-muted-foreground lg:col-span-3 lg:max-w-3xl">
+        {t('onboarding.people.decay')}
+      </p>
     </div>
   );
 }
