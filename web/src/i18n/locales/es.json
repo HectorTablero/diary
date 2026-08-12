@@ -142,6 +142,15 @@
       "title": "Un aviso al final del día",
       "lede": "Recibe un discreto recordatorio si aún no has escrito nada. Puedes cambiarlo en cualquier momento desde Ajustes."
     },
+    "threads": {
+      "title": "Un tema, muchos días",
+      "lede": "Un hilo agrupa entradas sobre el mismo proyecto o tema en una sola historia que puedes repasar, o con la que puedes poner a alguien al día de una vez."
+    },
+    "plugins": {
+      "title": "Amplía tu diario con complementos",
+      "lede": "Las funciones opcionales como el seguimiento de hábitos o del ciclo están integradas como complementos. Actívalas cuando quieras desde Ajustes.",
+      "settingsNote": "Activa o desactiva complementos en cualquier momento desde Ajustes → Complementos."
+    },
     "demo": {
       "person": "Ana",
       "colleague": "Javi",
@@ -149,7 +158,14 @@
       "tag": "trabajo",
       "entryMeeting": "Reunión de #{{tag}} con @{{person}}",
       "entryCollaboration": "Hablamos de una posible colaboración entre nuestros equipos",
-      "otherTags": ["buceo", "familia", "universidad", "escalada"]
+      "otherTags": ["buceo", "familia", "universidad", "escalada"],
+      "thread": "Proyecto del diario",
+      "projectTag": "proyecto",
+      "threadWidgets": "Añadí Widgets al #{{tag}} del Diario",
+      "threadPlugins": "Añadí Plugins al #{{tag}} del Diario",
+      "threadAesthetic": "Hice cambios estéticos en el #{{tag}} del Diario",
+      "threadFeature": "Añadí la función de hilos al #{{tag}} del Diario",
+      "profilePerson": "Marta"
     }
   },
   "diary": {

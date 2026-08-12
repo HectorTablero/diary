@@ -8,7 +8,9 @@ import { cn } from '@/lib/utils';
 import { ImportanceStep } from './steps/ImportanceStep';
 import { LanguageStep } from './steps/LanguageStep';
 import { PeopleStep } from './steps/PeopleStep';
+import { PluginsStep } from './steps/PluginsStep';
 import { RemindersStep } from './steps/RemindersStep';
+import { ThreadsStep } from './steps/ThreadsStep';
 import { WritingStep } from './steps/WritingStep';
 
 interface Step {
@@ -18,35 +20,26 @@ interface Step {
 }
 
 /* Ordered as a sentence: which language, what an entry is, what the numbers on it mean, what the
-   app does with them — and then, on a phone, whether to be reminded to write at all. Reminders
-   last because it is the only screen asking for something rather than showing something. */
+   app does with them — then threads, then phone reminders (if native), and finally plugins. */
 const WEB_STEPS: Step[] = [
   { id: 'language', Component: LanguageStep },
   { id: 'writing', Component: WritingStep },
   { id: 'importance', Component: ImportanceStep },
   { id: 'people', Component: PeopleStep },
+  { id: 'threads', Component: ThreadsStep },
 ];
 
 const NATIVE_STEPS: Step[] = [{ id: 'reminders', Component: RemindersStep }];
 
-/**
- * The first-run tour: a handful of screens over a fake diary, shown once per device.
- *
- * **A modal Dialog rather than a route or a bare overlay**, and that is not a styling choice. It
- * gives four things at once, each of which would otherwise be hand-written: `role="dialog"`, which
- * is what the Android hardware-back listener in App.tsx looks for — so back steps through the tour
- * instead of quitting the app, with no change needed there; Radix's focus trap and `aria-modal`,
- * which keep Tab inside the tour while the sign-in screen sits behind it; a caller that stays
- * mounted underneath, so finishing is a state flip rather than a navigation with a blank frame in
- * the middle; and the enter/exit animations the rest of the app's dialogs already use.
- *
- * **It never writes the "seen" preference itself.** The caller decides what finishing means — the
- * login screen records it, and the replay button in Settings does not — which is what lets the same
- * component be both a first run and a re-run.
- */
+const FINAL_STEPS: Step[] = [{ id: 'plugins', Component: PluginsStep }];
+
 export default function OnboardingFlow({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
-  const steps = useMemo(() => (isNative ? [...WEB_STEPS, ...NATIVE_STEPS] : WEB_STEPS), []);
+  const steps = useMemo(
+    () =>
+      isNative ? [...WEB_STEPS, ...NATIVE_STEPS, ...FINAL_STEPS] : [...WEB_STEPS, ...FINAL_STEPS],
+    [],
+  );
   const [index, setIndex] = useState(0);
   /* Which way the next panel slides in from. Kept in state rather than derived, because the exiting
      panel has to animate out the same way the entering one came in, and by the time it exits the
@@ -187,9 +180,20 @@ export default function OnboardingFlow({ onDone }: { onDone: () => void }) {
               /* The generous `pb` is the step's own bottom margin: without it the last thing on a
                  tall step sits flush against the footer bar, which reads as content cut off rather
                  than content ended. */
-              className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-2 pb-8"
+              className={cn(
+                'mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-2 pb-8',
+                step.id === 'people' || step.id === 'threads' || step.id === 'plugins'
+                  ? 'lg:max-w-5xl'
+                  : 'lg:max-w-3xl',
+              )}
             >
-              <div className="flex flex-col gap-1.5">
+              <div
+                className={cn(
+                  'mx-auto flex w-full flex-col gap-1.5',
+                  (step.id === 'people' || step.id === 'threads' || step.id === 'plugins') &&
+                    'lg:max-w-3xl',
+                )}
+              >
                 {/* The Radix title, so it is also the dialog's accessible name — which changes per
                     step, correctly: the name of this dialog right now *is* the step you are on. */}
                 <DialogTitle ref={focusHeading} tabIndex={-1} className="text-lg outline-none">

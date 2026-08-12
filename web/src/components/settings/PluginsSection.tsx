@@ -72,28 +72,30 @@ export function PluginsSection() {
 
   return (
     <Section title={t('settings.plugins.title')} description={t('settings.plugins.description')}>
-      {PLUGINS.map((plugin) => {
-        const on = enabled.has(plugin.id);
-        const rows = rowCounts[plugin.id] ?? 0;
-        return (
-          <ToggleRow
-            key={plugin.id}
-            id={`plugin-${plugin.id}`}
-            icon={plugin.icon}
-            // Before the locales land the switch would read as its own key, so hold the row back.
-            label={ready ? t(`plugins.${plugin.id}.name`) : '…'}
-            description={
-              !on && rows > 0
-                ? t('settings.plugins.hasData', { count: rows })
-                : ready
-                  ? t(`plugins.${plugin.id}.description`)
-                  : ''
-            }
-            checked={on}
-            onCheckedChange={(value) => void toggle(plugin.id, value)}
-          />
-        );
-      })}
+      <div className="flex flex-col gap-4">
+        {PLUGINS.map((plugin) => {
+          const on = enabled.has(plugin.id);
+          const rows = rowCounts[plugin.id] ?? 0;
+          return (
+            <ToggleRow
+              key={plugin.id}
+              id={`plugin-${plugin.id}`}
+              icon={plugin.icon}
+              // Before the locales land the switch would read as its own key, so hold the row back.
+              label={ready ? t(`plugins.${plugin.id}.name`) : '…'}
+              description={
+                !on && rows > 0
+                  ? t('settings.plugins.hasData', { count: rows })
+                  : ready
+                    ? t(`plugins.${plugin.id}.description`)
+                    : ''
+              }
+              checked={on}
+              onCheckedChange={(value) => void toggle(plugin.id, value)}
+            />
+          );
+        })}
+      </div>
     </Section>
   );
 }

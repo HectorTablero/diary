@@ -138,6 +138,15 @@
       "title": "Un promemoria a fine giornata",
       "lede": "Ricevi un discreto promemoria se non hai ancora scritto nulla. Puoi modificarlo in qualsiasi momento nelle Impostazioni."
     },
+    "threads": {
+      "title": "Un tema, molti giorni",
+      "lede": "Un thread raggruppa le voci relative allo stesso progetto o argomento in un'unica storia a cui puoi tornare, o con cui puoi aggiornare qualcuno tutto in una volta."
+    },
+    "plugins": {
+      "title": "Estendi il tuo diario con i Plugin",
+      "lede": "Le funzionalità opzionali come il tracciamento delle abitudini o del ciclo sono integrate come plugin. Attivale quando vuoi dalle Impostazioni.",
+      "settingsNote": "Attiva o disattiva i plugin in qualsiasi momento da Impostazioni → Plugin."
+    },
     "demo": {
       "person": "Ana",
       "colleague": "Luca",
@@ -145,7 +154,14 @@
       "tag": "lavoro",
       "entryMeeting": "Riunione di #{{tag}} con @{{person}}",
       "entryCollaboration": "Abbiamo parlato di una possibile collaborazione tra i nostri team",
-      "otherTags": ["ricerca", "famiglia", "università", "arrampicata"]
+      "otherTags": ["ricerca", "famiglia", "università", "arrampicata"],
+      "thread": "Progetto del diario",
+      "projectTag": "progetto",
+      "threadWidgets": "Ho aggiunto i Widget al #{{tag}} del Diario",
+      "threadPlugins": "Ho aggiunto i Plugin al #{{tag}} del Diario",
+      "threadAesthetic": "Ho fatto modifiche estetiche al #{{tag}} del Diario",
+      "threadFeature": "Ho aggiunto la funzione filone al #{{tag}} del Diario",
+      "profilePerson": "Elena"
     }
   },
   "diary": {

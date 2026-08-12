@@ -147,6 +147,24 @@ Surfaces: the day card (record only — nothing is created or destroyed there), 
 names rather than opaque blobs. A habit that was ever recorded can only be **retired**, not deleted:
 those days are diary history.
 
+### Period tracker
+
+One row per marked day (`{ period: true, flow }`, three flow levels) — there is deliberately no
+stored "cycle" row. A cycle is never anything but a maximal run of consecutive marked dateKeys,
+computed fresh by `groupCycles` whenever one is needed, which is what keeps recording a single tap:
+toggling a day on or off can never leave a stored cycle disagreeing with the days it was built from.
+
+Predictions (`predict.ts`) count forward from the last cycle's start by the mean length and duration
+of up to the 6 most recent cycles, falling back to population averages until a second cycle exists to
+average at all. The day page turns that into an outlook — quiet, "in ~N days", or "due" through a
+7-day grace period past the predicted end — never a day count within the window, since a prediction
+is a guess at a window, not at which day inside it.
+
+Surfaces: the day widget, a calendar view shading logged days by flow and predicted days lighter
+still, `/plugins/period-tracker` for the history, a Settings card for a device-local heads-up a
+couple of days before the next predicted start, and a plain-log export. No Android widget, unlike
+habits.
+
 ## Security and privacy
 
 - **App lock** — an optional passcode (PBKDF2, device-local) in front of the diary, with the

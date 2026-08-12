@@ -1,4 +1,4 @@
-import type { EntryNode, PersonRefDto, TagDto } from '@diary/shared';
+import type { EntryDto, EntryNode, PersonRefDto, TagDto, ThreadDto } from '@diary/shared';
 import type { TFunction } from 'i18next';
 
 /**
@@ -48,8 +48,18 @@ export interface DemoData {
       else — deliberately not the person the entry mentions, who would invite the reader to work out
       why she is there. */
   otherPerson: PersonRefDto;
+  /** A person who has never appeared anywhere else in the tour, whose profile the thread step's
+      second view shows — where several of the demo's entries surface grouped under one thread. */
+  profilePerson: PersonRefDto;
   tag: TagDto;
   otherTags: TagDto[];
+  /** The one thread the demo knows, gathered from the entries below it — the subject of the last
+      web step. */
+  thread: ThreadDto;
+  /** The tag every thread entry carries, so `#project` in their text highlights against it. */
+  projectTag: TagDto;
+  /** The thread's member entries, newest day first — the order the threads page lists them. */
+  threadEntries: EntryDto[];
   /** One entry with two sub-entries hanging off it — the shape a real day in the diary takes. */
   entry: EntryNode;
 }
@@ -61,6 +71,12 @@ export function demoData(t: TFunction): DemoData {
     id: 'demo-other-person',
     name: t('onboarding.demo.otherPerson'),
   };
+  /* Deliberately someone the tour has not met — the people step's list and profile belong to
+     Marco, and a stranger on this step keeps the two views from blending into one person. */
+  const profilePerson: PersonRefDto = {
+    id: 'demo-profile-person',
+    name: t('onboarding.demo.profilePerson'),
+  };
   /* Teal from the tag palette rather than a fresh hex, so the chip in the tour is a colour a real
      tag could actually be. */
   const tag: TagDto = { id: 'demo-tag', name: t('onboarding.demo.tag'), color: '#4ECDC4' };
@@ -71,6 +87,20 @@ export function demoData(t: TFunction): DemoData {
     { id: 'demo-other-tag-3', name: t('onboarding.demo.otherTags.2'), color: '#68CD4C' },
     { id: 'demo-other-tag-4', name: t('onboarding.demo.otherTags.3'), color: '#CD8A4C' },
   ];
+
+  /* A real palette colour, like `tag` above — Blue, distinct from every other chip in the tour. */
+  const projectTag: TagDto = {
+    id: 'demo-project-tag',
+    name: t('onboarding.demo.projectTag'),
+    color: '#4C55CD',
+  };
+
+  const thread: ThreadDto = {
+    id: 'demo-thread',
+    name: t('onboarding.demo.thread'),
+    createdAt: AT,
+    updatedAt: AT,
+  };
 
   const base = {
     dateKey: DATE_KEY,
@@ -84,12 +114,64 @@ export function demoData(t: TFunction): DemoData {
     children: [] as EntryNode[],
   };
 
+  /* Four days spread out over roughly a month, all about the same project — the demonstration that
+     a thread spans days and keeps them together. The texts interpolate the tag, exactly like the
+     headline entry, so `#project` highlights in every language; the *dates* are fixed so the
+     thread's spread is visible and deterministic, and rendered by the step as plain text rather
+     than through EntryRow's own (link-bearing) date, which has no place in the tour. */
+  const threadEntries: EntryDto[] = [
+    {
+      ...base,
+      id: 'demo-thread-widgets',
+      parentId: null,
+      orderKey: 't0',
+      content: t('onboarding.demo.threadWidgets', { tag: projectTag.name }),
+      importance: 3,
+      tags: [projectTag],
+      dateKey: '2026-08-11',
+    },
+    {
+      ...base,
+      id: 'demo-thread-plugins',
+      parentId: null,
+      orderKey: 't1',
+      content: t('onboarding.demo.threadPlugins', { tag: projectTag.name }),
+      importance: 3,
+      tags: [projectTag],
+      dateKey: '2026-08-10',
+    },
+    {
+      ...base,
+      id: 'demo-thread-aesthetic',
+      parentId: null,
+      orderKey: 't2',
+      content: t('onboarding.demo.threadAesthetic', { tag: projectTag.name }),
+      importance: 5,
+      tags: [projectTag],
+      dateKey: '2026-07-31',
+    },
+    {
+      ...base,
+      id: 'demo-thread-feature',
+      parentId: null,
+      orderKey: 't3',
+      content: t('onboarding.demo.threadFeature', { tag: projectTag.name }),
+      importance: 4,
+      tags: [projectTag],
+      dateKey: '2026-07-25',
+    },
+  ];
+
   return {
     person,
     colleague,
     otherPerson,
+    profilePerson,
     tag,
     otherTags,
+    thread,
+    projectTag,
+    threadEntries,
     entry: {
       ...base,
       id: 'demo-entry',
