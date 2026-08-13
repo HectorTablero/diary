@@ -110,10 +110,13 @@ final class HabitsWidgetRow {
 
         final int streak = streakFor(row, met);
         if (streak >= STREAK_MIN) {
-            item.setViewVisibility(R.id.row_streak, View.VISIBLE);
-            item.setTextViewText(R.id.row_streak_count, String.valueOf(streak));
+            item.setViewVisibility(R.id.row_streak_done, met ? View.VISIBLE : View.GONE);
+            item.setViewVisibility(R.id.row_streak_todo, met ? View.GONE : View.VISIBLE);
+            item.setTextViewText(
+                met ? R.id.row_streak_count_done : R.id.row_streak_count_todo, String.valueOf(streak));
         } else {
-            item.setViewVisibility(R.id.row_streak, View.GONE);
+            item.setViewVisibility(R.id.row_streak_done, View.GONE);
+            item.setViewVisibility(R.id.row_streak_todo, View.GONE);
         }
 
         if (isMood) {

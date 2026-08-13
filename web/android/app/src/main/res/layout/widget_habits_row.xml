@@ -59,7 +59,7 @@
         <!-- StreakBadge: a flame and a number on `bg-amber-500/10`. Hidden below two days, where a
              streak is just "you did it today" and the row already says so. -->
         <LinearLayout
-            android:id="@+id/row_streak"
+            android:id="@+id/row_streak_done"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -81,13 +81,45 @@
                 android:contentDescription="@null" />
 
             <TextView
-                android:id="@+id/row_streak_count"
+                android:id="@+id/row_streak_count_done"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="11sp"
                 android:fontFamily="@font/geist_sans"
             android:fontFeatureSettings="tnum"
                 android:textColor="@color/widget_streak" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/row_streak_todo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginStart="6dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="@drawable/widget_streak_badge_muted">
+
+            <ImageView
+                android:scaleType="fitCenter"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="2dp"
+                android:src="@drawable/widget_flame_muted"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/row_streak_count_todo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:fontFamily="@font/geist_sans"
+            android:fontFeatureSettings="tnum"
+                android:textColor="@color/widget_muted" />
         </LinearLayout>
 
         <!-- Counts, durations and scales: `−  value  +`, the app's ghost icon buttons. -->
