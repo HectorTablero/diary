@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateKey, todayKey } from '@/lib/dates';
+import { splitColumns, useIsWideContainer } from '@/lib/useContainerWidth';
 import { cn } from '@/lib/utils';
 import { habitChanges } from './changes';
 import { HiddenSection, StreakBadge } from './HabitControls';
@@ -68,12 +69,74 @@ import { useHabitsLibrary } from './useHabits';
 /** Three weeks: wide enough to see a pattern, narrow enough to fit a phone without scrolling. */
 const GRID_DAYS = 21;
 
+/* A habit card carries a 21-cell day grid across its full width — the same reason people's row of
+   badges wants more room than a tag chip does, that grid wants more per column than a bare list
+   item, so this sits above TagsPage's/PeriodPage's LIST_TWO_COLUMN_MIN. Still comfortably under
+   ~700px, though: `PageContainer` here never widens past its default max-w-3xl, so that's roughly
+   the ceiling this page's content width can ever reach, on any window. */
+const HABITS_TWO_COLUMN_MIN = 620;
+
+/** One habit list — active or archived — rendered as a single column or, given the room, as two
+    independent ones built from `splitColumns`. Shared so the archived list inside `HiddenSection`
+    doesn't have to repeat this branch. */
+function HabitCardList({
+  habits,
+  today,
+  library,
+  onEdit,
+  twoColumns,
+  archived = false,
+}: {
+  habits: Habit[];
+  today: string;
+  library: ReturnType<typeof useHabitsLibrary>;
+  onEdit: (habit: Habit) => void;
+  twoColumns: boolean;
+  archived?: boolean;
+}) {
+  if (!twoColumns) {
+    return (
+      <div className="space-y-3">
+        {habits.map((habit) => (
+          <HabitCard
+            key={habit.id}
+            habit={habit}
+            today={today}
+            library={library}
+            onEdit={() => onEdit(habit)}
+            archived={archived}
+          />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-3">
+      {splitColumns(habits).map((column, i) => (
+        <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">
+          {column.map((habit) => (
+            <HabitCard
+              key={habit.id}
+              habit={habit}
+              today={today}
+              library={library}
+              onEdit={() => onEdit(habit)}
+              archived={archived}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function HabitsPage() {
   const { t } = useTranslation();
   const today = todayKey();
   const library = useHabitsLibrary(today);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Habit | null>(null);
+  const [listRef, twoColumns] = useIsWideContainer<HTMLDivElement>(HABITS_TWO_COLUMN_MIN);
 
   return (
     <PageContainer>
@@ -111,54 +174,48 @@ export default function HabitsPage() {
         }}
       />
 
-      {library.loading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ) : library.active.length === 0 && library.archived.length === 0 ? (
-        <EmptyState
-          icon={CircleCheckBig}
-          title={t('plugins.habits.empty')}
-          description={t('plugins.habits.emptyPageDescription')}
-        >
-          <Button size="sm" className="mt-2 gap-1.5" onClick={() => setAdding(true)}>
-            <Plus className="size-3.5" />
-            {t('plugins.habits.newHabit')}
-          </Button>
-        </EmptyState>
-      ) : (
-        <div className="space-y-3">
-          {library.active.map((habit) => (
-            <HabitCard
-              key={habit.id}
-              habit={habit}
-              today={today}
-              library={library}
-              onEdit={() => setEditing(habit)}
-            />
-          ))}
-        </div>
-      )}
+      <div ref={listRef}>
+        {library.loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : library.active.length === 0 && library.archived.length === 0 ? (
+          <EmptyState
+            icon={CircleCheckBig}
+            title={t('plugins.habits.empty')}
+            description={t('plugins.habits.emptyPageDescription')}
+          >
+            <Button size="sm" className="mt-2 gap-1.5" onClick={() => setAdding(true)}>
+              <Plus className="size-3.5" />
+              {t('plugins.habits.newHabit')}
+            </Button>
+          </EmptyState>
+        ) : (
+          <HabitCardList
+            habits={library.active}
+            today={today}
+            library={library}
+            onEdit={setEditing}
+            twoColumns={twoColumns}
+          />
+        )}
 
-      <HiddenSection
-        count={library.archived.length}
-        showLabel={t('plugins.habits.retiredCount', { count: library.archived.length })}
-        hideLabel={t('plugins.habits.hideRetired')}
-      >
-        <div className="space-y-3">
-          {library.archived.map((habit) => (
-            <HabitCard
-              key={habit.id}
-              habit={habit}
-              today={today}
-              library={library}
-              onEdit={() => setEditing(habit)}
-              archived
-            />
-          ))}
-        </div>
-      </HiddenSection>
+        <HiddenSection
+          count={library.archived.length}
+          showLabel={t('plugins.habits.retiredCount', { count: library.archived.length })}
+          hideLabel={t('plugins.habits.hideRetired')}
+        >
+          <HabitCardList
+            habits={library.archived}
+            today={today}
+            library={library}
+            onEdit={setEditing}
+            twoColumns={twoColumns}
+            archived
+          />
+        </HiddenSection>
+      </div>
     </PageContainer>
   );
 }
