@@ -27,6 +27,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateKey, parseDateKey, todayKey } from '@/lib/dates';
+import { LIST_TWO_COLUMN_MIN, splitColumns, useIsWideContainer } from '@/lib/useContainerWidth';
 import { cn } from '@/lib/utils';
 import { FLOW_ICON } from './flowIcons';
 import { DEFAULT_FLOW, FLOW_LEVELS, type FlowLevel, type PeriodDay } from './model';
@@ -51,6 +52,10 @@ export default function PeriodPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Cycle | null>(null);
   const [working, setWorking] = useState(false);
+  const [listRef, twoColumns] = useIsWideContainer<HTMLDivElement>(LIST_TWO_COLUMN_MIN);
+  // Paired with the chronological predecessor `CycleCard` reads its cycle-length off, before any
+  // column split loses access to the source array's own indices.
+  const cyclesWithPrevious = cycles.map((cycle, i) => ({ cycle, previous: cycles[i + 1] }));
 
   const confirmDelete = async () => {
     if (!confirming) return;
@@ -115,17 +120,19 @@ export default function PeriodPage() {
       ) : (
         <>
           {/* Only shown once there is a real average behind it — see recentStats — rather than a
-              placeholder that would read as data before there is any. */}
+              placeholder that would read as data before there is any. One card, not two side by
+              side: both numbers describe the same cycle, and `justify-between` reads as a single
+              stat with two halves rather than two unrelated cards that happen to be neighbours. */}
           {stats && (
-            <div className="mb-4 grid grid-cols-2 gap-3">
-              <StatCard
+            <div className="mb-4 flex items-center justify-evenly gap-3 rounded-xl border bg-card p-3 shadow-xs">
+              <StatItem
                 icon={Repeat}
                 label={t('plugins.period-tracker.avgCycleLengthLabel')}
                 value={t('plugins.period-tracker.daysCount', {
                   count: Math.round(stats.avgCycleLength),
                 })}
               />
-              <StatCard
+              <StatItem
                 icon={Timer}
                 label={t('plugins.period-tracker.avgDurationLabel')}
                 value={t('plugins.period-tracker.daysCount', {
@@ -135,19 +142,44 @@ export default function PeriodPage() {
             </div>
           )}
 
-          <ul className="space-y-3">
-            {cycles.map((cycle, i) => (
-              <CycleCard
-                key={cycle.start}
-                cycle={cycle}
-                previous={cycles[i + 1]}
-                byDate={byDate}
-                onEdit={() => setEditing(cycle)}
-                onDelete={() => setConfirming(cycle)}
-                onSetDayFlow={(dateKey, flow) => void setDayFlow(dateKey, flow)}
-              />
-            ))}
-          </ul>
+          {/* Paired with its chronological predecessor *before* any column split: `previous` is
+              read off the full, source-ordered `cycles` array, and a column's own local index
+              inside its half is not that array's index. */}
+          <div ref={listRef}>
+            {twoColumns ? (
+              <div className="flex items-start gap-3">
+                {splitColumns(cyclesWithPrevious).map((column, i) => (
+                  <ul key={i} className="flex min-w-0 flex-1 flex-col gap-3">
+                    {column.map(({ cycle, previous }) => (
+                      <CycleCard
+                        key={cycle.start}
+                        cycle={cycle}
+                        previous={previous}
+                        byDate={byDate}
+                        onEdit={() => setEditing(cycle)}
+                        onDelete={() => setConfirming(cycle)}
+                        onSetDayFlow={(dateKey, flow) => void setDayFlow(dateKey, flow)}
+                      />
+                    ))}
+                  </ul>
+                ))}
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {cyclesWithPrevious.map(({ cycle, previous }) => (
+                  <CycleCard
+                    key={cycle.start}
+                    cycle={cycle}
+                    previous={previous}
+                    byDate={byDate}
+                    onEdit={() => setEditing(cycle)}
+                    onDelete={() => setConfirming(cycle)}
+                    onSetDayFlow={(dateKey, flow) => void setDayFlow(dateKey, flow)}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
         </>
       )}
 
@@ -177,7 +209,10 @@ export default function PeriodPage() {
   );
 }
 
-function StatCard({
+/** One half of the stats card — an icon, a number, and what it's a count of. No border or
+    background of its own: the two live inside one shared card, separated by `justify-between`,
+    rather than each carrying its own card chrome as if they were unrelated figures. */
+function StatItem({
   icon: Icon,
   label,
   value,
@@ -187,7 +222,7 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-xs">
+    <div className="flex min-w-0 items-center gap-3">
       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Icon className="size-4" aria-hidden />
       </span>

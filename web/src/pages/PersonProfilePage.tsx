@@ -28,7 +28,7 @@ import {
   UserX,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import {
@@ -72,6 +72,12 @@ import { ApiError } from '@/lib/apiClient';
 import { isCheckupDue } from '@/lib/checkup';
 import { formatDateKey, parseDateKey, todayKey } from '@/lib/dates';
 import { useEntityLinks } from '@/lib/entityLinks';
+import {
+  SIDEBAR_SPLIT_MIN_WIDTH,
+  SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH,
+  useContainerWidth,
+} from '@/lib/useContainerWidth';
+import { cn } from '@/lib/utils';
 
 /** Shared by all four profile tabs — see the note at the TabsList below for why it un-sets
     `whitespace-nowrap` and lets the trigger grow, but only up to the `sm` breakpoint. */
@@ -612,6 +618,17 @@ export default function PersonProfilePage() {
   const updatePerson = useUpdatePerson();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [splitRef, splitWidth] = useContainerWidth<HTMLDivElement>();
+  const useTwoColumns = splitWidth >= SIDEBAR_SPLIT_MIN_WIDTH;
+
+  /* The Events tab disappears in two-column mode — its content moves to the sidebar instead — so a
+     resize that crosses the threshold while it's the active tab would otherwise leave the page on a
+     trigger and a content pane that no longer exist. Falls back to the first tab rather than, say,
+     Memories: talking points are what most people open this page to check. */
+  const [activeTab, setActiveTab] = useState('talking-points');
+  useEffect(() => {
+    if (useTwoColumns && activeTab === 'events') setActiveTab('talking-points');
+  }, [useTwoColumns, activeTab]);
 
   /* The list this profile was almost certainly opened from. It already holds the name and the
      tags, so the header can be real from the first frame instead of a blank viewport. */
@@ -636,193 +653,250 @@ export default function PersonProfilePage() {
   const today = todayKey();
   const pendingFollowUps = pendingEventFollowUps(person.events, today);
 
+  /* Built once and placed twice below (never both): in the left column above the tabs when there's
+     only one column, or above Events in the sidebar when there are two — checking up on someone is
+     as much "context for reaching out" as an overdue event is, so it belongs beside Events rather
+     than buried above tab content the sidebar has already made unnecessary to scroll past. */
+  const checkupBanner = checkupDue && (
+    <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-2.5">
+        <BellRing className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div>
+          <p className="text-sm font-medium">
+            {t('people.checkupDueTitle', { name: person.name })}
+          </p>
+          <p className="text-xs text-muted-foreground">{t('people.checkupDueDescription')}</p>
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() =>
+            markCheckup.mutate(person.id, {
+              onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+              onError: () => notifyError(t('errors.unknown')),
+            })
+          }
+        >
+          <Check className="size-3.5" />
+          {t('people.markCheckupDone')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() =>
+            updatePerson.mutate(
+              { id: person.id, input: { checkupIntervalDays: null } },
+              {
+                onSuccess: () => notifySuccess(t('people.checkupsDisabled')),
+                onError: () => notifyError(t('errors.unknown')),
+              },
+            )
+          }
+        >
+          <BellOff className="size-3.5" />
+          {t('people.disableCheckups')}
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
-    <PageContainer>
-      <PersonIdentity
-        name={person.name}
-        tags={person.tags}
-        actions={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground"
-                aria-label={t('people.personActions', { name: person.name })}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setEditing(true)}>
-                <Pencil className="size-3.5" /> {t('people.editPerson')}
-              </DropdownMenuItem>
-              {person.checkupIntervalDays != null && (
-                <DropdownMenuItem
-                  onClick={() =>
-                    markCheckup.mutate(person.id, {
-                      onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
-                      onError: () => notifyError(t('errors.unknown')),
-                    })
-                  }
-                >
-                  <Check className="size-3.5" /> {t('people.markCheckupNow')}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-                <Trash2 className="size-3.5" /> {t('people.deletePerson')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        }
-      >
-        {person.notes && (
-          <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">{person.notes}</p>
+    // Unlike the list pages, this one is allowed to grow: the payoff of two columns here is real
+    // (events always visible instead of a tab away) rather than a cramped attempt to fit two card
+    // columns into a reading-width page, so the container widens the same way the day page's does.
+    <PageContainer className="lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl">
+      {/* The split starts here, at the very top, rather than below the header: the events sidebar
+          is meant to sit level with the identity block, not dangle down to align with wherever the
+          tabs happen to start. The ⋯ menu is what actually forces the header inside the left
+          column too — outside the split it would sit at the top-right of the whole widened page,
+          not the left column it visually belongs to. */}
+      <div
+        ref={splitRef}
+        className={cn(
+          useTwoColumns && 'grid grid-cols-12 items-start',
+          useTwoColumns && (splitWidth >= SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH ? 'gap-8' : 'gap-6'),
         )}
-        <ContactInfo person={person} onEdit={() => setEditing(true)} />
-      </PersonIdentity>
-
-      {checkupDue && (
-        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-2.5">
-            <BellRing className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div>
-              <p className="text-sm font-medium">
-                {t('people.checkupDueTitle', { name: person.name })}
-              </p>
-              <p className="text-xs text-muted-foreground">{t('people.checkupDueDescription')}</p>
-            </div>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() =>
-                markCheckup.mutate(person.id, {
-                  onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
-                  onError: () => notifyError(t('errors.unknown')),
-                })
-              }
-            >
-              <Check className="size-3.5" />
-              {t('people.markCheckupDone')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() =>
-                updatePerson.mutate(
-                  { id: person.id, input: { checkupIntervalDays: null } },
-                  {
-                    onSuccess: () => notifySuccess(t('people.checkupsDisabled')),
-                    onError: () => notifyError(t('errors.unknown')),
-                  },
-                )
-              }
-            >
-              <BellOff className="size-3.5" />
-              {t('people.disableCheckups')}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Same idiom as the checkup banner above — an unanswered "how did it go?" is the same
-          kind of debt, so it should look like one. */}
-      {pendingFollowUps.length > 0 && (
-        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
-          <div className="flex items-start gap-2.5">
-            <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div>
-              <p className="text-sm font-medium">
-                {t('people.eventFollowUpTitle', { count: pendingFollowUps.length })}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t('people.eventFollowUpDescription', { name: person.name })}
-              </p>
-            </div>
-          </div>
-          <ul className="flex flex-col gap-2">
-            {pendingFollowUps.map((event) => (
-              <li
-                key={event.id}
-                className="flex flex-col items-stretch gap-2 rounded-lg border border-amber-500/25 bg-background/40 p-2.5 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{event.title}</p>
-                  {/* The notes are the whole point of the reminder — they're what you'd actually
-                      ask about, so they belong right here rather than a tab away. */}
-                  {event.notes && (
-                    <p className="mt-0.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                      {event.notes}
-                    </p>
+      >
+        <div className={cn(useTwoColumns && 'col-span-7')}>
+          <PersonIdentity
+            name={person.name}
+            tags={person.tags}
+            actions={
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                    aria-label={t('people.personActions', { name: person.name })}
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditing(true)}>
+                    <Pencil className="size-3.5" /> {t('people.editPerson')}
+                  </DropdownMenuItem>
+                  {person.checkupIntervalDays != null && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        markCheckup.mutate(person.id, {
+                          onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+                          onError: () => notifyError(t('errors.unknown')),
+                        })
+                      }
+                    >
+                      <Check className="size-3.5" /> {t('people.markCheckupNow')}
+                    </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+                    <Trash2 className="size-3.5" /> {t('people.deletePerson')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            }
+          >
+            {person.notes && (
+              <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">
+                {person.notes}
+              </p>
+            )}
+            <ContactInfo person={person} onEdit={() => setEditing(true)} />
+          </PersonIdentity>
+
+          {!useTwoColumns && checkupBanner}
+
+          {/* Same idiom as the checkup banner above — an unanswered "how did it go?" is the same
+          kind of debt, so it should look like one.
+
+          Suppressed in two-column mode: it exists to surface something a tab was hiding, and once
+          the events section sits in the sidebar at all times, nothing is hidden — the same overdue
+          events are right there, each already carrying this exact nudge on its own `EventRow`
+          footer (the `followUpDue` block, above). Keeping both would just say it twice. */}
+          {!useTwoColumns && pendingFollowUps.length > 0 && (
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+              <div className="flex items-start gap-2.5">
+                <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <p className="text-sm font-medium">
+                    {t('people.eventFollowUpTitle', { count: pendingFollowUps.length })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('people.eventFollowUpDescription', { name: person.name })}
+                  </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full shrink-0 gap-1.5 sm:w-auto"
-                  onClick={() =>
-                    markEventAsked.mutate(
-                      { personId: person.id, eventId: event.id },
-                      {
-                        onSuccess: () => notifySuccess(t('people.eventMarkedAsked')),
-                        onError: () => notifyError(t('errors.unknown')),
-                      },
-                    )
-                  }
-                >
-                  <Check className="size-3.5" />
-                  {t('people.markEventAsked')}
-                </Button>
-              </li>
-            ))}
-          </ul>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {pendingFollowUps.map((event) => (
+                  <li
+                    key={event.id}
+                    className="flex flex-col items-stretch gap-2 rounded-lg border border-amber-500/25 bg-background/40 p-2.5 sm:flex-row sm:items-start sm:justify-between"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{event.title}</p>
+                      {/* The notes are the whole point of the reminder — they're what you'd actually
+                      ask about, so they belong right here rather than a tab away. */}
+                      {event.notes && (
+                        <p className="mt-0.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                          {event.notes}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full shrink-0 gap-1.5 sm:w-auto"
+                      onClick={() =>
+                        markEventAsked.mutate(
+                          { personId: person.id, eventId: event.id },
+                          {
+                            onSuccess: () => notifySuccess(t('people.eventMarkedAsked')),
+                            onError: () => notifyError(t('errors.unknown')),
+                          },
+                        )
+                      }
+                    >
+                      <Check className="size-3.5" />
+                      {t('people.markEventAsked')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            {/* Four tabs no longer fit one phone-width row, so they wrap into an even 2x2 grid and
+                only straighten out into a single row from `sm` up. The height override has to reuse
+                the same group-data variant TabsList sets it with, or it loses on specificity.
+
+                TAB_TRIGGER also drops TabsTrigger's own `whitespace-nowrap` below `sm`: a label that
+                can't shrink and can't wrap simply overflows its grid cell, which is what Spanish's
+                "Temas de conversación" did — pushing the icon off the left edge and the text off the
+                right. Letting it take a second line costs height only in the languages that need it,
+                and the grid keeps both cells in a row the same height by itself.
+
+                In two-column mode Events drops out of both the grid and the count that sizes it —
+                three tabs fit their own row without the 2x2 wrap ever coming into play, since
+                `useTwoColumns` can't be true below the `sm` viewport width the wrap exists for (a
+                container can't measure wider than the viewport holding it). */}
+            <TabsList
+              className={cn(
+                'mb-4 grid w-full gap-1 group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-auto sm:gap-0 sm:group-data-horizontal/tabs:h-8',
+                useTwoColumns ? 'grid-cols-3' : 'grid-cols-2',
+              )}
+            >
+              <TabsTrigger value="talking-points" className={TAB_TRIGGER}>
+                <TabLabel icon={MessageCircle}>{t('people.talkingPoints')}</TabLabel>
+              </TabsTrigger>
+              {!useTwoColumns && (
+                <TabsTrigger value="events" className={TAB_TRIGGER}>
+                  <TabLabel icon={CalendarClock}>{t('people.events')}</TabLabel>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="memories" className={TAB_TRIGGER}>
+                <TabLabel icon={Sparkles}>{t('people.memories')}</TabLabel>
+              </TabsTrigger>
+              <TabsTrigger value="history" className={TAB_TRIGGER}>
+                <TabLabel icon={AtSign}>{t('people.history')}</TabLabel>
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="talking-points">
+              <TalkingPointsTab personId={person.id} personName={person.name} />
+            </TabsContent>
+            {!useTwoColumns && (
+              <TabsContent value="events">
+                <EventsTab person={person} today={today} />
+              </TabsContent>
+            )}
+            <TabsContent value="memories">
+              <MemoriesTab personId={person.id} personName={person.name} />
+            </TabsContent>
+            <TabsContent value="history">
+              <HistoryTab personId={person.id} personName={person.name} />
+            </TabsContent>
+          </Tabs>
         </div>
-      )}
 
-      <Tabs defaultValue="talking-points">
-        {/* Four tabs no longer fit one phone-width row, so they wrap into an even 2x2 grid and
-            only straighten out into a single row from `sm` up. The height override has to reuse
-            the same group-data variant TabsList sets it with, or it loses on specificity. */}
-        {/* Four tabs no longer fit one phone-width row, so they wrap into an even 2x2 grid and
-            only straighten out into a single row from `sm` up. The height override has to reuse
-            the same group-data variant TabsList sets it with, or it loses on specificity.
-
-            TAB_TRIGGER also drops TabsTrigger's own `whitespace-nowrap` below `sm`: a label that
-            can't shrink and can't wrap simply overflows its grid cell, which is what Spanish's
-            "Temas de conversación" did — pushing the icon off the left edge and the text off the
-            right. Letting it take a second line costs height only in the languages that need it,
-            and the grid keeps both cells in a row the same height by itself. */}
-        <TabsList className="mb-4 grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-auto sm:gap-0 sm:group-data-horizontal/tabs:h-8">
-          <TabsTrigger value="talking-points" className={TAB_TRIGGER}>
-            <TabLabel icon={MessageCircle}>{t('people.talkingPoints')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger value="events" className={TAB_TRIGGER}>
-            <TabLabel icon={CalendarClock}>{t('people.events')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger value="memories" className={TAB_TRIGGER}>
-            <TabLabel icon={Sparkles}>{t('people.memories')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger value="history" className={TAB_TRIGGER}>
-            <TabLabel icon={AtSign}>{t('people.history')}</TabLabel>
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="talking-points">
-          <TalkingPointsTab personId={person.id} personName={person.name} />
-        </TabsContent>
-        <TabsContent value="events">
-          <EventsTab person={person} today={today} />
-        </TabsContent>
-        <TabsContent value="memories">
-          <MemoriesTab personId={person.id} personName={person.name} />
-        </TabsContent>
-        <TabsContent value="history">
-          <HistoryTab personId={person.id} personName={person.name} />
-        </TabsContent>
-      </Tabs>
+        {/* The tab's replacement: always on screen rather than a click away, which is also why the
+            amber follow-up banner above stands down in this mode — an overdue event is right here,
+            not hidden behind anything. `sticky` so it stays put while the (often longer) tab content
+            beside it scrolls. */}
+        {useTwoColumns && (
+          <aside className="col-span-5 sticky top-6">
+            {checkupBanner}
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
+              <CalendarClock className="size-4 text-muted-foreground" aria-hidden />
+              {t('people.events')}
+            </h2>
+            <EventsTab person={person} today={today} />
+          </aside>
+        )}
+      </div>
 
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="sm:max-w-md">

@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { notifyDeleted } from '@/lib/undo';
 import { ApiError } from '@/lib/apiClient';
+import { LIST_TWO_COLUMN_MIN, splitColumns, useIsWideContainer } from '@/lib/useContainerWidth';
 import { cn } from '@/lib/utils';
 
 function TagFormDialog({
@@ -111,6 +112,53 @@ function TagFormDialog({
   );
 }
 
+/** One tag, its usage line, and its edit/delete controls — pulled out of the list itself so
+    two-column mode can render it from two independent `.map()` calls without duplicating the
+    markup. */
+function TagRow({
+  tag,
+  onEdit,
+  onDelete,
+}: {
+  tag: TagWithStats;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <li className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
+      <span className="size-4 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">
+          <span className="text-muted-foreground">#</span>
+          {tag.name}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {t('tags.usage', { entries: tag.entryCount, people: tag.personCount })}
+        </p>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8 text-muted-foreground"
+        aria-label={t('tags.editTag')}
+        onClick={onEdit}
+      >
+        <Pencil className="size-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8 text-muted-foreground hover:text-destructive"
+        aria-label={t('tags.deleteTag')}
+        onClick={onDelete}
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </li>
+  );
+}
+
 export default function TagsPage() {
   const { t } = useTranslation();
   const { data: tags, isLoading } = useTags();
@@ -118,6 +166,7 @@ export default function TagsPage() {
   const [editing, setEditing] = useState<TagWithStats | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<TagWithStats | null>(null);
+  const [listRef, twoColumns] = useIsWideContainer<HTMLDivElement>(LIST_TWO_COLUMN_MIN);
 
   return (
     <>
@@ -173,49 +222,41 @@ export default function TagsPage() {
           <Skeleton className="h-12" />
         </div>
       ) : tags && tags.length > 0 ? (
-        <ul className="flex flex-col gap-2">
-          {tags.map((tag) => (
-            <li
-              key={tag.id}
-              className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs"
-            >
-              <span
-                className="size-4 shrink-0 rounded-full"
-                style={{ backgroundColor: tag.color }}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">
-                  <span className="text-muted-foreground">#</span>
-                  {tag.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {t('tags.usage', { entries: tag.entryCount, people: tag.personCount })}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 text-muted-foreground"
-                aria-label={t('tags.editTag')}
-                onClick={() => {
-                  setEditing(tag);
-                  setFormOpen(true);
-                }}
-              >
-                <Pencil className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 text-muted-foreground hover:text-destructive"
-                aria-label={t('tags.deleteTag')}
-                onClick={() => setDeleting(tag)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <div ref={listRef}>
+          {twoColumns ? (
+            <div className="flex items-start gap-2">
+              {splitColumns(tags).map((column, i) => (
+                <ul key={i} className="flex min-w-0 flex-1 flex-col gap-2">
+                  {column.map((tag) => (
+                    <TagRow
+                      key={tag.id}
+                      tag={tag}
+                      onEdit={() => {
+                        setEditing(tag);
+                        setFormOpen(true);
+                      }}
+                      onDelete={() => setDeleting(tag)}
+                    />
+                  ))}
+                </ul>
+              ))}
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {tags.map((tag) => (
+                <TagRow
+                  key={tag.id}
+                  tag={tag}
+                  onEdit={() => {
+                    setEditing(tag);
+                    setFormOpen(true);
+                  }}
+                  onDelete={() => setDeleting(tag)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
       ) : (
         <EmptyState
           icon={TagIcon}

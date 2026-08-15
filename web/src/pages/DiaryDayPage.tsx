@@ -16,6 +16,11 @@ import { ageOn, birthdaysOn } from '@/lib/birthday';
 import { formatDateKey, parseDateKey, toDateKey, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import { usePreferences } from '@/lib/preferences';
+import {
+  SIDEBAR_SPLIT_MIN_WIDTH,
+  SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH,
+  useContainerWidth,
+} from '@/lib/useContainerWidth';
 import { useEnabledPlugins } from '@/plugins/enabled';
 import { PluginDaySlot } from '@/plugins/PluginDaySlot';
 import { PLUGINS } from '@/plugins/registry';
@@ -31,6 +36,7 @@ export default function DiaryDayPage() {
   const { data: people = [] } = usePeople();
   const enabledPlugins = useEnabledPlugins();
   const prefs = usePreferences();
+  const [splitRef, splitWidth] = useContainerWidth<HTMLDivElement>();
 
   const [hasPluginContent, setHasPluginContent] = useState(false);
 
@@ -45,17 +51,27 @@ export default function DiaryDayPage() {
   const isToday = dateKey === todayKey();
   const celebrating = birthdaysOn(people, dateKey);
   const hasSideContent = celebrating.length > 0 || hasPluginContent;
-  const useTwoColumns = prefs.twoColumnLayout && hasSideContent;
+  /* The page's own max-width grows with the viewport whenever there's side content to potentially
+     show — that's just how wide this page is ever allowed to get, and it's fine for that ceiling to
+     track the viewport. It must NOT be gated on `useTwoColumns` itself: that would make the measured
+     width below depend on a decision that depends on the measured width, and the container would
+     never grow past max-w-3xl's ~700px of content to find out it had room to split. */
+  const useTwoColumns =
+    prefs.twoColumnLayout && hasSideContent && splitWidth >= SIDEBAR_SPLIT_MIN_WIDTH;
 
   return (
     <PageContainer
-      className={useTwoColumns ? 'lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl' : undefined}
+      className={hasSideContent ? 'lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl' : undefined}
     >
       <div
-        className={cn(useTwoColumns && 'lg:grid lg:grid-cols-12 lg:gap-6 xl:gap-8 lg:items-start')}
+        ref={splitRef}
+        className={cn(
+          useTwoColumns && 'grid grid-cols-12 items-start',
+          useTwoColumns && (splitWidth >= SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH ? 'gap-8' : 'gap-6'),
+        )}
       >
         {/* Main column: entries & composer */}
-        <div className={cn(useTwoColumns && 'lg:col-span-7 xl:col-span-7')}>
+        <div className={cn(useTwoColumns && 'col-span-7')}>
           <div className="mb-4 flex items-center gap-2">
             <Button
               variant="ghost"
@@ -134,12 +150,7 @@ export default function DiaryDayPage() {
 
         {/* Side content: birthdays & plugins (sidebar when useTwoColumns is true, single-column below composer when useTwoColumns is false) */}
         {(hasSideContent || enabledPlugins.size > 0) && (
-          <aside
-            className={cn(
-              'mt-6 space-y-6',
-              useTwoColumns && 'lg:mt-0 lg:col-span-5 xl:col-span-5 lg:sticky lg:top-6',
-            )}
-          >
+          <aside className={cn('mt-6 space-y-6', useTwoColumns && 'mt-0 col-span-5 sticky top-6')}>
             {/**
              * Whose birthday it is, in the same card the habit checklist uses.
              *
