@@ -42,5 +42,22 @@
   "perDayToggle": "Set intensity for each day",
   "perDayToggleHide": "Hide per-day intensity",
   "dateColumn": "Date",
-  "flowColumn": "Flow"
+  "flowColumn": "Flow",
+  "onboarding": {
+    "cycle": {
+      "title": "Log a period",
+      "lede": "Add a past period from its own page, then fine-tune the flow of any day inside it.",
+      "previewNote": "Just a preview — nothing here is saved."
+    },
+    "day": {
+      "title": "A heads-up on the day page",
+      "lede": "A few days before one's due, the day page says so — and once it's here, records it in two taps.",
+      "beforeLabel": "A few days out",
+      "todayLabel": "The day itself"
+    },
+    "calendar": {
+      "title": "See it on the calendar",
+      "lede": "Logged days shade darker the heavier the flow; a predicted window shades lighter than anything actually recorded, until it is."
+    }
+  }
 }

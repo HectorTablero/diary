@@ -74,13 +74,22 @@ export const PLUGINS: readonly PluginManifest[] = [
   {
     id: 'habits',
     icon: CircleCheckBig,
-    surfaces: ['day', 'page', 'settings', 'notifications', 'export', 'calendar', 'widget'],
+    surfaces: [
+      'day',
+      'page',
+      'settings',
+      'notifications',
+      'export',
+      'calendar',
+      'widget',
+      'onboarding',
+    ],
     load: () => import('./habits'),
   },
   {
     id: 'period-tracker',
     icon: Droplet,
-    surfaces: ['day', 'page', 'settings', 'notifications', 'export', 'calendar'],
+    surfaces: ['day', 'page', 'settings', 'notifications', 'export', 'calendar', 'onboarding'],
     // Above habits' day widget: a period warrants the more prominent slot.
     dayOrder: -1,
     // A reddish hue distinct from habits' violet, so the two plugins' tabs don't read as the same

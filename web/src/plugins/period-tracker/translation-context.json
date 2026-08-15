@@ -46,7 +46,16 @@
         "perDayToggle": "Label on a disclosure, collapsed state, that expands a list of days with a flow button for each. Three places use it: the add/edit-period form (every day in the chosen range, for refining the default flow day by day) and each past period's own card on the plugin page (that period's already-recorded days, editable in place).",
         "perDayToggleHide": "The same disclosure's label once open, wherever `perDayToggle` appears.",
         "dateColumn": "Header of the first column in the Markdown export table. One word.",
-        "flowColumn": "Header of the second column in the Markdown export table. One word."
+        "flowColumn": "Header of the second column in the Markdown export table. One word.",
+        "onboarding.cycle.title": "Heading of the tour's first screen — a live preview of a logged period on the plugin's own page, its per-day intensity list already open. Reachable from a button beside the plugin's switch in Settings (not part of the app's own first-run onboarding).",
+        "onboarding.cycle.lede": "One line under that heading: a period is logged on its own page, and each day inside it can be fine-tuned individually.",
+        "onboarding.cycle.previewNote": "Shown twice in the tour's live preview — beside its disabled \"Add a past period\" button, and under the card itself: says plainly that nothing here is kept, since the per-day flow buttons are genuinely live and would otherwise look like they save something.",
+        "onboarding.day.title": "Heading of the tour's second screen: the day page's own card, shown as its two faces — the heads-up text, and the recording control.",
+        "onboarding.day.lede": "One line under that heading.",
+        "onboarding.day.beforeLabel": "Small caption above the first of the tour's two example cards — the day page before a period has started, showing only the heads-up text.",
+        "onboarding.day.todayLabel": "As above, for the second example — the day page once there's something to record, showing the flow control instead of any text.",
+        "onboarding.calendar.title": "Heading of the tour's third screen: a fabricated three weeks shaded the same way the real Calendar page's tab shades one, including a predicted window.",
+        "onboarding.calendar.lede": "One line under that heading, naming the one distinction worth knowing before looking at the grid: a logged day and a predicted one are the same hue at different strengths, not two different colours."
       }
     }
   },

@@ -229,7 +229,13 @@ function DayLockButton({
   );
 }
 
-function HabitRow({
+/**
+ * Exported for `plugins/habits/onboarding/TypesStep.tsx`, which previews every kind of habit
+ * control through this exact component rather than a redrawing of it — see that file's own note
+ * on why a lookalike wasn't good enough (the container-query breakpoints below are precisely the
+ * part a hand-copied version had drifted from).
+ */
+export function HabitRow({
   habit,
   value,
   dateKey,
@@ -280,13 +286,13 @@ function HabitRow({
           'flex min-w-0 flex-1 gap-x-2 gap-y-1',
           inline
             ? 'items-center'
-            : 'flex-col items-stretch sm:flex-row sm:flex-wrap sm:items-center',
+            : 'flex-col items-stretch @[480px]:flex-row @[480px]:flex-wrap @[480px]:items-center',
         )}
       >
         <span
           className={cn(
             'min-w-0 truncate text-sm transition-colors',
-            inline ? 'flex-1' : 'sm:flex-1',
+            inline ? 'flex-1' : '@[480px]:flex-1',
             done ? 'text-foreground' : 'text-muted-foreground',
           )}
         >
@@ -303,16 +309,16 @@ function HabitRow({
           />
         ) : (
           /* Wraps rather than squeezes. A stopwatch is three buttons and a duration, and on a narrow
-             screen it and the bar simply do not share a line — so the bar drops to a row of its own
+             screen or sidebar container it and the bar simply do not share a line — so the bar drops to a row of its own
              (and takes the whole width of it) instead of both being compressed into illegibility.
-             `sm:flex-nowrap` retires that concession the moment there is room: on a wide screen the
+             `@[480px]:flex-nowrap` retires that concession the moment there is room: on a wide container the
              controls and the bar they fill belong beside each other, not stacked. */
           <div
             className={cn(
-              'flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:flex-nowrap',
-              /* Given the room on a wide screen, these take it. A stepper and a 40-unit bar in the
+              'flex flex-wrap items-center gap-x-2 gap-y-1.5 @[480px]:flex-nowrap',
+              /* Given the room on a wide container, these take it. A stepper and a 40-unit bar in the
                  corner of a full-width card looked like an afterthought bolted to the name. */
-              habit.type === 'scale' ? 'sm:flex-[2]' : 'sm:flex-1 sm:justify-end',
+              habit.type === 'scale' ? '@[480px]:flex-[2]' : '@[480px]:flex-1 @[480px]:justify-end',
             )}
           >
             <HabitControl
@@ -341,7 +347,7 @@ function HabitRow({
             size="icon"
             /* Hidden until hover on a pointer device, always reachable by keyboard. On touch there
                is no hover, so it stays visible there. */
-            className="size-7 opacity-100 transition-opacity sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100"
+            className="size-7 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100"
             aria-label={t('plugins.habits.clear', { name: habit.name })}
             onClick={clear}
           >

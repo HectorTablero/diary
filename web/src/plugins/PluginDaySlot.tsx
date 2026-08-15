@@ -1,6 +1,7 @@
-import { useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { captureError } from '@/lib/telemetry';
+import { cn } from '@/lib/utils';
 import { useEnabledPlugins } from './enabled';
 import { ensurePluginLocales } from './i18n';
 import { PLUGINS, type PluginManifest } from './registry';
@@ -25,8 +26,17 @@ import { PLUGINS, type PluginManifest } from './registry';
  * day widget, the second check fails and the chunk is still never fetched — which is why `surfaces`
  * exists on the manifest at all.
  */
-export function PluginDaySlot({ dateKey }: { dateKey: string }) {
+export function PluginDaySlot({
+  dateKey,
+  className,
+  onHasContentChange,
+}: {
+  dateKey: string;
+  className?: string;
+  onHasContentChange?: (hasContent: boolean) => void;
+}) {
   const enabled = useEnabledPlugins();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Filter on `enabled` first: it is the check that is false for almost everyone, so it is the one
   // that should short-circuit. `surfaces` narrows what is left to plugins that actually draw here.
@@ -36,10 +46,32 @@ export function PluginDaySlot({ dateKey }: { dateKey: string }) {
   const active = PLUGINS.filter(
     (plugin) => enabled.has(plugin.id) && plugin.surfaces.includes('day'),
   ).sort((a, b) => (a.dayOrder ?? 0) - (b.dayOrder ?? 0));
+
+  useEffect(() => {
+    if (!active.length) {
+      onHasContentChange?.(false);
+    }
+  }, [active.length, dateKey, onHasContentChange]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const check = () => {
+      const visible = el.children.length > 0;
+      onHasContentChange?.(visible);
+    };
+
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(el, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [dateKey, active.length, onHasContentChange]);
+
   if (!active.length) return null;
 
   return (
-    <div className="mt-6 space-y-4">
+    <div ref={containerRef} className={cn('space-y-4 @container', className)}>
       {active.map((plugin) => (
         <PluginDayWidget key={plugin.id} plugin={plugin} dateKey={dateKey} />
       ))}

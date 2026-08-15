@@ -414,6 +414,8 @@
       "hapticsDescription": "按下时轻微振动一下。",
       "importanceShapes": "用形状区分重要程度",
       "importanceShapesDescription": "为每个级别在颜色之外再加上专属形状，颜色难以分辨时仍能区分。",
+      "twoColumnLayout": "大屏双列布局",
+      "twoColumnLayoutDescription": "当有足够的水平空间时，在左侧显示日记条目，在右侧显示插件信息。",
       "replayOnboarding": "重看新手引导"
     },
     "reminders": {
@@ -584,7 +586,8 @@
       "title": "插件",
       "description": "可以开启的可选功能。启用后会应用到所有设备。",
       "hasData": "已关闭 — 此账户中有 {{count}} 条数据",
-      "saveFailed": "无法更改该插件。"
+      "saveFailed": "无法更改该插件。",
+      "tourButton": "查看快速导览"
     }
   },
   "errors": {

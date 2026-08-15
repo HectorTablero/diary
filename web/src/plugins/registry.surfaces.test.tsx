@@ -22,6 +22,7 @@ const MEMBER_FOR: Record<PluginSurface, keyof PluginModule> = {
   export: 'exportMarkdown',
   calendar: 'CalendarView',
   widget: 'syncNativeWidget',
+  onboarding: 'onboardingSteps',
 };
 
 describe('declared surfaces match what each plugin exports', () => {

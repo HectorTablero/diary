@@ -1,12 +1,15 @@
+import { Compass } from 'lucide-react';
 import { useEffect, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Section, ToggleRow } from '@/components/settings/Section';
+import { Button } from '@/components/ui/button';
 import { countPluginRecords } from '@/db/pluginRecords';
 import { notifyError } from '@/lib/notify';
 import { captureError } from '@/lib/telemetry';
 import { setPluginEnabled, useEnabledPlugins } from '@/plugins/enabled';
 import { ensurePluginLocales } from '@/plugins/i18n';
 import { syncNativeWidgets } from '@/plugins/nativeWidgets';
+import { PluginOnboarding } from '@/plugins/PluginOnboarding';
 import { PLUGINS } from '@/plugins/registry';
 
 /**
@@ -27,6 +30,9 @@ export function PluginsSection() {
   const enabled = useEnabledPlugins();
   const [ready, setReady] = useState(false);
   const [rowCounts, setRowCounts] = useState<Record<string, number>>({});
+  /** Which plugin's tour is open, if any — at most one at a time, the same way only one plugin's
+      settings card is ever being read. */
+  const [touring, setTouring] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,32 +77,60 @@ export function PluginsSection() {
   };
 
   return (
-    <Section title={t('settings.plugins.title')} description={t('settings.plugins.description')}>
-      <div className="flex flex-col gap-4">
-        {PLUGINS.map((plugin) => {
-          const on = enabled.has(plugin.id);
-          const rows = rowCounts[plugin.id] ?? 0;
-          return (
-            <ToggleRow
-              key={plugin.id}
-              id={`plugin-${plugin.id}`}
-              icon={plugin.icon}
-              // Before the locales land the switch would read as its own key, so hold the row back.
-              label={ready ? t(`plugins.${plugin.id}.name`) : '…'}
-              description={
-                !on && rows > 0
-                  ? t('settings.plugins.hasData', { count: rows })
-                  : ready
-                    ? t(`plugins.${plugin.id}.description`)
-                    : ''
-              }
-              checked={on}
-              onCheckedChange={(value) => void toggle(plugin.id, value)}
-            />
-          );
-        })}
-      </div>
-    </Section>
+    <>
+      <Section title={t('settings.plugins.title')} description={t('settings.plugins.description')}>
+        <div className="flex flex-col gap-4">
+          {PLUGINS.map((plugin) => {
+            const on = enabled.has(plugin.id);
+            const rows = rowCounts[plugin.id] ?? 0;
+            return (
+              <ToggleRow
+                key={plugin.id}
+                id={`plugin-${plugin.id}`}
+                icon={plugin.icon}
+                // Before the locales land the switch would read as its own key, so hold the row back.
+                label={ready ? t(`plugins.${plugin.id}.name`) : '…'}
+                description={
+                  !on && rows > 0
+                    ? t('settings.plugins.hasData', { count: rows })
+                    : ready
+                      ? t(`plugins.${plugin.id}.description`)
+                      : ''
+                }
+                checked={on}
+                onCheckedChange={(value) => void toggle(plugin.id, value)}
+              >
+                {/* Not gated on `ready` or `on`: a plugin's tour is what helps someone decide
+                    whether to turn it on in the first place, so it has to work before the switch
+                    does — and its own strings arrive from the same `ensurePluginLocales` call this
+                    section already made to read the switch's own label above. Only shown for a
+                    plugin that actually declares one — `surfaces` is readable without loading the
+                    plugin's chunk, same guard the day page and calendar slots use.
+
+                    The same indented, ruled row RemindersSection's own "At" qualifies a reminder
+                    with — a plugin's tour is exactly that kind of thing: it belongs to the row
+                    above, not beside it as a second, equally-weighted setting. */}
+                {plugin.surfaces.includes('onboarding') && (
+                  <div className="ml-1 flex items-center gap-2 border-l pl-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                      onClick={() => setTouring(plugin.id)}
+                    >
+                      <Compass className="size-4" />
+                      {t('settings.plugins.tourButton')}
+                    </Button>
+                  </div>
+                )}
+              </ToggleRow>
+            );
+          })}
+        </div>
+      </Section>
+
+      {touring && <PluginOnboarding pluginId={touring} onDone={() => setTouring(null)} />}
+    </>
   );
 }
 

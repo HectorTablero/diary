@@ -95,5 +95,34 @@
   "lock": "Lock this day",
   "dayLockedPast": "This day is in the past, so values are locked. Tap to make changes.",
   "dayLockedFuture": "This day hasn't happened yet, so values are locked. Tap to make changes.",
-  "dayUnlockedHint": "Unlocked for editing. Tap to lock this day again."
+  "dayUnlockedHint": "Unlocked for editing. Tap to lock this day again.",
+  "onboarding": {
+    "add": {
+      "title": "Add your habits",
+      "lede": "Habits are created on their own page, separate from the day you're writing — a name, and one of five ways to track it.",
+      "exampleName": "Cycling",
+      "exampleUnit": "km",
+      "previewNote": "Just a preview — nothing here is saved."
+    },
+    "types": {
+      "title": "Five ways to track",
+      "lede": "Every habit is one of these five kinds — the same controls you'll use on the day page.",
+      "exampleMeditate": "Meditate",
+      "examplePushups": "Push-ups",
+      "exampleReps": "reps",
+      "exampleRead": "Read",
+      "exampleSleep": "Sleep quality",
+      "exampleMood": "Mood"
+    },
+    "calendar": {
+      "title": "See it on the calendar",
+      "lede": "Once its tab is picked, the Calendar page shades every day by how many of that day's habits were met."
+    },
+    "widget": {
+      "title": "Add it to your home screen",
+      "lede": "On Android, a Habits widget lets you tick habits without opening the app — it keeps itself up to date on its own.",
+      "label": "Home screen widget",
+      "note": "Long-press your home screen, choose Widgets, and add Habits."
+    }
+  }
 }

@@ -206,16 +206,22 @@ function StatCard({
  * matching this plugin's habit of not reaching into another plugin's internals for a component this
  * small.
  */
-function Disclosure({
+export function Disclosure({
   label,
   hideLabel,
   children,
+  defaultOpen = false,
 }: {
   label: string;
   hideLabel: string;
   children: ReactNode;
+  /** Open on first render rather than collapsed — for `onboarding/CyclePageStep.tsx`, which exists
+      to show what is behind this disclosure and would otherwise have to script a click before
+      there was anything on screen worth looking at. Every real call site leaves this at its
+      default, which is unchanged from before this prop existed. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mt-2">
       <Button
@@ -274,13 +280,15 @@ function IntensityPill({
   );
 }
 
-function CycleCard({
+export function CycleCard({
   cycle,
   previous,
   byDate,
   onEdit,
   onDelete,
   onSetDayFlow,
+  disclosureDefaultOpen,
+  disableActions,
 }: {
   cycle: Cycle;
   /** The cycle before this one, chronologically — used only for the cycle-length reading beside it.
@@ -290,6 +298,12 @@ function CycleCard({
   onEdit: () => void;
   onDelete: () => void;
   onSetDayFlow: (dateKey: string, flow: FlowLevel) => void;
+  /** Passed straight through to the per-day list's own `Disclosure`. See that prop's own note. */
+  disclosureDefaultOpen?: boolean;
+  /** Grays out Edit and Delete without removing them — for a tour's preview of this card, where
+      both would otherwise look like real actions on a period that does not exist. The intensity
+      list stays live regardless: it is what the card exists to demonstrate. */
+  disableActions?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const duration = differenceInCalendarDays(parseDateKey(cycle.end), parseDateKey(cycle.start)) + 1;
@@ -322,6 +336,7 @@ function CycleCard({
       <Disclosure
         label={t('plugins.period-tracker.perDayToggle')}
         hideLabel={t('plugins.period-tracker.perDayToggleHide')}
+        defaultOpen={disclosureDefaultOpen}
       >
         <ul className="space-y-1">
           {dateKeysBetween(cycle.start, cycle.end).map((day) => (
@@ -346,6 +361,7 @@ function CycleCard({
           variant="ghost"
           size="sm"
           className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+          disabled={disableActions}
           onClick={onEdit}
         >
           <Pencil className="size-3" />
@@ -355,6 +371,7 @@ function CycleCard({
           variant="ghost"
           size="sm"
           className="h-7 gap-1 px-2 text-xs text-destructive"
+          disabled={disableActions}
           onClick={onDelete}
         >
           <Trash2 className="size-3" />

@@ -341,6 +341,16 @@ export default function SettingsPage() {
               />
             </div>
             <ToggleRow
+              id="two-column-layout"
+              label={t('settings.general.twoColumnLayout')}
+              description={t('settings.general.twoColumnLayoutDescription')}
+              checked={prefs.twoColumnLayout}
+              onCheckedChange={(checked) => {
+                setPreference('twoColumnLayout', checked);
+                notifyDeviceSaved(t('settings.general.savedOnDevice'));
+              }}
+            />
+            <ToggleRow
               id="entity-links"
               label={t('settings.entries.entityLinks')}
               description={t('settings.entries.entityLinksDescription')}

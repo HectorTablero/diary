@@ -7,13 +7,15 @@ import { PeriodSettingsSection } from './PeriodSettingsSection';
 import { exportPeriodMarkdown } from './markdown';
 import { parsePeriodDay } from './model';
 import { collectPeriodNotifications } from './notifications';
+import { periodTrackerOnboardingSteps } from './onboarding/steps';
 
-/* The period tracker. Six surfaces, matching the `surfaces` list in ../registry (a test asserts it —
-   see registry.surfaces.test.tsx): the day widget is "did it happen, and is it close", the calendar
-   view is "where has it been / is it likely" at a glance, the page is the history the day card has no
-   room for, the settings card is the device-local heads-up reminder, the collector is that reminder
-   actually being armed, and the export is a plain log for taking elsewhere. No `widget` surface —
-   deliberately no Android home-screen widget, unlike habits. */
+/* The period tracker. Seven surfaces, matching the `surfaces` list in ../registry (a test asserts
+   it — see registry.surfaces.test.tsx): the day widget is "did it happen, and is it close", the
+   calendar view is "where has it been / is it likely" at a glance, the page is the history the day
+   card has no room for, the settings card is the device-local heads-up reminder, the collector is
+   that reminder actually being armed, the export is a plain log for taking elsewhere, and the tour
+   is "what does any of this actually look like" for someone who hasn't turned the plugin on yet.
+   No `widget` surface — deliberately no Android home-screen widget, unlike habits. */
 
 const periodTracker: PluginModule = {
   DayWidget: PeriodDayWidget,
@@ -33,6 +35,7 @@ const periodTracker: PluginModule = {
     );
     return i18n.t('plugins.period-tracker.confirmedLabel', { flow });
   },
+  onboardingSteps: periodTrackerOnboardingSteps,
 };
 
 export default periodTracker;

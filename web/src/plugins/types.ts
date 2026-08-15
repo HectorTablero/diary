@@ -6,7 +6,7 @@ import type { PluginRecordDto } from '@diary/shared';
    without any of its code being reachable from the entry chunk. */
 
 export type PluginSurface =
-  'day' | 'page' | 'settings' | 'notifications' | 'export' | 'calendar' | 'widget';
+  'day' | 'page' | 'settings' | 'notifications' | 'export' | 'calendar' | 'widget' | 'onboarding';
 
 /**
  * One day's worth of a plugin's calendar data — just enough to colour and label a cell.
@@ -84,9 +84,34 @@ export interface PluginModule {
   /** A one-line, human-readable description of a row, for the backup import review — which
       otherwise has nothing to show but an opaque blob. */
   describeRecord?: (record: PluginRecordDto) => string;
+  /**
+   * A short tour of what this plugin does, opened from a button beside its switch in Settings.
+   *
+   * Deliberately not part of the app's own first-run onboarding (see components/onboarding/), and
+   * not merely "reusing" it — it is a *second*, separate flow with the same shape: its own dialog,
+   * driven by `PluginOnboarding.tsx` rather than `OnboardingFlow.tsx`. Three reasons it has to be
+   * its own thing rather than a slot inside the first-run tour: it must open on demand at any point
+   * from Settings, not only once at signup; it must work for a plugin that is currently switched
+   * *off* (touring a feature is how someone decides whether to turn it on); and it has none of the
+   * first-run tour's one-per-account "has this been seen" bookkeeping — replaying it is free, and
+   * does not need Settings' `replayOnboarding` escape hatch.
+   */
+  onboardingSteps?: readonly PluginOnboardingStep[];
 }
 
 export interface PluginNotificationContext {
   /** This plugin's slice of the notification id space. Pass to pluginNotificationId. */
   slot: number;
+}
+
+/**
+ * One screen of a plugin's own onboarding tour (see `PluginModule.onboardingSteps`).
+ *
+ * The same shape as the app's own onboarding `Step` (OnboardingFlow.tsx): an id that doubles as the
+ * i18n sub-namespace, and the component that renders the screen. `PluginOnboarding.tsx` reads
+ * `plugins.<pluginId>.onboarding.<id>.title` and `.lede` for the two lines above `Component`.
+ */
+export interface PluginOnboardingStep {
+  id: string;
+  Component: ComponentType;
 }

@@ -440,6 +440,8 @@
       "hapticsDescription": "Un toque suave al pulsar algo.",
       "importanceShapes": "Distinguir la importancia por forma",
       "importanceShapesDescription": "Da a cada nivel una forma propia además del color, para que los puntos se distingan aunque los colores no lo hagan.",
+      "twoColumnLayout": "Diseño en dos columnas en pantallas anchas",
+      "twoColumnLayoutDescription": "Muestra las entradas a la izquierda y la información de los plugins a la derecha cuando hay suficiente espacio horizontal.",
       "replayOnboarding": "Volver a ver la introducción"
     },
     "reminders": {
@@ -613,7 +615,8 @@
       "description": "Funciones opcionales que puedes activar. Al activar una se aplica en todos los dispositivos.",
       "hasData_one": "Desactivado — {{count}} registro guardado en esta cuenta",
       "hasData_other": "Desactivado — {{count}} registros guardados en esta cuenta",
-      "saveFailed": "No se pudo cambiar ese complemento."
+      "saveFailed": "No se pudo cambiar ese complemento.",
+      "tourButton": "Hacer un recorrido rápido"
     }
   },
   "errors": {

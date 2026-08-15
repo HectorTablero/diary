@@ -93,7 +93,26 @@
         "lock": "The same button's accessible name once tapped unlocked, offering to lock it again. \"Lock this day\", the mirror of `unlock`.",
         "dayLockedPast": "Tooltip shown while the padlock is locked and the day being viewed is before today. Explains *why* editing is blocked and what tapping the button does, since the icon alone only shows the state, not the reason. Read on hover on the web; on the native app there is no tooltip, so `unlock`'s accessible name is what a screen reader gets instead — this string only needs to work as an on-hover explanation.",
         "dayLockedFuture": "As above, for a day after today. A different reason (it hasn't happened yet, not that it's history), so a different sentence rather than one that tries to cover both.",
-        "dayUnlockedHint": "Tooltip once the day has been unlocked, on either side of today — the reason it was locked stops being the point once you can edit it, so this doesn't distinguish past from future."
+        "dayUnlockedHint": "Tooltip once the day has been unlocked, on either side of today — the reason it was locked stops being the point once you can edit it, so this doesn't distinguish past from future.",
+        "onboarding.add.title": "Heading of the tour's first screen — a live preview of the creation form, reachable from a button beside the plugin's switch in Settings (not part of the app's own first-run onboarding).",
+        "onboarding.add.lede": "One line under that heading: habits are made on their own page, not on the day page where they're only ever recorded.",
+        "onboarding.add.exampleName": "The example habit name pre-filled in the tour's live form preview. A plausible numeric habit — the form defaults to the Numeric kind so its extra fields (goal, unit) are visible without the visitor having to pick a kind first.",
+        "onboarding.add.exampleUnit": "The example unit paired with `exampleName`, in whatever unit that activity is normally measured in.",
+        "onboarding.add.previewNote": "Under the tour's live form preview, beside its disabled Create button: says plainly that nothing typed here is kept, since the fields are genuinely editable and would otherwise look like they do something.",
+        "onboarding.types.title": "Heading of the tour's second screen, showing all five kinds at once using the real day-page controls.",
+        "onboarding.types.lede": "One line under that heading.",
+        "onboarding.types.exampleMeditate": "Example binary habit in the tour. Also reused as one of the two rows in the widget-step mock (onboarding.widget) — the same habit recurring across screens is what makes the tour read as one diary rather than a new example every slide.",
+        "onboarding.types.examplePushups": "Example numeric habit in the tour, paired with `exampleReps`. Reused in the widget-step mock alongside `exampleMeditate`.",
+        "onboarding.types.exampleReps": "Unit for `examplePushups` — the word for one repetition, as short as `unitPlaceholder` needs to be.",
+        "onboarding.types.exampleRead": "Example time habit in the tour.",
+        "onboarding.types.exampleSleep": "Example scale habit in the tour — something judged on a dragged track rather than counted.",
+        "onboarding.types.exampleMood": "Example mood habit in the tour — the plugin's own name for this kind (`typeMood`), not a description of it.",
+        "onboarding.calendar.title": "Heading of the tour's third screen: a fabricated month shaded the same way the real Calendar page's Habits tab shades one.",
+        "onboarding.calendar.lede": "One line under that heading.",
+        "onboarding.widget.title": "Heading of the tour's fourth screen, native app only: the Android home-screen widget, introduced with a small built mock rather than a screenshot.",
+        "onboarding.widget.lede": "One line under that heading.",
+        "onboarding.widget.label": "Small kicker line above the widget mock, naming what kind of thing it's a mock of.",
+        "onboarding.widget.note": "Under the mock: how to actually place the widget on an Android home screen."
       }
     }
   },

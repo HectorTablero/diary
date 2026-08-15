@@ -95,5 +95,34 @@
   "lock": "Blocca questo giorno",
   "dayLockedPast": "Questo giorno è passato, quindi i valori sono bloccati. Tocca per modificarli.",
   "dayLockedFuture": "Questo giorno non è ancora arrivato, quindi i valori sono bloccati. Tocca per modificarli.",
-  "dayUnlockedHint": "Sbloccato per la modifica. Tocca per bloccare di nuovo questo giorno."
+  "dayUnlockedHint": "Sbloccato per la modifica. Tocca per bloccare di nuovo questo giorno.",
+  "onboarding": {
+    "add": {
+      "title": "Aggiungi le tue abitudini",
+      "lede": "Le abitudini si creano nella loro pagina, separata dal giorno che stai scrivendo: un nome e uno dei cinque modi per monitorarla.",
+      "exampleName": "Ciclismo",
+      "exampleUnit": "km",
+      "previewNote": "Solo un'anteprima: qui non viene salvato nulla."
+    },
+    "types": {
+      "title": "Cinque modi per monitorare",
+      "lede": "Ogni abitudine è uno di questi cinque tipi, con gli stessi controlli che userai nella pagina del giorno.",
+      "exampleMeditate": "Meditare",
+      "examplePushups": "Flessioni",
+      "exampleReps": "rip.",
+      "exampleRead": "Leggere",
+      "exampleSleep": "Qualità del sonno",
+      "exampleMood": "Umore"
+    },
+    "calendar": {
+      "title": "Guardalo sul calendario",
+      "lede": "Una volta scelta la sua scheda, la pagina Calendario sfuma ogni giorno in base a quante abitudini di quel giorno sono state rispettate."
+    },
+    "widget": {
+      "title": "Aggiungilo alla schermata Home",
+      "lede": "Su Android, un widget Abitudini ti permette di spuntarle senza aprire l'app: si aggiorna da solo.",
+      "label": "Widget per la schermata Home",
+      "note": "Tieni premuta la schermata Home, scegli Widget e aggiungi Abitudini."
+    }
+  }
 }
