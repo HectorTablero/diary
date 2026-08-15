@@ -420,6 +420,8 @@
       "hapticsDescription": "何かを押したときに軽く振動します。",
       "importanceShapes": "重要度を形でも区別する",
       "importanceShapesDescription": "各レベルに色だけでなく形も与えて、色で見分けにくいときでも区別できるようにします。",
+      "twoColumnLayout": "大画面での2列レイアウト",
+      "twoColumnLayoutDescription": "十分な横幅がある場合、左側に日記エントリー、右側にプラグイン情報を表示します。",
       "replayOnboarding": "はじめの案内をもう一度見る"
     },
     "reminders": {
@@ -590,7 +592,8 @@
       "title": "プラグイン",
       "description": "オンにできる追加機能です。有効にするとすべての端末に反映されます。",
       "hasData": "オフ — このアカウントに{{count}}件のデータがあります",
-      "saveFailed": "プラグインを変更できませんでした。"
+      "saveFailed": "プラグインを変更できませんでした。",
+      "tourButton": "簡単なツアーを見る"
     }
   },
   "errors": {

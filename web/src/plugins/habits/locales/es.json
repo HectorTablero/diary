@@ -95,5 +95,34 @@
   "lock": "Bloquear este día",
   "dayLockedPast": "Este día ya pasó, así que los valores están bloqueados. Toca para cambiarlos.",
   "dayLockedFuture": "Este día aún no ha llegado, así que los valores están bloqueados. Toca para cambiarlos.",
-  "dayUnlockedHint": "Desbloqueado para editar. Toca para volver a bloquear este día."
+  "dayUnlockedHint": "Desbloqueado para editar. Toca para volver a bloquear este día.",
+  "onboarding": {
+    "add": {
+      "title": "Añade tus hábitos",
+      "lede": "Los hábitos se crean en su propia página, aparte del día que estás escribiendo: un nombre y una de cinco formas de seguirlo.",
+      "exampleName": "Ciclismo",
+      "exampleUnit": "km",
+      "previewNote": "Solo una vista previa: nada de esto se guarda."
+    },
+    "types": {
+      "title": "Cinco formas de seguirlo",
+      "lede": "Cada hábito es uno de estos cinco tipos, con los mismos controles que usarás en la página del día.",
+      "exampleMeditate": "Meditar",
+      "examplePushups": "Flexiones",
+      "exampleReps": "reps",
+      "exampleRead": "Leer",
+      "exampleSleep": "Calidad del sueño",
+      "exampleMood": "Estado de ánimo"
+    },
+    "calendar": {
+      "title": "Míralo en el calendario",
+      "lede": "Al elegir su pestaña, la página del calendario sombrea cada día según cuántos de sus hábitos se cumplieron."
+    },
+    "widget": {
+      "title": "Añádelo a tu pantalla de inicio",
+      "lede": "En Android, un widget de Hábitos te permite marcarlos sin abrir la app: se mantiene actualizado por sí solo.",
+      "label": "Widget de pantalla de inicio",
+      "note": "Mantén pulsada la pantalla de inicio, elige Widgets y añade Hábitos."
+    }
+  }
 }

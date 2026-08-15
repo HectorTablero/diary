@@ -445,6 +445,8 @@
       "hapticsDescription": "A light tick when you press something.",
       "importanceShapes": "Distinguish importance by shape",
       "importanceShapesDescription": "Give each level its own shape as well as its colour, so the dots stay apart when the colours don’t.",
+      "twoColumnLayout": "Two-column layout on wide screens",
+      "twoColumnLayoutDescription": "Display entries on the left and plugin info on the right when enough horizontal space is available.",
       "replayOnboarding": "Replay the intro"
     },
     "reminders": {
@@ -617,7 +619,8 @@
       "description": "Optional features you can switch on. Enabling one applies to every device.",
       "hasData_one": "Off — {{count}} entry saved on this account",
       "hasData_other": "Off — {{count}} entries saved on this account",
-      "saveFailed": "Couldn't change that plugin."
+      "saveFailed": "Couldn't change that plugin.",
+      "tourButton": "Take a quick tour"
     }
   },
   "errors": {

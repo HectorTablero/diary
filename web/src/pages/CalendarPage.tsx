@@ -25,7 +25,10 @@ import { usePluginCalendarViews } from '@/plugins/usePluginCalendarViews';
     plugin may ever register the id "entries", or its tab would silently take this one's place. */
 const ENTRIES_VIEW = 'entries';
 
-function useIsDark(): boolean {
+/** Exported so a plugin's own onboarding tour can shade a demo grid identically to this page's —
+    see plugins/habits/onboarding/CalendarStep.tsx — rather than approximating it with a second,
+    driftable copy of the same rgba math. */
+export function useIsDark(): boolean {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -66,9 +69,9 @@ function heatmapBg(count: number, maxImportance: number, isDark: boolean): strin
    cell tinted violet reads at a glance as "not the entries heatmap" without needing a caption to
    say so, whichever plugin's data happens to be showing. Opacity still carries the same "how much"
    the entries heatmap uses opacity for, just against `level` (0..1) rather than a raw count. */
-const PLUGIN_HEATMAP_RGB = { light: '124, 58, 237', dark: '196, 165, 255' };
+export const PLUGIN_HEATMAP_RGB = { light: '124, 58, 237', dark: '196, 165, 255' };
 
-function pluginHeatmapBg(
+export function pluginHeatmapBg(
   level: number,
   isDark: boolean,
   hue: { light: string; dark: string } = PLUGIN_HEATMAP_RGB,

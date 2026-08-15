@@ -375,7 +375,7 @@ export function HabitControl({
       <Button
         variant="ghost"
         size="icon"
-        className="size-7 rounded-full sm:size-8"
+        className="size-7 rounded-full @[480px]:size-8"
         disabled={readOnly || value <= 0}
         aria-label={t('plugins.habits.decrease', { name: habit.name })}
         onClick={() => onChange?.(Math.max(0, value - step))}
@@ -394,7 +394,7 @@ export function HabitControl({
       <Button
         variant="ghost"
         size="icon"
-        className="size-7 rounded-full sm:size-8"
+        className="size-7 rounded-full @[480px]:size-8"
         disabled={readOnly}
         aria-label={t('plugins.habits.increase', { name: habit.name })}
         onClick={() => onChange?.(value + step)}
@@ -457,7 +457,7 @@ function TimeControl({
       <Button
         variant={running ? 'default' : 'ghost'}
         size="icon"
-        className="size-7 rounded-full sm:size-8"
+        className="size-7 rounded-full @[480px]:size-8"
         disabled={readOnly}
         aria-label={t(running ? 'plugins.habits.pause' : 'plugins.habits.start', {
           name: habit.name,
@@ -469,7 +469,7 @@ function TimeControl({
       <Button
         variant="ghost"
         size="icon"
-        className="size-7 rounded-full sm:size-8"
+        className="size-7 rounded-full @[480px]:size-8"
         disabled={readOnly || running || committed <= 0}
         aria-label={t('plugins.habits.decrease', { name: habit.name })}
         onClick={() => onChange?.(Math.max(0, committed - step))}
@@ -504,7 +504,7 @@ function TimeControl({
       <Button
         variant="ghost"
         size="icon"
-        className="size-7 rounded-full sm:size-8"
+        className="size-7 rounded-full @[480px]:size-8"
         disabled={readOnly || running}
         aria-label={t('plugins.habits.increase', { name: habit.name })}
         onClick={() => onChange?.(committed + step)}
@@ -802,7 +802,7 @@ export function HabitProgress({
        had to squint at. Above `sm` it goes back to a fixed gauge on the controls' line, free to
        shrink to `min-w-16` before anything overflows. */
     <div
-      className="relative h-1.5 w-full min-w-16 overflow-hidden rounded-full bg-muted sm:w-40"
+      className="relative h-1.5 w-full min-w-16 overflow-hidden rounded-full bg-muted @[480px]:w-40"
       aria-hidden
     >
       {/* Underneath, and the full extent of what has been counted. It eases in step with the bar

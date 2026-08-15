@@ -42,5 +42,22 @@
   "perDayToggle": "Ajustar la intensidad de cada día",
   "perDayToggleHide": "Ocultar la intensidad por día",
   "dateColumn": "Fecha",
-  "flowColumn": "Flujo"
+  "flowColumn": "Flujo",
+  "onboarding": {
+    "cycle": {
+      "title": "Registra un periodo",
+      "lede": "Añade un periodo pasado desde su propia página y luego ajusta la intensidad de cualquier día dentro de él.",
+      "previewNote": "Solo una vista previa: nada de esto se guarda."
+    },
+    "day": {
+      "title": "Un aviso en la página del día",
+      "lede": "Unos días antes de que toque, la página del día lo avisa; y en cuanto llega, lo registras en dos toques.",
+      "beforeLabel": "Unos días antes",
+      "todayLabel": "El día en cuestión"
+    },
+    "calendar": {
+      "title": "Míralo en el calendario",
+      "lede": "Los días registrados se sombrean más oscuros cuanto más abundante sea el flujo; una ventana prevista se sombrea más clara que cualquier día realmente registrado, hasta que lo sea."
+    }
+  }
 }

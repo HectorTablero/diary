@@ -66,6 +66,8 @@ export interface Preferences {
       is the one where they behave like links. Off leaves them as coloured text. See
       lib/entityLinks.ts. */
   entityLinks: boolean;
+  /** Whether the day page uses a 2-column layout on large screens when plugin info or birthdays are present. True by default. */
+  twoColumnLayout: boolean;
   /** Send crash reports and usage metrics. Whether there is anywhere to send them is decided at
       build time; this is whether to. Device-local like everything else here, and deliberately
       outside the synced settings so opting out on a phone can't be undone by a laptop. */
@@ -105,6 +107,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // second alphabet for anyone who doesn't need one.
   importanceShapes: false,
   entityLinks: true,
+  twoColumnLayout: true,
   // On by default: this is the only way a crash on someone else's device is ever seen, and the
   // switch below is one tap away for anyone who would rather it weren't.
   telemetry: true,

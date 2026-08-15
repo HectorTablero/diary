@@ -40,5 +40,22 @@
   "perDayToggle": "设置每天的经量",
   "perDayToggleHide": "隐藏每日经量",
   "dateColumn": "日期",
-  "flowColumn": "经量"
+  "flowColumn": "经量",
+  "onboarding": {
+    "cycle": {
+      "title": "记录一次经期",
+      "lede": "在专属页面添加过去的经期，然后微调其中任意一天的经量。",
+      "previewNote": "仅为预览——这里的内容不会被保存。"
+    },
+    "day": {
+      "title": "日期页面上的提醒",
+      "lede": "预计到来前几天，日期页面会提示你；一旦到来，两次点击即可记录。",
+      "beforeLabel": "还有几天",
+      "todayLabel": "当天"
+    },
+    "calendar": {
+      "title": "在日历上查看",
+      "lede": "已记录的日子经量越大颜色越深；预测的时间段在实际记录之前，颜色会比任何已记录的日子都浅。"
+    }
+  }
 }

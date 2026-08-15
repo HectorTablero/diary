@@ -21,6 +21,16 @@ export function PageHeader({
   );
 }
 
-export function PageContainer({ children }: { children: ReactNode }) {
-  return <div className="mx-auto w-full max-w-3xl px-4 py-6 md:px-8 md:py-8">{children}</div>;
+export function PageContainer({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('mx-auto w-full max-w-3xl px-4 py-6 md:px-8 md:py-8', className)}>
+      {children}
+    </div>
+  );
 }

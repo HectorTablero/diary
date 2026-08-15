@@ -107,7 +107,10 @@ export function PeriodDayWidget({ dateKey }: { dateKey: string }) {
   );
 }
 
-function Card({ children, action }: { children: ReactNode; action?: ReactNode }) {
+/** Exported for `onboarding/DayWarningsStep.tsx`, which previews this card's two faces — the
+    outlook text and the flow control — through the exact components the day page renders rather
+    than a redrawing of either. */
+export function Card({ children, action }: { children: ReactNode; action?: ReactNode }) {
   const { t } = useTranslation();
   return (
     <section
@@ -184,7 +187,7 @@ function DayLockButton({ locked, onToggle }: { locked: boolean; onToggle: () => 
   );
 }
 
-function OutlookText({ outlook }: { outlook: PeriodOutlook }) {
+export function OutlookText({ outlook }: { outlook: PeriodOutlook }) {
   const { t } = useTranslation();
   if (outlook.kind === 'none') return null;
   return (
@@ -207,7 +210,7 @@ function OutlookText({ outlook }: { outlook: PeriodOutlook }) {
  * `value` of `undefined` renders with nothing pressed, for the one case that has to ask rather than
  * assume — see PeriodDayWidget's notes on `ongoing`.
  */
-function PeriodControl({
+export function PeriodControl({
   value,
   onSelect,
   disabled,

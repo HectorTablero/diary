@@ -42,5 +42,22 @@
   "perDayToggle": "Imposta l'intensità per ogni giorno",
   "perDayToggleHide": "Nascondi l'intensità per giorno",
   "dateColumn": "Data",
-  "flowColumn": "Flusso"
+  "flowColumn": "Flusso",
+  "onboarding": {
+    "cycle": {
+      "title": "Registra un ciclo",
+      "lede": "Aggiungi un ciclo passato dalla sua pagina, poi perfeziona il flusso di qualsiasi giorno al suo interno.",
+      "previewNote": "Solo un'anteprima: qui non viene salvato nulla."
+    },
+    "day": {
+      "title": "Un avviso nella pagina del giorno",
+      "lede": "Qualche giorno prima che sia previsto, la pagina del giorno te lo segnala; e una volta arrivato, lo registri in due tocchi.",
+      "beforeLabel": "Qualche giorno prima",
+      "todayLabel": "Il giorno stesso"
+    },
+    "calendar": {
+      "title": "Guardalo sul calendario",
+      "lede": "I giorni registrati si scuriscono quanto più abbondante è il flusso; una finestra prevista è più chiara di qualsiasi giorno effettivamente registrato, finché non lo diventa."
+    }
+  }
 }

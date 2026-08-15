@@ -82,9 +82,9 @@ export function ToggleRow({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
+    <div className="flex flex-col gap-2 w-full">
+      <div className="flex items-center justify-between gap-3 w-full">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
           <div className="flex min-w-0 flex-col gap-0.5">
             <Label htmlFor={id}>{label}</Label>
@@ -124,8 +124,8 @@ export function SubToggleRow({
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="ml-1 flex items-center gap-3 border-l pl-3">
-      <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="ml-1 flex items-center gap-3 border-l pl-3 w-full">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* A step down from ToggleRow's `text-sm`, so the hierarchy survives even where the rule
             is hard to see. */}
         <Label htmlFor={id} className="text-xs">

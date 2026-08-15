@@ -89,5 +89,34 @@
   "lock": "锁定这一天",
   "dayLockedPast": "这一天已经过去，数值已锁定。点按即可修改。",
   "dayLockedFuture": "这一天还没到，数值已锁定。点按即可修改。",
-  "dayUnlockedHint": "已解锁，可以编辑。点按可重新锁定这一天。"
+  "dayUnlockedHint": "已解锁，可以编辑。点按可重新锁定这一天。",
+  "onboarding": {
+    "add": {
+      "title": "添加你的习惯",
+      "lede": "习惯在专属页面创建，与正在写的日记页面分开——一个名称，加上五种记录方式中的一种。",
+      "exampleName": "骑行",
+      "exampleUnit": "公里",
+      "previewNote": "仅为预览——这里的内容不会被保存。"
+    },
+    "types": {
+      "title": "五种记录方式",
+      "lede": "每个习惯都是这五种类型之一，使用与日期页面相同的控件。",
+      "exampleMeditate": "冥想",
+      "examplePushups": "俯卧撑",
+      "exampleReps": "个",
+      "exampleRead": "阅读",
+      "exampleSleep": "睡眠质量",
+      "exampleMood": "心情"
+    },
+    "calendar": {
+      "title": "在日历上查看",
+      "lede": "选中对应标签后，日历页面会按当天完成的习惯数量为每一天着色。"
+    },
+    "widget": {
+      "title": "添加到主屏幕",
+      "lede": "在 Android 上，习惯小组件让你无需打开应用即可打勾——它会自动保持最新状态。",
+      "label": "主屏幕小组件",
+      "note": "长按主屏幕，选择“小组件”，然后添加习惯。"
+    }
+  }
 }
