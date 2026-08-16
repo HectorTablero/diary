@@ -456,15 +456,17 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
   const personTagIds = new Set(person.tagIds);
   const broadcastTagIds = new Set(settings.broadcastTagIds);
 
-  const [inWindow, linked] = await Promise.all([
+  const [inWindow, all] = await Promise.all([
     // Full date-range set (not just matching candidates): a matching sub-entry
     // needs its non-matching ancestors/siblings available as context too. The range is the
     // scoring window, which the dateKey index can serve directly.
     db.entries.where('dateKey').aboveOrEqual(cutoff).toArray(),
-    /* Every entry linked to this person, which is a superset of the ones marked as said to them —
-       a said-mark is only ever written alongside the link. So the multi-entry index answers a
-       question the old code asked by reading the whole table and testing saidTo on each row. */
-    db.entries.where('peopleIds').equals(personId).toArray(),
+    /* Can't narrow this with the `peopleIds` index: "mark as said" is offered on tag- and
+       broadcast-matched entries too (see matchTypeFor in shared/scoring), and those entries never
+       get this person added to `peopleIds` — only a direct mention does. Querying `peopleIds` here
+       silently dropped every said-mark that came from a tag or broadcast match, which is why the
+       Talking Points tab's "Already told" section could render empty even with marks on record. */
+    db.entries.toArray(),
   ]);
 
   const active = buildTalkingPointForest(
@@ -476,7 +478,7 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
     now,
   ).slice(0, settings.talkingPointsLimit);
 
-  const said = linked
+  const said = all
     .filter((e) => e.saidTo.some((s) => s.personId === personId))
     .sort(byDateDesc)
     .slice(0, 50)

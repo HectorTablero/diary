@@ -216,6 +216,7 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
   const { t } = useTranslation();
   const { data, isLoading } = useTalkingPoints(personId);
   const setSaid = useSetSaid();
+  const [alreadyToldOpen, setAlreadyToldOpen] = useState(false);
 
   // Threads come off the entries themselves, so grouping needs no extra query. With no threads
   // defined this returns one singleton group per cluster, in the order the forest already had.
@@ -263,10 +264,12 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
       )}
 
       {data && data.said.length > 0 && (
-        <Collapsible>
+        <Collapsible open={alreadyToldOpen} onOpenChange={setAlreadyToldOpen}>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
-              <ChevronDown className="size-4" />
+              <ChevronDown
+                className={cn('size-4 transition-transform', alreadyToldOpen && 'rotate-180')}
+              />
               {t('people.alreadyTold')} ({data.said.length})
             </Button>
           </CollapsibleTrigger>
