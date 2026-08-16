@@ -138,6 +138,21 @@ export const APP_LOGO_PATHS = [
   { d: 'M 200 250 L 100 250' },
 ] as const;
 
+/**
+ * Which of the two logos the Android status-bar notification icon is drawn as: 'brand' for the tab
+ * mark (->|), 'app' for the diary D.
+ *
+ * Both read at a glance at 24dp, which is the only real constraint — Android throws away every
+ * colour in this icon and keeps the alpha channel, so it is a silhouette in the status bar whatever
+ * the source says. Flipping this constant and re-running `npm run generate:assets` is the whole
+ * change; the drawable it writes (android/.../drawable/ic_stat_notify.xml) is generated, ignored by
+ * git, and named by `smallIcon` in web/capacitor.config.ts.
+ *
+ * Annotated with the union rather than inferred, so that switching it doesn't turn every comparison
+ * against the other value into a type error.
+ */
+export const NOTIFICATION_ICON_LOGO: 'brand' | 'app' = 'brand';
+
 /** Palette cycled through when creating tags without an explicit color. */
 export const DEFAULT_TAG_COLORS = [
   '#4ECDC4', // Teal

@@ -13,17 +13,39 @@ const plugin = vi.hoisted(() => ({
   result: { notifications: [] as unknown[], protectedRanges: [] as unknown[] },
 }));
 const capacitor = vi.hoisted(() => ({
-  scheduled: [] as { id: number }[],
+  scheduled: [] as { id: number; title?: string; body?: string }[],
   cancelled: [] as { id: number }[],
   pending: [] as { id: number }[],
 }));
+/* Stands in for "the locale file has not arrived yet", which on a real cold start is a window the
+   reconcile can run inside — see ensureStringsLoaded in ./notifications. */
+const i18nState = vi.hoisted(() => ({ loaded: false }));
 
 vi.mock('@/lib/native', () => ({ isNative: native.value }));
+/* The real module fetches its strings, which jsdom has no server to answer. This mock keeps the
+   one behaviour the reconcile has to cope with: until `ensureLanguage` resolves, `t` answers with
+   the key itself — exactly what i18next does with no bundle registered. */
+vi.mock('@/i18n', () => ({
+  default: {
+    language: 'en',
+    t: (key: string, options?: { returnObjects?: boolean }) => {
+      if (!i18nState.loaded) return key;
+      return options?.returnObjects ? [`${key} template for {{name}}`] : `${key} translated`;
+    },
+  },
+  DEFAULT_LANGUAGE: 'en',
+  ensureLanguage: async () => {
+    i18nState.loaded = true;
+  },
+  resolveLanguage: () => 'en',
+}));
 vi.mock('@capacitor/local-notifications', () => ({
   LocalNotifications: {
-    schedule: vi.fn(async ({ notifications }: { notifications: { id: number }[] }) => {
-      capacitor.scheduled.push(...notifications);
-    }),
+    schedule: vi.fn(
+      async ({ notifications }: { notifications: { id: number; title?: string }[] }) => {
+        capacitor.scheduled.push(...notifications);
+      },
+    ),
     getPending: vi.fn(async () => ({ notifications: capacitor.pending })),
     cancel: vi.fn(async ({ notifications }: { notifications: { id: number }[] }) => {
       capacitor.cancelled.push(...notifications);
@@ -78,6 +100,8 @@ beforeEach(() => {
   capacitor.cancelled = [];
   capacitor.pending = [];
   plugin.result = { notifications: [], protectedRanges: [] };
+  // Every test starts from a cold boot, strings not yet fetched.
+  i18nState.loaded = false;
 });
 
 const scheduledIn = (base: number, span = 0x2aaaaaaa) =>
@@ -133,5 +157,22 @@ describe('when no plugin protects anything', () => {
     // And the diary's own kinds are untouched by a plugin joining the pass.
     expect(scheduledIn(CHECKUP_ID_BASE)).not.toHaveLength(0);
     expect(scheduledIn(BIRTHDAY_ID_BASE)).toHaveLength(0); // this person has no birthday
+  });
+});
+
+/* A notification's words are fixed the moment it is scheduled — nothing re-renders an alarm — so a
+   reconcile racing the locale fetch does not merely look wrong on screen for a frame, it writes
+   the raw key into the alarm. What made that reach a phone rather than being corrected by the next
+   pass is the catch-up path: it fires seconds after boot. */
+describe('the words a notification is scheduled with', () => {
+  it('waits for the strings rather than baking in raw keys', async () => {
+    await refreshNotificationsNow();
+
+    const [checkup] = scheduledIn(CHECKUP_ID_BASE);
+    expect(checkup.title).toBe('people.checkupDueTitle translated');
+    /* Not just "isn't the key": a missing bundle makes i18next return the key as a *string*, and
+       pickTemplate's random index into a string is a single character — the reported body was "d",
+       one letter of "notifications.birthdayBodies". */
+    expect(checkup.body).toBe('people.checkupBodies template for Ana');
   });
 });

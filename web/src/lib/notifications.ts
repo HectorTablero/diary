@@ -1,6 +1,6 @@
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications';
 import { db, getMeta, setMeta, type LocalPerson } from '@/db/db';
-import i18n from '@/i18n';
+import i18n, { DEFAULT_LANGUAGE, ensureLanguage } from '@/i18n';
 import { ageOn, daysUntilBirthday, nextOccurrence } from './birthday';
 import { CHECKUP_DAY_MS } from './checkup';
 import { toDateKey } from './dates';
@@ -66,8 +66,14 @@ type LocalPeople = LocalPerson[];
     Interpolated by hand rather than via i18next's returnObjects + options, since that path's
     interpolation-on-arrays behavior isn't guaranteed across i18next versions. */
 function pickTemplate(key: string, vars: Record<string, string> = {}): string {
-  const templates = i18n.t(key, { returnObjects: true }) as string[];
-  const template = templates[Math.floor(Math.random() * templates.length)];
+  const templates = i18n.t(key, { returnObjects: true });
+  /* i18next answers a key it cannot resolve with the key itself — a *string* — and a string
+     indexed by a random number is a single character. That is not a hypothetical: it is how a
+     birthday notification once went out reading "d", one letter of "notifications.birthdayBodies".
+     `ensureStringsLoaded` below is what stops the bundle being missing in the first place; this is
+     the guard that makes the failure legible rather than absurd if it ever is. */
+  if (!Array.isArray(templates) || templates.length === 0) return '';
+  const template = String(templates[Math.floor(Math.random() * templates.length)]);
   return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(`{{${k}}}`, v), template);
 }
 
@@ -262,8 +268,41 @@ async function collectDailyReminder(prefs: Preferences): Promise<LocalNotificati
   ];
 }
 
+/**
+ * Wait for the active language's strings, because every word of a notification is baked in here.
+ *
+ * A notification is text handed to AlarmManager at schedule time; nothing re-renders it later. So a
+ * reconcile that runs before i18n/index.ts has fetched the locale file writes raw i18next keys into
+ * a real alarm — "notifications.birthdayTitleWithAge", and a body that is one random character of
+ * "notifications.birthdayBodies" (see pickTemplate).
+ *
+ * That window is genuinely reachable, and this is why it is guarded *here* rather than by moving
+ * `initLocalNotifications()` into bootstrap(): only the detected language is loaded, and loaded by
+ * `fetch` after `initAuthToken()` has been awaited, while main.tsx starts the first reconcile from
+ * module scope — along with initPlugins() and every sync that lands before the first render. The
+ * one call site all of them share is this one.
+ *
+ * Usually invisible even so, because the next reconcile (a resume, a mutation, a sync) reschedules
+ * the same ids with the right words. What escapes that is exactly what was reported: a catch-up
+ * notification — a birthday whose hour passed while the app was closed — fires CATCH_UP_DELAY_MS
+ * after boot, long before any later pass could correct it.
+ *
+ * The same two-step fallback as bootstrap(), for the same reason: 'en' defines every key
+ * (scripts/checkI18n.ts enforces it), and if even that cannot be fetched there is nothing left to
+ * wait for. Cheap after boot — ensureLanguage returns an already-resolved promise once loaded — and
+ * cheap on the first pass of a native build too, where the locale files ship inside the APK.
+ */
+async function ensureStringsLoaded(): Promise<void> {
+  try {
+    await ensureLanguage(i18n.language);
+  } catch {
+    await ensureLanguage(DEFAULT_LANGUAGE).catch(() => {});
+  }
+}
+
 /** Schedule everything that should exist right now, and cancel everything pending that shouldn't. */
 async function reconcileNotifications(pluginTimeoutMs?: number): Promise<void> {
+  await ensureStringsLoaded();
   const people = await db.people.toArray();
   // Read once, so every collector sees the same snapshot even if a preference changes mid-pass.
   const prefs = getPreferences();
