@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Resources the release build must keep even though nothing appears to use them.
+
+    `shrinkResources true` (see app/build.gradle) drops any resource it cannot find a reference to,
+    and it looks for references in code, in other resources and in the manifest. `ic_stat_notify` is
+    named in none of those: it is a *string* in capacitor.config.json, read at runtime by
+    @capacitor/local-notifications, which resolves it with getIdentifier(). The shrinker's safe mode
+    catches some name-based lookups by matching string constants in the dex, but a name that only
+    exists in an asset file is invisible to it — and the release build's own report agrees, listing
+    `@es.tablerus.diary:drawable/ic_stat_notify : reachable=false`.
+
+    Losing it is not a build error, which is what made this take a while to spot: the plugin falls
+    back to android.R.drawable.ic_dialog_info, so every notification quietly shipped with the
+    system's ⓘ instead of the app's mark, in release builds only.
+
+    The drawable itself is generated — see generateNotificationIcon in web/scripts/generateAssets.ts.
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_notify" />

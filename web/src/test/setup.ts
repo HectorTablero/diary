@@ -12,7 +12,7 @@ import { cleanup, configure } from '@testing-library/react';
 import { webcrypto } from 'node:crypto';
 import { toast } from 'sonner';
 import { afterEach, beforeEach } from 'vitest';
-import i18n from '../i18n';
+import i18n, { seedCoreLanguage } from '../i18n';
 import en from '../i18n/locales/en.json';
 import { queryClient } from '../lib/queryClient';
 import { resetDb } from './seed';
@@ -27,8 +27,14 @@ import { resetDb } from './seed';
    it, which is a genuinely confusing thing to debug.
 
    Loading it here also means tests query by the label a user would actually read rather than by a
-   test id, and that a missing key fails a test instead of rendering as itself. */
-i18n.addResourceBundle('en', 'translation', en, true, true);
+   test id, and that a missing key fails a test instead of rendering as itself.
+
+   `seedCoreLanguage` rather than a bare `addResourceBundle`, which is what this used to be: the
+   strings are in the bundle either way, but only the seam records them as *core* strings that have
+   been loaded. Code that waits for its own strings before using them — lib/notifications.ts does,
+   since a notification's words are fixed at schedule time — would otherwise reach `ensureLanguage`,
+   find nothing loaded, and try to fetch a locale file from a jsdom with no server behind it. */
+seedCoreLanguage('en', en);
 await i18n.changeLanguage('en');
 
 /**
