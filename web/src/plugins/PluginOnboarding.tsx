@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import { useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -25,14 +25,6 @@ import type { PluginOnboardingStep } from './types';
  * first-run tour must never touch (rule 4 in registry.ts: no plugin page may be warmed for every
  * visitor). Threading a per-plugin, load-on-demand, replay-anytime step list through the component
  * built for a fixed once-only sequence would have complicated both without benefit to either.
- *
- * ## Why there is no drag-to-swipe
- *
- * OnboardingFlow's panels are draggable horizontally, with a click-vs-drag guard because a swipe
- * starting over a control still fires that control's click on release. A plugin's steps can hold a
- * *second* horizontal drag surface of their own — the habit tracker's rating slider is exactly
- * that — and a panel-level pan gesture layered over a control-level one is a fight over the same
- * pointer, not a bug that guard could paper over. Back and Next only.
  */
 export function PluginOnboarding({ pluginId, onDone }: { pluginId: string; onDone: () => void }) {
   const { t, i18n } = useTranslation();
@@ -88,6 +80,13 @@ export function PluginOnboarding({ pluginId, onDone }: { pluginId: string; onDon
     return () => document.documentElement.removeAttribute('data-fullbleed');
   }, []);
 
+  /* Same reasoning, same fix, as OnboardingFlow's own copy: a swipe that starts over a control is
+     still a press *of that control* as far as the DOM is concerned, so the click it ends with has
+     to be thrown away rather than let through as a stray tap on whatever the thumb happened to
+     start over. Reset on every pointer-down, not only after a swallowed click, so a drag that ends
+     somewhere with no click at all cannot leave the flag set and eat an unrelated press later. */
+  const dragged = useRef(false);
+
   if (empty) return null;
 
   const loading = steps === null;
@@ -104,6 +103,13 @@ export function PluginOnboarding({ pluginId, onDone }: { pluginId: string; onDon
     }
     setDirection(delta);
     setIndex(next);
+  };
+
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    const far = Math.abs(info.offset.x) > 60;
+    const fast = Math.abs(info.velocity.x) > 400;
+    if (!far && !fast) return;
+    go(info.offset.x < 0 ? 1 : -1);
   };
 
   return (
@@ -151,6 +157,27 @@ export function PluginOnboarding({ pluginId, onDone }: { pluginId: string; onDon
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: direction * -24 }}
                 transition={{ duration: 0.18 }}
+                drag="x"
+                dragDirectionLock
+                dragMomentum={false}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.15}
+                onDragStart={() => {
+                  dragged.current = true;
+                }}
+                onDragEnd={onDragEnd}
+                onPointerDownCapture={() => {
+                  dragged.current = false;
+                }}
+                // Capture phase, so a click that was really the end of a swipe is stopped here on
+                // the way *down* to whatever it landed on, before that control's own handler runs.
+                // See the note on `dragged`.
+                onClickCapture={(event) => {
+                  if (!dragged.current) return;
+                  dragged.current = false;
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
                 className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-2 pb-8 lg:max-w-3xl"
               >
                 <div className="mx-auto flex w-full flex-col gap-1.5">
