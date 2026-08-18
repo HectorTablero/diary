@@ -210,6 +210,7 @@ const ROUTE_SEGMENTS = new Set([
   // dirtyIds below still finds the document id in the second segment. The pluginId travels in the
   // body; it is deliberately not part of the shape, being far higher cardinality than a route.
   'plugin-records',
+  'plugin-documents',
   'settings',
   'sync',
   'checkup',
@@ -357,6 +358,10 @@ async function removeLocalDoc(op: OutboxOp) {
   else if (op.path.startsWith('/tags')) await db.tags.delete(id);
   else if (op.path.startsWith('/threads')) await db.threads.delete(id);
   else if (op.path.startsWith('/plugin-records')) await db.pluginRecords.delete(id);
+  /* Reached far more often than the others, and not only by the offline-enable race they exist for:
+     two devices writing the same document on the same day collide on the unique revision index, and
+     this is what drops the loser's phantom row so the pull can hand it the winner. */
+  else if (op.path.startsWith('/plugin-documents')) await db.pluginDocuments.delete(id);
 }
 
 /* Live channel: a WebSocket per open client. The server nudges the user's
@@ -492,6 +497,7 @@ async function pull(): Promise<PullSummary> {
 
   const threads = res.threads ?? []; // tolerates a server that predates threads (stale deploy)
   const pluginRecords = res.pluginRecords ?? []; // ditto — see `acknowledged` below
+  const pluginDocuments = res.pluginDocuments ?? []; // ditto
   /* Whether this response is the whole server state rather than a delta — see SyncResponse.reset.
      The `?? !since` mirrors the threads line above for a server that predates the field: without a
      cursor the client can reach the same conclusion on its own, and that is the only case where it
@@ -517,6 +523,7 @@ async function pull(): Promise<PullSummary> {
     tag: new Set(res.tags.map((t) => t.id)),
     thread: new Set(threads.map((t) => t.id)),
     pluginRecord: new Set(pluginRecords.map((r) => r.id)),
+    pluginDocument: new Set(pluginDocuments.map((d) => d.id)),
   };
 
   /* Which collections this response actually *spoke about*, as opposed to spoke about and had
@@ -534,6 +541,7 @@ async function pull(): Promise<PullSummary> {
   const acknowledged = new Set<SyncCollection>(['entry', 'person', 'tag']);
   if (res.threads !== undefined) acknowledged.add('thread');
   if (res.pluginRecords !== undefined) acknowledged.add('pluginRecord');
+  if (res.pluginDocuments !== undefined) acknowledged.add('pluginDocument');
 
   /* db.outbox joins the transaction so `dirty` can be read *inside* it.
      Reading it beforehand left a window: a mutation enqueued between that read and this
@@ -552,7 +560,16 @@ async function pull(): Promise<PullSummary> {
 
   await db.transaction(
     'rw',
-    [db.entries, db.people, db.tags, db.threads, db.pluginRecords, db.outbox, db.meta],
+    [
+      db.entries,
+      db.people,
+      db.tags,
+      db.threads,
+      db.pluginRecords,
+      db.pluginDocuments,
+      db.outbox,
+      db.meta,
+    ],
     async () => {
       const dirty = await dirtyIds();
       const clean = <T extends { id: string }>(docs: T[]) => {
@@ -566,12 +583,14 @@ async function pull(): Promise<PullSummary> {
       await db.tags.bulkPut(clean(res.tags));
       await db.threads.bulkPut(clean(threads));
       await db.pluginRecords.bulkPut(clean(pluginRecords));
+      await db.pluginDocuments.bulkPut(clean(pluginDocuments));
       const tables: Record<SyncCollection, SyncTable> = {
         entry: db.entries,
         person: db.people,
         tag: db.tags,
         thread: db.threads,
         pluginRecord: db.pluginRecords,
+        pluginDocument: db.pluginDocuments,
       };
       for (const del of res.deletions) {
         if (dirty.has(del.docId)) {
@@ -613,6 +632,7 @@ async function pull(): Promise<PullSummary> {
         res.tags.length ||
         threads.length ||
         pluginRecords.length ||
+        pluginDocuments.length ||
         res.deletions.length
       ) {
         applied = true;
@@ -635,7 +655,8 @@ async function pull(): Promise<PullSummary> {
     res.people.length +
     res.tags.length +
     threads.length +
-    pluginRecords.length;
+    pluginRecords.length +
+    pluginDocuments.length;
 
   /* A reset with a cursor is the one branch in this file that deletes local documents the user
      never asked to delete, and it is never sampled.

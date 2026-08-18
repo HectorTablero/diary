@@ -26,6 +26,7 @@ const Person = modelDouble();
 const Tag = modelDouble();
 const Thread = modelDouble();
 const PluginRecord = modelDouble();
+const PluginDocument = modelDouble();
 const UserSettings = modelDouble();
 const Deletion = modelDouble();
 
@@ -72,6 +73,7 @@ vi.mock('../models/person', () => ({ Person }));
 vi.mock('../models/tag', () => ({ Tag }));
 vi.mock('../models/thread', () => ({ Thread }));
 vi.mock('../models/pluginRecord', () => ({ PluginRecord }));
+vi.mock('../models/pluginDocument', () => ({ PluginDocument }));
 vi.mock('../models/userSettings', () => ({ UserSettings }));
 vi.mock('../models/deletion', () => ({ Deletion }));
 

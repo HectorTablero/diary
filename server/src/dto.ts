@@ -3,6 +3,7 @@ import type {
   PersonDto,
   PersonEventDto,
   PersonRefDto,
+  PluginDocumentDto,
   PluginRecordDto,
   PluginScope,
   SaidMark,
@@ -132,6 +133,41 @@ export const pluginRecordToDto = (record: LeanPluginRecord): PluginRecordDto => 
   data: record.data ?? {},
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
+});
+
+export interface LeanPluginDocument {
+  _id: Types.ObjectId;
+  pluginId: string;
+  dateKey: string;
+  documentId: string;
+  parentId: string;
+  title: string;
+  body: string;
+  sortKey: string;
+  added: number;
+  removed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/* Every `??` here is load-bearing in a way the ones above mostly aren't. A row written by a build
+   that predated a field is the usual case; this collection has a second one, because a document and
+   a revision each leave half of these at their default and Mongoose omits a defaulted empty string
+   from a lean read often enough that reading them as `undefined` would put `undefined` into a Dexie
+   compound index — which drops the row out of that index entirely rather than failing. */
+export const pluginDocumentToDto = (doc: LeanPluginDocument): PluginDocumentDto => ({
+  id: doc._id.toString(),
+  pluginId: doc.pluginId,
+  dateKey: doc.dateKey ?? '',
+  documentId: doc.documentId ?? '',
+  parentId: doc.parentId ?? '',
+  title: doc.title ?? '',
+  body: doc.body ?? '',
+  sortKey: doc.sortKey ?? '',
+  added: doc.added ?? 0,
+  removed: doc.removed ?? 0,
+  createdAt: doc.createdAt.toISOString(),
+  updatedAt: doc.updatedAt.toISOString(),
 });
 
 export const personRefToDto = (person: { _id: Types.ObjectId; name: string }): PersonRefDto => ({

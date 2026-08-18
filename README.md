@@ -95,6 +95,27 @@ enforce is shape and volume: `MAX_PLUGINS_PER_USER` (32), `MAX_PLUGIN_RECORDS_PE
 `MAX_PLUGIN_DATA_BYTES` (4096) and `MAX_PLUGIN_DATA_DEPTH` (3), since `pluginId` is deliberately
 open and would otherwise be a way to grow the collection without bound.
 
+**Documents are the exception.** `pluginRecord` is hostile to prose on purpose, and no amount of
+raising the cap fixes the half that matters: a row holding a whole document is the one shape where
+last-write-wins destroys an evening's work. So a second collection, `pluginDocument`, exists for
+plugins that store writing rather than values — the notebook is the only one so far, and adding it
+is what makes that plugin the **one plugin that is not a client-only change** (a shared schema, a
+model, a route, a sync branch and a Dexie version). Two properties justify the cost:
+
+- **`body` is a typed string, not an opaque blob.** That is what lets the app rewrite `@mentions`
+  inside plugin prose when a person is renamed — `renamePersonMentionsInDocuments` in
+  `web/src/db/mutations.ts` — **without loading the owning plugin**, which a rename must be able to
+  do while that plugin is switched off. Nothing there consults the registry.
+- **History is rows, not a field.** One row per document per day it changed, holding a forward patch
+  rather than a snapshot. Two devices writing on two days write two rows and neither can clobber the
+  other; only same-day edits collide, and a unique index on `(documentId, dateKey)` turns that into
+  the ordinary 409-on-create the whole app already converges through.
+
+Both row shapes live in the one collection, told apart by `dateKey` — the same idiom habits uses
+inside `pluginRecord`. Bounds: `MAX_PLUGIN_DOCUMENT_BYTES` (256 KB per body, measured on the UTF-8
+encoding), `MAX_PLUGIN_DOCUMENT_ROWS_PER_PLUGIN` (50,000) and `MAX_PLUGIN_DOCUMENT_DEPTH` (8, client
+-side — the server never walks `parentId`).
+
 Strings live in the plugin (`plugins/<id>/locales/{en,es,it,ja,zh}.json`, with
 `plugins/<id>/translation-context.json` beside them), are fetched on enable, and merge under
 `plugins.<id>.` — so a key written as `title` is used as `t('plugins.habits.title')`. `checkI18n`
@@ -108,7 +129,7 @@ first paint).
 
 ### Habits
 
-The one plugin that ships, and the one the API was shaped around. A habit is one of five kinds,
+The first plugin, and the one the API was shaped around. A habit is one of five kinds,
 differing only in how a day's number is entered and read, never in how it is stored: `binary` (a
 button), `numeric` (a stepper — push-ups, glasses of water), `time` (a stopwatch _and_ a stepper),
 `scale` (a dragged track, for something judged rather than counted) and `mood` (five faces).
@@ -164,6 +185,43 @@ Surfaces: the day widget, a calendar view shading logged days by flow and predic
 still, `/plugins/period-tracker` for the history, a Settings card for a device-local heads-up a
 couple of days before the next predicted start, and a plain-log export. No Android widget, unlike
 habits.
+
+### Notebook
+
+Longer, more abstract writing than an entry: an entry is a fact about a day ("went to the pool with
+`@A`"), a notebook document is a thought worked through in prose and expected to change over months.
+The first plugin to store documents rather than values — see `pluginDocument` above.
+
+Three decisions are worth knowing before touching it:
+
+- **A folder is a document.** Containment is a real `parentId`, and a document that has children is
+  still fully writable, so a group can explain itself. Obsidian's trick of making an index note that
+  links to its members exists because a filesystem folder cannot hold prose; this isn't a filesystem,
+  so the workaround isn't inherited. One page shape is reused at every level — the document's own
+  text, the documents inside it beneath — and the open one lives in `?doc=`, which buys the back
+  button, deep links and the Android hardware back key for free.
+- **Every day it changed is kept, as a forward patch.** `patch.ts` is a dependency-free line diff;
+  `history.ts` replays the chain. The document row holds the current text and is authoritative, the
+  chain is the past, and a save always diffs against _where the day started_ — so fifty saves in an
+  afternoon leave one revision holding the afternoon, not fifty holding a keystroke each. The two
+  can legitimately disagree (a rename rewrites bodies and not patches); the next save reconciles them.
+- **`@mentions` work, `#tags` don't.** `@Ana` in a thought means what it means in an entry — matched
+  by name through the app's own `lib/tokens`, resolved on read, rewritten by core on rename. `#` is
+  left alone because it is a Markdown heading here, and the notebook has no tags.
+
+Each revision stores two numbers, and the two surfaces ask different questions of them. The day card
+reports `+n −m` — both sides, because that is what happened to the document, and a day spent cutting
+a thought down is work. The calendar shades by `netGained` (added less removed, floored at zero per
+document), because a grid of a year is asking what is there now that wasn't before. Both readings
+are honest; keeping them apart is deliberate, and `netGained` in `history.ts` is where the calendar's
+choice is stated.
+
+Surfaces: the day card (a question on today, and links to what was written on any day — absent
+entirely on a past day with nothing in it), `/plugins/notebook`, a green contribution-graph calendar
+shaded by net characters gained, one Markdown section in the export, and a tour. Deliberately **no**
+notifications (a thought is not a task), **no** Android widget (a paragraph is not a one-tap record)
+and **no** Settings card (there is nothing device-local to configure). Deleting leaves an Undo on the
+toast, and a document created but never written in is discarded when you navigate away.
 
 ## Security and privacy
 

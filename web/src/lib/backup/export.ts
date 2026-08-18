@@ -13,18 +13,24 @@ import { BACKUP_VERSION, type BackupEnvelope } from './schema';
  * the device rather than the diary.
  */
 export async function buildBackupEnvelope(): Promise<BackupEnvelope> {
-  const [entries, people, tags, threads, pluginRecords, settings] = await Promise.all([
-    db.entries.toArray(),
-    db.people.toArray(),
-    db.tags.toArray(),
-    db.threads.toArray(),
-    /* Every plugin's rows, including plugins not installed on this device. A backup's job is to be
-       complete: dropping rows because the code that understands them happens to be absent here
-       would quietly turn a restore into a partial one. `config` rows come too — see the importer,
-       which offers them as their own section rather than applying them silently. */
-    db.pluginRecords.toArray(),
-    getSettings(),
-  ]);
+  const [entries, people, tags, threads, pluginRecords, pluginDocuments, settings] =
+    await Promise.all([
+      db.entries.toArray(),
+      db.people.toArray(),
+      db.tags.toArray(),
+      db.threads.toArray(),
+      /* Every plugin's rows, including plugins not installed on this device. A backup's job is to be
+         complete: dropping rows because the code that understands them happens to be absent here
+         would quietly turn a restore into a partial one. `config` rows come too — see the importer,
+         which offers them as their own section rather than applying them silently. */
+      db.pluginRecords.toArray(),
+      /* And their documents, which are the part of this file that could not be reconstructed by
+         doing anything again. Revisions come along with them: a document without its history would
+         restore as prose that has apparently existed in its final form since the day it was
+         written. */
+      db.pluginDocuments.toArray(),
+      getSettings(),
+    ]);
 
   return {
     version: BACKUP_VERSION,
@@ -34,6 +40,7 @@ export async function buildBackupEnvelope(): Promise<BackupEnvelope> {
     tags,
     threads,
     pluginRecords,
+    pluginDocuments,
     settings,
   };
 }

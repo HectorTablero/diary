@@ -23,6 +23,7 @@ const Person = modelDouble();
 const Tag = modelDouble();
 const Thread = modelDouble();
 const PluginRecord = modelDouble();
+const PluginDocument = modelDouble();
 const Deletion = modelDouble();
 
 const settings = vi.hoisted(() => ({ getSettings: vi.fn(), getProviderKeys: vi.fn() }));
@@ -36,6 +37,7 @@ vi.mock('../models/person', () => ({ Person }));
 vi.mock('../models/tag', () => ({ Tag }));
 vi.mock('../models/thread', () => ({ Thread }));
 vi.mock('../models/pluginRecord', () => ({ PluginRecord }));
+vi.mock('../models/pluginDocument', () => ({ PluginDocument }));
 /* Only the model is replaced; `isCursorStale` stays real. It is the thing being tested, and it is
    pure arithmetic over two dates — there is nothing about it that needs a database. */
 vi.mock('../models/deletion', async (importOriginal) => ({
@@ -64,7 +66,7 @@ const pull = async (search = '') => {
 const event = (name: string) => telemetry.events.find((e) => e.name === name);
 
 beforeEach(() => {
-  resetModels(Entry, Person, Tag, Thread, PluginRecord, Deletion);
+  resetModels(Entry, Person, Tag, Thread, PluginRecord, PluginDocument, Deletion);
   telemetry.events = [];
   settings.getSettings.mockReset();
   settings.getSettings.mockResolvedValue(DEFAULT_SETTINGS);
@@ -89,7 +91,7 @@ describe('GET /sync — choosing a delta or a reset', () => {
     const { body } = await pull(`?since=${encodeURIComponent(since)}`);
 
     expect(body.reset).toBe(false);
-    for (const model of [Entry, Person, Tag, Thread, PluginRecord]) {
+    for (const model of [Entry, Person, Tag, Thread, PluginRecord, PluginDocument]) {
       expect(model.find).toHaveBeenCalledWith({
         userId: USER_ID,
         updatedAt: { $gt: new Date(since) },
@@ -166,7 +168,7 @@ describe('GET /sync — what comes back', () => {
 
     // The only authorisation model in this endpoint: no id is accepted from the caller at all, and
     // the session's user is in all six filters.
-    for (const model of [Entry, Person, Tag, Thread, PluginRecord]) {
+    for (const model of [Entry, Person, Tag, Thread, PluginRecord, PluginDocument]) {
       expect(model.find).toHaveBeenCalledWith(expect.objectContaining({ userId: USER_ID }));
     }
     expect(settings.getSettings).toHaveBeenCalledWith(USER_ID);

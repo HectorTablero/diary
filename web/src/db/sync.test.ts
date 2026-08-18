@@ -95,6 +95,7 @@ const syncResponse = (patch: Partial<SyncResponse>): SyncResponse => ({
   tags: [],
   threads: [],
   pluginRecords: [],
+  pluginDocuments: [],
   settings: DEFAULT_SETTINGS,
   deletions: [],
   ...patch,
