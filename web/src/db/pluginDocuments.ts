@@ -100,6 +100,18 @@ export const getDocumentRevision = (
 export const countPluginDocuments = (pluginId: string): Promise<number> =>
   db.pluginDocuments.where('pluginId').equals(pluginId).count();
 
+/**
+ * A handful of documents by id, for resolving `[[id]]` links inside one document's preview.
+ *
+ * A primary-key `bulkGet`, not a scan: cost is bounded by how many links *that* document has, never
+ * by how large the notebook is — the same discipline every other read in this file follows.
+ */
+export const getPluginDocumentsByIds = async (ids: string[]): Promise<PluginDocumentDto[]> => {
+  if (!ids.length) return [];
+  const rows = await db.pluginDocuments.bulkGet(ids);
+  return rows.filter((row): row is PluginDocumentDto => row !== undefined);
+};
+
 /* --- Writes ----------------------------------------------------------------------------------- */
 
 const newRow = (

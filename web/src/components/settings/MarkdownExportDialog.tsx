@@ -1,5 +1,5 @@
 import { Hash, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePeople, useTags } from '@/api/hooks';
 import { TagChip } from '@/components/entry/chips';
@@ -37,9 +37,16 @@ import {
 import { fuzzyIncludes } from '@/lib/tokens';
 import { zipTextFiles } from '@/lib/zip';
 import { useEnabledPlugins } from '@/plugins/enabled';
+import { ensurePluginLocales } from '@/plugins/i18n';
 import { collectPluginMarkdown } from '@/plugins/markdown';
+import { PLUGINS } from '@/plugins/registry';
 
-type ExportType = 'entries' | 'people';
+/* 'entries' and 'people' are the app's own two; anything else is a plugin id — one that declares
+   the `ownExport` surface (see PluginModule.exportOwn), discovered below off `PLUGINS` rather than
+   named here. This dialog knows nothing about any particular plugin: it reads a manifest's `id` and
+   `load()`, and every string it shows for one comes from that plugin's own locale bundle
+   (`plugins.<id>.name`, `plugins.<id>.exportHint`), the same way the Plugins list in Settings does. */
+type ExportType = string;
 type OutputMode = 'merge' | 'zip';
 
 const DEFAULT_PERSON_OPTIONS: PersonMarkdownOptions = {
@@ -109,6 +116,33 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
   const [personOptions, setPersonOptions] = useState<PersonMarkdownOptions>(DEFAULT_PERSON_OPTIONS);
   const [exporting, setExporting] = useState(false);
   const enabledPlugins = useEnabledPlugins();
+
+  /* Every enabled plugin with an export type of its own — checked off `surfaces`, readable without
+     loading any plugin's chunk, the same rule every other slot in this app follows (registry.ts
+     rule 3). `type` matching one of these ids is what picks it out below; there is no other branch
+     naming a plugin. */
+  const ownExportPlugins = useMemo(
+    () =>
+      PLUGINS.filter(
+        (plugin) => enabledPlugins.has(plugin.id) && plugin.surfaces.includes('ownExport'),
+      ),
+    [enabledPlugins],
+  );
+  const ownExportPlugin = ownExportPlugins.find((plugin) => plugin.id === type);
+
+  /* A plugin's name and export hint live in its own locale bundle, fetched only once it is enabled
+     — same as PluginsSection.tsx fetching every plugin's strings to show a name beside its switch. */
+  const [pluginLabelsReady, setPluginLabelsReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setPluginLabelsReady(false);
+    void Promise.all(
+      ownExportPlugins.map((plugin) => ensurePluginLocales(plugin.id).catch(() => {})),
+    ).then(() => !cancelled && setPluginLabelsReady(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [ownExportPlugins]);
 
   const toggleTag = (id: string) =>
     setTagIds((prev) =>
@@ -180,6 +214,33 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
         const pluginSections = await collectPluginMarkdown(enabledPlugins);
         const full = [markdown, ...pluginSections.map((section) => section.markdown)].join('\n\n');
         await saveTextFile(`diary-entries-${Date.now()}.md`, full, 'text/markdown');
+      } else if (ownExportPlugin) {
+        /* `load()` is the manifest's own thunk (a literal `import('./notebook')` and so on, per
+           registry.ts rule 2) — the same mechanism collectPluginMarkdown above uses, so this dialog
+           never carries a byte of any plugin's code for a visitor who has it disabled, or never
+           opens the dialog at all. */
+        const { exportOwn } = (await ownExportPlugin.load()).default;
+        if (!exportOwn) return; // guarded by registry.surfaces.test.tsx; unreachable in practice
+        if (outputMode === 'zip') {
+          const files = await exportOwn.buildZip();
+          if (!files.length) {
+            notifyError(t('settings.markdownExport.exportEmpty'));
+            return;
+          }
+          const base64 = await zipTextFiles(files);
+          await saveBinaryFile(
+            `${ownExportPlugin.id}-${Date.now()}.zip`,
+            base64,
+            'application/zip',
+          );
+        } else {
+          const markdown = await exportOwn.buildMerged();
+          if (!markdown) {
+            notifyError(t('settings.markdownExport.exportEmpty'));
+            return;
+          }
+          await saveTextFile(`${ownExportPlugin.id}-${Date.now()}.md`, markdown, 'text/markdown');
+        }
       } else if (personIds.length > 0) {
         const results = await Promise.all(
           personIds.map(async (id) => {
@@ -243,11 +304,43 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                     {t('settings.markdownExport.typeEntries')}
                   </SelectItem>
                   <SelectItem value="people">{t('settings.markdownExport.typePeople')}</SelectItem>
+                  {/* Only offered once a plugin is both enabled and declares `ownExport` — an
+                      export type for data that doesn't exist would be a menu item that only ever
+                      produces an empty file. The label is the same name the Plugins list already
+                      shows it by, so there is exactly one place that string is ever written. */}
+                  {ownExportPlugins.map((plugin) => (
+                    <SelectItem key={plugin.id} value={plugin.id}>
+                      {pluginLabelsReady ? t(`plugins.${plugin.id}.name`) : '…'}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {type === 'entries' ? (
+            {ownExportPlugin ? (
+              <div className="flex flex-col gap-1.5">
+                <Label>{t('settings.markdownExport.outputMode')}</Label>
+                <Select value={outputMode} onValueChange={(v) => setOutputMode(v as OutputMode)}>
+                  <SelectTrigger
+                    className="w-full"
+                    aria-label={t('settings.markdownExport.outputMode')}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="merge">
+                      {t('settings.markdownExport.outputMerge')}
+                    </SelectItem>
+                    <SelectItem value="zip">{t('settings.markdownExport.outputZip')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {pluginLabelsReady && (
+                  <p className="text-xs text-muted-foreground">
+                    {t(`plugins.${ownExportPlugin.id}.exportHint`)}
+                  </p>
+                )}
+              </div>
+            ) : type === 'entries' ? (
               <>
                 <div className="flex gap-2">
                   <div className="flex flex-1 flex-col gap-1.5">

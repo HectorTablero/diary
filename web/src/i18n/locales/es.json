@@ -566,6 +566,7 @@
       "type": "Tipo de exportación",
       "typeEntries": "Entradas",
       "typePeople": "Resumen de personas",
+      "exportEmpty": "Todavía no hay nada que exportar.",
       "from": "Desde",
       "to": "Hasta",
       "tags": "Etiquetas",
@@ -576,7 +577,7 @@
       "selectedCount": "{{count}} seleccionados",
       "outputMode": "Salida",
       "outputMerge": "Fusionar en un solo archivo",
-      "outputZip": "Un archivo por persona (.zip)",
+      "outputZip": "Archivos independientes (.zip)",
       "export": "Exportar",
       "done": "Markdown exportado",
       "option": {

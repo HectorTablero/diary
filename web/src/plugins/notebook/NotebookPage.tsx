@@ -61,19 +61,27 @@ export default function NotebookPage() {
 
   const [focus, setFocus] = useState(false);
   /* Owned here rather than in the editor because the control that toggles it sits in this page's
-     header, beside the other things done *to* a document. */
+     header, beside the other things done *to* a document.
+
+     Deliberately *not* reset by `go()` below, unlike `focus`. Reading is what someone is doing
+     across a whole sitting with the notebook — following a `[[link]]` or a breadcrumb mid-read
+     should land in the same mode, not snap back to source every time. Focus mode is the opposite:
+     a screen-size affordance for the document just left, not a preference carried to the next one. */
   const [preview, setPreview] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  /** The document `onNew` just created, so its `TitleField` can mount already in edit mode. Cleared
+      by every navigation so revisiting it later doesn't reopen the title editor uninvited. */
+  const [newDocId, setNewDocId] = useState<string | null>(null);
 
   const go = useCallback(
     (id: string) => {
       setParams(id === ROOT_ID ? {} : { doc: id });
-      // Leaving a document means leaving its editor; neither of these is a setting, both are about
-      // one sitting with one document.
+      // Leaving a document means leaving its editor — a screen-size choice made for that document,
+      // not a preference carried to the next one.
       setFocus(false);
-      setPreview(false);
+      setNewDocId(null);
     },
     [setParams],
   );
@@ -91,6 +99,8 @@ export default function NotebookPage() {
     const created = await createDocument(documentId);
     await reload();
     go(created.id);
+    // After go(), which just cleared it — creating is the one moment this should be set.
+    setNewDocId(created.id);
   }, [documentId, go, reload]);
 
   const onDelete = useCallback(async () => {
@@ -129,6 +139,7 @@ export default function NotebookPage() {
                   key={current.id}
                   title={current.title}
                   label={label}
+                  startEditing={newDocId === current.id}
                   onCommit={(next) => void onRename(next)}
                 />
               ) : (

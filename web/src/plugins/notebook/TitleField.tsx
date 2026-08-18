@@ -23,14 +23,20 @@ import { useTranslation } from 'react-i18next';
 export function TitleField({
   title,
   label,
+  startEditing,
   onCommit,
 }: {
   title: string;
   label: string;
+  /** Mount already in edit mode, focused — for a document just created, so a name can be typed
+      immediately rather than requiring a click on the heading first. Read once, on mount: this
+      component is always remounted per document (see the `key={current.id}` at the call site), so
+      there is no later render where the prop could change and need to be reacted to. */
+  startEditing?: boolean;
   onCommit: (next: string) => void;
 }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(startEditing ? title : null);
 
   if (draft === null) {
     return (

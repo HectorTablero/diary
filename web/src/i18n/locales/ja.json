@@ -546,6 +546,7 @@
       "type": "書き出す種類",
       "typeEntries": "記録",
       "typePeople": "人物のまとめ",
+      "exportEmpty": "まだエクスポートできるものがありません。",
       "from": "開始",
       "to": "終了",
       "tags": "タグ",
@@ -556,7 +557,7 @@
       "selectedCount": "{{count}}件を選択中",
       "outputMode": "出力",
       "outputMerge": "ひとつのファイルにまとめる",
-      "outputZip": "人物ごとに 1 ファイル（.zip）",
+      "outputZip": "個別のファイル（.zip）",
       "export": "書き出す",
       "done": "Markdown を書き出しました",
       "option": {

@@ -20,6 +20,7 @@ const MEMBER_FOR: Record<PluginSurface, keyof PluginModule> = {
   settings: 'SettingsSection',
   notifications: 'collectNotifications',
   export: 'exportMarkdown',
+  ownExport: 'exportOwn',
   calendar: 'CalendarView',
   widget: 'syncNativeWidget',
   onboarding: 'onboardingSteps',

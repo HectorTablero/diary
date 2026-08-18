@@ -1,9 +1,11 @@
 import { MAX_PLUGIN_DOCUMENT_BYTES } from '@diary/shared';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePeople } from '@/api/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAllPluginDocuments } from '@/db/pluginDocuments';
 import { cn } from '@/lib/utils';
+import { documentLabel, NOTEBOOK_PLUGIN_ID } from './model';
 import { MarkdownView } from './MarkdownView';
 import { MentionTextarea } from './MentionTextarea';
 import { useDocumentEditor } from './useNotebook';
@@ -59,6 +61,28 @@ export function DocumentEditorPanel({
   );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  /* Every other document, for `[[` autocomplete — but only once `[[` is actually typed. Loading the
+     whole tree is otherwise reserved for the move picker and the export (see the docstrings on
+     `useAllDocuments` and `getAllPluginDocuments`): a body can be a quarter of a megabyte, so nothing
+     may pay for all of them just because a document was *opened*. A suggestion list is the same kind
+     of deliberate, user-triggered picker the move dialog already is — it just triggers on a keystroke
+     instead of a menu item, so the read is deferred to that keystroke rather than skipped. The ref
+     guards against re-fetching on every keystroke while `[[query` keeps changing. */
+  const [linkableDocuments, setLinkableDocuments] = useState<{ id: string; label: string }[]>([]);
+  const requestedDocuments = useRef(false);
+  const loadLinkableDocuments = useCallback(() => {
+    if (requestedDocuments.current) return;
+    requestedDocuments.current = true;
+    void getAllPluginDocuments(NOTEBOOK_PLUGIN_ID).then((docs) => {
+      const untitled = t('plugins.notebook.untitled');
+      setLinkableDocuments(
+        docs
+          .filter((doc) => doc.id !== documentId)
+          .map((doc) => ({ id: doc.id, label: documentLabel(doc, untitled) })),
+      );
+    });
+  }, [documentId, t]);
+
   /* Grow the box to the text. A prose editor with an inner scrollbar puts the document in a window
      inside a window — the page should scroll, not the field.
 
@@ -91,7 +115,7 @@ export function DocumentEditorPanel({
       {preview ? (
         <div className="min-h-70 rounded-lg border px-4 py-3">
           {body.trim() ? (
-            <MarkdownView text={body} people={people} />
+            <MarkdownView text={body} people={people} onToggleTask={setBody} />
           ) : (
             <p className="text-sm text-muted-foreground">{t('plugins.notebook.previewEmpty')}</p>
           )}
@@ -107,6 +131,8 @@ export function DocumentEditorPanel({
             value={body}
             onChange={setBody}
             people={people}
+            documents={linkableDocuments}
+            onDocumentTokenActive={loadLinkableDocuments}
             textareaRef={textareaRef}
             placeholder={t('plugins.notebook.bodyPlaceholder')}
             autoFocus={focus}

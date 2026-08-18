@@ -108,7 +108,14 @@ export const PLUGINS: readonly PluginManifest[] = [
   {
     id: 'notebook',
     icon: NotebookPen,
-    surfaces: ['day', 'page', 'export', 'calendar', 'onboarding'],
+    // `ownExport`, not `export`: that surface is a strict contract with an `exportMarkdown` member
+    // (see registry.surfaces.test.tsx) specifically meaning "contributes a section to the
+    // *Entries* export" — not what the notebook does any more, since a tree of Markdown doesn't
+    // flatten into another document's headings the way day-scoped plugin data does. `ownExport`
+    // (see PluginModule.exportOwn) is how MarkdownExportDialog.tsx discovers a plugin's own export
+    // type generically, off this array and this plugin's `load()`, without the dialog ever naming
+    // "notebook" itself.
+    surfaces: ['day', 'page', 'settings', 'ownExport', 'calendar', 'onboarding'],
     // Below both of the others: habits and a period are about the day being looked at, and the
     // notebook's card is a prompt and a set of links rather than something to record.
     dayOrder: 1,

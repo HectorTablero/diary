@@ -540,6 +540,7 @@
       "type": "导出类型",
       "typeEntries": "记录",
       "typePeople": "人物摘要",
+      "exportEmpty": "目前还没有可导出的内容。",
       "from": "从",
       "to": "到",
       "tags": "标签",
@@ -550,7 +551,7 @@
       "selectedCount": "已选 {{count}} 项",
       "outputMode": "输出",
       "outputMerge": "合并成一个文件",
-      "outputZip": "每人一个文件（.zip）",
+      "outputZip": "各自独立的文件（.zip）",
       "export": "导出",
       "done": "Markdown 已导出",
       "option": {
