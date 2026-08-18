@@ -1,6 +1,7 @@
 import { MAX_PLUGIN_DOCUMENT_BYTES, type PluginDocumentDto } from '@diary/shared';
 import { generateKeyBetween } from 'fractional-indexing';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   createPluginDocument,
   deletePluginDocuments,
@@ -8,6 +9,7 @@ import {
   getChildDocuments,
   getDocumentRevisions,
   getPluginDocument,
+  getPluginDocumentsByIds,
   getRevisionsForDay,
   getRevisionsInRange,
   putDocumentRevision,
@@ -17,7 +19,13 @@ import {
 import { onSyncApplied } from '@/db/sync';
 import { todayKey } from '@/lib/dates';
 import { baseTextBefore, netGained, replay, revisionFor, type HistoryDay } from './history';
-import { ancestorPath, NOTEBOOK_PLUGIN_ID as PLUGIN_ID, ROOT_ID, subtreeIds } from './model';
+import {
+  ancestorPath,
+  documentLabel,
+  NOTEBOOK_PLUGIN_ID as PLUGIN_ID,
+  ROOT_ID,
+  subtreeIds,
+} from './model';
 
 /**
  * The notebook's reads and writes, as hooks.
@@ -154,6 +162,38 @@ export function useAllDocuments(): PluginDocumentDto[] {
     return onSyncApplied(() => void load());
   }, [load]);
   return documents;
+}
+
+/**
+ * Live labels for a handful of document ids — what a `[[id]]` link in a preview resolves to.
+ *
+ * Built on `getPluginDocumentsByIds`, a bulkGet rather than a scan, so reading one document with a
+ * few links in it never costs a read proportional to the whole notebook (see the note above that
+ * function). `ids` is taken as a plain array rather than memoized by the caller — the effect keys
+ * off its *contents*, not its identity, since a fresh `[...]` literal from `matchAll` every render
+ * is otherwise a fresh effect run every render too.
+ */
+export function useDocumentLabels(ids: readonly string[]): ReadonlyMap<string, string> {
+  const { t } = useTranslation();
+  const [labels, setLabels] = useState<ReadonlyMap<string, string>>(new Map());
+  const key = ids.join('\n');
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!key) return setLabels(new Map());
+      const docs = await getPluginDocumentsByIds(key.split('\n'));
+      if (cancelled) return;
+      const untitled = t('plugins.notebook.untitled');
+      setLabels(new Map(docs.map((doc) => [doc.id, documentLabel(doc, untitled)])));
+    };
+    void load();
+    return onSyncApplied(() => void load());
+    // key stands in for `ids` (see above); `t` is stable enough for this not to matter in practice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return labels;
 }
 
 /* --- Writing ------------------------------------------------------------------------------------ */

@@ -565,6 +565,7 @@
       "type": "Tipo di esportazione",
       "typeEntries": "Voci",
       "typePeople": "Riepilogo persone",
+      "exportEmpty": "Non c'è ancora niente da esportare.",
       "from": "Da",
       "to": "A",
       "tags": "Etichette",
@@ -575,7 +576,7 @@
       "selectedCount": "{{count}} selezionati",
       "outputMode": "Output",
       "outputMerge": "Unisci in un solo file",
-      "outputZip": "Un file per persona (.zip)",
+      "outputZip": "File separati (.zip)",
       "export": "Esporta",
       "done": "Markdown esportato",
       "option": {

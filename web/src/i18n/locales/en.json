@@ -571,6 +571,7 @@
       "type": "Export type",
       "typeEntries": "Entries",
       "typePeople": "People briefing",
+      "exportEmpty": "There's nothing to export yet.",
       "from": "From",
       "to": "To",
       "tags": "Tags",
@@ -581,7 +582,7 @@
       "selectedCount": "{{count}} selected",
       "outputMode": "Output",
       "outputMerge": "Merge into one file",
-      "outputZip": "One file per person (.zip)",
+      "outputZip": "Separate files (.zip)",
       "export": "Export",
       "done": "Markdown exported",
       "option": {

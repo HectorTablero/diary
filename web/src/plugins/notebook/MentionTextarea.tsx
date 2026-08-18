@@ -1,12 +1,12 @@
 import type { PersonDto } from '@diary/shared';
-import { User } from 'lucide-react';
+import { FileText, User } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { detectActiveToken, fuzzyIncludes, type ActiveToken } from '@/lib/tokens';
+import { detectActiveToken, fuzzyIncludes } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
 /**
- * The notebook's writing surface: a plain textarea with `@person` autocomplete.
+ * The notebook's writing surface: a plain textarea with `@person` and `[[document]]` autocomplete.
  *
  * ## Why not the composer's TokenTextarea
  *
@@ -18,6 +18,12 @@ import { cn } from '@/lib/utils';
  * What is shared is the part worth sharing: `detectActiveToken` and `fuzzyIncludes` from
  * `lib/tokens`, which are what make `@Ana` in a thought mean exactly what `@Ana` in an entry means —
  * matched by name, resolved on read, and rewritten by the app when Ana is renamed.
+ *
+ * `[[` is deliberately *not* added to that shared module. It is detected locally, just below, because
+ * `lib/tokens.ts` is also the composer's, and the composer must never grow a meaning for `[[`. A
+ * document link resolves by id rather than by name (see MarkdownView's note on `[[id]]`), so unlike
+ * `@mentions` there is nothing here for a rename to keep in step with — the label shown is always
+ * read live.
  *
  * ## The popup follows the caret
  *
@@ -78,10 +84,28 @@ function caretOffset(textarea: HTMLTextAreaElement, index: number): { top: numbe
   return { top, left };
 }
 
+/** The `[[` trigger — see the note above on why this lives here rather than in `lib/tokens.ts`. Stays
+    active through everything but `[` or `]`, so `[[Ana` keeps suggesting while `[[Ana]]` (closed by
+    a pick or typed by hand) and a stray `[[[` both end it. */
+function detectDocumentToken(
+  value: string,
+  caret: number,
+): { start: number; query: string } | null {
+  const before = value.slice(0, caret);
+  const match = /\[\[([^[\]]*)$/.exec(before);
+  return match ? { start: caret - match[0].length, query: match[1] } : null;
+}
+
+type Token =
+  | { kind: 'person'; query: string; start: number }
+  | { kind: 'document'; query: string; start: number };
+
 export function MentionTextarea({
   value,
   onChange,
   people,
+  documents,
+  onDocumentTokenActive,
   placeholder,
   autoFocus,
   className,
@@ -90,6 +114,13 @@ export function MentionTextarea({
   value: string;
   onChange: (value: string) => void;
   people: PersonDto[];
+  /** Every other document, for `[[` autocomplete — the caller excludes the one being edited, and may
+      supply it lazily (empty until the first call to `onDocumentTokenActive`). */
+  documents: { id: string; label: string }[];
+  /** Fired the moment a `[[` token becomes active — the caller's cue to load `documents` if it
+      hasn't yet. Called again on every subsequent keystroke while the token stays open; the caller
+      is expected to no-op after its first real fetch. */
+  onDocumentTokenActive?: () => void;
   placeholder?: string;
   autoFocus?: boolean;
   className?: string;
@@ -99,7 +130,7 @@ export function MentionTextarea({
   const internalRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = externalRef ?? internalRef;
   const listboxId = useId();
-  const [token, setToken] = useState<ActiveToken | null>(null);
+  const [token, setToken] = useState<Token | null>(null);
   const [anchor, setAnchor] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -107,11 +138,19 @@ export function MentionTextarea({
     const el = textareaRef.current;
     if (!el) return setToken(null);
     const caret = el.selectionStart ?? 0;
-    const next = detectActiveToken(value, caret);
     // `#` means a Markdown heading here, not a tag: the notebook has no tags, and swallowing the
     // character to offer a suggestion list would make headings unwritable.
-    setToken(next?.type === '@' ? next : null);
-    if (next?.type === '@') setAnchor(caretOffset(el, caret));
+    const person = detectActiveToken(value, caret);
+    const next: Token | null =
+      person?.type === '@'
+        ? { kind: 'person', query: person.query, start: person.start }
+        : (() => {
+            const doc = detectDocumentToken(value, caret);
+            return doc && { kind: 'document', query: doc.query, start: doc.start };
+          })();
+    if (next?.kind === 'document') onDocumentTokenActive?.();
+    setToken(next);
+    if (next) setAnchor(caretOffset(el, caret));
   };
 
   useEffect(() => {
@@ -125,6 +164,12 @@ export function MentionTextarea({
 
   const suggestions = useMemo(() => {
     if (!token) return [];
+    if (token.kind === 'document') {
+      return documents
+        .filter((doc) => !token.query || fuzzyIncludes(doc.label, token.query))
+        .slice(0, 6)
+        .map((doc) => ({ id: doc.id, inserted: `[[${doc.id}]]`, label: doc.label }));
+    }
     const matchedAlias = (person: PersonDto) =>
       person.aliases.find((alias) => fuzzyIncludes(alias, token.query));
     return people
@@ -135,20 +180,24 @@ export function MentionTextarea({
       .map((p) => {
         // Show the nickname that matched, so picking "Carmen" after typing "@Mum" isn't a surprise.
         const alias = fuzzyIncludes(p.name, token.query) ? undefined : matchedAlias(p);
-        return { id: p.id, name: p.name, label: alias ? `${p.name} (${alias})` : p.name };
+        return {
+          id: p.id,
+          inserted: `@${p.name}`,
+          label: alias ? `${p.name} (${alias})` : p.name,
+        };
       });
-  }, [token, people]);
+  }, [token, people, documents]);
 
-  const insert = (name: string) => {
+  const insert = (suggestion: { inserted: string }) => {
     const el = textareaRef.current;
     if (!el || !token) return;
     const caret = el.selectionStart ?? value.length;
     /* No trailing space, unlike the composer. A bullet is a list of mentions and a sentence is not:
        "@Ana." and "@Ana," are both ordinary prose, and a space forced in front of the punctuation is
-       something to delete every single time. */
-    const next = `${value.slice(0, token.start)}@${name}${value.slice(caret)}`;
+       something to delete every single time. Same reasoning extends to `[[id]]`. */
+    const next = `${value.slice(0, token.start)}${suggestion.inserted}${value.slice(caret)}`;
     onChange(next);
-    const position = token.start + name.length + 1;
+    const position = token.start + suggestion.inserted.length;
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(position, position);
@@ -169,7 +218,7 @@ export function MentionTextarea({
          paragraph, which in a prose editor is the one key that must never be stolen. */
       event.preventDefault();
       const picked = suggestions[selectedIndex];
-      if (picked) insert(picked.name);
+      if (picked) insert(picked);
     } else if (event.key === 'Escape') {
       event.preventDefault();
       setToken(null);
@@ -216,7 +265,11 @@ export function MentionTextarea({
         <ul
           id={listboxId}
           role="listbox"
-          aria-label={t('plugins.notebook.mentionSuggestions')}
+          aria-label={t(
+            token?.kind === 'document'
+              ? 'plugins.notebook.documentMentionSuggestions'
+              : 'plugins.notebook.mentionSuggestions',
+          )}
           style={{ top: anchor.top, left: anchor.left }}
           className="absolute z-50 mt-6 max-w-[min(18rem,90%)] min-w-40 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md"
         >
@@ -230,7 +283,7 @@ export function MentionTextarea({
               // before the click could apply it.
               onMouseDown={(event) => {
                 event.preventDefault();
-                insert(suggestion.name);
+                insert(suggestion);
               }}
               onMouseEnter={() => setSelectedIndex(index)}
               className={cn(
@@ -238,7 +291,11 @@ export function MentionTextarea({
                 index === selectedIndex && 'bg-accent text-accent-foreground',
               )}
             >
-              <User aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+              {token?.kind === 'document' ? (
+                <FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+              ) : (
+                <User aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+              )}
               <span className="truncate">{suggestion.label}</span>
             </li>
           ))}

@@ -6,7 +6,15 @@ import type { PluginRecordDto } from '@diary/shared';
    without any of its code being reachable from the entry chunk. */
 
 export type PluginSurface =
-  'day' | 'page' | 'settings' | 'notifications' | 'export' | 'calendar' | 'widget' | 'onboarding';
+  | 'day'
+  | 'page'
+  | 'settings'
+  | 'notifications'
+  | 'export'
+  | 'ownExport'
+  | 'calendar'
+  | 'widget'
+  | 'onboarding';
 
 /**
  * One day's worth of a plugin's calendar data — just enough to colour and label a cell.
@@ -54,6 +62,26 @@ export interface PluginModule {
   collectNotifications?: (context: PluginNotificationContext) => Promise<LocalNotificationSchema[]>;
   /** Markdown files to add to the export archive. */
   exportMarkdown?: () => Promise<{ filename: string; markdown: string }[]>;
+  /**
+   * A whole export type of its own in the Markdown export dialog, for plugin data that doesn't fit
+   * the Entries export's day-scoped concatenation (`exportMarkdown` above) — a tree of documents,
+   * say, where flattening into another document's headings would scramble the user's own heading
+   * levels (see the notebook plugin, the first to need this).
+   *
+   * The dialog discovers this generically off the `ownExport` surface and its own `id` — it never
+   * names a plugin. Every plugin-specific string it shows (the option's label, a hint under the
+   * output-mode picker) comes from that plugin's own locale bundle instead: `plugins.<id>.name` for
+   * the label it already has for the Plugins list, and `plugins.<id>.exportHint` for the hint,
+   * which every plugin declaring this surface must define.
+   */
+  exportOwn?: {
+    /** Everything as one merged Markdown file, or `null` when there is nothing to export. */
+    buildMerged: () => Promise<string | null>;
+    /** Everything as a set of files for a ZIP archive. A `name` may contain `/` to lay out real
+        folders, when the plugin's own data has a shape that wants one (`lib/zip.ts` stores it
+        verbatim). */
+    buildZip: () => Promise<{ name: string; content: string }[]>;
+  };
   /**
    * A view in the calendar page's switcher: replaces the diary's own entry heatmap with this
    * plugin's data when picked.
