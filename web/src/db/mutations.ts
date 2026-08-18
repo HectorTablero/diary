@@ -22,6 +22,7 @@ import {
   isSelfOrDescendant,
   MAX_ALIASES,
   newObjectId,
+  UNDATED_KEY,
   wouldExceedMaxDepth,
 } from '@diary/shared';
 import { generateKeyBetween } from 'fractional-indexing';
@@ -30,6 +31,7 @@ import type { BackupResolution } from '@/lib/backup/conflicts';
 import type {
   EntryBackupRow,
   PersonBackupRow,
+  PluginDocumentBackupRow,
   PluginRecordBackupRow,
   TagBackupRow,
   ThreadBackupRow,
@@ -439,6 +441,65 @@ async function renamePersonMentions(
   }
 }
 
+/**
+ * The same rewrite, across plugin documents' prose.
+ *
+ * ## Why this lives in core rather than in the plugin that owns the documents
+ *
+ * Because it has to run when that plugin is switched **off**. A person renamed while the notebook is
+ * disabled would otherwise leave every `@OldName` in it pointing at nobody, discovered months later
+ * by whoever turns it back on — and the plugin contract's whole promise is that a disabled plugin
+ * costs nothing, which rules out loading its chunk on a rename to ask it to help.
+ *
+ * That is exactly what `pluginDocument.body` being a typed string buys, and it is the reason this
+ * collection exists instead of a bigger `pluginRecord`. Nothing here knows which plugin owns what:
+ * a document is prose, prose may name people, and `@Name` means the same thing in every prose the
+ * app stores. The registry is not consulted and no plugin code is imported, so the rule that a
+ * disabled plugin loads nothing still holds literally.
+ *
+ * ## What it deliberately does not touch
+ *
+ * **Revisions.** Their bodies are patches, not prose, and rewriting text inside one would corrupt
+ * the chain that reconstructs every earlier day. So history keeps the old name — which is also the
+ * truth about what was written then — and the document's own text is what the next edit diffs
+ * against, so the chain re-converges on the next save with the rename recorded as the change it was.
+ */
+async function renamePersonMentionsInDocuments(
+  personId: string,
+  oldName: string,
+  newName: string,
+): Promise<void> {
+  /* An index-only count, and for almost everyone it is zero: nobody who has never opened a
+     document pays more than this for a rename. */
+  const documents = db.pluginDocuments.where('dateKey').equals(UNDATED_KEY);
+  if ((await documents.count()) === 0) return;
+
+  const names = (await db.people.toArray()).map((p) => (p.id === personId ? oldName : p.name));
+  /* Streamed rather than collected: a notebook is the largest thing this database holds, and there
+     is no reason for a rename's peak memory to be all of it. Only the documents that actually
+     change are kept, and the writes happen after the cursor is done — Dexie makes no promise about
+     modifying a table while iterating it. */
+  const changed: { id: string; body: string }[] = [];
+  await documents.each((doc) => {
+    if (!doc.body.includes('@')) return;
+    const body = renameMentions(doc.body, '@', names, oldName, newName);
+    if (body !== doc.body) changed.push({ id: doc.id, body });
+  });
+  if (!changed.length) return;
+
+  const now = nowIso();
+  await db.pluginDocuments.bulkUpdate(
+    changed.map(({ id, body }) => ({ key: id, changes: { body, updatedAt: now } })),
+  );
+  await enqueueBatch(
+    changed.map(({ id, body }) => ({
+      method: 'PATCH' as const,
+      path: `/plugin-documents/${id}`,
+      body: { body },
+    })),
+  );
+}
+
 export async function updatePerson(personId: string, input: PersonUpdateInput): Promise<PersonDto> {
   if (input.name !== undefined) await assertUniquePersonName(input.name, personId);
   let oldName: string | undefined;
@@ -465,6 +526,7 @@ export async function updatePerson(personId: string, input: PersonUpdateInput): 
   if (!count) throw new ApiError(404, 'person.not_found');
   if (input.name !== undefined && oldName !== undefined && !fuzzyEquals(input.name, oldName)) {
     await renamePersonMentions(personId, oldName, input.name);
+    await renamePersonMentionsInDocuments(personId, oldName, input.name);
   }
   await enqueue('PATCH', `/people/${personId}`, input);
   return getPerson(personId);
@@ -1449,6 +1511,9 @@ export interface BackupImportPlan {
   /** Plugin rows to restore. Already filtered by the review screen — `config` rows only appear here
       if the user opted in, since restoring one switches a plugin on across every device. */
   pluginRecords: PluginRecordBackupRow[];
+  /** Plugin documents and their revisions. Not offered as a review section, unlike `config` rows:
+      restoring a document affects nothing outside the plugin that owns it. */
+  pluginDocuments: PluginDocumentBackupRow[];
 }
 
 export interface BackupImportSummary {
@@ -1459,6 +1524,7 @@ export interface BackupImportSummary {
       left exactly as they are. */
   entries: { created: number; merged: number; skipped: number; orphaned: number };
   pluginRecords: { created: number; merged: number };
+  pluginDocuments: { created: number; merged: number };
 }
 
 /**
@@ -1509,6 +1575,63 @@ async function importPluginRecords(rows: PluginRecordBackupRow[]) {
   };
 }
 
+/**
+ * Restore plugin documents and their revisions.
+ *
+ * Ids are kept rather than remapped, for a stronger version of the reason given above: a document's
+ * id is what its children point at through `parentId` and what its whole history points at through
+ * `documentId`. Remapping would restore a notebook as a pile of unparented documents with no
+ * history attached to any of them.
+ *
+ * The PATCH branch deliberately does not send `dateKey` or `documentId`, which the route refuses to
+ * update anyway — they are which row this is, not what it holds. A restored row that disagreed with
+ * the server about either is a different row, and would have to arrive under its own id.
+ */
+async function importPluginDocuments(rows: PluginDocumentBackupRow[]) {
+  if (!rows.length) return { created: 0, merged: 0, ops: [] as OutboxOp[] };
+
+  const existing = new Set(
+    (await db.pluginDocuments.bulkGet(rows.map((row) => row.id)))
+      .filter((row) => row !== undefined)
+      .map((row) => row.id),
+  );
+
+  await db.pluginDocuments.bulkPut(rows);
+
+  const ops: OutboxOp[] = rows.map((row) =>
+    existing.has(row.id)
+      ? {
+          method: 'PATCH',
+          path: `/plugin-documents/${row.id}`,
+          body: {
+            parentId: row.parentId,
+            title: row.title,
+            body: row.body,
+            sortKey: row.sortKey,
+            added: row.added,
+          },
+        }
+      : {
+          method: 'POST',
+          path: '/plugin-documents',
+          body: {
+            id: row.id,
+            createdAt: row.createdAt,
+            pluginId: row.pluginId,
+            dateKey: row.dateKey,
+            documentId: row.documentId,
+            parentId: row.parentId,
+            title: row.title,
+            body: row.body,
+            sortKey: row.sortKey,
+            added: row.added,
+          },
+        },
+  );
+
+  return { created: rows.length - existing.size, merged: existing.size, ops };
+}
+
 /** Applies a fully-resolved backup import plan: tags and threads first, then people (their tagIds
     rewritten through the fresh tagIdMap), then entries (rewritten through all three maps) — each
     step needs the id map(s) the previous one produced. Threads only have to precede entries, since
@@ -1525,6 +1648,7 @@ export async function importBackup(plan: BackupImportPlan): Promise<BackupImport
   );
   // Last, and independent of the id maps above: plugin rows reference nothing the others own.
   const pluginResult = await importPluginRecords(plan.pluginRecords);
+  const documentResult = await importPluginDocuments(plan.pluginDocuments);
 
   /* `tolerate404` on every op: a backup is a snapshot of how things were, and restoring one onto an
      account that has moved on legitimately references people, entries and threads the server has
@@ -1538,6 +1662,7 @@ export async function importBackup(plan: BackupImportPlan): Promise<BackupImport
       ...peopleResult.ops,
       ...entriesResult.ops,
       ...pluginResult.ops,
+      ...documentResult.ops,
     ].map((op) => ({ ...op, tolerate404: true })),
   );
 
@@ -1552,5 +1677,6 @@ export async function importBackup(plan: BackupImportPlan): Promise<BackupImport
       orphaned: entriesResult.orphaned,
     },
     pluginRecords: { created: pluginResult.created, merged: pluginResult.merged },
+    pluginDocuments: { created: documentResult.created, merged: documentResult.merged },
   };
 }

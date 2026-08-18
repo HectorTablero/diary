@@ -2,6 +2,7 @@ import type {
   EntryDto,
   PersonDto,
   PersonEventDto,
+  PluginDocumentDto,
   PluginRecordDto,
   SaidMark,
   TagDto,
@@ -110,6 +111,11 @@ export const db = new Dexie('diary') as Dexie & {
   /* Stored as the DTO, like tags and threads: a plugin record references nothing, so there is
      nothing to normalize and no join to keep fresh on rename. */
   pluginRecords: EntityTable<PluginRecordDto, 'id'>;
+  /* Also the DTO — but *not* for the reason above. A document's body does carry references: the
+     `@Name` text a person mention leaves behind, exactly as denormalized as entry.content is. It is
+     kept fresh the same way, by renamePerson rewriting the text (see mutations.ts), which is the one
+     thing a normalized id column would have made unnecessary and a plugin-owned blob impossible. */
+  pluginDocuments: EntityTable<PluginDocumentDto, 'id'>;
   outbox: EntityTable<OutboxOp, 'seq'>;
   deadLetter: EntityTable<DeadLetterOp, 'id'>;
   meta: EntityTable<MetaRow, 'key'>;
@@ -249,6 +255,33 @@ db.version(6).stores({
   meta: 'key',
 });
 
+/* v7 adds the plugin-document table: prose, and one row per day it changed. No `.upgrade()` — like
+   v5 and v6 it starts empty, and there is nothing in an older database to backfill from.
+
+   The three compound indexes, and the query each exists for:
+     - `[pluginId+dateKey]` answers both row shapes at once. Equal to `[id, '']` it is every
+       document; equal to `[id, '2026-08-18']` it is every revision written that day, which is what
+       the day widget and the calendar heatmap read.
+     - `[pluginId+dateKey+parentId]` is one document's children. The `dateKey` in the middle is not
+       redundant: revisions carry `parentId: ''` too, so without it a query for the *roots* would
+       return every revision in the notebook alongside them.
+     - `[documentId+dateKey]` is one document's history in date order — the patch chain, replayed
+       oldest-first to reconstruct any past day.
+   Bodies are large, so no read here is allowed to be "load them all and filter"; each of the three
+   is the index that keeps one screen from being proportional to the whole notebook. */
+db.version(7).stores({
+  entries: 'id, dateKey, parentId, *tagIds, *peopleIds, *threadIds',
+  people: 'id, name, *aliases, contactId',
+  tags: 'id, name',
+  threads: 'id, name',
+  pluginRecords: 'id, pluginId, scope, [pluginId+dateKey], [pluginId+scope]',
+  pluginDocuments:
+    'id, pluginId, dateKey, [pluginId+dateKey], [pluginId+dateKey+parentId], [documentId+dateKey]',
+  outbox: '++seq',
+  deadLetter: '++id, failedAt',
+  meta: 'key',
+});
+
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
   content: dto.content,
@@ -328,6 +361,7 @@ export async function clearLocalData(): Promise<void> {
       db.tags,
       db.threads,
       db.pluginRecords,
+      db.pluginDocuments,
       db.outbox,
       db.deadLetter,
       db.meta,
@@ -339,6 +373,7 @@ export async function clearLocalData(): Promise<void> {
         db.tags.clear(),
         db.threads.clear(),
         db.pluginRecords.clear(),
+        db.pluginDocuments.clear(),
         db.outbox.clear(),
         db.deadLetter.clear(),
         db.meta.clear(),

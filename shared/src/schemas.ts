@@ -20,6 +20,9 @@ import {
   normalizeBirthday,
   MAX_PLUGIN_DATA_BYTES,
   MAX_PLUGIN_DATA_DEPTH,
+  MAX_PLUGIN_DOCUMENT_BYTES,
+  MAX_PLUGIN_DOCUMENT_TITLE_LENGTH,
+  NO_PARENT_KEY,
   OBJECT_ID_REGEX,
   PLUGIN_ID_REGEX,
   UNDATED_KEY,
@@ -252,6 +255,50 @@ export const pluginRecordUpdateSchema = z.object({
   data: pluginDataSchema.optional(),
 });
 
+// --- Plugin documents ---
+
+/* One encoder, reused. `length` is UTF-16 code units and the cap is bytes: for the Japanese and
+   Chinese locales this app ships in, the two differ by a factor of three, so measuring the wrong
+   one would silently give some users a third of the document the cap promises. */
+const encoder = new TextEncoder();
+
+const pluginDocumentBodySchema = z
+  .string()
+  .refine((body) => encoder.encode(body).length <= MAX_PLUGIN_DOCUMENT_BYTES, {
+    message: `body: larger than ${MAX_PLUGIN_DOCUMENT_BYTES} bytes`,
+  });
+
+/* An id or the empty sentinel, for the two fields that are a link on one row shape and unused on
+   the other. `''` rather than null for the reason NO_PARENT_KEY exists: both sit in Dexie compound
+   indexes on the client, and IndexedDB cannot index null. */
+const optionalIdSchema = z.union([objectIdSchema, z.literal(NO_PARENT_KEY)]);
+
+export const pluginDocumentCreateSchema = z.object({
+  id: objectIdSchema.optional(),
+  createdAt: isoDateTimeSchema.optional(),
+  pluginId: pluginIdSchema,
+  dateKey: pluginDateKeySchema.default(UNDATED_KEY),
+  documentId: optionalIdSchema.default(NO_PARENT_KEY),
+  parentId: optionalIdSchema.default(NO_PARENT_KEY),
+  title: z.string().max(MAX_PLUGIN_DOCUMENT_TITLE_LENGTH).default(''),
+  body: pluginDocumentBodySchema.default(''),
+  sortKey: z.string().max(64).default(''),
+  added: z.number().int().min(0).default(0),
+  removed: z.number().int().min(0).default(0),
+});
+
+/* `pluginId`, `dateKey` and `documentId` are absent for the same reason `scope` is absent above:
+   together they are which row this is — a document or one day of one — not what it holds. A row
+   that could change `dateKey` could turn a document into a revision of itself. */
+export const pluginDocumentUpdateSchema = z.object({
+  parentId: optionalIdSchema.optional(),
+  title: z.string().max(MAX_PLUGIN_DOCUMENT_TITLE_LENGTH).optional(),
+  body: pluginDocumentBodySchema.optional(),
+  sortKey: z.string().max(64).optional(),
+  added: z.number().int().min(0).optional(),
+  removed: z.number().int().min(0).optional(),
+});
+
 // --- Settings ---
 
 const halfLifeRange = z.number().min(1).max(3650);
@@ -327,5 +374,7 @@ export type ThreadCreateInput = z.infer<typeof threadCreateSchema>;
 export type ThreadUpdateInput = z.infer<typeof threadUpdateSchema>;
 export type PluginRecordCreateInput = z.infer<typeof pluginRecordCreateSchema>;
 export type PluginRecordUpdateInput = z.infer<typeof pluginRecordUpdateSchema>;
+export type PluginDocumentCreateInput = z.infer<typeof pluginDocumentCreateSchema>;
+export type PluginDocumentUpdateInput = z.infer<typeof pluginDocumentUpdateSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
 export type AiSuggestionsRequestInput = z.infer<typeof aiSuggestionsRequestSchema>;

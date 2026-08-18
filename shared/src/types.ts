@@ -261,7 +261,66 @@ export interface PluginRecordDto {
   updatedAt: string;
 }
 
-export type SyncCollection = 'entry' | 'person' | 'tag' | 'thread' | 'pluginRecord';
+/**
+ * One row of the plugin-document collection: either a document or one day's revision of one.
+ *
+ * **Two row shapes, told apart by `dateKey`** — the same idiom habits uses inside pluginRecord:
+ *
+ * | | document | revision |
+ * | --- | --- | --- |
+ * | `dateKey` | `''` (UNDATED_KEY) | `YYYY-MM-DD` |
+ * | `documentId` | `''` | the document it belongs to |
+ * | `body` | the current full text | the patch that produces that day's text |
+ * | `title`, `parentId`, `sortKey` | used | `''` |
+ * | `added` | `0` | net characters added that day |
+ *
+ * The alternative was two collections, which is two models, two routes, two sync branches and two
+ * Dexie tables to express one relationship.
+ *
+ * ## What the server does and does not know
+ *
+ * It knows `body` is text, which is the whole reason this collection exists rather than a bigger
+ * `pluginRecord`: a typed text field is one the *app* can rewrite `@mentions` in when a person is
+ * renamed, without loading the plugin that owns it. It does not know what the text means, does not
+ * parse the patch format, and does not walk `parentId` — the tree is the client's, and a cycle or an
+ * over-deep move is refused there.
+ */
+export interface PluginDocumentDto {
+  id: string;
+  pluginId: string;
+  /** UNDATED_KEY (`''`) on a document; `YYYY-MM-DD` on a revision. The discriminator. */
+  dateKey: string;
+  /** Revisions only: the document this is a revision of. `''` on a document row. */
+  documentId: string;
+  /** Documents only: the parent in the tree, or `''` for a root. */
+  parentId: string;
+  /** Documents only. May be empty — the client falls back to the body's first line. */
+  title: string;
+  /** A document's current text, or a revision's encoded patch. Never inspected by the server. */
+  body: string;
+  /** Documents only: fractional index among siblings, the same scheme entries sort by. */
+  sortKey: string;
+  /**
+   * Revisions only: characters written that day, and characters taken out.
+   *
+   * Both are stored rather than derived, because a forward patch cannot answer the second one on its
+   * own — it records how many lines were dropped, not what was in them — so recovering `removed`
+   * would mean reconstructing the previous day's text. The calendar shades a month by `added` and
+   * the day card reports both, and neither may cost a replay of a patch chain.
+   *
+   * Counted at line granularity, the same granularity the patch and the history view use: a
+   * reworded line counts as its old length removed and its new length added. That reads high next
+   * to a naive character count and is the truthful answer to "how much writing happened here",
+   * which is what both surfaces are asking.
+   */
+  added: number;
+  removed: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SyncCollection =
+  'entry' | 'person' | 'tag' | 'thread' | 'pluginRecord' | 'pluginDocument';
 
 export interface SyncDeletion {
   coll: SyncCollection;
@@ -295,6 +354,8 @@ export interface SyncResponse {
    * collection rather than running it — see the `acknowledged` set in web/src/db/sync.ts.
    */
   pluginRecords: PluginRecordDto[];
+  /** Always present, even when empty — for exactly the reason spelled out above `pluginRecords`. */
+  pluginDocuments: PluginDocumentDto[];
   settings: SettingsDto;
   deletions: SyncDeletion[];
 }

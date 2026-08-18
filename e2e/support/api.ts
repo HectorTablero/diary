@@ -178,6 +178,9 @@ export async function installApiMock(
       tags: state.tags,
       threads: state.threads,
       pluginRecords: state.pluginRecords,
+      // Never omitted when empty: under `reset` the client deletes every local id the response
+      // did not name, so "absent" and "none" must not look alike. See SyncResponse.
+      pluginDocuments: [],
       settings: state.settings,
       // A reset carries no tombstones — the ids it omits *are* the deletions.
       deletions: reset ? [] : state.deletions,

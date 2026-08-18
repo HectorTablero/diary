@@ -1,4 +1,4 @@
-import { CircleCheckBig, Droplet, type LucideIcon } from 'lucide-react';
+import { CircleCheckBig, Droplet, NotebookPen, type LucideIcon } from 'lucide-react';
 import type { PluginModule, PluginSurface } from './types';
 
 /**
@@ -84,6 +84,13 @@ export const PLUGINS: readonly PluginManifest[] = [
       'widget',
       'onboarding',
     ],
+    /* The violet every plugin used to share, now stated rather than inherited. Same values as
+       PLUGIN_HEATMAP_RGB in pages/CalendarPage — deliberately repeated rather than imported, since
+       this file is reachable from the entry chunk and importing a page module here would drag the
+       calendar page in front of everyone's first paint (rule 1). With a second and a third plugin
+       declaring hues, leaving one to fall through to the default made habits' colour the only one
+       that would change if the default were ever retuned for something else. */
+    hue: { light: '124, 58, 237', dark: '196, 165, 255' },
     load: () => import('./habits'),
   },
   {
@@ -97,6 +104,19 @@ export const PLUGINS: readonly PluginManifest[] = [
     // entries heatmap's own five colours are, further down this file's CalendarPage counterpart.
     hue: { light: '220, 38, 38', dark: '248, 113, 113' },
     load: () => import('./period-tracker'),
+  },
+  {
+    id: 'notebook',
+    icon: NotebookPen,
+    surfaces: ['day', 'page', 'export', 'calendar', 'onboarding'],
+    // Below both of the others: habits and a period are about the day being looked at, and the
+    // notebook's card is a prompt and a set of links rather than something to record.
+    dayOrder: 1,
+    /* Green, and specifically the green of a contribution graph — the calendar view shades by
+       characters written per day, so it is the one plugin view that genuinely is one. Tailwind's
+       green-600/green-400, matching the light/dark split the period tracker's red uses. */
+    hue: { light: '22, 163, 74', dark: '74, 222, 128' },
+    load: () => import('./notebook'),
   },
 ];
 

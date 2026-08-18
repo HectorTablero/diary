@@ -141,8 +141,8 @@ describe('the envelope', () => {
     settings: DEFAULT_SETTINGS,
   };
 
-  it('is written at version 3', () => {
-    expect(BACKUP_VERSION).toBe(3);
+  it('is written at version 4', () => {
+    expect(BACKUP_VERSION).toBe(4);
   });
 
   it('still reads a version 2 file, as a diary with no plugin data', () => {

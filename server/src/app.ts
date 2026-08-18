@@ -27,6 +27,7 @@ import { peopleRouter } from './routes/people';
 import { settingsRouter } from './routes/settings';
 import { syncRouter } from './routes/sync';
 import { tagsRouter } from './routes/tags';
+import { pluginDocumentsRouter } from './routes/pluginDocuments';
 import { pluginRecordsRouter } from './routes/pluginRecords';
 import { threadsRouter } from './routes/threads';
 
@@ -143,6 +144,9 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   /* Flat, not nested under a plugin id — see the note at the top of routes/pluginRecords.ts: the
      client's dirty-id tracking reads the second path segment as the document id. */
   api.route('/plugin-records', pluginRecordsRouter);
+  // Flat for the same reason, and it matters more here: a document delete is queued offline with no
+  // body at all, so the id has to be findable in the path.
+  api.route('/plugin-documents', pluginDocumentsRouter);
   api.route('/settings', settingsRouter);
   api.route('/sync', syncRouter);
   // DELETE only: erases the diary and the account behind it. See routes/account.ts.

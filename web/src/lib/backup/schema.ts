@@ -102,20 +102,45 @@ export const pluginRecordRowSchema = z.object({
   updatedAt: isoDateTimeSchema,
 });
 
-/** What buildBackupEnvelope writes. 2 when threads arrived, 3 when plugins did. */
-export const BACKUP_VERSION = 3;
+/**
+ * One plugin document or one day's revision of one, as it sits in Dexie.
+ *
+ * Same posture as the row above — the importer validates the shape the collection guarantees and
+ * nothing about what the text means. It is the more important of the two to get into a backup: a
+ * plugin record can usually be reconstructed by doing the thing again, and a document is prose
+ * somebody wrote once.
+ */
+export const pluginDocumentRowSchema = z.object({
+  id: objectIdSchema,
+  pluginId: z.string().regex(PLUGIN_ID_REGEX, 'invalid plugin id'),
+  dateKey: z.union([dateKeySchema, z.literal(UNDATED_KEY)]),
+  documentId: z.union([objectIdSchema, z.literal('')]),
+  parentId: z.union([objectIdSchema, z.literal('')]),
+  title: z.string(),
+  body: z.string(),
+  sortKey: z.string(),
+  added: z.number(),
+  removed: z.number(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+/** What buildBackupEnvelope writes. 2 when threads arrived, 3 when plugins did, 4 when plugins
+    gained documents. */
+export const BACKUP_VERSION = 4;
 
 export const backupEnvelopeSchema = z.object({
-  /* Older files still import. Version 1 predates threads and version 2 predates plugins; both
-     default to empty, so an older file restores as a diary without those things rather than
-     refusing to load at all. */
-  version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  /* Older files still import. Version 1 predates threads, 2 predates plugins and 3 predates plugin
+     documents; each missing array defaults to empty, so an older file restores as a diary without
+     those things rather than refusing to load at all. */
+  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   exportedAt: isoDateTimeSchema,
   entries: z.array(localEntrySchema),
   people: z.array(localPersonSchema),
   tags: z.array(tagRowSchema),
   threads: z.array(threadRowSchema).default([]),
   pluginRecords: z.array(pluginRecordRowSchema).default([]),
+  pluginDocuments: z.array(pluginDocumentRowSchema).default([]),
   settings: settingsSchema,
 });
 
@@ -124,4 +149,5 @@ export type PersonBackupRow = z.infer<typeof localPersonSchema>;
 export type TagBackupRow = z.infer<typeof tagRowSchema>;
 export type ThreadBackupRow = z.infer<typeof threadRowSchema>;
 export type PluginRecordBackupRow = z.infer<typeof pluginRecordRowSchema>;
+export type PluginDocumentBackupRow = z.infer<typeof pluginDocumentRowSchema>;
 export type BackupEnvelope = z.infer<typeof backupEnvelopeSchema>;

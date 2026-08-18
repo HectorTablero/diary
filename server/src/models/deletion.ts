@@ -8,7 +8,7 @@ const deletionSchema = new Schema({
   coll: {
     type: String,
     required: true,
-    enum: ['entry', 'person', 'tag', 'thread', 'pluginRecord'],
+    enum: ['entry', 'person', 'tag', 'thread', 'pluginRecord', 'pluginDocument'],
   },
   docId: { type: Schema.Types.ObjectId, required: true },
   deletedAt: { type: Date, required: true, default: Date.now },

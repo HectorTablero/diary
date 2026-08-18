@@ -215,7 +215,7 @@ export const MAX_PLUGIN_RECORDS_PER_PLUGIN = 20_000;
 export const MAX_PLUGIN_DATA_BYTES = 4096;
 
 /** How deep a `data` blob may nest. Plugin data is settings and per-day values; anything deeper is
-    a document, and documents belong in entries. */
+    a document, and documents belong in the pluginDocument collection below. */
 export const MAX_PLUGIN_DATA_DEPTH = 3;
 
 /** The sentinel `dateKey` for a row that isn't about a particular day.
@@ -225,6 +225,49 @@ export const MAX_PLUGIN_DATA_DEPTH = 3;
  * row out of Dexie's `[pluginId+dateKey]` index — the row would exist, and every query through that
  * index would behave as though it did not. `''` is a valid key and sorts before every real date. */
 export const UNDATED_KEY = '';
+
+/* --- Plugin documents --------------------------------------------------------------------------
+
+   The second plugin collection, and the one exception to "adding a plugin is a client-only change".
+
+   `pluginRecord` above is deliberately hostile to documents: 4 KB, depth 3, one opaque blob the
+   server never reads. That is right for settings and per-day values and wrong for prose, and no
+   amount of raising the cap fixes the part that actually matters — a row carrying a whole document
+   is the one shape where last-write-wins destroys something a person spent an evening on.
+
+   So documents get their own collection, with two properties `pluginRecord` cannot have:
+
+   1. **Typed, not opaque.** `body` is a known string field rather than a Mixed blob, which is what
+      lets the app rewrite `@mentions` inside it when a person is renamed *without loading the
+      owning plugin* — see renamePerson in web/src/db/mutations.ts. A rename must reach a disabled
+      plugin's prose, and nothing that loads plugin code could do that.
+   2. **History as rows, not as a field.** A revision is its own row, so two devices writing on two
+      days write two rows and neither can clobber the other. Only same-day edits collide, and the
+      unique index below turns that into the ordinary 409-on-create the whole app already converges
+      through.
+
+   Kept to *one* collection with two row shapes, told apart by `dateKey` — the same idiom the habits
+   plugin uses within pluginRecord — because two collections would be two models, two routes, two
+   sync branches and two Dexie tables to say one thing. */
+
+/** Byte cap on one document's `body`, measured on the UTF-8 encoding rather than on `length`: the
+    cost is bytes stored and bytes synced, and a Japanese document is three times its length. */
+export const MAX_PLUGIN_DOCUMENT_BYTES = 262_144;
+
+/** Rows one account may hold for one plugin, documents and revisions together. Revisions are the
+    half that grows on its own, at most one per document per day. */
+export const MAX_PLUGIN_DOCUMENT_ROWS_PER_PLUGIN = 50_000;
+
+/** A title is a tree label, not content — anything longer belongs in the body. */
+export const MAX_PLUGIN_DOCUMENT_TITLE_LENGTH = 120;
+
+/** How deep the document tree may nest. Enforced on the client, which is the only side that knows
+    the tree: the server sees `parentId` as an opaque string and never walks it. */
+export const MAX_PLUGIN_DOCUMENT_DEPTH = 8;
+
+/** The sentinel `parentId`/`documentId` for "no such link", for the same indexing reason as
+    UNDATED_KEY: IndexedDB cannot index null, and both fields sit in compound indexes. */
+export const NO_PARENT_KEY = '';
 
 /** `YYYY-MM-DD`, or vCard-style `--MM-DD` when the year is unknown — phone contacts very
     often store a birthday without one, so the year can never be required.

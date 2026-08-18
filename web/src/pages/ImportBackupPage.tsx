@@ -390,7 +390,17 @@ export default function ImportBackupPage() {
         pluginConflicts,
         pluginResolutions,
       );
-      const summary = await importBackup({ tags, threads, people, entries, pluginRecords });
+      /* Restored wholesale, with no review section of their own. The choice next door exists
+         because a plugin's `config` row switches that plugin on across every device — a document
+         changes nothing outside the plugin that owns it, so there is nothing to ask about. */
+      const summary = await importBackup({
+        tags,
+        threads,
+        people,
+        entries,
+        pluginRecords,
+        pluginDocuments: envelope?.pluginDocuments ?? [],
+      });
 
       /* Everything is now safely in Dexie, so nothing below can lose it — but it is still only on
          this device, and that is not what someone restoring a backup means by "done". Push, and

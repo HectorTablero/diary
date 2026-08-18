@@ -8,6 +8,7 @@ import { trackEvent, userHash } from '../lib/telemetry';
 import { Deletion, isCursorStale } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
+import { PluginDocument } from '../models/pluginDocument';
 import { PluginRecord } from '../models/pluginRecord';
 import { Tag } from '../models/tag';
 import { Thread } from '../models/thread';
@@ -17,11 +18,13 @@ import {
   ENTRY_POPULATE,
   entryToDto,
   personToDto,
+  pluginDocumentToDto,
   pluginRecordToDto,
   tagToDto,
   threadToDto,
   type LeanEntry,
   type LeanPerson,
+  type LeanPluginDocument,
   type LeanPluginRecord,
   type LeanTag,
   type LeanThread,
@@ -56,22 +59,26 @@ export const syncRouter = new Hono<AppEnv>()
     const changedSince = reset ? {} : { updatedAt: { $gt: cursor } };
 
     const queryStartedAt = performance.now();
-    const [entries, people, tags, threads, pluginRecords, settings, deletions] = await Promise.all([
-      Entry.find({ userId, ...changedSince })
-        .populate(ENTRY_POPULATE)
-        .lean(),
-      Person.find({ userId, ...changedSince })
-        .populate(PERSON_POPULATE)
-        .lean(),
-      Tag.find({ userId, ...changedSince }).lean(),
-      Thread.find({ userId, ...changedSince }).lean(),
-      /* The one collection whose delta is served by a real index on updatedAt rather than a
-         userId-prefix scan — see the note on the index in models/pluginRecord. */
-      PluginRecord.find({ userId, ...changedSince }).lean(),
-      getSettings(userId),
-      // A full state names every doc that exists; the ones it doesn't name are the deletions.
-      reset ? Promise.resolve([]) : Deletion.find({ userId, deletedAt: { $gt: cursor } }).lean(),
-    ]);
+    const [entries, people, tags, threads, pluginRecords, pluginDocuments, settings, deletions] =
+      await Promise.all([
+        Entry.find({ userId, ...changedSince })
+          .populate(ENTRY_POPULATE)
+          .lean(),
+        Person.find({ userId, ...changedSince })
+          .populate(PERSON_POPULATE)
+          .lean(),
+        Tag.find({ userId, ...changedSince }).lean(),
+        Thread.find({ userId, ...changedSince }).lean(),
+        /* The two collections whose deltas are served by a real index on updatedAt rather than a
+           userId-prefix scan — see the note on the index in models/pluginRecord, which applies to
+           documents for the same reason and rather more strongly: a revision row per document per
+           day outgrows a diary faster than a habit row per day does. */
+        PluginRecord.find({ userId, ...changedSince }).lean(),
+        PluginDocument.find({ userId, ...changedSince }).lean(),
+        getSettings(userId),
+        // A full state names every doc that exists; the ones it doesn't name are the deletions.
+        reset ? Promise.resolve([]) : Deletion.find({ userId, deletedAt: { $gt: cursor } }).lean(),
+      ]);
 
     const queryMs = Math.round(performance.now() - queryStartedAt);
 
@@ -98,6 +105,10 @@ export const syncRouter = new Hono<AppEnv>()
         tags: tags.length,
         threads: threads.length,
         plugin_records: pluginRecords.length,
+        /* Reported separately from plugin_records, not folded in. A reset's cost is bytes as much as
+           rows here — one document row can be a quarter of a megabyte, where a record row is capped
+           at four kilobytes — so a count that mixed the two would hide the expensive half. */
+        plugin_documents: pluginDocuments.length,
         query_ms: queryMs,
       });
     } else if (queryMs >= 250) {
@@ -107,7 +118,12 @@ export const syncRouter = new Hono<AppEnv>()
         user: userHash(userId),
         query_ms: queryMs,
         changed:
-          entries.length + people.length + tags.length + threads.length + pluginRecords.length,
+          entries.length +
+          people.length +
+          tags.length +
+          threads.length +
+          pluginRecords.length +
+          pluginDocuments.length,
         deletions: deletions.length,
       });
     }
@@ -124,6 +140,11 @@ export const syncRouter = new Hono<AppEnv>()
          absence as emptiness would delete the account's entire plugin history. The client's own
          tolerance for a server that predates this field is to skip the sweep, not to run it. */
       pluginRecords: (pluginRecords as unknown as LeanPluginRecord[]).map(pluginRecordToDto),
+      /* Always sent, never omitted when empty — for the reason spelled out on pluginRecords just
+         above, which applies to every collection added after a client shipped. */
+      pluginDocuments: (pluginDocuments as unknown as LeanPluginDocument[]).map(
+        pluginDocumentToDto,
+      ),
       settings,
       deletions: (deletions as unknown as LeanDeletion[]).map((d) => ({
         coll: d.coll,

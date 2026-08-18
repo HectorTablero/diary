@@ -1,5 +1,6 @@
 import i18n from 'i18next';
 import * as mutations from '@/db/mutations';
+import { restorePluginDocuments, type PluginDocumentDeletion } from '@/db/pluginDocuments';
 import { notifyError, notifySuccess } from './notify';
 import { queryClient } from './queryClient';
 
@@ -9,7 +10,12 @@ export type Deletion =
   | mutations.PersonDeletion
   | mutations.TagDeletion
   | mutations.ThreadDeletion
-  | mutations.EventDeletion;
+  | mutations.EventDeletion
+  /* The one kind a *plugin* raises. It belongs here rather than in the plugin because the
+     collection does: `pluginDocument` is a core table with a typed body (it is swept on rename —
+     see renamePersonMentionsInDocuments), so restoring one needs no knowledge of which plugin wrote
+     it, and any later plugin storing documents gets undo without touching this file again. */
+  | PluginDocumentDeletion;
 
 /** One dispatch point, so a call site only has to hand over what its delete returned. */
 async function restore(deletion: Deletion): Promise<void> {
@@ -25,6 +31,8 @@ async function restore(deletion: Deletion): Promise<void> {
     case 'event':
       await mutations.restoreEvent(deletion);
       return;
+    case 'pluginDocument':
+      return restorePluginDocuments(deletion);
   }
 }
 
