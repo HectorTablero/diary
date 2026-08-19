@@ -10,7 +10,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
-import { diffView } from './history';
+import { diffView, hasChanges } from './history';
+import { ProseDiff } from './ProseDiff';
 import { useDocumentHistory } from './useNotebook';
 
 /**
@@ -44,7 +45,7 @@ export function HistoryDialog({
   const toIndex = selected ?? days.length - 1;
   const fromIndex = toIndex - 1;
 
-  const lines = useMemo(() => {
+  const blocks = useMemo(() => {
     if (toIndex < 0) return [];
     return diffView(fromIndex >= 0 ? days[fromIndex].text : '', days[toIndex].text);
   }, [days, fromIndex, toIndex]);
@@ -135,33 +136,16 @@ export function HistoryDialog({
                       date: formatDateKey(days[toIndex].dateKey, i18n.language, 'PP'),
                     })}
               </p>
-              {lines.length === 0 ? (
+              {hasChanges(blocks) ? (
+                <ProseDiff blocks={blocks} className="p-3" />
+              ) : (
+                /* A day can legitimately have changed nothing — an edit typed and undone leaves its
+                   revision in place, rewritten to say so. Showing the whole document as unchanged
+                   context would be a screen of prose whose answer to "what changed that day" is
+                   buried in the fact that nothing is marked. */
                 <p className="p-3 text-sm text-muted-foreground">
                   {t('plugins.notebook.diffNoChange')}
                 </p>
-              ) : (
-                <div className="p-1 font-mono text-xs leading-6">
-                  {lines.map((line, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        'flex gap-2 rounded px-2 whitespace-pre-wrap',
-                        line.kind === 'added' &&
-                          'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                        line.kind === 'removed' && 'bg-destructive/10 text-destructive',
-                        line.kind === 'context' && 'text-muted-foreground',
-                      )}
-                    >
-                      {/* The gutter is aria-hidden: "+" and "−" are how a sighted reader sees which
-                          side a line is on, and reading them aloud in front of every line would bury
-                          the prose the screen was opened for. */}
-                      <span aria-hidden className="shrink-0 select-none opacity-60">
-                        {line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '}
-                      </span>
-                      <span className="min-w-0 flex-1">{line.text || ' '}</span>
-                    </div>
-                  ))}
-                </div>
               )}
             </div>
           </div>

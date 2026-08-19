@@ -33,6 +33,7 @@
   "diffBetween": "{{from}} → {{to}}",
   "diffFirstDay": "{{date}} に書き始めました",
   "diffNoChange": "この 2 日の間に変わったところはありません。",
+  "diffUnchangedHidden": "変更のない部分は省略されています",
   "move": "移動先…",
   "moveTitle": "ドキュメントを移動",
   "moveDescription": "「{{name}}」の置き場所を選んでください。中身もすべて一緒に移動します。",
