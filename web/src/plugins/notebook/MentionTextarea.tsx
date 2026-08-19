@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { detectActiveToken, fuzzyIncludes } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
+import { caretOffset } from './caret';
 
 /**
  * The notebook's writing surface: a plain textarea with `@person` and `[[document]]` autocomplete.
@@ -29,60 +30,9 @@ import { cn } from '@/lib/utils';
  *
  * A composer can hang its suggestions off the bottom edge, because the caret is never more than a
  * line or two away from it. In a full-page document the bottom edge can be a screen and a half
- * below what you are typing, so the list is positioned at the caret instead — measured by laying the
- * text out in a mirror div, which is the only way to ask a textarea where its caret actually is.
+ * below what you are typing, so the list is positioned at the caret instead — measured by
+ * `caretOffset` in caret.ts, which is the only way to ask a textarea where its caret actually is.
  */
-
-/** The properties a mirror must copy for its line breaks to fall where the textarea's do. */
-const MIRRORED_STYLES = [
-  'font-family',
-  'font-size',
-  'font-weight',
-  'font-style',
-  'letter-spacing',
-  'line-height',
-  'text-indent',
-  'text-transform',
-  'padding-top',
-  'padding-right',
-  'padding-bottom',
-  'padding-left',
-  'border-top-width',
-  'border-right-width',
-  'border-bottom-width',
-  'border-left-width',
-  'box-sizing',
-] as const;
-
-/** Where the caret sits inside the textarea's box, in CSS pixels, scroll accounted for. */
-function caretOffset(textarea: HTMLTextAreaElement, index: number): { top: number; left: number } {
-  const mirror = document.createElement('div');
-  const computed = window.getComputedStyle(textarea);
-  for (const property of MIRRORED_STYLES) {
-    mirror.style.setProperty(property, computed.getPropertyValue(property));
-  }
-  mirror.style.position = 'absolute';
-  mirror.style.top = '0';
-  mirror.style.left = '-9999px';
-  mirror.style.visibility = 'hidden';
-  mirror.style.whiteSpace = 'pre-wrap';
-  mirror.style.overflowWrap = 'break-word';
-  mirror.style.width = `${textarea.clientWidth}px`;
-
-  mirror.textContent = textarea.value.slice(0, index);
-  const marker = document.createElement('span');
-  /* The rest of the text goes *inside* the marker so the marker wraps exactly as the real text
-     does. Without it a caret at the end of a line would measure at the start of the next one. A
-     full stop stands in for an empty tail, since a zero-width span has no position to report. */
-  marker.textContent = textarea.value.slice(index) || '.';
-  mirror.appendChild(marker);
-
-  document.body.appendChild(mirror);
-  const top = marker.offsetTop - textarea.scrollTop;
-  const left = marker.offsetLeft;
-  mirror.remove();
-  return { top, left };
-}
 
 /** The `[[` trigger — see the note above on why this lives here rather than in `lib/tokens.ts`. Stays
     active through everything but `[` or `]`, so `[[Ana` keeps suggesting while `[[Ana]]` (closed by

@@ -215,6 +215,14 @@ Three decisions are worth knowing before touching it:
   recorded when it started editing — `git push`, rejected, pull, merge, push. Edits to different
   sentences simply combine; when both devices rewrote the same sentence, both versions are kept and
   a toast says so. `db/pluginDocumentMerge.ts` and `lib/textMerge.ts`.
+- **The line you are writing stays near the middle of the screen.** A browser scrolls a caret into
+  view _minimally_, which in a full-page editor means writing along the bottom edge — a few pixels
+  above the keyboard on a phone — with everything you have written above you and nothing below. So
+  the page follows the caret a line at a time, like a typewriter, holding it at 42% of whatever is
+  actually visible (`visualViewport` minus the tab bar, both measured rather than assumed). The last
+  line of a document is the case scrolling alone cannot fix — there is nothing below it to bring
+  into view — so the editor asks for exactly the blank space it is short of, and drops it again on
+  blur. `caret.ts` holds the rule and `useCaretCentering.ts` the plumbing.
 - **`@mentions` work, `#tags` don't.** `@Ana` in a thought means what it means in an entry — matched
   by name through the app's own `lib/tokens`, resolved on read, rewritten by core on rename. `#` is
   left alone because it is a Markdown heading here, and the notebook has no tags.

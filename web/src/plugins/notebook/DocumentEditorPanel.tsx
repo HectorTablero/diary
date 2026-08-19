@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { documentLabel, NOTEBOOK_PLUGIN_ID } from './model';
 import { MarkdownView } from './MarkdownView';
 import { MentionTextarea } from './MentionTextarea';
+import { useCaretCentering } from './useCaretCentering';
 import { useDocumentEditor } from './useNotebook';
 
 /**
@@ -60,6 +61,11 @@ export function DocumentEditorPanel({
     onDiscarded,
   );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /* Writing happens at the end of a document, and the end of a document is the bottom of the page —
+     so a browser left to itself keeps the caret on the last visible line, with the sentence being
+     written pinned against the keyboard. This holds it near the middle instead, and asks for the
+     blank space below that centring the *last* line needs. See useCaretCentering. */
+  const caretSpacer = useCaretCentering(textareaRef, !preview);
 
   /* Every other document, for `[[` autocomplete — but only once `[[` is actually typed. Loading the
      whole tree is otherwise reserved for the move picker and the export (see the docstrings on
@@ -147,6 +153,12 @@ export function DocumentEditorPanel({
       <p aria-live="polite" className="h-4 text-xs text-destructive">
         {tooLong ? t('plugins.notebook.tooLong', { over: bytes - MAX_PLUGIN_DOCUMENT_BYTES }) : ''}
       </p>
+
+      {/* Room to scroll the last line of the document up to the middle of the screen, and nothing
+          else: zero unless the caret is somewhere the page cannot reach, and gone the moment the
+          box loses focus. Last, so the size warning above it never ends up below a screenful of
+          nothing. Untabbable and unspoken — there is nothing here to read or to reach. */}
+      {caretSpacer > 0 && <div aria-hidden style={{ height: caretSpacer }} />}
     </div>
   );
 }
