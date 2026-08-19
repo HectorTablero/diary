@@ -28,6 +28,7 @@
     "pausedPending": "Wi-Fi を待っています · 変更{{count}}件",
     "syncAnyway": "今すぐ同期",
     "rejected": "{{count}}件の変更を保存できませんでした",
+    "merged": "2台の端末で編集されました。{{count}}箇所で両方の版を残しました",
     "sessionExpired": "セッションの有効期限が切れました。",
     "reconnected": "接続が回復しました — 同期しています…"
   },

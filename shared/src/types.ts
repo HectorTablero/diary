@@ -304,14 +304,16 @@ export interface PluginDocumentDto {
    * Revisions only: characters written that day, and characters taken out.
    *
    * Both are stored rather than derived, because a forward patch cannot answer the second one on its
-   * own — it records how many lines were dropped, not what was in them — so recovering `removed`
+   * own — it records how many units were dropped, not what was in them — so recovering `removed`
    * would mean reconstructing the previous day's text. The calendar shades a month by `added` and
    * the day card reports both, and neither may cost a replay of a patch chain.
    *
-   * Counted at line granularity, the same granularity the patch and the history view use: a
-   * reworded line counts as its old length removed and its new length added. That reads high next
-   * to a naive character count and is the truthful answer to "how much writing happened here",
-   * which is what both surfaces are asking.
+   * Counted at sentence granularity, the same granularity the patch and the history view use: a
+   * reworded sentence counts as its old length removed and its new length added. That reads a
+   * little high next to a naive character count and is the truthful answer to "how much writing
+   * happened here", which is what both surfaces are asking. Rows written before the diff moved from
+   * lines to sentences counted a reworded *paragraph* the same way, so a figure from an old day can
+   * read several times larger than the same edit would today.
    */
   added: number;
   removed: number;

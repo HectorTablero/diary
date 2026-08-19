@@ -7,6 +7,7 @@ import {
 } from '@diary/shared';
 import { db } from './db';
 import { enqueue, enqueueBatch } from './outbox';
+import { forgetDocumentBases, rememberDocumentBase } from './pluginDocumentMerge';
 
 /**
  * Read and write helpers for the plugin-document table.
@@ -165,13 +166,28 @@ export async function createPluginDocument(
   return row;
 }
 
-/** Change a document's title, body, parent or sibling order. */
+/**
+ * Change a document's title, body, parent or sibling order.
+ *
+ * A body change goes up as a *conditional* write, so that two devices editing one document cannot
+ * overwrite each other — this is where the ancestor that makes the merge possible is captured, and
+ * `pushOutbox` attaches the precondition itself when the write is actually sent (see
+ * `documentWritePrecondition`). A title, a parent or a sibling order is one small field where
+ * last-write-wins is what anyone would expect, and making those conditional would only invent
+ * conflicts between two edits that never touched the same thing.
+ *
+ * The ancestor is captured for every field, though, not only for `body`: renaming a document and
+ * then typing in it is one ordinary sequence, and if the rename had already replaced `updatedAt`
+ * with this device's clock, the body write that followed would carry a precondition the server
+ * could never match.
+ */
 export async function updatePluginDocument(
   id: string,
   patch: PluginDocumentUpdateInput,
 ): Promise<void> {
   const existing = await db.pluginDocuments.get(id);
   if (!existing) return;
+  await rememberDocumentBase(existing);
   await db.pluginDocuments.put({ ...existing, ...patch, updatedAt: nowIso() });
   await enqueue('PATCH', `${PATH}/${id}`, patch);
 }
@@ -228,6 +244,7 @@ export async function deletePluginDocuments(ids: string[]): Promise<PluginDocume
   // Read before deleting: this is the only copy of what is about to go.
   const rows = (await db.pluginDocuments.bulkGet(ids)).filter((row) => row !== undefined);
   await db.pluginDocuments.bulkDelete(ids);
+  await forgetDocumentBases(ids);
   await enqueueBatch(ids.map((id) => ({ method: 'DELETE' as const, path: `${PATH}/${id}` })));
   return { kind: 'pluginDocument', rows };
 }
@@ -244,6 +261,9 @@ export async function deletePluginDocuments(ids: string[]): Promise<PluginDocume
 export async function restorePluginDocuments(deletion: PluginDocumentDeletion): Promise<void> {
   if (!deletion.rows.length) return;
   await db.pluginDocuments.bulkPut(deletion.rows);
+  /* A restore re-creates rows the server has not got, so there is no ancestor to merge against and
+     nothing for one to protect. The next edit captures a fresh one. */
+  await forgetDocumentBases(deletion.rows.map((row) => row.id));
   await enqueueBatch(
     deletion.rows.map((row) => ({ method: 'POST' as const, path: PATH, body: createBody(row) })),
   );

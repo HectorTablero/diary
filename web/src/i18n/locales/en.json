@@ -32,6 +32,8 @@
     "syncAnyway": "Sync now",
     "rejected_one": "{{count}} change couldn't be saved",
     "rejected_other": "{{count}} changes couldn't be saved",
+    "merged_one": "Edited on two devices — both versions kept in {{count}} place",
+    "merged_other": "Edited on two devices — both versions kept in {{count}} places",
     "sessionExpired": "Your session has expired.",
     "reconnected": "Connection restored — syncing…"
   },

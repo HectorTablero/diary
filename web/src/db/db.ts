@@ -98,6 +98,28 @@ export interface DeadLetterOp {
   failedAt: string;
 }
 
+/**
+ * The text a plugin document had the last time this device and the server agreed on it.
+ *
+ * The merge base — `git`'s remote-tracking ref, in one row. A three-way merge needs a common
+ * ancestor to tell "I added this" from "you deleted that", and neither side of a sync can supply
+ * one: the local row is what we have now and the server's row is what they have now. This is the
+ * third text, captured the moment a clean document is first edited on this device.
+ *
+ * **Local only.** It never syncs, never appears in a backup, and is not a second copy of the
+ * notebook: a row exists only while a document has edits this device hasn't got acknowledged yet,
+ * and the pull that confirms the server has them deletes it again. In the ordinary case that is one
+ * row, for the document currently open.
+ */
+export interface PluginDocumentBase {
+  /** The document's id. */
+  id: string;
+  /** Its body as the server last had it. */
+  text: string;
+  /** The `updatedAt` the server had then — the precondition a body write is sent with. */
+  version: string;
+}
+
 interface MetaRow {
   key: string;
   value: unknown;
@@ -116,6 +138,8 @@ export const db = new Dexie('diary') as Dexie & {
      kept fresh the same way, by renamePerson rewriting the text (see mutations.ts), which is the one
      thing a normalized id column would have made unnecessary and a plugin-owned blob impossible. */
   pluginDocuments: EntityTable<PluginDocumentDto, 'id'>;
+  /* Local-only bookkeeping, not data — see the interface. */
+  pluginDocumentBases: EntityTable<PluginDocumentBase, 'id'>;
   outbox: EntityTable<OutboxOp, 'seq'>;
   deadLetter: EntityTable<DeadLetterOp, 'id'>;
   meta: EntityTable<MetaRow, 'key'>;
@@ -282,6 +306,29 @@ db.version(7).stores({
   meta: 'key',
 });
 
+/* v8 adds the plugin-document merge bases: the third text a three-way merge needs, so two devices
+   writing the same document stop overwriting each other (see reconcilePluginDocuments in
+   db/pluginDocuments.ts). No `.upgrade()`, for the reason v5, v6 and v7 needed none — the table
+   holds only in-flight bookkeeping, it starts empty by definition, and there is nothing in an older
+   database to backfill it from. A device upgrading mid-edit simply captures its base on the next
+   keystroke and is protected from then on.
+
+   One index, the primary key, and deliberately no others: every read here is "the base for this one
+   document", by id, and the table is never scanned. */
+db.version(8).stores({
+  entries: 'id, dateKey, parentId, *tagIds, *peopleIds, *threadIds',
+  people: 'id, name, *aliases, contactId',
+  tags: 'id, name',
+  threads: 'id, name',
+  pluginRecords: 'id, pluginId, scope, [pluginId+dateKey], [pluginId+scope]',
+  pluginDocuments:
+    'id, pluginId, dateKey, [pluginId+dateKey], [pluginId+dateKey+parentId], [documentId+dateKey]',
+  pluginDocumentBases: 'id',
+  outbox: '++seq',
+  deadLetter: '++id, failedAt',
+  meta: 'key',
+});
+
 export const entryFromDto = (dto: EntryDto): LocalEntry => ({
   id: dto.id,
   content: dto.content,
@@ -362,6 +409,7 @@ export async function clearLocalData(): Promise<void> {
       db.threads,
       db.pluginRecords,
       db.pluginDocuments,
+      db.pluginDocumentBases,
       db.outbox,
       db.deadLetter,
       db.meta,
@@ -374,6 +422,7 @@ export async function clearLocalData(): Promise<void> {
         db.threads.clear(),
         db.pluginRecords.clear(),
         db.pluginDocuments.clear(),
+        db.pluginDocumentBases.clear(),
         db.outbox.clear(),
         db.deadLetter.clear(),
         db.meta.clear(),

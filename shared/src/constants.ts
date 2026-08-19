@@ -245,6 +245,12 @@ export const UNDATED_KEY = '';
       days write two rows and neither can clobber the other. Only same-day edits collide, and the
       unique index below turns that into the ordinary 409-on-create the whole app already converges
       through.
+   3. **A body that is merged rather than overwritten.** The two above make the *history* safe; they
+      do nothing for the text itself, which is one field and was therefore still last-write-wins —
+      two devices open on one thought, and the slower one's paragraph was gone. `baseVersion` on the
+      update schema is what closed that: a body write says which version it was built on and the
+      server refuses it if the row has moved, so the client can merge the two versions and try
+      again. See db/pluginDocumentMerge.ts in the web client for the whole loop.
 
    Kept to *one* collection with two row shapes, told apart by `dateKey` — the same idiom the habits
    plugin uses within pluginRecord — because two collections would be two models, two routes, two

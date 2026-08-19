@@ -70,15 +70,47 @@ export const pluginDocumentsRouter = new Hono<AppEnv>()
       throw err;
     }
   })
+  /**
+   * Update a row, optionally only if it hasn't moved since the client last saw it.
+   *
+   * `baseVersion` is the whole of the concurrency story for this collection, and the reason a
+   * document survives being written on two devices at once. Without it, `body` — which carries the
+   * entire text — is a last-write-wins register, and the loser's paragraph is gone with nothing
+   * anywhere recording that it ever existed. With it, the second write is refused and the client
+   * merges the two versions before trying again.
+   *
+   * `updatedAt` is the version, rather than a counter of its own: Mongoose stamps it on every
+   * `findOneAndUpdate`, so it already changes on exactly the writes a precondition needs to notice,
+   * and it is already on the DTO the client holds. Two writes inside the same millisecond would
+   * share a stamp and the second could slip through — a race between two of the user's own devices
+   * typing into one document in the same millisecond, which the client's save debounce makes
+   * unreachable in practice.
+   */
   .patch('/:id', jsonValidator(pluginDocumentUpdateSchema), async (c) => {
     const userId = c.get('userId');
-    const input = c.req.valid('json');
+    const { baseVersion, ...fields } = c.req.valid('json');
+    const id = oid(c.req.param('id'));
+    // Every field is optional, and Mongo rejects an empty `$set`. Nothing to change is not an error.
+    if (Object.keys(fields).length === 0) {
+      const doc = await PluginDocument.findOne({ _id: id, userId }).lean();
+      if (!doc) throw notFound('pluginDocument.not_found');
+      return c.json(pluginDocumentToDto(doc as unknown as LeanPluginDocument));
+    }
     const doc = await PluginDocument.findOneAndUpdate(
-      { _id: oid(c.req.param('id')), userId },
-      { $set: input },
+      baseVersion ? { _id: id, userId, updatedAt: new Date(baseVersion) } : { _id: id, userId },
+      { $set: fields },
       { returnDocument: 'after', runValidators: true },
     ).lean();
-    if (!doc) throw notFound('pluginDocument.not_found');
+    if (!doc) {
+      /* Two very different failures reach here once a precondition is in play, and the client acts
+         on them differently: gone means the write is moot and is dropped, while stale means the
+         write is still wanted and has to be merged and retried. Only a second lookup can tell them
+         apart, and it only runs on the branch that failed. */
+      if (baseVersion && (await PluginDocument.exists({ _id: id, userId }))) {
+        throw conflict('pluginDocument.stale_write');
+      }
+      throw notFound('pluginDocument.not_found');
+    }
     return c.json(pluginDocumentToDto(doc as unknown as LeanPluginDocument));
   })
   /* Deleting a document does not cascade to its revisions or its children.

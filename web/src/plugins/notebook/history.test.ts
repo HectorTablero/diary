@@ -127,18 +127,36 @@ describe('diffView', () => {
   });
 
   it('collapses long unchanged stretches so the change is what you see', () => {
-    const before = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n');
-    const after = `${before}\nnew last line`;
-    const view = diffView(before, after);
+    /* The document already ends in a newline, so the appended sentence is purely an addition. Were
+       it not, the last segment would change too — it would gain the newline now separating it from
+       the new one — and the diff would honestly show that as one sentence rewritten. */
+    const before = `${Array.from({ length: 40 }, (_, i) => `Line ${i}.`).join('\n')}\n`;
+    const view = diffView(before, `${before}New last line.`);
     expect(view.filter((l) => l.kind === 'added')).toEqual([
-      { kind: 'added', text: 'new last line' },
+      { kind: 'added', text: 'New last line.' },
     ]);
-    // 2 lines of context either side of the gap marker, not 40 lines of unchanged text.
+    // 2 rows of context either side of the gap marker, not 40 rows of unchanged text.
     expect(view).toHaveLength(6);
     expect(view.some((l) => l.text === '…')).toBe(true);
   });
 
   it('shows a short unchanged run whole rather than collapsing it', () => {
-    expect(diffView('a\nb\nc', 'a\nb\nc\nd').filter((l) => l.kind === 'context')).toHaveLength(3);
+    const view = diffView('A.\nB.\nC.\n', 'A.\nB.\nC.\nD.');
+    expect(view.filter((l) => l.kind === 'context')).toHaveLength(3);
+  });
+
+  /* The switch from lines to sentences, as the history screen sees it: rewording one clause of a
+     paragraph used to strike the whole paragraph out and retype it underneath. */
+  it('marks the sentence that changed, not the paragraph containing it', () => {
+    const view = diffView(
+      'First one. Second one. Third one.',
+      'First one. Second ones. Third one.',
+    );
+    expect(view.filter((l) => l.kind === 'removed')).toEqual([
+      { kind: 'removed', text: 'Second one.' },
+    ]);
+    expect(view.filter((l) => l.kind === 'added')).toEqual([
+      { kind: 'added', text: 'Second ones.' },
+    ]);
   });
 });
