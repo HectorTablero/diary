@@ -34,6 +34,7 @@
   "diffBetween": "{{from}} → {{to}}",
   "diffFirstDay": "Escrito por primera vez el {{date}}",
   "diffNoChange": "No cambió nada entre esos dos días.",
+  "diffUnchangedHidden": "Texto sin cambios oculto",
   "move": "Mover a…",
   "moveTitle": "Mover documento",
   "moveDescription": "Elige dónde debe estar «{{name}}». Todo lo que hay dentro se mueve con él.",

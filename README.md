@@ -207,7 +207,12 @@ Three decisions are worth knowing before touching it:
   started_ — so fifty saves in an afternoon leave one revision holding the afternoon, not fifty
   holding a keystroke each. The two can legitimately disagree (a rename rewrites bodies and not
   patches); the next save reconciles them. The stored format carries a version, so revisions written
-  by older builds — which were line diffs — still replay exactly as they always did.
+  by older builds — which were line diffs — still replay exactly as they always did. The history
+  screen draws that diff as **prose, not as rows**: paragraphs are the outer structure and a
+  rewritten sentence is marked with `<del>`/`<ins>` where it stands, so a clause changed
+  mid-paragraph reads as a clause changed mid-paragraph. A whole paragraph replaced still reads as
+  the old one struck through above the new one, and that distinction falls out of the line break
+  rather than being decided anywhere.
 - **Two devices editing one thought are merged, not raced.** A `body` is a whole page in one field,
   so the usual "newest row wins" would mean the slower device's paragraph never existed. Instead a
   body write is conditional on the version it was built from (`baseVersion`), the server refuses it

@@ -133,56 +133,142 @@ export function revisionFor(
 export const netGained = (revision: { added: number; removed: number }): number =>
   Math.max(0, revision.added - revision.removed);
 
-/** One row of a rendered diff — now one sentence, not one line. `context` rows are unchanged. */
-export interface DiffLine {
+/** One run of text inside a paragraph, and what became of it. */
+export interface DiffPiece {
   kind: 'context' | 'added' | 'removed';
   text: string;
 }
 
-/* Segments own their trailing whitespace, which is what makes them tile a document exactly (see
-   textDiff.ts) — and exactly what a row of a diff must not show. A segment ending in a newline
-   would otherwise draw a blank half-row under itself, and every second row of a list would look
-   double-spaced for no reason the reader could see. A segment that is *only* whitespace becomes
-   empty and draws as the paragraph break it is. */
-const forDisplay = (segment: string): string => segment.replace(/\s+$/u, '');
+/**
+ * One paragraph of a rendered diff, or a marker standing in for the untouched ones between two
+ * changes.
+ */
+export type DiffBlock =
+  { kind: 'paragraph'; changed: boolean; pieces: DiffPiece[] } | { kind: 'gap' };
 
 /**
- * Two texts, as rows to draw.
+ * Fold away a change that is only in the whitespace at the end of a segment.
+ *
+ * A segment owns its own trailing newline — that is what makes segments tile a document exactly
+ * (see textDiff.ts) — so *appending* to a document rewrites the segment appended to, purely to give
+ * it the newline that now separates it from what follows. Left alone, the commonest edit anyone
+ * makes would draw the last paragraph struck through and then immediately retyped, identically,
+ * above the new one. It is the diff telling the truth about its own units and lying about the
+ * document.
+ *
+ * Matched from the front of each removed/added run, because that is the shape the case has: one
+ * segment reappears unchanged and the genuinely new segments follow it.
+ */
+function settleWhitespace(pieces: readonly DiffPiece[]): DiffPiece[] {
+  const out: DiffPiece[] = [];
+  for (let i = 0; i < pieces.length; i++) {
+    const removed: DiffPiece[] = [];
+    while (pieces[i]?.kind === 'removed') removed.push(pieces[i++]);
+    const added: DiffPiece[] = [];
+    while (pieces[i]?.kind === 'added') added.push(pieces[i++]);
+
+    let paired = 0;
+    while (
+      paired < removed.length &&
+      paired < added.length &&
+      removed[paired].text.trimEnd() === added[paired].text.trimEnd()
+    ) {
+      // The added form, not the removed one: it carries the whitespace the document has now.
+      out.push({ kind: 'context', text: added[paired].text });
+      paired++;
+    }
+    out.push(...removed.slice(paired), ...added.slice(paired));
+    if (i < pieces.length && pieces[i].kind === 'context') out.push(pieces[i]);
+  }
+  return out;
+}
+
+/**
+ * Gather the pieces into the paragraphs they belong to.
+ *
+ * The unit that matters to a reader is the paragraph, and in this app a paragraph is a line — so a
+ * block ends at the segment that carries the newline, and that newline is dropped, because the
+ * paragraph break is the block boundary rather than a character to draw. Several sentences of one
+ * paragraph therefore stay together with their changes marked *inside* them, which is the whole
+ * point: a sentence rewritten mid-paragraph should read as a sentence rewritten mid-paragraph, not
+ * as a row torn out of a list of rows.
+ */
+function paragraphs(pieces: readonly DiffPiece[]): DiffBlock[] {
+  const blocks: DiffBlock[] = [];
+  let current: DiffPiece[] = [];
+  const close = () => {
+    blocks.push({
+      kind: 'paragraph',
+      changed: current.some((piece) => piece.kind !== 'context'),
+      pieces: current,
+    });
+    current = [];
+  };
+  for (const piece of pieces) {
+    const ends = piece.text.endsWith('\n');
+    current.push({ kind: piece.kind, text: ends ? piece.text.slice(0, -1) : piece.text });
+    if (ends) close();
+  }
+  if (current.length) close();
+  return blocks;
+}
+
+/**
+ * Replace long untouched stretches with a marker, keeping a few paragraphs either side.
+ *
+ * What someone re-reading a thought six months on wants is what *moved*; a screen of unchanged
+ * paragraphs between two edits buries it. A marker rather than a count of what is hidden, because
+ * the number is never the question.
+ */
+function collapse(blocks: readonly DiffBlock[], context: number): DiffBlock[] {
+  const out: DiffBlock[] = [];
+  const untouched = (block: DiffBlock | undefined): boolean =>
+    block?.kind === 'paragraph' && !block.changed;
+
+  for (let i = 0; i < blocks.length;) {
+    const start = i;
+    while (untouched(blocks[i])) i++;
+    const run = blocks.slice(start, i);
+    if (run.length > context * 2 + 1) {
+      out.push(...run.slice(0, context), { kind: 'gap' }, ...run.slice(-context));
+    } else {
+      out.push(...run);
+    }
+    if (i < blocks.length && i === start) out.push(blocks[i++]);
+  }
+  return out;
+}
+
+/**
+ * Two texts, as paragraphs to draw.
  *
  * Reuses the same diff the storage format is built on, so what the history screen shows and what the
- * row actually stores can never drift apart — they are one computation. The switch from lines to
- * sentences shows up here more than anywhere: the day someone fixed one clause of a long paragraph
- * used to render as that whole paragraph struck through and retyped, and now renders as the clause.
+ * row actually stores can never drift apart — they are one computation.
  *
- * Long unchanged stretches are collapsed to a few rows of context either side, the way a diff tool
- * does: the interesting thing about re-reading a thought six months on is what moved, and a screen
- * of unchanged paragraphs between two edits buries it.
+ * The shape of the *output* is the part that had to change when the unit became a sentence. A row
+ * per unit is what a code host draws, and it was right while a unit was a line: one line, one row.
+ * A sentence is not a line, so the same rendering broke a paragraph into a stack of unrelated-looking
+ * rows and gave a reader no way to tell which of them had been sitting next to each other all along.
+ * Paragraphs are therefore the outer structure and the changes live inside them.
  */
-export function diffView(before: string, after: string, context = 2): DiffLine[] {
+export function diffView(before: string, after: string, context = 2): DiffBlock[] {
   const source = sentences(before);
-  const lines: DiffLine[] = [];
-  const row =
-    (kind: DiffLine['kind']) =>
-    (segment: string): DiffLine => ({ kind, text: forDisplay(segment) });
+  const pieces: DiffPiece[] = [];
   let i = 0;
   for (const op of diffSentences(before, after)) {
     if (op[0] === '=') {
-      const run = source.slice(i, i + op[1]);
+      for (const text of source.slice(i, i + op[1])) pieces.push({ kind: 'context', text });
       i += op[1];
-      if (run.length <= context * 2 + 1) {
-        lines.push(...run.map(row('context')));
-      } else {
-        lines.push(...run.slice(0, context).map(row('context')));
-        // A gap marker rather than a count of hidden rows: the number is never the question.
-        lines.push({ kind: 'context', text: '…' });
-        lines.push(...run.slice(-context).map(row('context')));
-      }
     } else if (op[0] === '-') {
-      lines.push(...source.slice(i, i + op[1]).map(row('removed')));
+      for (const text of source.slice(i, i + op[1])) pieces.push({ kind: 'removed', text });
       i += op[1];
     } else {
-      lines.push(...op[1].map(row('added')));
+      for (const text of op[1]) pieces.push({ kind: 'added', text });
     }
   }
-  return lines;
+  return collapse(paragraphs(settleWhitespace(pieces)), context);
 }
+
+/** Whether a rendered diff has anything to show — a day can legitimately have changed nothing. */
+export const hasChanges = (blocks: readonly DiffBlock[]): boolean =>
+  blocks.some((block) => block.kind === 'paragraph' && block.changed);

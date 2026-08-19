@@ -1,6 +1,14 @@
 import type { PluginDocumentDto } from '@diary/shared';
 import { describe, expect, it } from 'vitest';
-import { baseTextBefore, diffView, netGained, replay, revisionFor } from './history';
+import {
+  baseTextBefore,
+  diffView,
+  hasChanges,
+  netGained,
+  replay,
+  revisionFor,
+  type DiffBlock,
+} from './history';
 
 /** A revision row carrying the patch from `from` to `to`, as putDocumentRevision would store it. */
 const revision = (dateKey: string, from: string, to: string): PluginDocumentDto => {
@@ -117,46 +125,124 @@ describe('netGained', () => {
 });
 
 describe('diffView', () => {
-  it('marks added and removed lines against their context', () => {
-    expect(diffView('a\nb\nc', 'a\nB\nc')).toEqual([
-      { kind: 'context', text: 'a' },
-      { kind: 'removed', text: 'b' },
-      { kind: 'added', text: 'B' },
-      { kind: 'context', text: 'c' },
-    ]);
-  });
+  /** Every block's text as one string, with a marker around what changed — the shape a reader sees. */
+  const rendered = (blocks: DiffBlock[]) =>
+    blocks.map((block) =>
+      block.kind === 'gap'
+        ? '…'
+        : block.pieces
+            .map((piece) =>
+              piece.kind === 'context'
+                ? piece.text
+                : `${piece.kind === 'added' ? '+' : '-'}[${piece.text}]`,
+            )
+            .join(''),
+    );
 
-  it('collapses long unchanged stretches so the change is what you see', () => {
-    /* The document already ends in a newline, so the appended sentence is purely an addition. Were
-       it not, the last segment would change too — it would gain the newline now separating it from
-       the new one — and the diff would honestly show that as one sentence rewritten. */
-    const before = `${Array.from({ length: 40 }, (_, i) => `Line ${i}.`).join('\n')}\n`;
-    const view = diffView(before, `${before}New last line.`);
-    expect(view.filter((l) => l.kind === 'added')).toEqual([
-      { kind: 'added', text: 'New last line.' },
-    ]);
-    // 2 rows of context either side of the gap marker, not 40 rows of unchanged text.
-    expect(view).toHaveLength(6);
-    expect(view.some((l) => l.text === '…')).toBe(true);
-  });
+  const paragraphs = (blocks: DiffBlock[]) => blocks.filter((block) => block.kind === 'paragraph');
 
-  it('shows a short unchanged run whole rather than collapsing it', () => {
-    const view = diffView('A.\nB.\nC.\n', 'A.\nB.\nC.\nD.');
-    expect(view.filter((l) => l.kind === 'context')).toHaveLength(3);
-  });
-
-  /* The switch from lines to sentences, as the history screen sees it: rewording one clause of a
-     paragraph used to strike the whole paragraph out and retype it underneath. */
-  it('marks the sentence that changed, not the paragraph containing it', () => {
+  /* The complaint this rewrite answers. A paragraph is one block, and a sentence rewritten inside it
+     is marked where it stands — not lifted out into rows of its own with nothing to say that the
+     sentences either side of it were its neighbours all along. */
+  it('marks a rewritten sentence inside the paragraph it belongs to', () => {
     const view = diffView(
       'First one. Second one. Third one.',
       'First one. Second ones. Third one.',
     );
-    expect(view.filter((l) => l.kind === 'removed')).toEqual([
-      { kind: 'removed', text: 'Second one.' },
+    expect(view).toHaveLength(1);
+    expect(rendered(view)).toEqual(['First one. -[Second one. ]+[Second ones. ]Third one.']);
+  });
+
+  it('keeps two edits to one paragraph in that one paragraph', () => {
+    const view = diffView('One. Two. Three.', 'One changed. Two. Three changed.');
+    expect(view).toHaveLength(1);
+    expect(rendered(view)).toEqual(['-[One. ]+[One changed. ]Two. -[Three.]+[Three changed.]']);
+  });
+
+  /* The other half of the same distinction, and it falls out of the line break rather than being
+     decided anywhere: a whole paragraph replaced reads as the old paragraph struck through *above*
+     the new one, because each of them is a paragraph and wants to be read as one. Only a change
+     inside a paragraph is marked inline. */
+  it('draws a replaced paragraph as two paragraphs, old above new', () => {
+    expect(rendered(diffView('A one.\nB one.\nC one.', 'A one.\nB two.\nC one.'))).toEqual([
+      'A one.',
+      '-[B one.]',
+      '+[B two.]',
+      'C one.',
     ]);
-    expect(view.filter((l) => l.kind === 'added')).toEqual([
-      { kind: 'added', text: 'Second ones.' },
+  });
+
+  /* The blank line between two paragraphs is a block of its own, so the shape of the document
+     survives into its history rather than every paragraph looking equally spaced. */
+  it('keeps a blank line between paragraphs as a block of its own', () => {
+    expect(rendered(diffView('One.\n\nTwo.', 'One.\n\nTwo, revised.'))).toEqual([
+      'One.',
+      '',
+      '-[Two.]+[Two, revised.]',
     ]);
+  });
+
+  it('marks a whole paragraph that was added, and one that was taken out', () => {
+    expect(rendered(diffView('Keep.\nDrop.\n', 'Keep.\nAdded.\n'))).toEqual([
+      'Keep.',
+      '-[Drop.]',
+      '+[Added.]',
+    ]);
+  });
+
+  it('says which paragraphs changed, so unchanged ones can be drawn quietly', () => {
+    const view = diffView('A one.\nB one.', 'A one.\nB two.');
+    expect(paragraphs(view).map((block) => block.changed)).toEqual([false, true]);
+  });
+
+  /* A segment owns its trailing newline, so appending to a document technically rewrites the
+     paragraph appended to — purely to give it the newline that now separates the two. Drawing that
+     as a paragraph struck through and immediately retyped, identically, is the diff being honest
+     about its units and misleading about the document. */
+  it('does not report a paragraph as rewritten when only its trailing newline moved', () => {
+    expect(rendered(diffView('One thought.', 'One thought.\nAnd another.'))).toEqual([
+      'One thought.',
+      '+[And another.]',
+    ]);
+  });
+
+  it('collapses long unchanged stretches so the change is what you see', () => {
+    const before = `${Array.from({ length: 40 }, (_, i) => `Line ${i}.`).join('\n')}\n`;
+    const view = diffView(before, `${before}New last line.`);
+    // 2 paragraphs of context either side of the gap, not 40 of unchanged text.
+    expect(rendered(view)).toEqual([
+      'Line 0.',
+      'Line 1.',
+      '…',
+      'Line 38.',
+      'Line 39.',
+      '+[New last line.]',
+    ]);
+  });
+
+  it('shows a short unchanged run whole rather than collapsing it', () => {
+    const view = diffView('A.\nB.\nC.\n', 'A.\nB.\nC.\nD.');
+    expect(view.some((block) => block.kind === 'gap')).toBe(false);
+    expect(rendered(view)).toEqual(['A.', 'B.', 'C.', '+[D.]']);
+  });
+
+  it('is every paragraph added, for the first day a document existed', () => {
+    expect(rendered(diffView('', 'First. Second.'))).toEqual(['+[First. ]+[Second.]']);
+  });
+});
+
+describe('hasChanges', () => {
+  it('is true when anything at all was marked', () => {
+    expect(hasChanges(diffView('One.', 'Two.'))).toBe(true);
+  });
+
+  /* A day can legitimately have changed nothing: an edit typed and undone still rewrites that day's
+     revision, to say so. The dialog shows a sentence rather than the whole document unmarked. */
+  it('is false for two days that read identically', () => {
+    expect(hasChanges(diffView('One. Two.', 'One. Two.'))).toBe(false);
+  });
+
+  it('is false for nothing at all', () => {
+    expect(hasChanges(diffView('', ''))).toBe(false);
   });
 });
