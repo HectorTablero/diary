@@ -33,6 +33,8 @@
     "syncAnyway": "Sincronizar ahora",
     "rejected_one": "No se pudo guardar {{count}} cambio",
     "rejected_other": "No se pudieron guardar {{count}} cambios",
+    "merged_one": "Editado en dos dispositivos: se conservaron ambas versiones en {{count}} lugar",
+    "merged_other": "Editado en dos dispositivos: se conservaron ambas versiones en {{count}} lugares",
     "sessionExpired": "Tu sesión ha caducado.",
     "reconnected": "Conexión restablecida — sincronizando…"
   },

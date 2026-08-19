@@ -1,90 +1,82 @@
 import { describe, expect, it } from 'vitest';
-import { applyPatch, decodePatch, diffLines, encodePatch } from './patch';
+import { applyPatch, decodePatch, diffText, encodePatch } from './patch';
 
-/* The one property that has to hold for every input, since the whole history feature rests on it:
-   applying a document's patch reproduces the text it was made from. Everything else here is about
-   the patch staying *small*, which is the reason the format exists at all. */
+/* The diff itself is tested in lib/textDiff.test.ts, which is where it now lives. What is left here
+   is this plugin's half: writing a patch down, reading it back, and — the part that has to keep
+   working forever — reading back one written by an older build in the old line format. */
+
 const roundTrips = (before: string, after: string) =>
-  applyPatch(before, diffLines(before, after)) === after;
+  applyPatch(before, decodePatch(encodePatch(diffText(before, after)))) === after;
 
-describe('diffLines / applyPatch', () => {
-  it('round-trips an edit in the middle of a document', () => {
-    const before = 'one\ntwo\nthree\nfour';
-    expect(roundTrips(before, 'one\ntwo CHANGED\nthree\nfour')).toBe(true);
+describe('encodePatch / decodePatch / applyPatch', () => {
+  it('round-trips an edit through storage', () => {
+    expect(roundTrips('One. Two. Three.', 'One. Two changed. Three.')).toBe(true);
   });
 
   it('round-trips writing from nothing, and emptying', () => {
-    expect(roundTrips('', 'first thought')).toBe(true);
-    expect(roundTrips('first thought', '')).toBe(true);
+    expect(roundTrips('', 'First thought.')).toBe(true);
+    expect(roundTrips('First thought.', '')).toBe(true);
   });
 
-  it('round-trips inserts, deletes and pure reordering', () => {
-    expect(roundTrips('a\nb\nc', 'a\nb\nb2\nc')).toBe(true);
-    expect(roundTrips('a\nb\nc', 'a\nc')).toBe(true);
-    expect(roundTrips('a\nb\nc', 'c\nb\na')).toBe(true);
+  it('round-trips a document written in Japanese', () => {
+    expect(roundTrips('こんにちは。元気ですか？', 'こんにちは。元気ですか？また明日。')).toBe(true);
   });
 
   it('preserves blank lines, which is what separates paragraphs in prose', () => {
-    const before = 'para one\n\npara two';
-    expect(roundTrips(before, 'para one\n\npara two\n\npara three')).toBe(true);
+    const before = 'Para one.\n\nPara two.';
+    expect(roundTrips(before, `${before}\n\nPara three.`)).toBe(true);
     expect(
-      applyPatch(before, diffLines(before, `${before}\n\npara three`)).split('\n'),
-    ).toHaveLength(5);
+      applyPatch(before, decodePatch(encodePatch(diffText(before, `${before}\n\nPara three.`)))),
+    ).toBe('Para one.\n\nPara two.\n\nPara three.');
   });
 
-  it('emits nothing for an unchanged document', () => {
-    expect(diffLines('same\ntext', 'same\ntext')).toEqual([['=', 2]]);
+  it('stays small for an append to a long document', () => {
+    const long = Array.from({ length: 400 }, (_, i) => `Paragraph ${i}.`).join('\n');
+    expect(encodePatch(diffText(long, `${long}\nAnd one more.`)).length).toBeLessThan(120);
+  });
+});
+
+/* The format version, and the whole reason it exists. A chain can be half line-format and half
+   sentence-format — every document written before this change is — and both halves must replay
+   exactly as their own build meant them to. Getting this wrong loses every line break in someone's
+   history, silently, months after the fact. */
+describe('the line format written by older builds', () => {
+  /* A bare array with no version stamp: exactly what encodePatch used to produce. */
+  const legacy = JSON.stringify([
+    ['=', 1],
+    ['+', ['second line']],
+  ]);
+
+  it('is recognised by its shape and joined back with newlines', () => {
+    expect(decodePatch(legacy).units).toBe('line');
+    expect(applyPatch('first line', decodePatch(legacy))).toBe('first line\nsecond line');
   });
 
-  /* The reason the prefix/suffix trim exists. Appending one paragraph to a long document must cost
-     one insert, not a rewrite — otherwise a year of daily edits stores the document a year over. */
-  it('keeps a one-paragraph append to a long document to a single insert', () => {
-    const long = Array.from({ length: 900 }, (_, i) => `paragraph ${i}`).join('\n');
-    const ops = diffLines(long, `${long}\nand one more`);
-    expect(ops).toEqual([
-      ['=', 900],
-      ['+', ['and one more']],
-    ]);
-    expect(encodePatch(ops).length).toBeLessThan(60);
+  it('is not confused with what this build writes', () => {
+    expect(decodePatch(encodePatch(diffText('a', 'b'))).units).toBe('sentence');
   });
 
-  /* Past MAX_LCS_LINES the middle is replaced wholesale rather than diffed. Correctness is the
-     promise; compactness is not, and this pins the fallback so a change to the cap can't silently
-     turn it into a hang. */
-  it('still round-trips when the changed region is too large to diff', () => {
-    const before = Array.from({ length: 500 }, (_, i) => `a${i}`).join('\n');
-    const after = Array.from({ length: 500 }, (_, i) => `b${i}`).join('\n');
-    expect(roundTrips(before, after)).toBe(true);
-  });
-
-  it('coalesces runs rather than emitting one op per line', () => {
-    const before = 'k\nx1\nx2\nx3\nk2';
-    const after = 'k\nk2';
-    expect(diffLines(before, after)).toEqual([
-      ['=', 1],
-      ['-', 3],
-      ['=', 1],
-    ]);
+  /* The mistake this guards against, stated as an assertion: applying a line patch with the
+     sentence rule concatenates the lines instead of separating them. */
+  it('would lose every line break if replayed with the sentence rule', () => {
+    expect(applyPatch('first line', { units: 'sentence', ops: decodePatch(legacy).ops })).toBe(
+      'first linesecond line',
+    );
   });
 });
 
 describe('decodePatch', () => {
-  it('round-trips through JSON', () => {
-    const ops = diffLines('a\nb', 'a\nc');
-    expect(decodePatch(encodePatch(ops))).toEqual(ops);
-  });
-
   /* Same posture as every other plugin read: the server never looked at this string. A history
      screen must not be able to throw because one row is malformed. */
-  it.each(['not json', '{}', '[["?",1]]', '[["=", -1]]', '[["+", [1,2]]]', '[[1,2,3]]'])(
+  it.each(['not json', '{}', '{"v":99,"ops":[]}', '[["?",1]]', '[["=",-1]]', '[["+",[1,2]]]'])(
     'treats %s as no change rather than throwing',
     (body) => {
-      expect(decodePatch(body)).toEqual([]);
+      expect(decodePatch(body).ops).toEqual([]);
     },
   );
 
   it('drops only the invalid ops, keeping the rest of a partly-readable patch', () => {
-    expect(decodePatch('[["=",2],["?",9],["+",["x"]]]')).toEqual([
+    expect(decodePatch('{"v":2,"ops":[["=",2],["?",9],["+",["x"]]]}').ops).toEqual([
       ['=', 2],
       ['+', ['x']],
     ]);
@@ -92,10 +84,12 @@ describe('decodePatch', () => {
 });
 
 describe('applyPatch tolerance', () => {
-  /* A chain can legitimately stop lining up — a rename rewrote the document's text, or two devices'
-     same-day writes converged. Reading old history must degrade, never crash. */
+  /* A chain can legitimately stop lining up — a rename rewrote the document's text, or a merge
+     rewrote a day. Reading old history must degrade, never crash. */
   it('stops at the end of the source instead of throwing', () => {
-    expect(applyPatch('one line', [['=', 50]])).toBe('one line');
-    expect(applyPatch('', [['-', 3]])).toBe('');
+    expect(applyPatch('one sentence.', { units: 'sentence', ops: [['=', 50]] })).toBe(
+      'one sentence.',
+    );
+    expect(applyPatch('', { units: 'sentence', ops: [['-', 3]] })).toBe('');
   });
 });

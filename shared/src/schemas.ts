@@ -297,6 +297,23 @@ export const pluginDocumentUpdateSchema = z.object({
   sortKey: z.string().max(64).optional(),
   added: z.number().int().min(0).optional(),
   removed: z.number().int().min(0).optional(),
+  /**
+   * Write this only if the row is still at this `updatedAt` — a compare-and-swap, not a field.
+   *
+   * The one guard that makes concurrent editing safe. A document's `body` is the whole text, so a
+   * plain PATCH of it is "replace everything with what I have", and two devices doing that a second
+   * apart means the slower one's paragraph never existed. With a precondition attached, the second
+   * write is refused (409 `pluginDocument.stale_write`) instead of landing, and the client does what
+   * `git push` makes you do when it is rejected: pull, merge the two versions properly, push again.
+   * See `reconcilePluginDocuments` in the web client.
+   *
+   * Sent on body writes only. A title or a re-parent is one small field where last-write-wins is
+   * both expected and harmless, and making those conditional would only manufacture conflicts
+   * between edits that never overlapped.
+   *
+   * Stripped from the update rather than stored: it describes the write, not the row.
+   */
+  baseVersion: isoDateTimeSchema.optional(),
 });
 
 // --- Settings ---

@@ -8,7 +8,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Toaster } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { initDb } from './db/storage';
-import { initSync, onReconnected, onRejected, onSyncApplied } from './db/sync';
+import { initSync, onDocumentsMerged, onReconnected, onRejected, onSyncApplied } from './db/sync';
 import { initAppLock } from './lib/appLock';
 import { initAuthToken } from './lib/authToken';
 import { initBackgroundSync } from './lib/backgroundSync';
@@ -86,6 +86,13 @@ onReconnected(() => notifySuccess(i18n.t('sync.reconnected')));
    local copy still shows the change as saved, so this toast is the only moment a person is ever
    told — an error, never suppressed, rather than a console.warn nobody reads. */
 onRejected((count) => notifyError(i18n.t('sync.rejected', { count })));
+/* Two devices wrote the same document at once and the app merged them rather than letting one win
+   (see reconcilePluginDocuments). Announced only when the merge had to keep both versions of
+   something: a clean merge produced exactly what both people meant and needs no interruption, while
+   a conflict has left a duplicated sentence in someone's prose that only they can resolve. Marked
+   important so it survives "hide routine notifications" — it is a report about their writing, not a
+   confirmation of something they just did. */
+onDocumentsMerged((count) => notifySuccess(i18n.t('sync.merged', { count }), { important: true }));
 
 /**
  * Framer Motion animates in JavaScript, so the reduced-motion rules in index.css can't reach it.

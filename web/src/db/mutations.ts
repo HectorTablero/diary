@@ -40,6 +40,7 @@ import type { ContactCandidate, Resolution } from '@/lib/conflicts';
 import { fuzzyEquals, renameMentions } from '@/lib/tokens';
 import { db, type LocalEntry, type LocalPerson, type OutboxOp } from './db';
 import { enqueue, enqueueBatch } from './outbox';
+import { rememberDocumentBase } from './pluginDocumentMerge';
 import { getDayEntries, getPerson, getSettings } from './repo';
 
 /* Local write layer: every mutation applies to Dexie immediately (the UI is
@@ -479,14 +480,27 @@ async function renamePersonMentionsInDocuments(
      is no reason for a rename's peak memory to be all of it. Only the documents that actually
      change are kept, and the writes happen after the cursor is done — Dexie makes no promise about
      modifying a table while iterating it. */
-  const changed: { id: string; body: string }[] = [];
+  const changed: { id: string; body: string; was: string; version: string }[] = [];
   await documents.each((doc) => {
     if (!doc.body.includes('@')) return;
     const body = renameMentions(doc.body, '@', names, oldName, newName);
-    if (body !== doc.body) changed.push({ id: doc.id, body });
+    if (body !== doc.body) {
+      changed.push({ id: doc.id, body, was: doc.body, version: doc.updatedAt });
+    }
   });
   if (!changed.length) return;
 
+  /* A rename rewrites `body`, which makes it a body write like any other, and it gets the same
+     protection: the ancestor is recorded so that if another device edited one of these documents in
+     the meantime, the server refuses this write and the next pull merges the rename *into* their
+     edit. Without it a rename would be the one path left that could still quietly overwrite someone
+     else's paragraph — a hole in the guarantee, in the code most likely to touch many documents at
+     once. */
+  await Promise.all(
+    changed.map(({ id, was, version }) =>
+      rememberDocumentBase({ id, body: was, updatedAt: version }),
+    ),
+  );
   const now = nowIso();
   await db.pluginDocuments.bulkUpdate(
     changed.map(({ id, body }) => ({ key: id, changes: { body, updatedAt: now } })),

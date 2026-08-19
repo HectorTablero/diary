@@ -18,6 +18,7 @@ import {
 } from '@/db/pluginDocuments';
 import { onSyncApplied } from '@/db/sync';
 import { todayKey } from '@/lib/dates';
+import { merge3 } from '@/lib/textMerge';
 import { baseTextBefore, netGained, replay, revisionFor, type HistoryDay } from './history';
 import {
   ancestorPath,
@@ -226,6 +227,13 @@ export interface DocumentEditor {
  * Every enqueue kicks a sync pass, and writing prose produces keystrokes by the hundred. Same
  * reasoning as the habits day card, with a longer window: a habit is a tap and a thought is a
  * paragraph, so the moment worth banking is the pause between sentences.
+ *
+ * ## What happens when the other device writes at the same time
+ *
+ * The row is merged rather than overwritten one layer down, in the sync engine (see
+ * reconcilePluginDocuments). This hook has to do the same thing for the text that is only in the
+ * *box* — typed since the last save, and therefore in neither the row nor the merge — which is what
+ * the three-way merge in `load` is for.
  */
 export function useDocumentEditor(documentId: string, onDiscarded?: () => void): DocumentEditor {
   const [document, setDocument] = useState<PluginDocumentDto | undefined>(undefined);
@@ -238,6 +246,9 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
   const revisionsRef = useRef<PluginDocumentDto[]>([]);
   const pendingRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* The stored text this editor last agreed with — the ancestor for the merge in `load`. Moved on
+     every adopt and every save, which are exactly the moments the box and the row are in step. */
+  const storedRef = useRef('');
   /* The unmount cleanup runs after the last render, so everything it inspects has to be reachable
      from a ref rather than from that render's closure. */
   const latestRef = useRef<{ document: PluginDocumentDto | undefined; body: string }>({
@@ -255,17 +266,32 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
     ]);
     revisionsRef.current = revisions;
     setDocument(doc);
-    /* Only adopt the stored text when nothing local is waiting to be written. A sync landing
-       mid-sentence must not replace the sentence — the pull already skipped this row if a write was
-       queued for it (dirtyIds in db/sync.ts), and this is the same rule one layer up, for the window
-       between a keystroke and its debounce firing. */
-    if (pendingRef.current === null) setBodyState(doc?.body ?? '');
+    const stored = doc?.body ?? '';
+    if (pendingRef.current === null) {
+      // Nothing typed since the last save: the row is simply the truth.
+      setBodyState(stored);
+      storedRef.current = stored;
+    } else if (stored !== storedRef.current) {
+      /* The row moved while there were keystrokes in the box that had not reached it yet — a sync
+         landing inside the debounce window, carrying another device's writing (which the pull has
+         already merged into the row; see reconcilePluginDocuments).
+         Replacing the box would throw away the half-sentence being typed. *Keeping* the box, which
+         is what this used to do, is worse and was the last hole in the whole scheme: the pending
+         text was written from before the other device's changes existed, so banking it a moment
+         later overwrote them — after all the trouble taken to merge them. So the two are merged
+         here too, by the same function and against the last text the box and the row agreed on. */
+      const merged = merge3(storedRef.current, pendingRef.current, stored);
+      pendingRef.current = merged.text;
+      setBodyState(merged.text);
+      storedRef.current = stored;
+    }
     setLoading(false);
   }, [documentId]);
 
   useEffect(() => {
     setLoading(true);
     pendingRef.current = null;
+    storedRef.current = '';
     void load();
     return onSyncApplied(() => void load());
   }, [load]);
@@ -280,6 +306,7 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
     const { patch, added, removed, changed } = revisionFor(base, next);
 
     await updatePluginDocument(documentId, { body: next });
+    storedRef.current = next; // the box and the row agree again; this is the next merge's ancestor
     setDocument((current) => (current ? { ...current, body: next } : current));
 
     /* A day whose net change is nothing gets no revision — an edit typed and undone should not

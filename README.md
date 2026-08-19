@@ -200,11 +200,21 @@ Three decisions are worth knowing before touching it:
   so the workaround isn't inherited. One page shape is reused at every level — the document's own
   text, the documents inside it beneath — and the open one lives in `?doc=`, which buys the back
   button, deep links and the Android hardware back key for free.
-- **Every day it changed is kept, as a forward patch.** `patch.ts` is a dependency-free line diff;
-  `history.ts` replays the chain. The document row holds the current text and is authoritative, the
-  chain is the past, and a save always diffs against _where the day started_ — so fifty saves in an
-  afternoon leave one revision holding the afternoon, not fifty holding a keystroke each. The two
-  can legitimately disagree (a rename rewrites bodies and not patches); the next save reconciles them.
+- **Every day it changed is kept, as a forward patch.** `lib/textDiff.ts` is a dependency-free
+  diff over _sentences_ (`Intl.Segmenter`, so `。`, `？` and `¿` are as much a boundary as `.`);
+  `patch.ts` writes it down and `history.ts` replays the chain. The document row holds the current
+  text and is authoritative, the chain is the past, and a save always diffs against _where the day
+  started_ — so fifty saves in an afternoon leave one revision holding the afternoon, not fifty
+  holding a keystroke each. The two can legitimately disagree (a rename rewrites bodies and not
+  patches); the next save reconciles them. The stored format carries a version, so revisions written
+  by older builds — which were line diffs — still replay exactly as they always did.
+- **Two devices editing one thought are merged, not raced.** A `body` is a whole page in one field,
+  so the usual "newest row wins" would mean the slower device's paragraph never existed. Instead a
+  body write is conditional on the version it was built from (`baseVersion`), the server refuses it
+  if the row has moved, and the next pull runs a three-way merge against the ancestor the device
+  recorded when it started editing — `git push`, rejected, pull, merge, push. Edits to different
+  sentences simply combine; when both devices rewrote the same sentence, both versions are kept and
+  a toast says so. `db/pluginDocumentMerge.ts` and `lib/textMerge.ts`.
 - **`@mentions` work, `#tags` don't.** `@Ana` in a thought means what it means in an entry — matched
   by name through the app's own `lib/tokens`, resolved on read, rewritten by core on rename. `#` is
   left alone because it is a Markdown heading here, and the notebook has no tags.

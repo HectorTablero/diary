@@ -28,6 +28,7 @@
     "pausedPending": "等待 Wi-Fi · {{count}} 项更改",
     "syncAnyway": "立即同步",
     "rejected": "{{count}} 项更改未能保存",
+    "merged": "在两台设备上编辑过，已在 {{count}} 处保留两个版本",
     "sessionExpired": "登录状态已过期。",
     "reconnected": "已重新连接 — 正在同步…"
   },

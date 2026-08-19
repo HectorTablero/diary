@@ -53,11 +53,16 @@ pluginDocumentSchema.index({ userId: 1, pluginId: 1, updatedAt: 1 });
 
 /* At most one revision per document per day.
  *
- * This is what makes a day of writing converge instead of forking. Two devices editing the same
+ * This is what makes a day of *history* converge instead of forking. Two devices editing the same
  * document on the same day both create a revision for it; the second create collides here and comes
  * back 409, which the client already knows how to resolve — pushOutbox drops the phantom local row
  * and the next pull brings the server's (removeLocalDoc in web/src/db/sync.ts). Without it the two
  * rows would both survive and the document's history would have two versions of one day in it.
+ *
+ * Note what is *not* at risk when that happens, and why it took a second mechanism to say so: the
+ * day's writing itself lives in the document's own `body`, which is merged rather than overwritten
+ * (see `baseVersion` on the PATCH route). Losing the collided revision costs a day's entry in the
+ * timeline until the next save rewrites it; it never cost the prose.
  *
  * Partial on `documentId` being non-empty, so it constrains revisions only: document rows all carry
  * `''` for both keys and would otherwise be unique-per-plugin, which is to say limited to one. */
