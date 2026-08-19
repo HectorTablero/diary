@@ -278,6 +278,11 @@ function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
   const { t } = useTranslation();
   return (
     <nav
+      /* Marks the bottom obstruction for anything that needs to know how much screen is actually
+         usable — the notebook's caret centring measures this rect rather than assuming a height,
+         because the bar is `display: none` on a wide screen in the browser build and a zero rect is
+         exactly the right answer there. */
+      data-bottom-bar
       className={cn(
         'fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80',
         // The app always uses the tab bar, even in landscape widths.
