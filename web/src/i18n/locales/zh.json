@@ -643,6 +643,7 @@
     "mic_unavailable": "麦克风不可用",
     "invalid_key": "你的 LLM API 密钥似乎无效",
     "rate_limited": "已达到 LLM 的频率限制，请稍后再试",
+    "quota_exhausted": "你的 LLM 账户额度已用完",
     "upstream_error": "LLM 无法处理这个请求",
     "timeout": "LLM 响应超时",
     "no_key": "请先在设置里添加 Groq API 密钥",

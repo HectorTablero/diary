@@ -229,7 +229,8 @@
       "keys": {
         "thinking": "Shown while the model turns a transcript into draft entries. Deliberately vague about the model.",
         "acceptAll": "Counted: adds all reviewed suggestions to the diary.",
-        "invalid_key": "\"LLM\" appears in these messages because the user supplies their own provider key and needs to know which thing failed. Keep it recognisable."
+        "invalid_key": "\"LLM\" appears in these messages because the user supplies their own provider key and needs to know which thing failed. Keep it recognisable.",
+        "quota_exhausted": "The provider answered 402: the key is valid but the account is out of credit or free allowance. Unlike rate_limited it will not clear by waiting, so don't word it as \"try again later\". Only shown once every configured provider has failed."
       }
     },
     "import": {

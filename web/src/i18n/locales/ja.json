@@ -649,6 +649,7 @@
     "mic_unavailable": "マイクを使用できません",
     "invalid_key": "LLM の API キーが正しくないようです",
     "rate_limited": "LLM の利用制限に達しました。しばらくしてからお試しください",
+    "quota_exhausted": "LLM アカウントの残高がありません",
     "upstream_error": "LLM が処理できませんでした",
     "timeout": "LLM の応答に時間がかかりすぎました",
     "no_key": "先に設定で Groq API キーを追加してください",
