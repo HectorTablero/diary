@@ -31,8 +31,29 @@ export interface ChatCompletionResponse {
 
 function mapErrorResponse(res: Response): HttpError {
   if (res.status === 401 || res.status === 403) return new HttpError(400, 'ai.invalid_key');
+  // The key is fine, the account isn't: Cerebras and OpenRouter both answer 402 once the free
+  // allowance or the prepaid balance is gone. Unlike a 429 this does not clear on its own.
+  if (res.status === 402) return new HttpError(402, 'ai.quota_exhausted');
   if (res.status === 429) return new HttpError(429, 'ai.rate_limited');
   return new HttpError(502, 'ai.upstream_error');
+}
+
+/**
+ * Failures that mean "this provider cannot serve the request" rather than "the request is wrong".
+ *
+ * A caller holding more than one key can retry the same conversation on the next provider instead
+ * of surfacing any of these — see the failover in aiSuggestionService.
+ */
+const PROVIDER_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'ai.invalid_key',
+  'ai.quota_exhausted',
+  'ai.rate_limited',
+  'ai.upstream_error',
+  'ai.timeout',
+]);
+
+export function isProviderFailure(err: unknown): err is HttpError {
+  return err instanceof HttpError && PROVIDER_FAILURE_CODES.has(err.code);
 }
 
 /** Providers send this on 429s, usually a fraction of a second to a few seconds for burst limits. */

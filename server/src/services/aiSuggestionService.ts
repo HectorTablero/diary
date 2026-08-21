@@ -15,7 +15,13 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { config } from '../config';
 import { badRequest, HttpError } from '../errors';
-import { chatCompletion, type ChatMessage } from '../lib/aiChatClient';
+import {
+  chatCompletion,
+  isProviderFailure,
+  type ChatCompletionRequest,
+  type ChatCompletionResponse,
+  type ChatMessage,
+} from '../lib/aiChatClient';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
 import { normalize, searchPeopleCsv, type SearchablePerson } from './personSearch';
@@ -287,28 +293,72 @@ interface Provider {
 
 /** Cerebras and OpenRouter are used for text/tool-calling; Groq is always required for
     transcription but also works as the text fallback so the assistant still functions with just
-    a Groq key. */
-function pickProvider(keys: ProviderKeys): Provider {
+    a Groq key.
+
+    Every key the user has, in preference order — not just the first one. These are free or
+    near-free tiers that run dry, so "has a Cerebras key" is not the same as "Cerebras will answer
+    right now", and a user who configured a second provider did so precisely for that case. */
+function buildProviders(keys: ProviderKeys): Provider[] {
+  const providers: Provider[] = [];
   if (keys.cerebrasApiKey) {
-    return {
+    providers.push({
       baseUrl: CEREBRAS_API_BASE,
       apiKey: keys.cerebrasApiKey,
       model: CEREBRAS_CHAT_MODEL,
-    };
+    });
   }
   if (keys.openRouterApiKey) {
-    return {
+    providers.push({
       baseUrl: OPENROUTER_API_BASE,
       apiKey: keys.openRouterApiKey,
       model: OPENROUTER_CHAT_MODEL,
       // Optional but recommended by OpenRouter for inclusion in their public rankings.
       headers: { 'HTTP-Referer': config.betterAuthUrl, 'X-Title': 'Diary' },
-    };
+    });
   }
   if (keys.groqApiKey) {
-    return { baseUrl: GROQ_API_BASE, apiKey: keys.groqApiKey, model: GROQ_CHAT_MODEL };
+    providers.push({ baseUrl: GROQ_API_BASE, apiKey: keys.groqApiKey, model: GROQ_CHAT_MODEL });
   }
-  throw badRequest('ai.no_key');
+  if (!providers.length) throw badRequest('ai.no_key');
+  return providers;
+}
+
+/**
+ * Runs one chat completion, moving down the provider list when one won't serve the request.
+ *
+ * The conversation is provider-neutral — plain OpenAI-shaped messages — so a provider that dies
+ * halfway through the tool loop can be swapped out and the next key picks the same conversation up
+ * where it left off, tool results included. A provider that fails this way is not tried again for
+ * the rest of the request: whatever ran it dry (a 402, an invalid key) will still be true a second
+ * later, and retrying it would just pay the latency again on every remaining iteration.
+ *
+ * Only provider-level failures fail over. Everything else, and the last provider's failure, is
+ * raised as-is so the user sees the real reason rather than a generic one.
+ */
+function createCompleter(providers: Provider[]) {
+  let index = 0;
+  return async function complete(
+    body: Omit<ChatCompletionRequest, 'model'>,
+  ): Promise<ChatCompletionResponse> {
+    for (; index < providers.length; index++) {
+      const provider = providers[index];
+      try {
+        return await chatCompletion(
+          provider.baseUrl,
+          provider.apiKey,
+          { ...body, model: provider.model },
+          provider.headers,
+        );
+      } catch (err) {
+        const next = providers[index + 1];
+        if (!next || !isProviderFailure(err)) throw err;
+        console.warn(`ai chat (${provider.baseUrl}): ${err.code}, falling back to ${next.baseUrl}`);
+      }
+    }
+    /* Unreachable: buildProviders never returns an empty list, and the last iteration either
+       returns or rethrows. */
+    throw new HttpError(502, 'ai.upstream_error');
+  };
 }
 
 export async function generateSuggestions(
@@ -322,7 +372,7 @@ export async function generateSuggestions(
   // Two reads rather than one: the keys never travel with the settings any more (see
   // settingsService), so anything needing one asks for it explicitly.
   const [settings, keys] = await Promise.all([getSettings(userId), getProviderKeys(userId)]);
-  const provider = pickProvider(keys);
+  const complete = createCompleter(buildProviders(keys));
   const aiLanguage = settings.forceEnglishAIEvents ? 'en' : language;
   const availableDepth = availableDepthFor(parentPath, settings.maxSubEntryDepth);
 
@@ -368,19 +418,13 @@ export async function generateSuggestions(
   const tools = buildTools(availableDepth);
   let reminders = 0;
   for (let i = 0; i < AI_MAX_TOOL_ITERATIONS; i++) {
-    const res = await chatCompletion(
-      provider.baseUrl,
-      provider.apiKey,
-      {
-        model: provider.model,
-        messages,
-        tools,
-        tool_choice: 'auto',
-        temperature: 0.2,
-        max_tokens: 4096,
-      },
-      provider.headers,
-    );
+    const res = await complete({
+      messages,
+      tools,
+      tool_choice: 'auto',
+      temperature: 0.2,
+      max_tokens: 4096,
+    });
     const message = res.choices[0]?.message;
     if (!message) throw new HttpError(502, 'ai.upstream_error');
     messages.push(message);

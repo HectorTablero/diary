@@ -675,6 +675,7 @@
     "mic_unavailable": "El micrófono no está disponible",
     "invalid_key": "Tu API key del LLM no parece válida",
     "rate_limited": "Se ha alcanzado el límite del LLM, inténtalo de nuevo en un momento",
+    "quota_exhausted": "Tu cuenta del LLM se ha quedado sin crédito",
     "upstream_error": "El LLM no ha podido procesar eso",
     "timeout": "El LLM ha tardado demasiado en responder",
     "no_key": "Añade una clave de API de Groq en los ajustes primero",
