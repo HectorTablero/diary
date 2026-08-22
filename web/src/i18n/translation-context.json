@@ -15,7 +15,7 @@
     "interpolation": "{{name}}, {{count}}, {{days}}, {{age}}, {{months}}, {{version}} etc. are substituted verbatim. Keep every one the reference uses; word order may move freely around them. checkI18n compares the set per key, treating variables English omits from one plural variant as optional.",
     "markup": "diary.birthdayLine and birthdayLineWithAge contain a <mention> element rendered as a styled @mention chip. Keep the tag and its contents intact; move it within the sentence as the grammar needs.",
     "sigils": "@ marks a person and # marks a tag; both are typed literally into entry text and parsed by lib/tokens.ts. Never localise or space them away — \"@人物\" is correct, \"@ 人物\" is not.",
-    "brandNames": "Google, WhatsApp, WeChat, Groq, OpenRouter, Cerebras, Markdown, Android, Tamagotchi and API key placeholders (gsk_…, sk-or-…, csk-…) stay as they are. WeChat may take its local name where one is standard (微信).",
+    "brandNames": "Google, WhatsApp, Groq, OpenRouter, Cerebras, Markdown, Android, Tamagotchi and API key placeholders (gsk_…, sk-or-…, csk-…) stay as they are.",
     "examplePlaceholders": "Example phone numbers are localised to a plausible number for the language's main market, keeping the international format the hint is teaching. Email placeholders stay at example.com (an RFC-reserved domain).",
     "ellipsis": "Placeholders and in-progress labels use the single character … , not three dots.",
     "length": "These strings sit in chips, buttons and table cells. Aim at or below the English length; a chip truncates with an ellipsis rather than wrapping."
@@ -135,7 +135,6 @@
         "personActions": "Invisible label on the ⋯ menu of a person, in the list and on the profile header. {{name}} is there so twenty rows read as twenty distinct controls.",
         "alsoKnownAs": "An inline prefix before a nickname list. Very short; a gendered participle (Italian detto/detta) must be avoided here.",
         "phoneInternationalHint": "Teaches the international format. The example number is localised per language — keep the leading + and the country code.",
-        "wechatQrDescription": "Explains a WeChat limitation: a chat can't be opened from a link, so the ID has to be pasted into WeChat's own search.",
         "birthdayInDays": "Counted, shown as a countdown chip beside a name.",
         "ageYears": "Counted, used both standalone and inside a birthday line.",
         "checkupsPending": "Counted badge on the People nav item and the list header."
@@ -314,7 +313,7 @@
       "register": "你, informal and direct. Sentence case is not a concept; keep punctuation full-width (：，。「」) except inside Latin runs.",
       "measureWords": "Measure words sit around {{count}} in the strings: 条 for entries and talking points, 人 for people, 个 for tags and threads, 天 for days, 岁 for age, 件 for events. Changing a noun means rechecking its measure word.",
       "references": "断更／催更 (a serialised story going quiet, readers demanding more) and 打卡 (habit check-in) for the daily reminders; 电子宠物 for Tamagotchi; 已读不回 for the read-receipt joke; 潜水 for going silent; 表情包 and 「在吗」 for the send-something nudge; 成就解锁 for the achievement joke; 那年今日 for calendar.onThisDay.",
-      "typography": "A space goes either side of literal Latin runs and of numeric interpolations (Groq API 密钥, {{count}} 条记录) — standard Chinese typesetting, and what keeps an interpolated digit from fusing with a measure word. No space around {{name}}-style interpolations, though, since those may hold Han text and a hard-coded space would then be wrong. WeChat takes its local name 微信.",
+      "typography": "A space goes either side of literal Latin runs and of numeric interpolations (Groq API 密钥, {{count}} 条记录) — standard Chinese typesetting, and what keeps an interpolated digit from fusing with a measure word. No space around {{name}}-style interpolations, though, since those may hold Han text and a hard-coded space would then be wrong.",
       "terms": "Entry = 记录, sub-entry = 子记录, thread = 话题, talking point = 谈资, tag = 标签, event = 经历, checkup = 联系提醒. Note 线程 was rejected for thread: it means a CPU thread."
     }
   }

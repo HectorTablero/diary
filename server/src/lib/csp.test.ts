@@ -83,7 +83,7 @@ describe('buildCsp', () => {
 
   it('permits the image sources the app actually renders', () => {
     const { imgSrc } = buildCsp(writeHtml(''));
-    // Generated QR codes and inlined flag SVGs, and the signed-in user's Google avatar.
+    // Inlined flag SVGs, and the signed-in user's Google avatar.
     expect(imgSrc).toContain('data:');
     expect(imgSrc).toContain('https://*.googleusercontent.com');
   });

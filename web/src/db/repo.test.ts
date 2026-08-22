@@ -57,7 +57,6 @@ const person = (id: string, name: string, tagIds: string[] = []) => ({
   aliases: [],
   phone: null,
   email: null,
-  wechatId: null,
   birthday: null,
   company: null,
   jobTitle: null,

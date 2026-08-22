@@ -148,7 +148,6 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
   const [phone, setPhone] = useState(person?.phone ?? '');
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [email, setEmail] = useState(person?.email ?? '');
-  const [wechatId, setWechatId] = useState(person?.wechatId ?? '');
   const [company, setCompany] = useState(person?.company ?? '');
   const [jobTitle, setJobTitle] = useState(person?.jobTitle ?? '');
   const initialBirthday = parseBirthday(person?.birthday ?? null);
@@ -204,7 +203,6 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
       aliases,
       phone: toE164(phone),
       email: email.trim() || null,
-      wechatId: wechatId.trim() || null,
       birthday: buildBirthday(birthdayDay, birthdayMonth, birthdayYear),
       company: company.trim() || null,
       jobTitle: jobTitle.trim() || null,
@@ -328,19 +326,6 @@ export function PersonForm({ person = null, onDone }: PersonFormProps) {
           value={email}
           placeholder={t('people.emailPlaceholder')}
           onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="person-wechat">
-          {t('people.wechat')}{' '}
-          <span className="font-normal text-muted-foreground">({t('common.optional')})</span>
-        </Label>
-        <Input
-          id="person-wechat"
-          value={wechatId}
-          placeholder={t('people.wechatPlaceholder')}
-          onChange={(e) => setWechatId(e.target.value)}
         />
       </div>
 

@@ -51,7 +51,6 @@ const leanPerson = (patch: Record<string, unknown> = {}) => ({
   aliases: ['Mum'],
   phone: null,
   email: null,
-  wechatId: null,
   birthday: null,
   company: null,
   jobTitle: 'Nurse',

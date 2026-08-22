@@ -66,7 +66,6 @@ const person = {
   aliases: [],
   phone: null,
   email: null,
-  wechatId: null,
   birthday: null,
   company: null,
   jobTitle: null,

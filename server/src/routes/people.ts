@@ -53,7 +53,6 @@ export const peopleRouter = new Hono<AppEnv>()
             aliases: input.aliases,
             phone: input.phone,
             email: input.email,
-            wechatId: input.wechatId,
             birthday: input.birthday,
             company: input.company,
             jobTitle: input.jobTitle,
@@ -95,7 +94,6 @@ export const peopleRouter = new Hono<AppEnv>()
     if (input.aliases !== undefined) person.aliases = input.aliases;
     if (input.phone !== undefined) person.phone = input.phone;
     if (input.email !== undefined) person.email = input.email;
-    if (input.wechatId !== undefined) person.wechatId = input.wechatId;
     if (input.birthday !== undefined) person.birthday = input.birthday;
     if (input.company !== undefined) person.company = input.company;
     if (input.jobTitle !== undefined) person.jobTitle = input.jobTitle;

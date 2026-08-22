@@ -180,7 +180,6 @@ function personToDto(person: LocalPerson, tags: Map<string, TagDto>): PersonDto 
     aliases: person.aliases ?? [],
     phone: person.phone ?? null,
     email: person.email ?? null,
-    wechatId: person.wechatId ?? null,
     birthday: person.birthday ?? null,
     company: person.company ?? null,
     jobTitle: person.jobTitle ?? null,

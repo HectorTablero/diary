@@ -15,7 +15,6 @@ const person = (overrides: Partial<PersonDto>): PersonDto => ({
   aliases: [],
   phone: null,
   email: null,
-  wechatId: null,
   birthday: null,
   company: null,
   jobTitle: null,
