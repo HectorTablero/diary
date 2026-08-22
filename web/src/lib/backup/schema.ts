@@ -18,7 +18,6 @@ import {
   pluginDataSchema,
   settingsSchema,
   UNDATED_KEY,
-  wechatIdSchema,
 } from '@diary/shared';
 import { z } from 'zod';
 
@@ -57,7 +56,6 @@ export const localPersonSchema = z.object({
   aliases: aliasesSchema,
   phone: phoneSchema,
   email: emailSchema,
-  wechatId: wechatIdSchema,
   birthday: birthdaySchema,
   company: organizationSchema,
   jobTitle: organizationSchema,

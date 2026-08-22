@@ -403,7 +403,6 @@ export async function createPerson(input: PersonCreateInput): Promise<PersonDto>
     aliases: input.aliases ?? [],
     phone: input.phone ?? null,
     email: input.email ?? null,
-    wechatId: input.wechatId ?? null,
     birthday: input.birthday ?? null,
     company: input.company ?? null,
     jobTitle: input.jobTitle ?? null,
@@ -526,7 +525,6 @@ export async function updatePerson(personId: string, input: PersonUpdateInput): 
       if (input.aliases !== undefined) p.aliases = input.aliases;
       if (input.phone !== undefined) p.phone = input.phone;
       if (input.email !== undefined) p.email = input.email;
-      if (input.wechatId !== undefined) p.wechatId = input.wechatId;
       if (input.birthday !== undefined) p.birthday = input.birthday;
       if (input.company !== undefined) p.company = input.company;
       if (input.jobTitle !== undefined) p.jobTitle = input.jobTitle;
@@ -661,7 +659,6 @@ export async function importPeople(
       aliases: candidate.aliases,
       phone: candidate.phone,
       email: candidate.email,
-      wechatId: null,
       birthday: candidate.birthday,
       company: candidate.company,
       jobTitle: candidate.jobTitle,
@@ -1010,7 +1007,6 @@ export async function restorePerson(deletion: PersonDeletion): Promise<void> {
         aliases: person.aliases,
         phone: person.phone,
         email: person.email,
-        wechatId: person.wechatId,
         birthday: person.birthday,
         company: person.company,
         jobTitle: person.jobTitle,
@@ -1239,7 +1235,6 @@ function mergeBackupPersonPatch(
   const patch: PersonUpdateInput = {};
   if (!target.phone && incoming.phone) patch.phone = incoming.phone;
   if (!target.email && incoming.email) patch.email = incoming.email;
-  if (!target.wechatId && incoming.wechatId) patch.wechatId = incoming.wechatId;
   if (!target.birthday && incoming.birthday) patch.birthday = incoming.birthday;
   if (!target.company && incoming.company) patch.company = incoming.company;
   if (!target.jobTitle && incoming.jobTitle) patch.jobTitle = incoming.jobTitle;
@@ -1299,7 +1294,6 @@ export async function importPeopleFromBackup(
           aliases: patch.aliases ?? target.aliases,
           phone: patch.phone ?? target.phone,
           email: patch.email ?? target.email,
-          wechatId: patch.wechatId ?? target.wechatId,
           birthday: patch.birthday ?? target.birthday,
           company: patch.company ?? target.company,
           jobTitle: patch.jobTitle ?? target.jobTitle,
@@ -1326,7 +1320,6 @@ export async function importPeopleFromBackup(
           aliases: row.aliases,
           phone: row.phone,
           email: row.email,
-          wechatId: row.wechatId,
           birthday: row.birthday,
           company: row.company,
           jobTitle: row.jobTitle,
@@ -1350,7 +1343,6 @@ export async function importPeopleFromBackup(
             aliases: person.aliases,
             phone: person.phone,
             email: person.email,
-            wechatId: person.wechatId,
             birthday: person.birthday,
             company: person.company,
             jobTitle: person.jobTitle,

@@ -37,7 +37,6 @@ import { cancelIdle, onIdle } from '@/lib/idle';
 import { isLocalOnly, setLocalOnly } from '@/lib/localOnly';
 import { isNative } from '@/lib/native';
 import { setPreference, usePreferences } from '@/lib/preferences';
-import { preloadLoaders } from '@/lib/preloaders';
 import { cacheUser, getCachedUser } from '@/lib/sessionCache';
 import { getUpdateState, subscribeToUpdateState, type UpdateState } from '@/lib/liveUpdate';
 import { dismissUpdate, isDismissed } from '@/lib/updateCheck';
@@ -530,9 +529,6 @@ export default function AppLayout() {
     if (saveData) return;
     const handle = onIdle(() => {
       for (const load of Object.values(pageLoaders)) void load();
-      if (!isNative) {
-        for (const load of Object.values(preloadLoaders)) void load();
-      }
     });
     return () => cancelIdle(handle);
   }, [session]);

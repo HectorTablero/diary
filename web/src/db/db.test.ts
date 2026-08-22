@@ -71,7 +71,6 @@ describe('schema upgrades from v1', () => {
       aliases: [],
       phone: null,
       email: null,
-      wechatId: null,
       birthday: null,
       company: null,
       jobTitle: null,

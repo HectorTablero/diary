@@ -29,7 +29,6 @@ export const aPerson = (patch: Partial<PersonDto> & Pick<PersonDto, 'id' | 'name
   aliases: [],
   phone: null,
   email: null,
-  wechatId: null,
   birthday: null,
   company: null,
   jobTitle: null,

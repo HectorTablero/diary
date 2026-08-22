@@ -62,7 +62,6 @@ export interface LeanPerson {
   aliases?: string[];
   phone?: string | null;
   email?: string | null;
-  wechatId?: string | null;
   birthday?: string | null;
   company?: string | null;
   jobTitle?: string | null;
@@ -181,7 +180,6 @@ export const personToDto = (person: LeanPerson): PersonDto => ({
   aliases: person.aliases ?? [],
   phone: person.phone ?? null,
   email: person.email ?? null,
-  wechatId: person.wechatId ?? null,
   birthday: person.birthday ?? null,
   company: person.company ?? null,
   jobTitle: person.jobTitle ?? null,

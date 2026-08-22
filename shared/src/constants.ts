@@ -18,7 +18,6 @@ export const MAX_ALIAS_LENGTH = 100;
 export const MAX_PHONE_LENGTH = 40;
 export const MAX_EMAIL_LENGTH = 200;
 export const MAX_ORGANIZATION_LENGTH = 100;
-export const MAX_WECHAT_ID_LENGTH = 60;
 
 export const MAX_EVENTS = 50;
 export const MAX_EVENT_TITLE_LENGTH = 120;

@@ -64,8 +64,6 @@ export interface PersonDto {
       which the UI flags as incomplete. Only an E.164 number can open a WhatsApp chat. */
   phone: string | null;
   email: string | null;
-  /** WeChat ID, deep-linked as `weixin://dl/chat?<id>`. */
-  wechatId: string | null;
   /** `YYYY-MM-DD`, or `--MM-DD` when the year is unknown (see BIRTHDAY_REGEX). */
   birthday: string | null;
   company: string | null;

@@ -16,7 +16,6 @@ import {
   MAX_SUB_ENTRY_DEPTH,
   MAX_THREAD_NAME_LENGTH,
   MAX_THREADS_PER_ENTRY,
-  MAX_WECHAT_ID_LENGTH,
   normalizeBirthday,
   MAX_PLUGIN_DATA_BYTES,
   MAX_PLUGIN_DATA_DEPTH,
@@ -87,7 +86,6 @@ export const aliasesSchema = z
     keeping (the UI flags it), and only the edit form insists on a full international number. */
 export const phoneSchema = z.string().trim().max(MAX_PHONE_LENGTH).nullable();
 export const emailSchema = z.string().trim().max(MAX_EMAIL_LENGTH).nullable();
-export const wechatIdSchema = z.string().trim().max(MAX_WECHAT_ID_LENGTH).nullable();
 /* Transform-then-validate, so a legacy `---MM-DD` value is accepted and rewritten to the
    canonical `--MM-DD` on its way into the database — every write quietly heals the row.
    (A queued offline PATCH from a client that predates the fix would otherwise 400 forever.) */
@@ -124,7 +122,6 @@ export const personCreateSchema = z.object({
   aliases: aliasesSchema.default([]),
   phone: phoneSchema.default(null),
   email: emailSchema.default(null),
-  wechatId: wechatIdSchema.default(null),
   birthday: birthdaySchema.default(null),
   company: organizationSchema.default(null),
   jobTitle: organizationSchema.default(null),
@@ -143,7 +140,6 @@ export const personUpdateSchema = z.object({
   aliases: aliasesSchema.optional(),
   phone: phoneSchema.optional(),
   email: emailSchema.optional(),
-  wechatId: wechatIdSchema.optional(),
   birthday: birthdaySchema.optional(),
   company: organizationSchema.optional(),
   jobTitle: organizationSchema.optional(),

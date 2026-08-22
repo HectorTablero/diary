@@ -121,8 +121,8 @@ export function buildCsp(indexHtmlPath: string): CspDirectives {
        by hashes (only by 'unsafe-hashes', which is unevenly supported). Injecting CSS is also a far
        smaller prize than injecting script, which is the one this policy actually locks down. */
     styleSrc: ["'self'", "'unsafe-inline'"],
-    // data: for the generated WeChat QR codes and the inlined flag SVGs; the Google host for the
-    // signed-in user's profile picture, which is rendered with referrerPolicy="no-referrer".
+    // data: for the inlined flag SVGs; the Google host for the signed-in user's profile
+    // picture, which is rendered with referrerPolicy="no-referrer".
     imgSrc: ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'],
     fontSrc: ["'self'"],
     connectSrc: [...connectSrc],

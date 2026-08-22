@@ -42,7 +42,6 @@ export interface LocalPerson {
   aliases: string[];
   phone: string | null;
   email: string | null;
-  wechatId: string | null;
   birthday: string | null;
   company: string | null;
   jobTitle: string | null;
@@ -172,7 +171,6 @@ db.version(2)
         person.aliases ??= [];
         person.phone ??= null;
         person.email ??= null;
-        person.wechatId ??= null;
         person.birthday ??= null;
         person.company ??= null;
         person.jobTitle ??= null;
@@ -353,7 +351,6 @@ export const personFromDto = (dto: PersonDto): LocalPerson => ({
   aliases: dto.aliases,
   phone: dto.phone,
   email: dto.email,
-  wechatId: dto.wechatId,
   birthday: dto.birthday,
   company: dto.company,
   jobTitle: dto.jobTitle,
