@@ -196,7 +196,7 @@ export default function ThreadsPage() {
           nothing but the count left in it. */}
       <PageHeader
         title={
-          <span className="flex items-baseline gap-2">
+          <span className="flex items-center gap-2">
             {/* Under the bottom tab bar the switcher above is what names the page, so the word
                 itself only has to reach a screen reader — but it must still reach one, or the
                 page would have no heading at all. */}

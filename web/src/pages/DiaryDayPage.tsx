@@ -51,17 +51,24 @@ export default function DiaryDayPage() {
   const isToday = dateKey === todayKey();
   const celebrating = birthdaysOn(people, dateKey);
   const hasSideContent = celebrating.length > 0 || hasPluginContent;
-  /* The page's own max-width grows with the viewport whenever there's side content to potentially
-     show — that's just how wide this page is ever allowed to get, and it's fine for that ceiling to
-     track the viewport. It must NOT be gated on `useTwoColumns` itself: that would make the measured
-     width below depend on a decision that depends on the measured width, and the container would
-     never grow past max-w-3xl's ~700px of content to find out it had room to split. */
+  /* The page's own max-width grows with the viewport whenever the two-column preference is on and
+     there's side content to potentially show — that's just how wide this page is ever allowed to
+     get, and it's fine for that ceiling to track the viewport. It must NOT be gated on
+     `useTwoColumns` itself: that would make the measured width below depend on a decision that
+     depends on the measured width, and the container would never grow past max-w-3xl's ~700px of
+     content to find out it had room to split. Gating on the preference instead of `useTwoColumns`
+     keeps that bootstrapping intact while still keeping the page at the same max-w-3xl as every
+     other page when the user has opted into single-column mode outright. */
   const useTwoColumns =
     prefs.twoColumnLayout && hasSideContent && splitWidth >= SIDEBAR_SPLIT_MIN_WIDTH;
 
   return (
     <PageContainer
-      className={hasSideContent ? 'lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl' : undefined}
+      className={
+        prefs.twoColumnLayout && hasSideContent
+          ? 'lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl'
+          : undefined
+      }
     >
       <div
         ref={splitRef}
