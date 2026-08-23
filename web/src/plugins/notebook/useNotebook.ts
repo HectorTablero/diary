@@ -465,7 +465,10 @@ export function useTouchedDocuments(dateKey: string): {
   }, [dateKey]);
 
   useEffect(() => {
-    setLoading(true);
+    // Not `setLoading(true)` here: `load` also changes identity on every `dateKey` change (arrow-key
+    // navigation on the day page), and flipping back to loading for that hides the widget entirely
+    // for an instant on every keypress. The read is local IndexedDB and fast; `loading` now only
+    // ever describes the very first read, from its `useState(true)` initial value.
     void load();
     return onSyncApplied(() => void load());
   }, [load]);

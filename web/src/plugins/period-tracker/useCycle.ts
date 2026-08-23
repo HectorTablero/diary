@@ -88,7 +88,11 @@ export function usePeriodDay(dateKey: string): PeriodDayState {
   }, [dateKey, today]);
 
   useEffect(() => {
-    setLoading(true);
+    // Not `setLoading(true)` here: `load` also changes identity on every `dateKey` change (arrow-key
+    // navigation on the day page), and flipping back to loading for that is a layout shift for no
+    // reason — the data is local IndexedDB, the read is fast, and the previous day's card staying on
+    // screen for the instant it takes is strictly better than a skeleton immediately replaced again.
+    // `loading` now only ever describes the very first read, from its `useState(true)` initial value.
     void load();
     return onSyncApplied(() => void load());
   }, [load]);

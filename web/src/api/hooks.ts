@@ -14,7 +14,7 @@ import type {
   ThreadUpdateInput,
 } from '@diary/shared';
 import type { ExistingEntryIndex } from '@/lib/backup/conflicts';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as mutations from '@/db/mutations';
 import * as repo from '@/db/repo';
 import { apiPost } from '@/lib/apiClient';
@@ -239,6 +239,12 @@ export const useDayEntries = (dateKey: string) =>
   useQuery({
     queryKey: ['entries', 'day', dateKey],
     queryFn: () => repo.getDayEntries(dateKey),
+    // Arrow-key navigation on the day page changes `dateKey` on every press, which is a new query
+    // key each time — without this, `isLoading` goes true for an instant on every single press and
+    // the page collapses to its skeleton/single-column state only to immediately expand back out.
+    // The read is local IndexedDB and fast; keeping the previous day's entries on screen until the
+    // new day's resolve is strictly better than a guaranteed flash of loading state.
+    placeholderData: keepPreviousData,
   });
 
 function useInvalidateEntryData() {

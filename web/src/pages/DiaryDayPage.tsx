@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { DATE_KEY_REGEX } from '@diary/shared';
 import { addDays } from 'date-fns';
 import { Cake, ChevronLeft, ChevronRight, NotebookPen } from 'lucide-react';
@@ -38,11 +38,15 @@ export default function DiaryDayPage() {
   const prefs = usePreferences();
   const [splitRef, splitWidth] = useContainerWidth<HTMLDivElement>();
 
+  /* Deliberately not reset to `false` on every `dateKey` change: `PluginDaySlot` already re-derives
+     this itself for the new date (its own effect keys off `dateKey` too, checking the real DOM once
+     the new day's widgets have rendered) — see the comment on `onHasContentChange` there. Forcing it
+     false here first meant every day navigation collapsed the side column and then, a tick later,
+     re-expanded it once the child caught up: a guaranteed double layout shift on every navigation,
+     worst in two-column mode where it also toggled the entries column between full-width and
+     col-span-7. Starting from the previous day's value and letting the child correct it produces at
+     most the one shift a genuine change in content actually requires. */
   const [hasPluginContent, setHasPluginContent] = useState(false);
-
-  useEffect(() => {
-    setHasPluginContent(false);
-  }, [dateKey]);
 
   if (!valid) return <Navigate to={`/diary/${todayKey()}`} replace />;
 
