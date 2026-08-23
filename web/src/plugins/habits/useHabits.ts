@@ -151,7 +151,12 @@ export function useHabitsDay(dateKey: string): HabitsDay {
   }, [dateKey]);
 
   useEffect(() => {
-    setLoading(true);
+    // Not `setLoading(true)` here: `load` also changes identity on every `dateKey` change (arrow-key
+    // navigation on the day page), and flipping back to the loading skeleton for that is a layout
+    // shift for no reason — the data is local IndexedDB, the read is fast, and the previous day's
+    // card staying on screen for the instant it takes is strictly better than replacing it with a
+    // skeleton that is immediately replaced again. `loading` now only ever describes the very first
+    // read, from its `useState(true)` initial value.
     void load();
     // The widget reads Dexie directly rather than through the query cache, so a change from another
     // device needs its own subscription.
