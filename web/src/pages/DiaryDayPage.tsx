@@ -67,155 +67,169 @@ export default function DiaryDayPage() {
     prefs.twoColumnLayout && hasSideContent && splitWidth >= SIDEBAR_SPLIT_MIN_WIDTH;
 
   return (
-    <PageContainer
-      className={
-        prefs.twoColumnLayout && hasSideContent
-          ? 'lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl'
-          : undefined
-      }
-    >
-      <div
-        ref={splitRef}
+    <>
+      {/* Its own `PageContainer`, separate from the one below: reusing the component rather than
+          hand-matching its `max-w-3xl`/padding means the date selector is *guaranteed* pixel-identical
+          to every other page's heading, rather than merely intended to be. It never takes the widened
+          className the container below can get — inside `col-span-7` (or, before that, inside a
+          shared container that had already widened) the arrows read as off-center or oddly spaced the
+          moment there was side content to show. Sitting in a container of its own, always at the
+          1-column width, means it looks and sits exactly the same way regardless of what's below it.
+          `pb-0`/no top margin on the row below close the gap a second container's own padding would
+          otherwise open up between this and the content container's `pt-0`. */}
+      <PageContainer className="pb-0 md:pb-0">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={() => shift(-1)}
+            aria-label={t('diary.previousDay')}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+
+          {/* The heading *is* the date field. It used to open a detached `<input type="date">` via
+              showPicker(), which meant the app's most-used date control was the only one not using
+              the app's own calendar — a different widget per browser, a full-screen Material dialog
+              on Android, and no first-day-of-week setting. Same DatePicker as the composer and
+              search now, just wearing the heading as its trigger. */}
+          <DatePicker
+            value={dateKey}
+            onChange={(value) => value && goTo(value)}
+            align="center"
+            aria-label={t('diary.entryDate')}
+            trigger={
+              <button
+                type="button"
+                className="min-w-0 flex-1 rounded-lg text-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <h1
+                  className={cn(
+                    'text-base font-semibold tracking-tight first-letter:uppercase',
+                    isToday && 'text-primary',
+                  )}
+                >
+                  {formatDateKey(dateKey, i18n.language, 'EEEE, d MMMM')}
+                </h1>
+                <p className="text-xs text-muted-foreground">
+                  {isToday
+                    ? t('common.today')
+                    : formatDateKey(dateKey, i18n.language, 'yyyy') +
+                      (parseDateKey(dateKey) > new Date() ? ` (${t('common.future')})` : '')}
+                </p>
+              </button>
+            }
+          />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={() => shift(1)}
+            aria-label={t('diary.nextDay')}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      </PageContainer>
+
+      <PageContainer
         className={cn(
-          useTwoColumns && 'grid grid-cols-12 items-start',
-          useTwoColumns && (splitWidth >= SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH ? 'gap-8' : 'gap-6'),
+          'pt-4 md:pt-4',
+          prefs.twoColumnLayout && hasSideContent && 'lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl',
         )}
       >
-        {/* Main column: entries & composer */}
-        <div className={cn(useTwoColumns && 'col-span-7')}>
-          <div className="mb-4 flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0"
-              onClick={() => shift(-1)}
-              aria-label={t('diary.previousDay')}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-
-            {/* The heading *is* the date field. It used to open a detached `<input type="date">` via
-                showPicker(), which meant the app's most-used date control was the only one not using
-                the app's own calendar — a different widget per browser, a full-screen Material dialog
-                on Android, and no first-day-of-week setting. Same DatePicker as the composer and
-                search now, just wearing the heading as its trigger. */}
-            <DatePicker
-              value={dateKey}
-              onChange={(value) => value && goTo(value)}
-              align="center"
-              aria-label={t('diary.entryDate')}
-              trigger={
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 rounded-lg text-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <h1
-                    className={cn(
-                      'text-base font-semibold tracking-tight first-letter:uppercase',
-                      isToday && 'text-primary',
-                    )}
-                  >
-                    {formatDateKey(dateKey, i18n.language, 'EEEE, d MMMM')}
-                  </h1>
-                  <p className="text-xs text-muted-foreground">
-                    {isToday
-                      ? t('common.today')
-                      : formatDateKey(dateKey, i18n.language, 'yyyy') +
-                        (parseDateKey(dateKey) > new Date() ? ` (${t('common.future')})` : '')}
-                  </p>
-                </button>
-              }
-            />
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0"
-              onClick={() => shift(1)}
-              aria-label={t('diary.nextDay')}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-8 w-2/3" />
-              <Skeleton className="h-8 w-4/5" />
-            </div>
-          ) : entries && entries.length > 0 ? (
-            <EntryTree entries={entries} />
-          ) : (
-            <EmptyState
-              icon={NotebookPen}
-              title={t('diary.noEntries')}
-              description={t('diary.noEntriesDescription')}
-            />
+        <div
+          ref={splitRef}
+          className={cn(
+            useTwoColumns && 'grid grid-cols-12 items-start',
+            useTwoColumns && (splitWidth >= SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH ? 'gap-8' : 'gap-6'),
           )}
-
-          <div className="mt-8 rounded-xl border bg-card p-3 shadow-xs">
-            <EntryComposer key={dateKey} dateKey={dateKey} />
-          </div>
-        </div>
-
-        {/* Side content: birthdays & plugins (sidebar when useTwoColumns is true, single-column below composer when useTwoColumns is false) */}
-        {(hasSideContent || enabledPlugins.size > 0) && (
-          <aside className={cn('mt-6 space-y-6', useTwoColumns && 'mt-0 col-span-5 sticky top-6')}>
-            {/**
-             * Whose birthday it is, in the same card the habit checklist uses.
-             *
-             * Below the composer it joins the band of things that are *about* the day rather than the day
-             * itself, above the habits for the same reason the habits are below the composer: writing
-             * comes first, and what is fixed about the day comes before what you are still filling in.
-             */}
-            {celebrating.length > 0 && (
-              <section
-                className="rounded-xl border bg-card p-4 shadow-xs"
-                aria-labelledby="birthdays-day-title"
-              >
-                <div className="flex items-center gap-2">
-                  <Cake className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <h2 id="birthdays-day-title" className="flex-1 text-sm font-medium">
-                    {t('diary.birthdays')}
-                  </h2>
-                </div>
-
-                <ul className="mt-2 flex flex-col gap-1 text-sm">
-                  {celebrating.map((person) => {
-                    const age = ageOn(person.birthday, parseDateKey(dateKey));
-                    return (
-                      <li key={person.id}>
-                        <Trans
-                          i18nKey={
-                            age === null ? 'diary.birthdayLine' : 'diary.birthdayLineWithAge'
-                          }
-                          values={{ name: person.name, age }}
-                          components={{
-                            mention: (
-                              <Link
-                                to={`/people/${person.id}`}
-                                className="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
-                              />
-                            ),
-                          }}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
+        >
+          {/* Main column: entries & composer */}
+          <div className={cn(useTwoColumns && 'col-span-7')}>
+            {isLoading ? (
+              <div className="flex flex-col gap-3">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-8 w-2/3" />
+                <Skeleton className="h-8 w-4/5" />
+              </div>
+            ) : entries && entries.length > 0 ? (
+              <EntryTree entries={entries} />
+            ) : (
+              <EmptyState
+                icon={NotebookPen}
+                title={t('diary.noEntries')}
+                description={t('diary.noEntriesDescription')}
+              />
             )}
 
-            {/* Plugin day widgets (habits, period tracker, etc.) */}
-            <PluginDaySlot
-              dateKey={dateKey}
-              className="mt-0"
-              onHasContentChange={setHasPluginContent}
-            />
-          </aside>
-        )}
-      </div>
-    </PageContainer>
+            <div className="mt-8 rounded-xl border bg-card p-3 shadow-xs">
+              <EntryComposer key={dateKey} dateKey={dateKey} />
+            </div>
+          </div>
+
+          {/* Side content: birthdays & plugins (sidebar when useTwoColumns is true, single-column below composer when useTwoColumns is false) */}
+          {(hasSideContent || enabledPlugins.size > 0) && (
+            <aside
+              className={cn('mt-6 space-y-6', useTwoColumns && 'mt-0 col-span-5 sticky top-6')}
+            >
+              {/**
+               * Whose birthday it is, in the same card the habit checklist uses.
+               *
+               * Below the composer it joins the band of things that are *about* the day rather than the day
+               * itself, above the habits for the same reason the habits are below the composer: writing
+               * comes first, and what is fixed about the day comes before what you are still filling in.
+               */}
+              {celebrating.length > 0 && (
+                <section
+                  className="rounded-xl border bg-card p-4 shadow-xs"
+                  aria-labelledby="birthdays-day-title"
+                >
+                  <div className="flex items-center gap-2">
+                    <Cake className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <h2 id="birthdays-day-title" className="flex-1 text-sm font-medium">
+                      {t('diary.birthdays')}
+                    </h2>
+                  </div>
+
+                  <ul className="mt-2 flex flex-col gap-1 text-sm">
+                    {celebrating.map((person) => {
+                      const age = ageOn(person.birthday, parseDateKey(dateKey));
+                      return (
+                        <li key={person.id}>
+                          <Trans
+                            i18nKey={
+                              age === null ? 'diary.birthdayLine' : 'diary.birthdayLineWithAge'
+                            }
+                            values={{ name: person.name, age }}
+                            components={{
+                              mention: (
+                                <Link
+                                  to={`/people/${person.id}`}
+                                  className="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                                />
+                              ),
+                            }}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
+
+              {/* Plugin day widgets (habits, period tracker, etc.) */}
+              <PluginDaySlot
+                dateKey={dateKey}
+                className="mt-0"
+                onHasContentChange={setHasPluginContent}
+              />
+            </aside>
+          )}
+        </div>
+      </PageContainer>
+    </>
   );
 }
