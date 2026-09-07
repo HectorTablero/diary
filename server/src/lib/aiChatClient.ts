@@ -66,6 +66,21 @@ function retryDelayMs(res: Response, attempt: number): number {
 
 const MAX_ATTEMPTS = 3;
 
+/**
+ * A 200 does not guarantee a completion. Providers occasionally answer OK with an error envelope
+ * instead (OpenRouter does this when its own upstream fails), and a body without a usable
+ * `choices` entry would otherwise be cast straight through and blow up in the caller's tool loop.
+ * Rejecting it here turns it into an ordinary provider failure, so a user with a second key fails
+ * over to it exactly as they would on a 402 or a 429.
+ */
+function asChatCompletion(payload: unknown): ChatCompletionResponse | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const { choices } = payload as { choices?: unknown };
+  if (!Array.isArray(choices) || !choices.length) return undefined;
+  if (!choices.every((c) => c && typeof c === 'object' && 'message' in c)) return undefined;
+  return payload as ChatCompletionResponse;
+}
+
 /** This is the server's only outbound fetch — Node's global fetch, no new dependency. */
 export async function chatCompletion(
   baseUrl: string,
@@ -91,7 +106,16 @@ export async function chatCompletion(
         throw new HttpError(504, 'ai.timeout');
       throw new HttpError(502, 'ai.upstream_error');
     }
-    if (res.ok) return (await res.json()) as ChatCompletionResponse;
+    if (res.ok) {
+      const payload = await res.json().catch(() => undefined);
+      const completion = asChatCompletion(payload);
+      if (completion) return completion;
+      console.warn(
+        `ai chat (${baseUrl}): 200 without usable choices`,
+        JSON.stringify(payload)?.slice(0, 500),
+      );
+      throw new HttpError(502, 'ai.upstream_error');
+    }
 
     // Free-tier rate limits are commonly short bursts, not real capacity problems — the account
     // can easily have headroom while a single request still gets a 429. Retry a couple of times

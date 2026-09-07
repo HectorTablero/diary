@@ -425,7 +425,8 @@ export async function generateSuggestions(
       temperature: 0.2,
       max_tokens: 4096,
     });
-    const message = res.choices[0]?.message;
+    // chatCompletion already rejects a response without a usable choice; this stays defensive.
+    const message = res.choices?.[0]?.message;
     if (!message) throw new HttpError(502, 'ai.upstream_error');
     messages.push(message);
 
