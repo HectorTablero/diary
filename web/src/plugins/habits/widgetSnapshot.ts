@@ -25,19 +25,23 @@ import {
  *
  * So the model stays here and only its *conclusions* cross. A row carries a label, a string to
  * display, a number behind it and a goal to fill toward. `HabitKind` never appears in Java; adding
- * a sixth kind is a change to `toRow` and to nothing native at all.
+ * a kind is a change to `toRow` and to nothing native at all — which `task` is the proof of: it
+ * arrived with a schedule, a carry-over rule and an overdue state, and cost the provider nothing,
+ * because a task reaches it as a box that is either ticked or isn't. Nor does the schedule: the
+ * snapshot only ever describes today, so "which days ask this" has already been answered by the
+ * time a row exists.
  *
- * ## The four formats, and why they are not the five kinds
+ * ## The five formats, and why they are not the six kinds
  *
  * The widget still has to re-render a row *locally* after a `+` press — the app may not be running,
  * and a stepper that does nothing until you next open the app is not a stepper. That is the only
  * reason `format` exists: it is the smallest thing the provider needs to turn a number back into
- * text. Four display shapes cover the five kinds today and are the shapes any future kind will
+ * text. Five display shapes cover the six kinds today and are the shapes any future kind will
  * reuse, because they are about typography rather than meaning:
  *
  *   count     a number, optionally with a unit — "20", "20 reps"
  *   duration  hours/minutes/seconds — "1h 20m"
- *   binary    a pill that reads `strings.markDone`, filled once it is
+ *   binary    a pill that reads `strings.markDone`, filled once it is — a `task` too
  *   scale     a reading against a fixed top — "4/5" — stepped between its bounds
  *   mood      the same reading, chosen from five faces
  *
@@ -56,6 +60,10 @@ import {
  * newer snapshot treats it as absent and draws its empty state, which is the right failure: the web
  * layer updates over the air while the provider only changes when a new APK is installed, so this
  * pairing is genuinely allowed to skew.
+ *
+ * Tasks and schedules deliberately did *not* bump it. Both change which rows exist, never what a
+ * row is, so an installed APK draws them correctly the day the web layer ships them — where a bump
+ * would have blanked every widget in the field until its owner happened to update the app.
  */
 export const WIDGET_SNAPSHOT_VERSION = 4;
 
@@ -211,7 +219,10 @@ export function toRow(
     max: 0,
   };
 
-  if (habit.type === 'binary') {
+  /* A task ships as the box it looks like. Nothing about carrying over crosses into Java: the
+     snapshot already only contains rows that apply *today*, so an overdue task is simply present
+     and a satisfied one is simply absent — a conclusion, like every other field here. */
+  if (habit.type === 'binary' || habit.type === 'task') {
     return {
       ...base,
       format: 'binary',

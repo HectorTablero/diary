@@ -13,7 +13,9 @@ import { isPluginEnabled } from '../enabled';
 import { HabitsWidget } from './widgetPlugin';
 import {
   habitAppliesOn,
+  habitOccursOn,
   isArchived,
+  isTask,
   metTarget,
   parseHabit,
   parseValues,
@@ -23,6 +25,7 @@ import {
   type Habit,
 } from './model';
 import { dateKeyWindow, streakBefore, STREAK_WINDOW_DAYS } from './streaks';
+import { doneDaysOf, pendingTask } from './tasks';
 import { buildSnapshot, type WidgetSnapshot, type WidgetStrings } from './widgetSnapshot';
 
 /**
@@ -178,11 +181,25 @@ async function readSnapshot(): Promise<WidgetSnapshot> {
 
   /* `habitAppliesOn` rather than `!isArchived`: the widget only ever shows today, and a habit
      retired yesterday is not a question today is asking. It also drops habits created later than
-     today, which cannot happen for a real clock but can for a device whose date was wound back. */
-  const active = habits.filter((habit) => !isArchived(habit) && habitAppliesOn(habit, dateKey));
+     today, which cannot happen for a real clock but can for a device whose date was wound back.
+
+     Then the same three-way test the day card makes, so the home screen and the day page never
+     disagree about what today is asking: today's schedule, or a task still owed from an earlier
+     day, or an answer already recorded — a habit ticked this morning must not vanish from the
+     widget because its schedule says today was never its day. */
+  const active = habits.filter((habit) => {
+    if (isArchived(habit) || !habitAppliesOn(habit, dateKey)) return false;
+    if ((values[habit.id] ?? 0) > 0) return true;
+    return isTask(habit)
+      ? pendingTask(habit, dateKey, doneDaysOf(habit.id, history)) !== undefined
+      : habitOccursOn(habit, dateKey);
+  });
 
   const streaksBefore = new Map(
-    active.map((habit) => [habit.id, streakBefore(metDays(habit, history), dateKey)]),
+    active.map((habit) => [
+      habit.id,
+      streakBefore(metDays(habit, history), dateKey, (day) => habitOccursOn(habit, day)),
+    ]),
   );
 
   const timers = await readTimers();

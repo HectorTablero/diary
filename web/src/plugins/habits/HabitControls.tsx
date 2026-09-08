@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Flame,
   Frown,
+  History,
   Laugh,
   Meh,
   Minus,
@@ -16,11 +17,13 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Slider as SliderPrimitive } from 'radix-ui';
 import { Button } from '@/components/ui/button';
+import { formatDateKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import {
   configAt,
   formatDuration,
   formatHabitValue,
+  isCheckbox,
   scaleBounds,
   showsSeconds,
   type Habit,
@@ -77,9 +80,24 @@ export function HiddenSection({
  * column for the whole list: without it every row's controls would sit at a different x depending
  * on whether that particular habit happened to be on a streak.
  */
-export function StreakBadge({ streak, completed = true }: { streak: number; completed?: boolean }) {
+export function StreakBadge({
+  streak,
+  completed = true,
+  /** Whether the run is measured in days. A habit asked about on Mondays counts *Mondays* in a row
+      — see `streakBefore` — and "5 days in a row" would be a plainly false thing to read out for a
+      habit that has only been asked five times in five weeks. Visually it is the same number
+      either way; this only changes the sentence a screen reader hears. */
+  everyDay = true,
+}: {
+  streak: number;
+  completed?: boolean;
+  everyDay?: boolean;
+}) {
   const { t } = useTranslation();
   if (streak < STREAK_MIN) return null;
+  const label = everyDay
+    ? t('plugins.habits.streak', { count: streak })
+    : t('plugins.habits.streakOccurrences', { count: streak });
   return (
     <span
       className={cn(
@@ -88,10 +106,37 @@ export function StreakBadge({ streak, completed = true }: { streak: number; comp
           ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
           : 'bg-muted text-muted-foreground',
       )}
-      aria-label={t('plugins.habits.streak', { count: streak })}
+      aria-label={label}
     >
       <Flame className="size-3" aria-hidden />
       <span aria-hidden>{streak}</span>
+    </span>
+  );
+}
+
+/**
+ * How long a task has been waiting, beside its name.
+ *
+ * Only ever shown once the day it was due has passed — on the day itself the row is simply a row,
+ * and labelling a task "due today" on the day it is due would put a warning on every task the
+ * moment it appears. The date is read out rather than printed: the pill has to survive beside a
+ * long habit name on a phone, and "Overdue" is the part that changes what you do about it.
+ *
+ * Deliberately not red. A task carried over from Tuesday is a thing still to do, not an error, and
+ * the diary does not tell people off — the same reason the reminder counts what is left rather than
+ * congratulating what is done. Amber is the tone this plugin already uses for "worth noticing".
+ */
+export function OverdueBadge({ since }: { since: string }) {
+  const { t, i18n } = useTranslation();
+  return (
+    <span
+      className="flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+      aria-label={t('plugins.habits.overdueSince', {
+        date: formatDateKey(since, i18n.language),
+      })}
+    >
+      <History className="size-3" aria-hidden />
+      <span aria-hidden>{t('plugins.habits.overdue')}</span>
     </span>
   );
 }
@@ -112,7 +157,7 @@ export interface LiveValue {
 
 export function useLiveHabitValue(habit: Habit, value: number, dateKey: string): LiveValue {
   // Called for every kind because hooks cannot be conditional; it is a localStorage read and
-  // nothing more for the four kinds that never start it.
+  // nothing more for the five kinds that never start it.
   const stopwatch = useStopwatch(habit.id, dateKey);
   const pending = habit.type === 'time' ? stopwatch.elapsed : 0;
   return { committed: value, pending, total: value + pending, stopwatch };
@@ -338,7 +383,7 @@ export function HabitControl({
    * the fill is what says which one you are in — so the button never becomes a congratulation, and
    * the row's width does not change as it is pressed.
    */
-  if (habit.type === 'binary') {
+  if (isCheckbox(habit.type)) {
     return (
       <Button
         type="button"

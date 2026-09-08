@@ -44,7 +44,7 @@ describe('AddHabitsStep', () => {
 });
 
 describe('TypesStep', () => {
-  it('shows all five kinds through the real day-page controls, read-only', () => {
+  it('shows all six kinds through the real day-page controls, read-only', () => {
     renderWithProviders(<TypesStep />);
 
     // Binary: ticked, and on a long enough run to read amber. Scoped to its own row — Sleep
@@ -71,6 +71,13 @@ describe('TypesStep', () => {
     // only asserts the track renders rather than asserting a name nothing here can give it.
     expect(screen.getByRole('slider')).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: 'Mood' })).toBeInTheDocument();
+
+    /* The task, and the one thing about it a static row has to show: a box like any other, wearing
+       the pill that says its question outlived the day it was asked on. The pill's visible word is
+       hidden from screen readers in favour of the date it was owed from, so this asserts the row
+       rather than the word — the label is what a reader is actually given. */
+    const taskRow = screen.getByRole('checkbox', { name: 'Book the dentist' }).closest('li')!;
+    expect(within(taskRow).getByText('Overdue')).toBeInTheDocument();
 
     // Read-only throughout: nothing here is a habit that can actually be ticked.
     for (const control of screen.getAllByRole('button')) expect(control).toBeDisabled();
@@ -99,9 +106,9 @@ describe('WidgetStep', () => {
     // rather than the habits plugin icon, and the same "met/total" counter.
     const widget = screen.getByRole('region', { name: 'Home screen widget' });
     expect(within(widget).getByText('Habits')).toBeInTheDocument();
-    expect(within(widget).getByText('3/5')).toBeInTheDocument();
+    expect(within(widget).getByText('3/6')).toBeInTheDocument();
 
-    // The same five examples TypesStep shows — one cast of habits, not a fresh invention here.
+    // The same six examples TypesStep shows — one cast of habits, not a fresh invention here.
     expect(within(widget).getByText('Meditate')).toBeInTheDocument();
     expect(within(widget).getByText('20 reps')).toBeInTheDocument();
 

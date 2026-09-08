@@ -2,11 +2,12 @@ import 'fake-indexeddb/auto';
 import { UNDATED_KEY } from '@diary/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db/db';
 import { createPluginRecord } from '@/db/pluginRecords';
 import i18n from '@/i18n';
 import { todayKey } from '@/lib/dates';
+import { resetPreferences, setPreference } from '@/lib/preferences';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import HabitsPage from './HabitsPage';
 import en from './locales/en.json';
@@ -40,6 +41,119 @@ beforeEach(async () => {
   i18n.addResourceBundle('en', 'translation', { plugins: { habits: en } }, true, true);
   await db.pluginRecords.clear();
   await db.outbox.clear();
+  resetPreferences();
+});
+
+afterEach(() => {
+  resetPreferences();
+});
+
+/* The seven weekday toggles, in the order they are drawn — the whole row, not one of them, because
+   a rotation is only ever wrong in the *sequence*: any single button, read alone, looks right. */
+const weekdayToggles = () =>
+  within(screen.getByRole('group', { name: 'Days of the week' }))
+    .getAllByRole('button')
+    .map((button) => button.getAttribute('aria-label'));
+
+const openScheduleKind = async (user: ReturnType<typeof userEvent.setup>, option: string) => {
+  await user.click(await screen.findByRole('button', { name: 'New habit' }));
+  await user.click(screen.getByRole('combobox', { name: 'When' }));
+  await user.click(await screen.findByRole('option', { name: option }));
+};
+
+describe('scheduling a habit', () => {
+  it('stores only the days that were picked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<HabitsPage />);
+
+    await openScheduleKind(user, 'Certain weekdays');
+    await user.type(screen.getByLabelText('Habit name'), 'Gym');
+    await user.click(screen.getByRole('button', { name: 'Tuesday' }));
+    await user.click(screen.getByRole('button', { name: 'Thursday' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(async () => expect(await definitions()).toHaveLength(1));
+    // Stored Sunday-first and sorted, whatever order they were clicked in or drawn in.
+    expect((await definitions())[0].schedule).toEqual({ kind: 'weekdays', days: [2, 4] });
+  });
+
+  it('refuses a week with no days ticked rather than storing a habit that never comes round', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<HabitsPage />);
+
+    await openScheduleKind(user, 'Certain weekdays');
+    await user.type(screen.getByLabelText('Habit name'), 'Gym');
+
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+  });
+
+  it('takes a habit back to every day, rather than leaving the old schedule standing', async () => {
+    /* An edit applies by spreading the new configuration over the old, so "no schedule" has to
+       travel as an explicit `undefined` — a merely absent key would read as "unchanged". */
+    await seed({ name: 'Gym', schedule: { kind: 'weekdays', days: [2] } });
+    const user = userEvent.setup();
+    renderWithProviders(<HabitsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('combobox', { name: 'When' }));
+    await user.click(await screen.findByRole('option', { name: 'Every day' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => expect((await definitions())[0].schedule).toBeUndefined());
+    // And the change is banked, so the Tuesdays it really was on stay Tuesdays in the past.
+    expect((await definitions())[0].revisions).toHaveLength(1);
+  });
+
+  it('leaves a daily habit with no stored schedule at all', async () => {
+    /* The default is absent, not `{ kind: 'daily' }` — exactly like every row written before
+       schedules existed, so opening the form and saving changes nothing and banks no revision. */
+    const user = userEvent.setup();
+    renderWithProviders(<HabitsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'New habit' }));
+    await user.type(screen.getByLabelText('Habit name'), 'Read');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(async () => expect(await definitions()).toHaveLength(1));
+    expect((await definitions())[0].schedule).toBeUndefined();
+  });
+
+  it('starts the week where the active language starts it', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<HabitsPage />);
+
+    await openScheduleKind(user, 'Certain weekdays');
+    // `weekStartsOn: 'auto'` is the default and defers to the language; English starts on Sunday.
+    expect(weekdayToggles()).toEqual([
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ]);
+  });
+
+  it('re-lays the toggles when the week is set to start on Monday', async () => {
+    setPreference('weekStartsOn', 1);
+    const user = userEvent.setup();
+    renderWithProviders(<HabitsPage />);
+
+    await openScheduleKind(user, 'Certain weekdays');
+    /* The same Settings preference the calendar's month grid follows — one answer to "where does a
+       week start", not a second one invented here. The *stored* order is unaffected; only the
+       reading order moves. */
+    expect(weekdayToggles()).toEqual([
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ]);
+  });
 });
 
 describe('creating a habit', () => {

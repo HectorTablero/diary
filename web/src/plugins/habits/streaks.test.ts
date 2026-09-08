@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { currentStreak, dateKeysBetween, dateKeyWindow, streakBefore } from './streaks';
+import {
+  currentStreak,
+  dateKeysBetween,
+  dateKeyWindow,
+  streakBefore,
+  STREAK_WINDOW_DAYS,
+} from './streaks';
 
 /* Date arithmetic, which is where this feature's bugs would live and where none of them would be
    visible: a streak that is silently one short reads as a user's own misremembering. */
@@ -141,5 +147,47 @@ describe('dateKeysBetween', () => {
       '2026-02-01',
       '2026-02-02',
     ]);
+  });
+});
+
+describe('streakBefore — a habit that is not asked every day', () => {
+  /* Mondays and Thursdays. 2026-09-07, -09-10, -09-14 and -09-17 are those days; everything
+     between them is a day the question was never put. */
+  const monThu = (dateKey: string) =>
+    ['2026-09-07', '2026-09-10', '2026-09-14', '2026-09-17'].includes(dateKey);
+
+  it('steps over the days the habit was never asked on', () => {
+    /* Without this a Mon/Thu habit could never hold a streak longer than one: every Tuesday would
+       read as a missed day, and the number would be measuring the calendar rather than the person.
+     */
+    expect(streakBefore(on('2026-09-07', '2026-09-10', '2026-09-14'), '2026-09-17', monThu)).toBe(
+      3,
+    );
+  });
+
+  it('still breaks on an occurrence that was actually missed', () => {
+    expect(streakBefore(on('2026-09-07', '2026-09-14'), '2026-09-17', monThu)).toBe(1);
+  });
+
+  it('is unmoved by a day recorded outside the schedule', () => {
+    // Ticked on a Wednesday the habit does not fall on. It happened, and it is not a Monday.
+    expect(streakBefore(on('2026-09-09', '2026-09-14'), '2026-09-17', monThu)).toBe(1);
+  });
+
+  it('counts occurrences for currentStreak too, including today', () => {
+    expect(currentStreak(on('2026-09-10', '2026-09-14', '2026-09-17'), '2026-09-17', monThu)).toBe(
+      3,
+    );
+  });
+
+  it('terminates on a schedule with no earlier occurrence at all', () => {
+    // A one-off task: nothing before it is ever scheduled, so the walk has nothing to count and
+    // must stop at the window rather than running to the beginning of time.
+    expect(streakBefore(on(), '2026-09-17', () => false)).toBe(0);
+  });
+
+  it('never counts further back than the window it was read from', () => {
+    const everyDay = new Set(dateKeyWindow('2026-09-17', 400));
+    expect(streakBefore(everyDay, '2026-09-17')).toBe(STREAK_WINDOW_DAYS);
   });
 });

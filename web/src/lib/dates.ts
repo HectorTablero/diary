@@ -32,9 +32,13 @@ export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.
 const SUNDAY = new Date(2024, 0, 7);
 
 /** Name of a weekday by index (0 = Sunday), in the given language. 'EEEEEE' gives the short
-    two-letter form used as a column header. Lowercase in several languages — capitalise in CSS. */
-export const weekdayName = (day: number, lng: string, pattern: 'EEEE' | 'EEEEEE' = 'EEEE') =>
-  format(addDays(SUNDAY, day), pattern, { locale: dateFnsLocale(lng) });
+    two-letter form used as a column header, 'EEE' the abbreviation that reads as a word in a list.
+    Lowercase in several languages — capitalise in CSS. */
+export const weekdayName = (
+  day: number,
+  lng: string,
+  pattern: 'EEEE' | 'EEE' | 'EEEEEE' = 'EEEE',
+) => format(addDays(SUNDAY, day), pattern, { locale: dateFnsLocale(lng) });
 
 /** Today's date key in the user's local timezone. */
 export const todayKey = () => format(new Date(), 'yyyy-MM-dd');

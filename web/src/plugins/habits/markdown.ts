@@ -2,7 +2,7 @@ import { UNDATED_KEY, type PluginRecordDto } from '@diary/shared';
 import { db } from '@/db/db';
 import i18n from '@/i18n';
 import { habitChanges } from './changes';
-import { formatHabitValue, parseHabit, parseValues } from './model';
+import { formatHabitValue, isCheckbox, parseHabit, parseValues } from './model';
 
 /**
  * The habit log, as a Markdown table: one row per day, one column per habit.
@@ -39,10 +39,12 @@ export async function exportHabitsMarkdown(): Promise<{ filename: string; markdo
     const cells = habits.map((habit) => {
       const value = recorded[habit.id] ?? 0;
       if (value <= 0) return '';
-      // A binary is a mark, not "yes" — the column is scanned down, not read across, and a word in
-      // every cell turns a table into a wall. Everything else prints what it actually was.
-      // Formatted against the configuration in force on that day, for the same reason the grid is.
-      return habit.type === 'binary' ? '×' : formatHabitValue(habit, value, day.dateKey);
+      // A ticked box is a mark, not "yes" — the column is scanned down, not read across, and a
+      // word in every cell turns a table into a wall. A task is a box too, and a late one is
+      // recorded on the day it was actually done, so the row it lands on is the truthful one.
+      // Everything else prints what it actually was, formatted against the configuration in force
+      // on that day, for the same reason the grid is.
+      return isCheckbox(habit.type) ? '×' : formatHabitValue(habit, value, day.dateKey);
     });
     return `| ${day.dateKey} | ${cells.join(' | ')} |`;
   });
