@@ -1,6 +1,11 @@
 import { addDays } from 'date-fns';
 import { parseDateKey, toDateKey } from '@/lib/dates';
 
+/** How far back the day widget reads, and the bound on every walk below. Long enough that a
+    displayed streak is never truncated by the window rather than by a missed day — and if one ever
+    is, it is capped honestly at 90. */
+export const STREAK_WINDOW_DAYS = 90;
+
 /**
  * How many days in a row a habit has been done, counting back from a given day.
  *
@@ -32,9 +37,25 @@ import { parseDateKey, toDateKey } from '@/lib/dates';
  * That does mean a streak "survives" the whole of the day it will actually be broken on, which is
  * the right trade: it is corrected at midnight, and no one is misled about anything they can still
  * change.
+ *
+ * ## A day that was never asked about breaks nothing
+ *
+ * Once a habit can be scheduled, "a missing day" stops meaning "a day with nothing recorded". A
+ * habit set for Mondays, Wednesdays and Fridays has nothing recorded on any Tuesday, and counting
+ * those would cap every such streak at one — the number would measure the calendar rather than the
+ * person. So `scheduledOn` says which days the habit was actually asked on, and the walk *skips*
+ * the rest rather than treating them as either met or missed. A streak of a weekly habit is then
+ * a run of weeks, which is what someone keeping it would call it.
+ *
+ * The default is "every day", so a habit that has never had a schedule counts exactly as it always
+ * did.
  */
-export function currentStreak(met: ReadonlySet<string>, from: string): number {
-  return streakBefore(met, from) + (met.has(from) ? 1 : 0);
+export function currentStreak(
+  met: ReadonlySet<string>,
+  from: string,
+  scheduledOn?: (dateKey: string) => boolean,
+): number {
+  return streakBefore(met, from, scheduledOn) + (met.has(from) ? 1 : 0);
 }
 
 /**
@@ -50,11 +71,25 @@ export function currentStreak(met: ReadonlySet<string>, from: string): number {
  * the stored one, then the new one again. Nothing was wrong with the arithmetic; it was being asked
  * a question whose inputs were briefly stale. Excluding today removes the staleness from the input.
  */
-export function streakBefore(met: ReadonlySet<string>, from: string): number {
+export function streakBefore(
+  met: ReadonlySet<string>,
+  from: string,
+  /** Which days this habit's question was actually put on. Days it says no to are stepped over —
+      see "A day that was never asked about breaks nothing" above. */
+  scheduledOn: (dateKey: string) => boolean = () => true,
+  /** How far back to walk. Bounded rather than open-ended now that days can be skipped: a monthly
+      habit's walk would otherwise run to the beginning of time looking for the next occurrence.
+      The default is the window the callers read, so a streak is never longer than its evidence. */
+  limit = STREAK_WINDOW_DAYS,
+): number {
   let cursor = addDays(parseDateKey(from), -1);
   let streak = 0;
-  while (met.has(toDateKey(cursor))) {
-    streak++;
+  for (let step = 0; step < limit; step++) {
+    const day = toDateKey(cursor);
+    if (scheduledOn(day)) {
+      if (!met.has(day)) break;
+      streak++;
+    }
     cursor = addDays(cursor, -1);
   }
   return streak;
@@ -73,10 +108,6 @@ export function dateKeyWindow(from: string, days: number): string[] {
   for (let offset = days - 1; offset >= 0; offset--) keys.push(toDateKey(addDays(end, -offset)));
   return keys;
 }
-
-/** How far back the day widget reads. Long enough that a displayed streak is never truncated by
-    the window rather than by a missed day — and if one ever is, it is capped honestly at 90. */
-export const STREAK_WINDOW_DAYS = 90;
 
 /** Every date key from `start` to `end`, inclusive, oldest first. The calendar view's read range —
     a bounded span rather than a window counting back from today, since a month can be any month. */

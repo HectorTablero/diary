@@ -23,11 +23,13 @@ import {
   HabitControl,
   HabitProgress,
   HiddenSection,
+  OverdueBadge,
   STREAK_MIN,
   StreakBadge,
   useLiveHabitValue,
 } from './HabitControls';
-import { metTarget, type Habit } from './model';
+import { isCheckbox, metTarget, scheduleAt, type Habit } from './model';
+import type { TaskState } from './tasks';
 import { useHabitsDay } from './useHabits';
 
 /**
@@ -45,9 +47,11 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
     archivedWithProgress,
     values,
     priorStreaks,
+    taskStates,
     loading,
     hasAnyHabit,
     anyHabitCreatedByThatDay,
+    anyLiveHabitThatDay,
     setValue,
   } = useHabitsDay(dateKey);
 
@@ -147,6 +151,7 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
                   dateKey={dateKey}
                   streak={streakOf(habit)}
                   reserveStreak={anyStreak}
+                  task={taskStates.get(habit.id)}
                   onChange={(next) => setValue(habit.id, next)}
                   readOnly={locked}
                 />
@@ -154,12 +159,18 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
             </ul>
           )}
 
-          {/* Every habit retired but this day has none of them recorded: not an empty state — the
-              habits exist, they are simply all in the past. The other way a list can end up empty
-              here — a day before any habit existed — never reaches this render at all; see the
-              early return above. */}
+          {/* An empty list, explained. Two things it can mean, and they are not the same news:
+              every habit is retired, or the habits are alive and none of them is asked on this
+              particular day — a Sunday, for someone who only tracks weekdays. Saying "every habit
+              is retired" there would be a plain falsehood about a diary that is working fine. The
+              third way a list can be empty — a day before any habit existed — never reaches this
+              render at all; see the early return above. */}
           {active.length === 0 && archivedWithProgress.length === 0 && (
-            <p className="mt-1 text-sm text-muted-foreground">{t('plugins.habits.allRetired')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {anyLiveHabitThatDay
+                ? t('plugins.habits.nothingScheduled')
+                : t('plugins.habits.allRetired')}
+            </p>
           )}
 
           {/* Archived habits that *were* recorded on this day. Read-only: the day is a record, and
@@ -241,6 +252,7 @@ export function HabitRow({
   dateKey,
   streak = 0,
   reserveStreak = false,
+  task,
   onChange,
   readOnly = false,
 }: {
@@ -249,6 +261,10 @@ export function HabitRow({
   dateKey: string;
   streak?: number;
   reserveStreak?: boolean;
+  /** What this day still owes, for a task — `undefined` for every other kind and for a task whose
+      day is simply today. Passed in rather than derived here, because the answer depends on
+      history the row does not have and must not move while the row is being ticked. */
+  task?: TaskState;
   onChange?: (value: number) => void;
   readOnly?: boolean;
 }) {
@@ -273,11 +289,12 @@ export function HabitRow({
     });
   };
 
-  /* The one kind narrow enough to sit beside its name at every width: a single button, against the
-     other four's stepper-and-bar or row of five faces, which on a phone leave no room for a name.
-     So it keeps one row and puts the control at the end of it, where every other row's control also
-     ends up — the eye runs down one column of things to press rather than two. */
-  const inline = habit.type === 'binary';
+  /* The kinds narrow enough to sit beside their name at every width: a single button, against the
+     others' stepper-and-bar or row of five faces, which on a phone leave no room for a name. So
+     they keep one row and put the control at the end of it, where every other row's control also
+     ends up — the eye runs down one column of things to press rather than two. A task is a box, so
+     it lands here too, which is also what leaves room for its overdue pill beside the name. */
+  const inline = isCheckbox(habit.type);
 
   return (
     <li className="group flex items-center gap-2 py-2">
@@ -298,6 +315,11 @@ export function HabitRow({
         >
           {habit.name}
         </span>
+
+        {/* Kept even once the task has been ticked today: `task` is derived from settled history
+            and does not move while the row is being used, so the pill does not blink out from
+            under the finger that just pressed the button beside it. */}
+        {task?.overdue && <OverdueBadge since={task.dueOn} />}
 
         {inline ? (
           <HabitControl
@@ -338,7 +360,11 @@ export function HabitRow({
       <div className="flex shrink-0 items-center gap-0.5 self-center">
         {reserveStreak && (
           <span className="flex w-10 justify-end">
-            <StreakBadge streak={streak} completed={completed} />
+            <StreakBadge
+              streak={streak}
+              completed={completed}
+              everyDay={scheduleAt(habit, dateKey).kind === 'daily'}
+            />
           </span>
         )}
         {!readOnly && done ? (

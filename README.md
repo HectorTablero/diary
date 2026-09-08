@@ -129,17 +129,18 @@ first paint).
 
 ### Habits
 
-The first plugin, and the one the API was shaped around. A habit is one of five kinds,
+The first plugin, and the one the API was shaped around. A habit is one of six kinds,
 differing only in how a day's number is entered and read, never in how it is stored: `binary` (a
 button), `numeric` (a stepper — push-ups, glasses of water), `time` (a stopwatch _and_ a stepper),
-`scale` (a dragged track, for something judged rather than counted) and `mood` (five faces).
+`scale` (a dragged track, for something judged rather than counted), `mood` (five faces) and `task`
+(the same button as `binary`, but the question outlives the day — see below).
 
 Every kind stores a plain number, which is what makes "did this happen" one question rather than
 five. Time is stored in **seconds** because the stopwatch produces them — pausing at 14:09 and
 resuming has to resume from 14:09 — and rounded only at the point of display. Zero is stored as
 absence, never as `0`.
 
-Three decisions are worth knowing before touching it:
+Four decisions are worth knowing before touching it:
 
 - **Two row shapes, told apart by `dateKey`.** A _definition_ is undated, one row per habit; a _day_
   is dated, one row holding every habit's value for that day. One row per habit (rather than one
@@ -156,6 +157,18 @@ Three decisions are worth knowing before touching it:
   run ending _yesterday_ once per habit and adds today's answer itself, so the badge is arithmetic on
   local state — it cannot flicker while a debounced write and the sync it triggers go past. Today
   being blank never breaks a streak; only yesterday can.
+- **_When_ a habit is asked about is a second axis, independent of its kind.** A `schedule`
+  (`schedule.ts`) is `daily`, `once`, chosen `weekdays`, a date each `monthly`, or an `interval` of N
+  days anchored on the habit's origin; absent means the kind's default, which is why no stored row
+  had to change. It lives in the config, so it is revised like a goal — narrowing a habit to
+  Mondays must not retroactively excuse every Saturday it was genuinely missed on — and every
+  surface narrows through `habitOccursOn`. The streak walk _skips_ unscheduled days rather than
+  counting them as misses, or a Mon/Wed/Fri habit could never hold a run longer than one.
+  A `task` is the one kind whose question survives its day: it is owed until something is recorded
+  at or after its occurrence (`pendingTask` in `tasks.ts`), shown overdue in the meantime, and
+  cleared by a single completion however many occurrences went by — a backlog of identical boxes
+  would be a guilt ledger, not a diary. None of this reached the Android widget: the snapshot only
+  ever describes today, so a task crosses as the box it looks like and the version stayed at 4.
 
 The stopwatch persists the _instant it started_, device-local and keyed by day, so a timer survives
 a reload, a lock screen or a discarded tab, and one left running past midnight is banked against the

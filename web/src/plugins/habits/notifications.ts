@@ -7,7 +7,8 @@ import { nextDailyReminderAt } from '@/lib/notificationSchedule';
 import { pluginNotificationId } from '@/lib/notificationIds';
 import { getPluginPreference } from '../reminders';
 import type { PluginNotificationContext } from '../types';
-import { isArchived, parseHabit, parseValues } from './model';
+import { habitOccursOn, isArchived, isTask, parseHabit, parseValues } from './model';
+import { doneDaysOf, pendingTask } from './tasks';
 
 /**
  * The habit tracker's one reminder: a nudge if the day's habits are still untouched.
@@ -52,7 +53,21 @@ export async function collectHabitNotifications({
      is the habits that haven't been touched — but a day where every habit is ticked has nothing
      left to say, so it returns nothing and the reconcile cancels the pending alarm. */
   const recorded = parseValues(rows.find((row) => row.dateKey === candidateKey));
-  const remaining = habits.filter((habit) => (recorded[habit.id] ?? 0) === 0);
+
+  /* What the alarm's day is actually asking — the day card's own test, so the count in the
+     notification matches the count on the card it sends you to. A habit not scheduled for that day
+     is not "left", and a task owed since last week is, which is the whole point of a task having a
+     reminder at all. */
+  const history = new Map(
+    rows.filter((row) => row.dateKey !== UNDATED_KEY).map((row) => [row.dateKey, parseValues(row)]),
+  );
+  const asked = habits.filter((habit) =>
+    isTask(habit)
+      ? pendingTask(habit, candidateKey, doneDaysOf(habit.id, history)) !== undefined
+      : habitOccursOn(habit, candidateKey),
+  );
+
+  const remaining = asked.filter((habit) => (recorded[habit.id] ?? 0) === 0);
   if (!remaining.length) return [];
 
   const body = i18n.t('plugins.habits.reminderBody', { count: remaining.length });

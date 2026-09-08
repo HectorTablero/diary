@@ -15,7 +15,9 @@ import {
   configChanged,
   habitAppliesOn,
   habitCreatedBy,
+  habitOccursOn,
   isArchived,
+  isTask,
   MAX_HABITS,
   metTarget,
   parseHabit,
@@ -25,6 +27,7 @@ import {
   type Habit,
   type HabitConfig,
 } from './model';
+import { doneDaysOf, pendingTask, type TaskState } from './tasks';
 import { todayKey } from '@/lib/dates';
 import {
   currentStreak,
@@ -71,6 +74,16 @@ const WRITE_DEBOUNCE_MS = 600;
 const definitionsOf = (rows: PluginRecordDto[]): Habit[] =>
   sortHabits(rows.flatMap((row) => parseHabit(row) ?? []));
 
+/**
+ * The days this habit's question was actually put — what a streak walk must step over rather than
+ * count as a miss.
+ *
+ * A closure per habit rather than a set, because `habitOccursOn` is pure arithmetic on a date and
+ * the walk asks about at most ninety of them; materialising a set per habit up front would compute
+ * the ninety that a two-day streak never looks at.
+ */
+const scheduledOn = (habit: Habit) => (day: string) => habitOccursOn(habit, day);
+
 /* --- The day page ------------------------------------------------------------------------------ */
 
 export interface HabitsDay {
@@ -85,6 +98,14 @@ export interface HabitsDay {
   archivedWithProgress: Habit[];
   values: Record<string, number>;
   /**
+   * The tasks this day still owes, by habit id — absent for every habit that owes nothing.
+   *
+   * Derived from settled history only, never from `values`, so it does not move while a task is
+   * being ticked: the row keeps saying what it was overdue from right through the write. Same
+   * reason `priorStreaks` stops at yesterday. See `pendingTask`.
+   */
+  taskStates: ReadonlyMap<string, TaskState>;
+  /**
    * Each habit's run of met days ending *yesterday* — today deliberately left out.
    *
    * The card adds today's own answer itself, which is the whole point: this map is derived from
@@ -95,6 +116,15 @@ export interface HabitsDay {
   loading: boolean;
   /** Any habit at all, archived or not — the difference between "nothing set up" and "all done". */
   hasAnyHabit: boolean;
+  /**
+   * Whether any habit that is *still* being kept had been created by this day.
+   *
+   * The third way `active` can come up empty, and the one schedules introduced: not "nothing set
+   * up" and not "everything retired", but a live habit whose schedule simply says nothing about
+   * this particular day. A Sunday with only weekday habits should say so, not announce a
+   * retirement that hasn't happened.
+   */
+  anyLiveHabitThatDay: boolean;
   /**
    * Whether *any* habit had already been created by this day — regardless of whether it has since
    * been retired, and regardless of whether it was retired *before* this day too.
@@ -189,15 +219,36 @@ export function useHabitsDay(dateKey: string): HabitsDay {
   const priorStreaks = useMemo(() => {
     const result = new Map<string, number>();
     for (const habit of habits)
-      result.set(habit.id, streakBefore(metDays(habit, history), dateKey));
+      result.set(habit.id, streakBefore(metDays(habit, history), dateKey, scheduledOn(habit)));
     return result;
   }, [habits, history, dateKey]);
 
-  // `habitCreatedBy` rather than just `!isArchived`: a habit created after this day was not being
-  // asked about on it, and showing it as an unchecked box would be asking the day a question it
-  // never actually posed. (The archival half of `habitAppliesOn` is a no-op here, since
-  // `!isArchived` already excludes every currently-retired habit.)
-  const active = habits.filter((habit) => !isArchived(habit) && habitCreatedBy(habit, dateKey));
+  const taskStates = useMemo(() => {
+    const result = new Map<string, TaskState>();
+    for (const habit of habits) {
+      if (isArchived(habit)) continue;
+      const state = pendingTask(habit, dateKey, doneDaysOf(habit.id, history));
+      if (state) result.set(habit.id, state);
+    }
+    return result;
+  }, [habits, history, dateKey]);
+
+  /* What this day is actually asking about.
+     `habitCreatedBy` rather than just `!isArchived`: a habit created after this day was not being
+     asked about on it, and showing it as an unchecked box would be asking the day a question it
+     never actually posed. (The archival half of `habitAppliesOn` is a no-op here, since
+     `!isArchived` already excludes every currently-retired habit.)
+
+     Then the schedule, which asks it of a narrower set of days — and for a task, `taskStates`
+     instead, because an overdue task is asked about precisely on the days its schedule says
+     nothing about. A recorded value always shows regardless: a day that has an answer must never
+     hide the question, or narrowing a habit to weekdays would make last Saturday's tick vanish
+     from a day it is still stored on. */
+  const active = habits.filter((habit) => {
+    if (isArchived(habit) || !habitCreatedBy(habit, dateKey)) return false;
+    if ((values[habit.id] ?? 0) > 0) return true;
+    return isTask(habit) ? taskStates.has(habit.id) : habitOccursOn(habit, dateKey);
+  });
   const archivedWithProgress = habits.filter(
     (habit) => isArchived(habit) && (values[habit.id] ?? 0) > 0,
   );
@@ -207,6 +258,7 @@ export function useHabitsDay(dateKey: string): HabitsDay {
     archivedWithProgress,
     values,
     priorStreaks,
+    taskStates,
     loading,
     hasAnyHabit: habits.length > 0,
     // Distinguishes "every habit is retired" from "no habit created yet" — both leave the card's
@@ -214,6 +266,9 @@ export function useHabitsDay(dateKey: string): HabitsDay {
     // asked. `habitCreatedBy` rather than `habitAppliesOn`: a habit archived before this day still
     // counts here, so its retirement gets said out loud instead of the card vanishing.
     anyHabitCreatedByThatDay: habits.some((habit) => habitCreatedBy(habit, dateKey)),
+    anyLiveHabitThatDay: habits.some(
+      (habit) => !isArchived(habit) && habitCreatedBy(habit, dateKey),
+    ),
     setValue,
   };
 }
@@ -284,7 +339,8 @@ export function useHabitsLibrary(today: string): HabitsLibrary {
 
   const streaks = useMemo(() => {
     const result = new Map<string, number>();
-    for (const habit of habits) result.set(habit.id, currentStreak(metDays(habit, history), today));
+    for (const habit of habits)
+      result.set(habit.id, currentStreak(metDays(habit, history), today, scheduledOn(habit)));
     return result;
   }, [habits, history, today]);
 
@@ -335,6 +391,7 @@ export function useHabitsLibrary(today: string): HabitsLibrary {
                 target: habit.target,
                 min: habit.min,
                 max: habit.max,
+                schedule: habit.schedule,
               },
             ];
 
@@ -421,9 +478,18 @@ export function useHabitsCalendar(start: string, end: string): ReadonlyMap<strin
   return useMemo(() => {
     const data = new Map<string, HabitDayRatio>();
     for (const day of dateKeysBetween(start, end)) {
-      const applicable = habits.filter((habit) => habitAppliesOn(habit, day));
-      if (!applicable.length) continue; // nothing was being tracked yet — not a day of zero
       const recorded = history.get(day) ?? {};
+      /* Scheduled on this day, or answered on it anyway. The second half is what keeps a tick made
+         on a day the habit wasn't due out of nowhere — it happened, so it counts, on both sides of
+         the ratio. An overdue task is deliberately *not* counted on the days it drags through:
+         one chore left undone in March would otherwise shade every day since amber, and the day it
+         was actually due is already sitting there unmet, saying so once. */
+      const applicable = habits.filter(
+        (habit) =>
+          habitOccursOn(habit, day) ||
+          (habitAppliesOn(habit, day) && (recorded[habit.id] ?? 0) > 0),
+      );
+      if (!applicable.length) continue; // nothing was being tracked yet — not a day of zero
       const met = applicable.filter((habit) =>
         metTarget(habit, recorded[habit.id] ?? 0, day),
       ).length;

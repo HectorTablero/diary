@@ -1,5 +1,6 @@
 import type { PluginRecordDto } from '@diary/shared';
 import { z } from 'zod';
+import { occursOn, sameSchedule, scheduleSchema, type HabitSchedule } from './schedule';
 
 /**
  * What the habit tracker stores, and how it reads it back.
@@ -32,7 +33,7 @@ export const MAX_HABIT_UNIT_LENGTH = 16;
 export const MAX_HABIT_TARGET = 100_000;
 
 /**
- * The five things a habit can be.
+ * The six things a habit can be.
  *
  * They differ only in how a day's number is *entered and read* — never in how it is stored. A
  * binary is 1, a scale is its position, a mood is 1–5, time is minutes. One stored shape means one
@@ -44,10 +45,36 @@ export const MAX_HABIT_TARGET = 100_000;
  *   time     how long — minutes, entered and shown as hours and minutes
  *   scale    how much, judged rather than counted — sleep quality, on a dragged track
  *   mood     how it felt — five faces
+ *   task     did it happen — the same box, but the question outlives the day (see below)
+ *
+ * ## Why `task` is a kind and not a flag
+ *
+ * A task is entered exactly like a `binary`: one box, worth 1. What differs is *which days ask it*.
+ * An unfinished task keeps being asked on the days after the one it was due on — see `pendingTask`
+ * in tasks.ts — where every other kind's question expires with the day it belonged to.
+ *
+ * That could have been a boolean beside the kind, and it is a kind instead for one reason: the
+ * choice is not independent of the others. "A number that carries over" is not a thing — half of
+ * twenty push-ups is not an outstanding ten — and neither is a mood, or a rating, both of which
+ * are statements about a day that has already gone. Carrying over is only meaningful for a box, so
+ * a flag would have been a flag that is only legal for one kind, which is a kind wearing a disguise.
+ * Everything downstream that already switches on the kind gets the distinction for free, including
+ * the Android widget, which draws a task as the `binary` it looks like without knowing the word.
  */
-export type HabitKind = 'binary' | 'numeric' | 'time' | 'scale' | 'mood';
+export type HabitKind = 'binary' | 'numeric' | 'time' | 'scale' | 'mood' | 'task';
 
-export const HABIT_KINDS: readonly HabitKind[] = ['binary', 'numeric', 'time', 'scale', 'mood'];
+export const HABIT_KINDS: readonly HabitKind[] = [
+  'binary',
+  'numeric',
+  'time',
+  'scale',
+  'mood',
+  'task',
+];
+
+/** The kinds recorded by ticking a box — one stored value, `1`, and no number worth printing.
+    Everywhere a mark is shown instead of a figure asks this rather than naming `binary` twice. */
+export const isCheckbox = (kind: HabitKind): boolean => kind === 'binary' || kind === 'task';
 
 /** Scale bounds, when a habit doesn't set its own. Mood is always exactly this. */
 export const DEFAULT_SCALE_MIN = 1;
@@ -62,8 +89,8 @@ const LEGACY_KINDS: Record<string, HabitKind> = { check: 'binary', count: 'numer
 const kindSchema = z
   .string()
   .transform((value) => LEGACY_KINDS[value] ?? value)
-  .pipe(z.enum(['binary', 'numeric', 'time', 'scale', 'mood']))
-  // `.catch` rather than a hard failure: a row from a future build that adds a sixth kind should
+  .pipe(z.enum(['binary', 'numeric', 'time', 'scale', 'mood', 'task']))
+  // `.catch` rather than a hard failure: a row from a future build that adds a seventh kind should
   // read as a plain box here, not vanish from the list.
   .catch('binary');
 
@@ -80,6 +107,8 @@ const definitionSchema = z.object({
   /** Scale only. Mood is fixed at 1–5 and ignores these. */
   min: z.number().int().min(0).max(MAX_HABIT_TARGET).optional(),
   max: z.number().int().min(1).max(MAX_HABIT_TARGET).optional(),
+  /** Which days ask this habit's question. Absent means the kind's default — see `scheduleAt`. */
+  schedule: scheduleSchema,
   /** The day the *current* configuration took effect. Days before it are judged by `revisions`. */
   since: z.string().catch(''),
   /**
@@ -105,6 +134,7 @@ const definitionSchema = z.object({
         target: z.number().optional(),
         min: z.number().optional(),
         max: z.number().optional(),
+        schedule: scheduleSchema,
       }),
     )
     .catch([]),
@@ -137,6 +167,9 @@ export interface HabitConfig {
   target?: number;
   min?: number;
   max?: number;
+  /** Absent for a row written before schedules existed, and for one left on its kind's default.
+      Read through `scheduleAt`, never directly — the default differs by kind. */
+  schedule?: HabitSchedule;
 }
 
 export interface HabitRevision extends HabitConfig {
@@ -162,7 +195,8 @@ export interface Habit extends HabitConfig {
 export function parseHabit(record: PluginRecordDto): Habit | undefined {
   const parsed = definitionSchema.safeParse(record.data);
   if (!parsed.success) return undefined;
-  const { name, type, unit, target, min, max, since, revisions, order, archivedAt } = parsed.data;
+  const { name, type, unit, target, min, max, schedule, since, revisions, order, archivedAt } =
+    parsed.data;
   return {
     id: record.id,
     name,
@@ -171,6 +205,7 @@ export function parseHabit(record: PluginRecordDto): Habit | undefined {
     target,
     min,
     max,
+    schedule,
     // '' for a row written before edits were tracked: it has no history, so its current
     // configuration has always applied. `configAt` treats that as "since forever".
     since,
@@ -188,6 +223,7 @@ export const habitData = (habit: Omit<Habit, 'id'>) => ({
   ...(habit.target ? { target: habit.target } : {}),
   ...(habit.min !== undefined ? { min: habit.min } : {}),
   ...(habit.max !== undefined ? { max: habit.max } : {}),
+  ...(habit.schedule ? { schedule: habit.schedule } : {}),
   since: habit.since,
   revisions: habit.revisions,
   order: habit.order,
@@ -207,6 +243,7 @@ export function configAt(habit: Habit, dateKey?: string): HabitConfig {
     target: habit.target,
     min: habit.min,
     max: habit.max,
+    schedule: habit.schedule,
   };
   if (!dateKey || !habit.revisions.length || (habit.since && dateKey >= habit.since))
     return current;
@@ -224,7 +261,8 @@ export const configChanged = (a: HabitConfig, b: HabitConfig): boolean =>
   a.unit !== b.unit ||
   a.target !== b.target ||
   a.min !== b.min ||
-  a.max !== b.max;
+  a.max !== b.max ||
+  !sameSchedule(a.schedule, b.schedule);
 
 /** A scale's bounds, with mood's fixed values and the defaults already applied. */
 export function scaleBounds(habit: Habit, dateKey?: string): { min: number; max: number } {
@@ -304,8 +342,64 @@ export function metTarget(habit: Habit, value: number, dateKey?: string): boolea
  * having existed, where a day before it was ever created should not.
  */
 export function habitCreatedBy(habit: Habit, dateKey: string): boolean {
-  const origin = habit.revisions[0]?.since || habit.since;
+  const origin = habitOrigin(habit);
   return !origin || dateKey >= origin;
+}
+
+/**
+ * The day this habit came into existence: the earliest banked revision if there is one, `since`
+ * otherwise, and `''` for a row written before edits were tracked.
+ *
+ * Named because two very different things need the *same* answer. `habitCreatedBy` asks it to
+ * decide how far back a habit reaches; `occursOn` asks it as the anchor an `interval` counts from
+ * and the one day a `once` falls on. If those two ever disagreed, a habit could be scheduled for a
+ * day it did not yet exist on — so they read one function rather than repeating one expression.
+ */
+export function habitOrigin(habit: Habit): string {
+  return habit.revisions[0]?.since || habit.since;
+}
+
+/** Recorded by carrying over rather than expiring with its day. See the note on `HabitKind`. */
+export const isTask = (habit: Habit): boolean => habit.type === 'task';
+
+/**
+ * What a habit does when it is left on its kind's default.
+ *
+ * The one place the two axes touch. A habit with nothing said about when it happens happens every
+ * day — which is what every habit written before schedules existed already was, so no stored row
+ * had to change. A task with nothing said about it happens *once*: a chore you enter today and
+ * intend to do is not a chore you intend to do again tomorrow, and "once, until it is done" is the
+ * whole of what a task is before you give it a rhythm.
+ */
+export const defaultSchedule = (kind: HabitKind): HabitSchedule =>
+  kind === 'task' ? { kind: 'once' } : { kind: 'daily' };
+
+/**
+ * The schedule that was in force on a given day, with the kind's default already applied.
+ *
+ * Through `configAt` like every other judgement about a past day, for the reason in the note on
+ * `revisions`: narrowing a habit to weekdays must not retroactively excuse every Saturday it was
+ * genuinely missed on.
+ */
+export function scheduleAt(habit: Habit, dateKey?: string): HabitSchedule {
+  return configAt(habit, dateKey).schedule ?? defaultSchedule(habit.type);
+}
+
+/**
+ * Whether this habit's question is put to a given day: it existed, it had not been retired, and its
+ * schedule falls on that day.
+ *
+ * The schedule-aware half of `habitAppliesOn`, kept as a second function rather than folded into it
+ * because a day a habit simply isn't scheduled on is a different silence from a day before it
+ * existed. Callers that judge *history* — the streak walk, the calendar's denominator — want this
+ * one. A task's outstanding days are not here: an overdue task is asked about on a day its schedule
+ * says nothing about, which is exactly what `pendingTask` in tasks.ts is for.
+ */
+export function habitOccursOn(habit: Habit, dateKey: string): boolean {
+  return (
+    habitAppliesOn(habit, dateKey) &&
+    occursOn(scheduleAt(habit, dateKey), dateKey, habitOrigin(habit))
+  );
 }
 
 /**

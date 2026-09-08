@@ -6,16 +6,17 @@ import { metTarget } from '../model';
 import { anyDemoStreak, buildDemoExamples, demoDateKey, demoStreak } from './demoExamples';
 
 /**
- * All five kinds a habit can be, each shown through `HabitRow` — the exact row HabitsDayWidget
+ * All six kinds a habit can be, each shown through `HabitRow` — the exact row HabitsDayWidget
  * renders on the day page, not a redrawing of it. That match has to be literal, not just visual:
  * `HabitRow` switches shape at a `@[480px]:` container-query breakpoint, and a hand-copied version
  * of it is exactly the kind of thing that quietly drifts the next time the real one changes. So
  * this wraps the same `@container` PluginDaySlot puts around every day widget, and otherwise gets
  * completely out of `HabitRow`'s way.
  *
- * Fixed, read-only values rather than something to play with: two of the five (the streak badges
- * on Meditate and Push-ups) are already doing the one piece of teaching that needed a value to
- * differ from "recorded" or "not" — a run that continues in amber, and one about to break in grey —
+ * Fixed, read-only values rather than something to play with: three of the six (the streak badges
+ * on Meditate and Push-ups, and the overdue pill on the task) are already doing the one piece of
+ * teaching that needed a value to differ from "recorded" or "not" — a run that continues in amber,
+ * one about to break in grey, and a box whose question outlived the day it was asked on —
  * and a control a visitor could actually drag or tick invites trying every one of them for its own
  * sake, which is a different tour than "here is what tracking looks like".
  */
@@ -53,6 +54,7 @@ export function TypesStep() {
               dateKey={dateKey}
               streak={demoStreak(example, dateKey)}
               reserveStreak={reserveStreak}
+              task={example.task}
               readOnly
             />
           ))}

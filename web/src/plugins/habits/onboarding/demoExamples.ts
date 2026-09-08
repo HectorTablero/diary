@@ -1,7 +1,9 @@
+import { addDays } from 'date-fns';
 import type { TFunction } from 'i18next';
-import { todayKey } from '@/lib/dates';
+import { toDateKey, todayKey } from '@/lib/dates';
 import { STREAK_MIN } from '../HabitControls';
 import { metTarget, type Habit } from '../model';
+import type { TaskState } from '../tasks';
 import { demoHabit } from './demoHabit';
 
 export interface DemoExample {
@@ -12,10 +14,13 @@ export interface DemoExample {
       exactly the badge-colour change ticking it for real would produce. Fixed rather than derived
       from anything, since there is no history behind a habit that was never actually recorded. */
   priorStreak: number;
+  /** What a task is still owed from, for the one example that is one. Fixed for the same reason
+      `priorStreak` is: `pendingTask` reads history, and the tour has none. */
+  task?: TaskState;
 }
 
 /**
- * The tour's one cast of habits — all five kinds, used by both TypesStep (the day-page controls)
+ * The tour's one cast of habits — all six kinds, used by both TypesStep (the day-page controls)
  * and WidgetStep (the same habits, on the home-screen widget). One list rather than two, so the
  * tour reads as one diary followed across two surfaces instead of a fresh example on every screen.
  */
@@ -70,6 +75,19 @@ export function buildDemoExamples(t: TFunction): DemoExample[] {
       }),
       value: 4,
       priorStreak: 4,
+    },
+    {
+      /* Shown overdue, which is the whole of what makes a task a task: it is the one kind whose
+         row can say something about a day other than the one it is on. Two days back rather than
+         one, so the date read out is unambiguously not yesterday-as-in-nearly-today. */
+      habit: demoHabit({
+        id: 'onboarding-demo-task',
+        name: t('plugins.habits.onboarding.types.exampleTask'),
+        type: 'task',
+      }),
+      value: 0,
+      priorStreak: 0,
+      task: { dueOn: toDateKey(addDays(new Date(), -2)), overdue: true },
     },
   ];
 }
