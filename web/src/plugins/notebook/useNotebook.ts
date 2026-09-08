@@ -19,7 +19,14 @@ import {
 import { onSyncApplied } from '@/db/sync';
 import { todayKey } from '@/lib/dates';
 import { merge3 } from '@/lib/textMerge';
-import { baseTextBefore, netGained, replay, revisionFor, type HistoryDay } from './history';
+import {
+  baseTextBefore,
+  netGained,
+  replay,
+  revisionFor,
+  wasWrittenIn,
+  type HistoryDay,
+} from './history';
 import {
   ancestorPath,
   documentLabel,
@@ -40,6 +47,9 @@ import {
 
 /** How long typing settles before a save. */
 const SAVE_DEBOUNCE_MS = 800;
+
+/** How many times a reload may find that a save landed inside its own read — see `useDocumentEditor`. */
+const LOAD_RETRIES = 3;
 
 /* --- Browsing the tree -------------------------------------------------------------------------- */
 
@@ -165,8 +175,25 @@ export function useAllDocuments(): PluginDocumentDto[] {
   return documents;
 }
 
+export interface DocumentLabels {
+  labels: ReadonlyMap<string, string>;
+  /**
+   * True until the first read for *this* set of ids has come back.
+   *
+   * An id missing from `labels` means "that document is gone" only once this is false; before it,
+   * the same absence means "not looked up yet". The preview can afford to conflate the two, since
+   * it renders either one as the plain text the user typed — but the editor's overlay paints a dead
+   * reference red, and without this every reference in a document would flash red on open.
+   *
+   * A sync reloading the labels does not raise it again: the ids have not changed, the answer for
+   * them is already on screen, and flickering it back to "unknown" is what this exists to stop.
+   */
+  loading: boolean;
+}
+
 /**
- * Live labels for a handful of document ids — what a `[[id]]` link in a preview resolves to.
+ * Live labels for a handful of document ids — what a `[[id]]` reference resolves to, in the preview
+ * and under the caret in the editor.
  *
  * Built on `getPluginDocumentsByIds`, a bulkGet rather than a scan, so reading one document with a
  * few links in it never costs a read proportional to the whole notebook (see the note above that
@@ -174,19 +201,22 @@ export function useAllDocuments(): PluginDocumentDto[] {
  * off its *contents*, not its identity, since a fresh `[...]` literal from `matchAll` every render
  * is otherwise a fresh effect run every render too.
  */
-export function useDocumentLabels(ids: readonly string[]): ReadonlyMap<string, string> {
+export function useDocumentLabels(ids: readonly string[]): DocumentLabels {
   const { t } = useTranslation();
-  const [labels, setLabels] = useState<ReadonlyMap<string, string>>(new Map());
+  const [state, setState] = useState<DocumentLabels>({ labels: new Map(), loading: true });
   const key = ids.join('\n');
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (!key) return setLabels(new Map());
+      if (!key) return setState({ labels: new Map(), loading: false });
       const docs = await getPluginDocumentsByIds(key.split('\n'));
       if (cancelled) return;
       const untitled = t('plugins.notebook.untitled');
-      setLabels(new Map(docs.map((doc) => [doc.id, documentLabel(doc, untitled)])));
+      setState({
+        labels: new Map(docs.map((doc) => [doc.id, documentLabel(doc, untitled)])),
+        loading: false,
+      });
     };
     void load();
     return onSyncApplied(() => void load());
@@ -194,7 +224,16 @@ export function useDocumentLabels(ids: readonly string[]): ReadonlyMap<string, s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return labels;
+  /* A reference typed a moment ago is not a broken one. Noticed during the render rather than in
+     the effect above, because an effect runs *after* the frame that added it — one frame is all it
+     takes to see a link turn red and back again. */
+  const askedFor = useRef(key);
+  if (askedFor.current !== key) {
+    askedFor.current = key;
+    if (!state.loading) setState((current) => ({ ...current, loading: true }));
+  }
+
+  return state;
 }
 
 /* --- Writing ------------------------------------------------------------------------------------ */
@@ -234,6 +273,28 @@ export interface DocumentEditor {
  * reconcilePluginDocuments). This hook has to do the same thing for the text that is only in the
  * *box* — typed since the last save, and therefore in neither the row nor the merge — which is what
  * the three-way merge in `load` is for.
+ *
+ * ## What happens when no other device is writing at all
+ *
+ * Which is nearly always, and it has to cost nothing. Every pull that carries anything re-runs
+ * `load`, and on a slow connection that is often: each save kicks a pass, a pass is a push and then
+ * a pull, and both of them take as long as the link is bad. So `load` runs *while* the user is
+ * typing, over and over, and the row it reads is one this device wrote.
+ *
+ * The rule is therefore that a reload may only move the box when something arrived that this device
+ * did not write, and must cost nothing when nothing did. Three things get it there. The row keeps
+ * its object identity while `updatedAt` has not moved, so a pull that had nothing to say about this
+ * document re-renders nothing around what is being typed. `storedRef` — the text the box and the
+ * row last agreed on — is what the merge below is measured against, so a row still holding what we
+ * banked has nothing to merge in.
+ *
+ * The third is the one that was actually visible. `load` reads the row through two awaited Dexie
+ * queries, and a save landing between the read starting and its result being used hands back a
+ * photograph of the document as it was one keystroke ago. Applied, that puts the box back to the
+ * previous sentence until the next pull puts it forward again — the editor flickering between two
+ * versions of what someone is in the middle of writing, which is what a high-latency connection
+ * used to produce, because that is where saves and pulls overlap. `writeSeq` and `writing` are how
+ * such a read is recognised, and it is thrown away rather than applied.
  */
 export function useDocumentEditor(documentId: string, onDiscarded?: () => void): DocumentEditor {
   const [document, setDocument] = useState<PluginDocumentDto | undefined>(undefined);
@@ -249,6 +310,12 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
   /* The stored text this editor last agreed with — the ancestor for the merge in `load`. Moved on
      every adopt and every save, which are exactly the moments the box and the row are in step. */
   const storedRef = useRef('');
+  /* Saves, counted, and the one in flight. Together they are how a `load` tells a row it read a
+     moment ago from the row as it is now — see "What happens when no other device is writing at
+     all" above. The promise keeps a read from starting in the middle of a save; the counter catches
+     a save that both started and finished while a read was outstanding, which the promise cannot. */
+  const writeSeqRef = useRef(0);
+  const writingRef = useRef<Promise<void> | null>(null);
   /* The unmount cleanup runs after the last render, so everything it inspects has to be reachable
      from a ref rather than from that render's closure. */
   const latestRef = useRef<{ document: PluginDocumentDto | undefined; body: string }>({
@@ -260,32 +327,53 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
   discardedRef.current = onDiscarded;
 
   const load = useCallback(async () => {
-    const [doc, revisions] = await Promise.all([
-      getPluginDocument(documentId),
-      getDocumentRevisions(documentId),
-    ]);
-    revisionsRef.current = revisions;
-    setDocument(doc);
-    const stored = doc?.body ?? '';
-    if (pendingRef.current === null) {
-      // Nothing typed since the last save: the row is simply the truth.
-      setBodyState(stored);
-      storedRef.current = stored;
-    } else if (stored !== storedRef.current) {
-      /* The row moved while there were keystrokes in the box that had not reached it yet — a sync
-         landing inside the debounce window, carrying another device's writing (which the pull has
-         already merged into the row; see reconcilePluginDocuments).
-         Replacing the box would throw away the half-sentence being typed. *Keeping* the box, which
-         is what this used to do, is worse and was the last hole in the whole scheme: the pending
-         text was written from before the other device's changes existed, so banking it a moment
-         later overwrote them — after all the trouble taken to merge them. So the two are merged
-         here too, by the same function and against the last text the box and the row agreed on. */
-      const merged = merge3(storedRef.current, pendingRef.current, stored);
-      pendingRef.current = merged.text;
-      setBodyState(merged.text);
-      storedRef.current = stored;
+    for (let attempt = 0; ; attempt++) {
+      // Never read the row out from under a save that is halfway through writing it.
+      await writingRef.current;
+      const seq = writeSeqRef.current;
+      const [doc, revisions] = await Promise.all([
+        getPluginDocument(documentId),
+        getDocumentRevisions(documentId),
+      ]);
+      /* A save landed inside those two reads, so what came back describes the document as it was
+         before it. Dropping the answer costs nothing — the save has already left the box, the row
+         and `storedRef` in step — and reading again is what picks up whatever else the sync brought
+         with it. Bounded, because a loop that cannot end is worse than a stale render: after a few
+         tries the box is simply left alone, and the next pull reloads it anyway. */
+      if ((writeSeqRef.current !== seq || writingRef.current) && attempt < LOAD_RETRIES) continue;
+
+      revisionsRef.current = revisions;
+      /* Identity preserved when the row has not actually moved. Most pulls say nothing about this
+         document, and a fresh object for each of them re-renders the editor for no reason.
+         `updatedAt` is the row's version stamp: it moves on every write, local or pulled. */
+      setDocument((current) =>
+        current && doc && current.updatedAt === doc.updatedAt ? current : doc,
+      );
+      const stored = doc?.body ?? '';
+      if (pendingRef.current === null) {
+        /* Nothing typed since the last save: the row is simply the truth. Unguarded on purpose —
+           `setBodyState` with the string it already holds is a bail-out, not a render, and this
+           branch is also what puts a *different* document's text in the box when `documentId`
+           changes without the hook remounting. */
+        setBodyState(stored);
+        storedRef.current = stored;
+      } else if (stored !== storedRef.current) {
+        /* The row moved while there were keystrokes in the box that had not reached it yet — a sync
+           landing inside the debounce window, carrying another device's writing (which the pull has
+           already merged into the row; see reconcilePluginDocuments).
+           Replacing the box would throw away the half-sentence being typed. *Keeping* the box, which
+           is what this used to do, is worse and was the last hole in the whole scheme: the pending
+           text was written from before the other device's changes existed, so banking it a moment
+           later overwrote them — after all the trouble taken to merge them. So the two are merged
+           here too, by the same function and against the last text the box and the row agreed on. */
+        const merged = merge3(storedRef.current, pendingRef.current, stored);
+        pendingRef.current = merged.text;
+        setBodyState(merged.text);
+        storedRef.current = stored;
+      }
+      setLoading(false);
+      return;
     }
-    setLoading(false);
   }, [documentId]);
 
   useEffect(() => {
@@ -301,24 +389,45 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
     if (next === null) return;
     pendingRef.current = null;
 
-    const dateKey = todayKey();
-    const base = baseTextBefore(revisionsRef.current, dateKey);
-    const { patch, added, removed, changed } = revisionFor(base, next);
+    /* The save is published as one promise before it does anything asynchronous, so a reload racing
+       it can wait for it rather than photograph the row halfway through — see `load`. */
+    const saving = (async () => {
+      const dateKey = todayKey();
+      const base = baseTextBefore(revisionsRef.current, dateKey);
+      const { patch, added, removed, changed } = revisionFor(base, next);
 
-    await updatePluginDocument(documentId, { body: next });
-    storedRef.current = next; // the box and the row agree again; this is the next merge's ancestor
-    setDocument((current) => (current ? { ...current, body: next } : current));
+      await updatePluginDocument(documentId, { body: next });
+      storedRef.current = next; // the box and the row agree again; the next merge's ancestor
+      setDocument((current) => (current ? { ...current, body: next } : current));
 
-    /* A day whose net change is nothing gets no revision — an edit typed and undone should not
-       leave a day in the timeline whose diff is empty. An *existing* revision for today is still
-       rewritten in that case, because it has to go back to describing no change. */
-    const existing = revisionsRef.current.find((r) => r.dateKey === dateKey);
-    if (changed || existing) {
-      const row = await putDocumentRevision(PLUGIN_ID, documentId, dateKey, patch, added, removed);
-      revisionsRef.current = [
-        ...revisionsRef.current.filter((r) => r.dateKey !== dateKey),
-        row,
-      ].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+      /* A day whose net change is nothing gets no revision — an edit typed and undone should not
+         leave a day in the timeline whose diff is empty. An *existing* revision for today is still
+         rewritten in that case, because it has to go back to describing no change. */
+      const existing = revisionsRef.current.find((r) => r.dateKey === dateKey);
+      if (changed || existing) {
+        const row = await putDocumentRevision(
+          PLUGIN_ID,
+          documentId,
+          dateKey,
+          patch,
+          added,
+          removed,
+        );
+        revisionsRef.current = [
+          ...revisionsRef.current.filter((r) => r.dateKey !== dateKey),
+          row,
+        ].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+      }
+    })();
+
+    writingRef.current = saving;
+    try {
+      await saving;
+    } finally {
+      // Bumped even when the save threw: the row may still have moved, so a read taken across it
+      // cannot be trusted either way.
+      writeSeqRef.current++;
+      if (writingRef.current === saving) writingRef.current = null;
     }
   }, [documentId]);
 
@@ -446,7 +555,10 @@ export function useTouchedDocuments(dateKey: string): {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const revisions = await getRevisionsForDay(PLUGIN_ID, dateKey);
+    /* Filtered before the documents are fetched, not after: a day whose revision recorded nothing is
+       not a document to link to (see `wasWrittenIn`), and reading its row to then drop it would be a
+       primary-key `get` spent on a link that is never drawn. */
+    const revisions = (await getRevisionsForDay(PLUGIN_ID, dateKey)).filter(wasWrittenIn);
     const documents = await Promise.all(
       revisions.map((revision) => getPluginDocument(revision.documentId)),
     );
