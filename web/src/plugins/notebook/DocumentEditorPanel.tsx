@@ -1,5 +1,5 @@
 import { MAX_PLUGIN_DOCUMENT_BYTES } from '@diary/shared';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePeople } from '@/api/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 import { documentLabel, NOTEBOOK_PLUGIN_ID } from './model';
 import { MarkdownView } from './MarkdownView';
 import { MentionTextarea } from './MentionTextarea';
+import { referencedDocumentIds } from './syntax';
 import { useCaretCentering } from './useCaretCentering';
-import { useDocumentEditor } from './useNotebook';
+import { useDocumentEditor, useDocumentLabels } from './useNotebook';
 
 /**
  * One document, being written in or read.
@@ -22,9 +23,11 @@ import { useDocumentEditor } from './useNotebook';
  * the user typed. A styled-as-you-type surface would have to keep a second representation in step
  * with that one, and the failure mode is silent.
  *
- * The preview is where `@mentions` become links to people — see MarkdownView.tsx. In the editor they
- * are left as plain text on purpose: highlighting them means laying the whole document out twice on
- * every keystroke, which the composer can afford for one line and a thousand-word thought cannot.
+ * The preview is where `@mentions` become links to people and `[[id]]` becomes a link to another
+ * document — see MarkdownView.tsx. The editor no longer leaves them as plain text: it paints a
+ * highlight layer behind the textarea, so the shape of a document is legible while it is being
+ * written, and an id in the middle of a sentence resolves to a title under the caret. What that
+ * layer may and may not do to the text is the subject of syntax.ts.
  *
  * ## Nothing says "saving"
  *
@@ -89,6 +92,13 @@ export function DocumentEditorPanel({
     });
   }, [documentId, t]);
 
+  /* Live titles for the references this document *contains*, which is a different question from the
+     one above: the picker needs every document there is, while this needs the handful actually
+     linked to. A `bulkGet` on those ids (see `useDocumentLabels`), so it costs what the document
+     spends on links rather than what the notebook holds — which is why it can run on every edit
+     while `loadLinkableDocuments` has to wait to be asked. */
+  const documentLabels = useDocumentLabels(useMemo(() => referencedDocumentIds(body), [body]));
+
   /* Grow the box to the text. A prose editor with an inner scrollbar puts the document in a window
      inside a window — the page should scroll, not the field.
 
@@ -138,6 +148,8 @@ export function DocumentEditorPanel({
             onChange={setBody}
             people={people}
             documents={linkableDocuments}
+            documentLabels={documentLabels.labels}
+            documentLabelsLoading={documentLabels.loading}
             onDocumentTokenActive={loadLinkableDocuments}
             textareaRef={textareaRef}
             placeholder={t('plugins.notebook.bodyPlaceholder')}

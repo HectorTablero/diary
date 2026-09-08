@@ -92,7 +92,9 @@ export function HistoryDialog({
                       </span>
                       {/* The same two figures the day card shows, in the same two colours, and a
                           side that is zero is left out the same way. A timeline reporting only
-                          what was added would describe a day of cutting as a day of nothing. */}
+                          what was added would describe a day of cutting as a day of nothing.
+                          Both sides being zero is not a case here: a day that changed nothing is
+                          not a day in this list at all — see `wasWrittenIn`. */}
                       <span
                         className="block tabular-nums"
                         aria-label={t('plugins.notebook.charactersDeltaLabel', {
@@ -100,24 +102,16 @@ export function HistoryDialog({
                           removed: day.removed,
                         })}
                       >
-                        {day.added === 0 && day.removed === 0 ? (
-                          <span className="text-muted-foreground">
-                            {t('plugins.notebook.noNetGrowth')}
+                        {day.added > 0 && (
+                          <span aria-hidden className="text-emerald-600 dark:text-emerald-400">
+                            +{day.added}
                           </span>
-                        ) : (
-                          <>
-                            {day.added > 0 && (
-                              <span aria-hidden className="text-emerald-600 dark:text-emerald-400">
-                                +{day.added}
-                              </span>
-                            )}
-                            {day.added > 0 && day.removed > 0 && ' '}
-                            {day.removed > 0 && (
-                              <span aria-hidden className="text-destructive">
-                                −{day.removed}
-                              </span>
-                            )}
-                          </>
+                        )}
+                        {day.added > 0 && day.removed > 0 && ' '}
+                        {day.removed > 0 && (
+                          <span aria-hidden className="text-destructive">
+                            −{day.removed}
+                          </span>
                         )}
                       </span>
                     </button>

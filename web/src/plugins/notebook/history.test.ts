@@ -7,6 +7,7 @@ import {
   netGained,
   replay,
   revisionFor,
+  wasWrittenIn,
   type DiffBlock,
 } from './history';
 
@@ -51,6 +52,40 @@ describe('replay', () => {
 
   it('is empty for a document that was created and never written in', () => {
     expect(replay([])).toEqual([]);
+  });
+
+  /* A day someone opened, edited and put back exactly as they found it. The row exists — it had to
+     be rewritten to describe no change — but it is not a day in the history, and a timeline listing
+     it would be offering to show a diff with nothing in it. */
+  it('leaves out a day that ended where it started', () => {
+    const undone = [...chain, revision('2026-08-13', WED, WED)];
+    expect(replay(undone).map((day) => day.dateKey)).toEqual([
+      '2026-08-10',
+      '2026-08-11',
+      '2026-08-12',
+    ]);
+  });
+
+  it('still replays that day, so the days after it reconstruct correctly', () => {
+    const AFTER = `${WED}
+
+And one more thought.`;
+    const undone = [...chain, revision('2026-08-13', WED, WED), revision('2026-08-14', WED, AFTER)];
+    expect(replay(undone).at(-1)?.text).toBe(AFTER);
+  });
+});
+
+describe('wasWrittenIn', () => {
+  it('counts a day that only cut text, which is work like any other', () => {
+    expect(wasWrittenIn({ added: 0, removed: 40 })).toBe(true);
+  });
+
+  it('counts a day that rewrote as much as it removed', () => {
+    expect(wasWrittenIn({ added: 40, removed: 40 })).toBe(true);
+  });
+
+  it('does not count a day that ended where it started', () => {
+    expect(wasWrittenIn({ added: 0, removed: 0 })).toBe(false);
   });
 });
 

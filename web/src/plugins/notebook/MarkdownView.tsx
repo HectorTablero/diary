@@ -2,10 +2,12 @@ import type { PersonDto } from '@diary/shared';
 import { Fragment, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useEntityLinks } from '@/lib/entityLinks';
 import { segmentContent } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 import { NotebookImage } from './NotebookImage';
+import { INLINE_PATTERN, referencedDocumentIds } from './syntax';
 import { useDocumentLabels } from './useNotebook';
 
 /**
@@ -142,13 +144,6 @@ export function toggleTaskAtLine(text: string, lineIndex: number): string {
   return lines.join('\n');
 }
 
-/** Every `[[id]]` referenced anywhere in `text`, deduplicated — what `useDocumentLabels` needs. */
-function referencedDocumentIds(text: string): string[] {
-  const ids = new Set<string>();
-  for (const match of text.matchAll(/\[\[([^\]]+)\]\]/g)) ids.add(match[1]);
-  return [...ids];
-}
-
 const HEADING_CLASS: Record<number, string> = {
   1: 'mt-6 mb-2 text-xl font-semibold first:mt-0',
   2: 'mt-6 mb-2 text-lg font-semibold first:mt-0',
@@ -172,7 +167,9 @@ export function MarkdownView({
 }) {
   const blocks = parseBlocks(text);
   const documentIds = useMemo(() => referencedDocumentIds(text), [text]);
-  const documentLabels = useDocumentLabels(documentIds);
+  // Only the map here: the preview renders an unresolved reference and a still-loading one the
+  // same way — as the text the user typed — so it has no use for `loading`. See DocumentLabels.
+  const { labels: documentLabels } = useDocumentLabels(documentIds);
 
   const list = (block: Block, ordered: boolean) => {
     const Tag = ordered ? 'ol' : 'ul';
@@ -281,28 +278,25 @@ function TaskCheckbox({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
+  /* The app's own checkbox, not the browser's. A bare `<input type="checkbox">` is drawn by the
+     platform — a blue Windows tick, a different blue on a Mac, something else again on Android — and
+     next to this app's own switches and radio groups it reads as a form control that wandered in
+     from another page. The shared component is the same square, border and check the rest of the
+     app uses, and it follows the theme. */
   return (
-    <input
-      type="checkbox"
+    <Checkbox
       checked={checked}
       disabled={disabled}
-      onChange={onToggle}
+      onCheckedChange={onToggle}
       aria-label={label || t('plugins.notebook.taskCheckbox')}
-      className="mt-1.5 size-3.5 shrink-0 accent-foreground disabled:cursor-not-allowed"
+      className="mt-1.5"
     />
   );
 }
 
-/* Inline syntax, innermost-binding first. Code spans come first and are not descended into, which
-   is what lets a document explain `**bold**` without the explanation turning bold.
-
-   The three link-shaped forms are checked before the code/emphasis marks resolve their own inner
-   text — `[[id]]` before the single-bracket link, so a document reference is never partially
-   swallowed by the plainer pattern, and image before link, so `!` is never left dangling in front of
-   a rendered link. None of the three is parsed recursively for nested emphasis inside its own
-   label/alt text, matching the rest of this hand-rolled, one-pass parser. */
-const INLINE_PATTERN =
-  /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(_[^_]+_)|(\[\[[^\]]+\]\])|(!\[[^\]]*\]\([^)]+\))|(\[[^\]]+\]\([^)]+\))/;
+/* The inline grammar — which token wins where — lives in syntax.ts, because the editor's highlight
+   layer has to agree with this renderer character for character. See the note at the top of that
+   file for what the two surfaces would otherwise disagree about. */
 
 const IMAGE_PATTERN = /^!\[([^\]]*)\]\(([^)]+)\)$/;
 const LINK_PATTERN = /^\[([^\]]+)\]\(([^)]+)\)$/;

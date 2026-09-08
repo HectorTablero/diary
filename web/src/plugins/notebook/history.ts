@@ -36,17 +36,39 @@ export interface HistoryDay {
 }
 
 /**
+ * Whether a day's revision recorded any work at all.
+ *
+ * A row can exist and say nothing happened. A save only writes a revision when the text actually
+ * moved (see `revisionFor`'s `changed`) — but a day that *had* moved and was then put back exactly
+ * as it was found has to rewrite its existing row to describe no change, because deleting it is not
+ * something the chain can express. So `+0 −0` days are real rows, and they are the one thing in this
+ * plugin nobody wants listed: a document appearing under "written in today" that is character for
+ * character what it was this morning is a link offering to show you nothing.
+ *
+ * A predicate rather than the comparison written out at each of the two call sites, because those
+ * two — the day card and the history — have to agree about it, and this is where they do.
+ */
+export const wasWrittenIn = (revision: { added: number; removed: number }): boolean =>
+  revision.added > 0 || revision.removed > 0;
+
+/**
  * Replay a chain into one text per day, oldest first.
  *
  * Linear in the number of revisions and in the size of the document, which is the trade the patch
  * format was chosen for: opening the history of a thought edited on three hundred days applies three
  * hundred small patches, and every one of them was a few hundred bytes to store.
+ *
+ * Every revision is applied; only the ones that changed nothing are left out of the *answer*. The
+ * two are not the same thing — a patch is applied for its effect on the text, and a `+0 −0` patch
+ * has none, so skipping it outright would give the same result. Applying it anyway is what keeps
+ * this loop a plain replay of the chain rather than a replay with an exception in it.
  */
 export function replay(revisions: readonly PluginDocumentDto[]): HistoryDay[] {
   const days: HistoryDay[] = [];
   let text = '';
   for (const revision of revisions) {
     text = applyPatch(text, decodePatch(revision.body));
+    if (!wasWrittenIn(revision)) continue;
     days.push({
       dateKey: revision.dateKey,
       text,
