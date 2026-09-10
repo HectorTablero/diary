@@ -38,13 +38,12 @@ import { formatDateKey, todayKey, weekdayName } from '@/lib/dates';
 import { useWeekStart } from '@/lib/preferences';
 import { splitColumns, useIsWideContainer } from '@/lib/useContainerWidth';
 import { cn } from '@/lib/utils';
-import { describeSchedule, habitChanges } from './changes';
+import { describeSchedule, habitChanges, habitSummary } from './changes';
 import { HiddenSection, StreakBadge } from './HabitControls';
 import {
   DEFAULT_SCALE_MAX,
   DEFAULT_SCALE_MIN,
   defaultSchedule,
-  formatDuration,
   formatHabitValue,
   HABIT_KINDS,
   habitOccursOn,
@@ -53,9 +52,7 @@ import {
   MAX_HABIT_TARGET,
   MAX_HABIT_UNIT_LENGTH,
   metTarget,
-  scaleBounds,
   scheduleAt,
-  showsSeconds,
   type Habit,
   type HabitKind,
 } from './model';
@@ -250,43 +247,6 @@ function KindIcon({ kind }: { kind: HabitKind }) {
               ? ListTodo
               : CircleCheckBig;
   return <Icon className="size-3.5" />;
-}
-
-/**
- * The one-line description under a habit's name.
- *
- * Every branch is written out rather than built from a template, because `checkI18n` can only see
- * string-literal keys — a key assembled at runtime is invisible to it and would be the first thing
- * to go missing in a translation nobody checks.
- */
-function habitSummary(habit: Habit, t: TFunction): string {
-  switch (habit.type) {
-    case 'numeric':
-      return habit.target
-        ? t('plugins.habits.summaryNumeric_target', {
-            unit: habit.unit || t('plugins.habits.typeNumeric'),
-            target: habit.target,
-          })
-        : t('plugins.habits.summaryNumeric', {
-            unit: habit.unit || t('plugins.habits.typeNumeric'),
-          });
-    case 'time':
-      return habit.target
-        ? t('plugins.habits.summaryTime_target', {
-            target: formatDuration(habit.target, showsSeconds(habit)),
-          })
-        : t('plugins.habits.summaryTime');
-    case 'scale': {
-      const { min, max } = scaleBounds(habit);
-      return t('plugins.habits.summaryScale', { min, max });
-    }
-    case 'mood':
-      return t('plugins.habits.summaryMood');
-    case 'task':
-      return t('plugins.habits.summaryTask');
-    default:
-      return t('plugins.habits.summaryBinary');
-  }
 }
 
 /**
