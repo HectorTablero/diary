@@ -3,6 +3,7 @@ import { localeWeekStart, weekdayName, type WeekStart } from '@/lib/dates';
 import {
   defaultSchedule,
   formatDuration,
+  scaleBounds,
   showsSeconds,
   type Habit,
   type HabitConfig,
@@ -50,6 +51,48 @@ export function describeSchedule(
       return t('plugins.habits.scheduleIntervalSummary', { count: schedule.every });
     default:
       return t('plugins.habits.scheduleDaily');
+  }
+}
+
+/**
+ * The one-line description of what a habit *is*: its kind, and the unit, goal or bounds that give
+ * its numbers meaning.
+ *
+ * Beside `describeSchedule` for the same reason — the card, the change log and the Markdown export
+ * all have to say the same thing about a habit, and the export is read by an agent that has no card
+ * to compare it against.
+ *
+ * Every branch is written out rather than built from a template, because `checkI18n` can only see
+ * string-literal keys — a key assembled at runtime is invisible to it and would be the first thing
+ * to go missing in a translation nobody checks.
+ */
+export function habitSummary(habit: Habit, t: TFunction): string {
+  switch (habit.type) {
+    case 'numeric':
+      return habit.target
+        ? t('plugins.habits.summaryNumeric_target', {
+            unit: habit.unit || t('plugins.habits.typeNumeric'),
+            target: habit.target,
+          })
+        : t('plugins.habits.summaryNumeric', {
+            unit: habit.unit || t('plugins.habits.typeNumeric'),
+          });
+    case 'time':
+      return habit.target
+        ? t('plugins.habits.summaryTime_target', {
+            target: formatDuration(habit.target, showsSeconds(habit)),
+          })
+        : t('plugins.habits.summaryTime');
+    case 'scale': {
+      const { min, max } = scaleBounds(habit);
+      return t('plugins.habits.summaryScale', { min, max });
+    }
+    case 'mood':
+      return t('plugins.habits.summaryMood');
+    case 'task':
+      return t('plugins.habits.summaryTask');
+    default:
+      return t('plugins.habits.summaryBinary');
   }
 }
 
