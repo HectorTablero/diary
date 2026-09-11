@@ -66,6 +66,19 @@ export interface PluginManifest {
    * Optional: a plugin with no calendar view, or one content with the shared violet, leaves it unset.
    */
   hue?: { light: string; dark: string };
+  /**
+   * Extra checkboxes the Markdown export dialog offers for this plugin's `ownExport` type, as
+   * `{ <key>: <default> }`, passed back to `buildMerged`/`buildZip` as `PluginExportOptions`.
+   *
+   * On the manifest rather than the module for the reason `icon` and `hue` are: the dialog draws
+   * these boxes before anyone presses Export, and rule 3 says a slot must know what to draw without
+   * fetching a chunk to ask.
+   *
+   * Each key's label comes from the plugin's own locale bundle at
+   * `plugins.<id>.exportOption.<key>`, the same way `plugins.<id>.exportHint` supplies the hint —
+   * the dialog never spells out an option, only looks one up.
+   */
+  exportOptions?: Readonly<Record<string, boolean>>;
   /** Literal path. See rule 2. */
   load: () => Promise<{ default: PluginModule }>;
 }
@@ -123,6 +136,10 @@ export const PLUGINS: readonly PluginManifest[] = [
        characters written per day, so it is the one plugin view that genuinely is one. Tailwind's
        green-600/green-400, matching the light/dark split the period tracker's red uses. */
     hue: { light: '22, 163, 74', dark: '74, 222, 128' },
+    /* Off by default: the export existed for a long time without history, a document written in for
+       two years narrates into far more text than the document itself, and what most exports are for
+       is the prose as it stands. Someone who wants how a thought moved asks for it. */
+    exportOptions: { history: false },
     load: () => import('./notebook'),
   },
 ];

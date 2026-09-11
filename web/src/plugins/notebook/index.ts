@@ -39,7 +39,13 @@ const notebook: PluginModule = {
   Page: NotebookPage,
   SettingsSection: NotebookSettingsSection,
   CalendarView: NotebookCalendarView,
-  exportOwn: { buildMerged: buildNotebookMergedMarkdown, buildZip: buildNotebookZipEntries },
+  /* The dialog hands over `PluginExportOptions` — a plain `Record<string, boolean>` keyed by what
+     the manifest declared. Narrowed to this plugin's own option here, at the boundary, so nothing
+     below this line deals in loose string keys (see NotebookExportOptions in markdown.ts). */
+  exportOwn: {
+    buildMerged: (options) => buildNotebookMergedMarkdown({ history: options.history === true }),
+    buildZip: (options) => buildNotebookZipEntries({ history: options.history === true }),
+  },
   onboardingSteps: notebookOnboardingSteps,
 };
 

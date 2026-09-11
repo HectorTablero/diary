@@ -46,7 +46,10 @@
   "touchedToday": "今日書いたもの",
   "touchedThatDay": "その日に書いたもの",
   "charactersDeltaLabel": "{{added}} 文字を書き、{{removed}} 文字を削除",
-  "exportHint": "各ドキュメントに、そのメタデータを YAML フロントマターとして付けたもの。履歴は含まれません。",
+  "exportHint": "各ドキュメントに、そのメタデータを YAML フロントマターとして付けたもの。履歴は下で指定しないかぎり含まれません。",
+  "exportOption": {
+    "history": "各ドキュメントの履歴を含める"
+  },
   "settingsTitle": "画像",
   "settingsDescription": "ドキュメントがリンクする画像をこの端末に保存し、オフラインでも表示されるようにします。",
   "cacheImages": "画像をキャッシュする",

@@ -46,7 +46,10 @@
   "touchedToday": "今天写过的",
   "touchedThatDay": "那天写过的",
   "charactersDeltaLabel": "写下 {{added}} 个字符，删除 {{removed}} 个",
-  "exportHint": "每篇文档都会附上以 YAML frontmatter 形式记录的元数据。不包含历史记录。",
+  "exportHint": "每篇文档都会附上以 YAML frontmatter 形式记录的元数据。除非在下方勾选，否则不包含历史记录。",
+  "exportOption": {
+    "history": "包含每篇文档的历史记录"
+  },
   "settingsTitle": "图片",
   "settingsDescription": "把文档链接的图片保存在这台设备上，离线时也能显示。",
   "cacheImages": "缓存图片",

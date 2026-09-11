@@ -2,6 +2,7 @@ import type { PluginDocumentDto } from '@diary/shared';
 import { describe, expect, it } from 'vitest';
 import {
   baseTextBefore,
+  changesBetween,
   diffView,
   hasChanges,
   netGained,
@@ -279,5 +280,51 @@ describe('hasChanges', () => {
 
   it('is false for nothing at all', () => {
     expect(hasChanges(diffView('', ''))).toBe(false);
+  });
+});
+
+describe('changesBetween', () => {
+  /* Compact enough to read a whole expectation at a glance: `+text`, `-text`, `old>new`. */
+  const narrated = (before: string, after: string): string[] =>
+    changesBetween(before, after).map((change) =>
+      change.kind === 'replaced'
+        ? `${change.before}>${change.after}`
+        : `${change.kind === 'added' ? '+' : '-'}${change.text}`,
+    );
+
+  it('is nothing at all for two texts that read identically', () => {
+    expect(narrated('One. Two.', 'One. Two.')).toEqual([]);
+    expect(narrated('', '')).toEqual([]);
+  });
+
+  it('is one addition for the first day a document existed', () => {
+    expect(narrated('', 'First. Second.')).toEqual(['+First. Second.']);
+  });
+
+  it('pairs a removal with the addition that follows it into one replacement', () => {
+    expect(narrated('One. Two. Three.', 'One. Second. Third.')).toEqual([
+      'Two. Three.>Second. Third.',
+    ]);
+  });
+
+  it('leaves a removal with nothing after it as a removal, and the reverse as an addition', () => {
+    expect(narrated('One. Two. Three.', 'One. Three.')).toEqual(['-Two.']);
+    expect(narrated('One. Three.', 'One. Two. Three.')).toEqual(['+Two.']);
+  });
+
+  it('reports separated changes separately, in the order they occur', () => {
+    expect(narrated('A. B. C. D. E.', 'A2. B. D. F. E.')).toEqual(['A.>A2.', '-C.', '+F.']);
+  });
+
+  /* The reason `settleWhitespace`'s rule is repeated here. A segment owns its trailing newline, so
+     appending a paragraph rewrites the one above purely to give it the blank line that now separates
+     them. Narrated naively, the commonest edit anyone makes reads as a paragraph replaced by an
+     identical copy of itself. */
+  it('says nothing about a paragraph rewritten only to gain its separator', () => {
+    expect(narrated('A.\n\nB.', 'A.\n\nB.\n\nC.')).toEqual(['+C.']);
+  });
+
+  it('flattens a multi-line run onto one quotable line', () => {
+    expect(narrated('', 'A.\n\nB.')).toEqual(['+A. B.']);
   });
 });
