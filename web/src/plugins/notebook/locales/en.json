@@ -50,7 +50,10 @@
   "touchedThatDay_one": "Written in that day",
   "touchedThatDay_other": "Written in that day",
   "charactersDeltaLabel": "{{added}} characters written, {{removed}} removed",
-  "exportHint": "Every document, with its metadata as YAML frontmatter. History isn't included.",
+  "exportHint": "Every document, with its metadata as YAML frontmatter. History is left out unless you ask for it below.",
+  "exportOption": {
+    "history": "Include the history of each document"
+  },
   "settingsTitle": "Images",
   "settingsDescription": "Keep images your documents link to on this device, so they still show when you're offline.",
   "cacheImages": "Cache images",

@@ -50,7 +50,10 @@
   "touchedThatDay_one": "Scritto quel giorno",
   "touchedThatDay_other": "Scritto quel giorno",
   "charactersDeltaLabel": "{{added}} caratteri scritti, {{removed}} rimossi",
-  "exportHint": "Ogni documento, con i suoi metadati come frontmatter YAML. La cronologia non è inclusa.",
+  "exportHint": "Ogni documento, con i suoi metadati come frontmatter YAML. La cronologia è esclusa, a meno che tu non la chieda qui sotto.",
+  "exportOption": {
+    "history": "Includi la cronologia di ogni documento"
+  },
   "settingsTitle": "Immagini",
   "settingsDescription": "Conserva su questo dispositivo le immagini collegate dai tuoi documenti, così restano visibili anche offline.",
   "cacheImages": "Metti in cache le immagini",

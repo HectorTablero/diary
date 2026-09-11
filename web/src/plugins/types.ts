@@ -17,6 +17,19 @@ export type PluginSurface =
   | 'onboarding';
 
 /**
+ * The extra checkboxes an `ownExport` plugin asked for, as `{ <key>: <ticked> }`.
+ *
+ * The keys — and their defaults — come from the plugin's *manifest* (`PluginManifest.exportOptions`)
+ * rather than from the module, because the dialog has to draw the boxes before anyone presses
+ * Export, and rule 3 forbids it loading a chunk to find out what to draw. The module receives the
+ * answers; the manifest declares the questions.
+ *
+ * Every key is always present, defaults filled in, so a builder can read `options.history` without
+ * guarding it.
+ */
+export type PluginExportOptions = Readonly<Record<string, boolean>>;
+
+/**
  * One day's worth of a plugin's calendar data — just enough to colour and label a cell.
  *
  * `level` is 0 (nothing to show) to 1 (fully met), on the same scale regardless of what the plugin
@@ -76,11 +89,11 @@ export interface PluginModule {
    */
   exportOwn?: {
     /** Everything as one merged Markdown file, or `null` when there is nothing to export. */
-    buildMerged: () => Promise<string | null>;
+    buildMerged: (options: PluginExportOptions) => Promise<string | null>;
     /** Everything as a set of files for a ZIP archive. A `name` may contain `/` to lay out real
         folders, when the plugin's own data has a shape that wants one (`lib/zip.ts` stores it
         verbatim). */
-    buildZip: () => Promise<{ name: string; content: string }[]>;
+    buildZip: (options: PluginExportOptions) => Promise<{ name: string; content: string }[]>;
   };
   /**
    * A view in the calendar page's switcher: replaces the diary's own entry heatmap with this

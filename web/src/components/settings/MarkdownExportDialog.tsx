@@ -45,7 +45,10 @@ import { PLUGINS } from '@/plugins/registry';
    the `ownExport` surface (see PluginModule.exportOwn), discovered below off `PLUGINS` rather than
    named here. This dialog knows nothing about any particular plugin: it reads a manifest's `id` and
    `load()`, and every string it shows for one comes from that plugin's own locale bundle
-   (`plugins.<id>.name`, `plugins.<id>.exportHint`), the same way the Plugins list in Settings does. */
+   (`plugins.<id>.name`, `plugins.<id>.exportHint`, `plugins.<id>.exportOption.<key>`), the same way
+   the Plugins list in Settings does. The per-plugin checkboxes are the same arrangement one level
+   on: the *keys* come from the manifest (`exportOptions`) so they can be drawn without loading the
+   plugin, and the answers go back to `buildMerged`/`buildZip` for the plugin itself to interpret. */
 type ExportType = string;
 type OutputMode = 'merge' | 'zip';
 
@@ -114,6 +117,7 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
   const [personIds, setPersonIds] = useState<string[]>([]);
   const [outputMode, setOutputMode] = useState<OutputMode>('merge');
   const [personOptions, setPersonOptions] = useState<PersonMarkdownOptions>(DEFAULT_PERSON_OPTIONS);
+  const [pluginOptions, setPluginOptions] = useState<Record<string, boolean>>({});
   const [exporting, setExporting] = useState(false);
   const enabledPlugins = useEnabledPlugins();
 
@@ -129,6 +133,18 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
     [enabledPlugins],
   );
   const ownExportPlugin = ownExportPlugins.find((plugin) => plugin.id === type);
+
+  /* Whatever the selected plugin's manifest declared, with its defaults — readable without loading
+     the plugin, which is the point of it living on the manifest (registry.ts rule 3). Reset on each
+     change of type so one plugin's answers never carry into another's, and so reopening the dialog
+     starts from the declared defaults rather than from last time. */
+  const pluginOptionKeys = useMemo(
+    () => Object.keys(ownExportPlugin?.exportOptions ?? {}),
+    [ownExportPlugin],
+  );
+  useEffect(() => {
+    setPluginOptions({ ...(ownExportPlugin?.exportOptions ?? {}) });
+  }, [ownExportPlugin]);
 
   /* A plugin's name and export hint live in its own locale bundle, fetched only once it is enabled
      — same as PluginsSection.tsx fetching every plugin's strings to show a name beside its switch. */
@@ -222,7 +238,7 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
         const { exportOwn } = (await ownExportPlugin.load()).default;
         if (!exportOwn) return; // guarded by registry.surfaces.test.tsx; unreachable in practice
         if (outputMode === 'zip') {
-          const files = await exportOwn.buildZip();
+          const files = await exportOwn.buildZip(pluginOptions);
           if (!files.length) {
             notifyError(t('settings.markdownExport.exportEmpty'));
             return;
@@ -234,7 +250,7 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
             'application/zip',
           );
         } else {
-          const markdown = await exportOwn.buildMerged();
+          const markdown = await exportOwn.buildMerged(pluginOptions);
           if (!markdown) {
             notifyError(t('settings.markdownExport.exportEmpty'));
             return;
@@ -338,6 +354,36 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                   <p className="text-xs text-muted-foreground">
                     {t(`plugins.${ownExportPlugin.id}.exportHint`)}
                   </p>
+                )}
+                {/* One checkbox per key the manifest declared, labelled out of that plugin's own
+                    locale bundle — the same arrangement as the hint above, so this dialog still
+                    knows nothing about any particular plugin's data. Held back until the bundle has
+                    loaded rather than flashing the raw key.
+
+                    Boxed and capped the same way the person list below is: this list is as long as
+                    whatever plugin is selected says it is, and a plugin with a dozen options would
+                    otherwise push the footer past the bottom of the dialog. It grows with its
+                    content up to the cap and scrolls after that. */}
+                {pluginLabelsReady && pluginOptionKeys.length > 0 && (
+                  <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border">
+                    <ul className="divide-y">
+                      {pluginOptionKeys.map((key) => (
+                        <li key={key}>
+                          <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-accent/40">
+                            <Checkbox
+                              checked={pluginOptions[key] === true}
+                              onCheckedChange={(v) =>
+                                setPluginOptions((prev) => ({ ...prev, [key]: v === true }))
+                              }
+                            />
+                            <span className="text-sm">
+                              {t(`plugins.${ownExportPlugin.id}.exportOption.${key}`)}
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             ) : type === 'entries' ? (

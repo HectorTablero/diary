@@ -50,7 +50,10 @@
   "touchedThatDay_one": "Escrito ese día",
   "touchedThatDay_other": "Escrito ese día",
   "charactersDeltaLabel": "{{added}} caracteres escritos, {{removed}} eliminados",
-  "exportHint": "Cada documento, con sus metadatos como frontmatter YAML. El historial no se incluye.",
+  "exportHint": "Cada documento, con sus metadatos como frontmatter YAML. El historial no se incluye salvo que lo pidas abajo.",
+  "exportOption": {
+    "history": "Incluir el historial de cada documento"
+  },
   "settingsTitle": "Imágenes",
   "settingsDescription": "Guarda en este dispositivo las imágenes que enlazan tus documentos, para que sigan mostrándose sin conexión.",
   "cacheImages": "Guardar imágenes en caché",

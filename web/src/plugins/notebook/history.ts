@@ -294,3 +294,77 @@ export function diffView(before: string, after: string, context = 2): DiffBlock[
 /** Whether a rendered diff has anything to show — a day can legitimately have changed nothing. */
 export const hasChanges = (blocks: readonly DiffBlock[]): boolean =>
   blocks.some((block) => block.kind === 'paragraph' && block.changed);
+
+/** One change a day made to a document, at the same sentence granularity everything else here uses. */
+export type TextChange =
+  | { kind: 'added'; text: string }
+  | { kind: 'removed'; text: string }
+  | { kind: 'replaced'; before: string; after: string };
+
+/** A run of segments as one quotable line: the newlines segments carry are what separate them *in
+    the document*, and inside a Markdown bullet they would end the bullet instead. */
+const oneLine = (text: string): string => text.replace(/\s+/gu, ' ').trim();
+
+/**
+ * A day's work as a flat list of labelled changes — what the Markdown export narrates.
+ *
+ * Deliberately *not* `diffView`. That one builds paragraphs, keeps untouched context either side of
+ * a change and collapses the rest behind a marker, because it is drawn on screen next to the
+ * document it describes. An export has no document beside it and nobody scrolling it: it wants the
+ * changes only, each one whole, in the order they happened.
+ *
+ * A removed run immediately followed by an added run becomes one `replaced` rather than a `removed`
+ * and an `added`, which is the whole reason this reads as prose rather than as a patch — a reworded
+ * sentence should say it was reworded. Runs pair whole: four sentences becoming one is one
+ * replacement of four by one, not four replacements with three of them empty.
+ *
+ * The front-matching loop is `settleWhitespace`'s rule, for its reason (see above): a segment owns
+ * its trailing newline, so appending to a document rewrites the segment appended to purely to give
+ * it the separator it now needs. Left alone, the commonest edit anyone makes would export as a
+ * sentence replaced by a character-for-character copy of itself.
+ */
+export function changesBetween(before: string, after: string): TextChange[] {
+  const source = sentences(before);
+  const changes: TextChange[] = [];
+
+  let cursor = 0;
+  let cut: string[] = [];
+  let put: string[] = [];
+
+  const flush = () => {
+    let paired = 0;
+    while (
+      paired < cut.length &&
+      paired < put.length &&
+      cut[paired].trimEnd() === put[paired].trimEnd()
+    ) {
+      paired++;
+    }
+    const cutText = oneLine(cut.slice(paired).join(''));
+    const putText = oneLine(put.slice(paired).join(''));
+    cut = [];
+    put = [];
+
+    if (cutText && putText) changes.push({ kind: 'replaced', before: cutText, after: putText });
+    else if (cutText) changes.push({ kind: 'removed', text: cutText });
+    else if (putText) changes.push({ kind: 'added', text: putText });
+  };
+
+  for (const op of diffSentences(before, after)) {
+    if (op[0] === '=') {
+      flush();
+      cursor += op[1];
+    } else if (op[0] === '-') {
+      /* A `-` arriving after a `+` opens a new pair rather than joining the one being built: ops are
+         coalesced, so `+` then `-` is two separate edits, not one replacement read backwards. */
+      if (put.length) flush();
+      cut.push(...source.slice(cursor, cursor + op[1]));
+      cursor += op[1];
+    } else {
+      put.push(...op[1]);
+    }
+  }
+  flush();
+
+  return changes;
+}
