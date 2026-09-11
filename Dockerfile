@@ -19,7 +19,7 @@ COPY scripts/ scripts/
 # so without this every image build would pay for browsers the image never runs. The runtime stage
 # below sidesteps it differently, with --ignore-scripts.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-RUN npm ci --no-audit --no-fund
+RUN npm ci --force --no-audit --no-fund
 COPY . .
 # Vite inlines these into the web bundle, so they have to be present at build time, not runtime.
 # Both are safe to expose: the token is a write-only Better Stack ingest key. Leave them unset and
@@ -34,7 +34,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 COPY shared/package.json shared/
 COPY server/package.json server/
-RUN npm ci --omit=dev --no-audit --no-fund -w server --ignore-scripts
+RUN npm ci --force --omit=dev --no-audit --no-fund -w server --ignore-scripts
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/web/dist web/dist
 EXPOSE 3000
