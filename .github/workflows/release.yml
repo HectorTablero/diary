@@ -51,7 +51,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --force
 
       - name: Typecheck
         run: npm run typecheck
@@ -181,7 +181,7 @@ jobs:
           java-version: 21
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --force
 
       # The root package.json version is the single source of truth (bumped by the pre-commit
       # hook). The tag, the APK versionName/versionCode and the OTA bundle name all derive from
