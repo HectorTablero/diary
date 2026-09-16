@@ -157,7 +157,9 @@ function buildHistorySection(revisions: readonly PluginDocumentDto[]): string {
     const bullets = changes.map((change) =>
       change.kind === 'replaced'
         ? `- Replaced: "${change.before}" → "${change.after}"`
-        : `- ${change.kind === 'added' ? 'Added' : 'Removed'}: "${change.text}"`,
+        : `- ${change.kind === 'added' ? 'Added' : 'Removed'}: "${change.text}"${
+            change.within ? ` (${change.kind === 'added' ? 'in' : 'from'} "${change.within}")` : ''
+          }`,
     );
     blocks.push(`### ${day.dateKey}${delta ? ` — ${delta}` : ''}\n\n${bullets.join('\n')}`);
   }

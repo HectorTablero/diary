@@ -25,14 +25,26 @@ describe('ProseDiff', () => {
   it('keeps a rewritten sentence inside the paragraph it belongs to', () => {
     const { container } = render(
       'First one. Second one. Third one.',
-      'First one. Second ones. Third one.',
+      'First one. Second two. Third one.',
     );
 
     const paragraphs = container.querySelectorAll('p');
     expect(paragraphs).toHaveLength(1);
-    expect(paragraphs[0].textContent).toBe('First one. Second one. Second ones. Third one.');
+    expect(paragraphs[0].textContent).toBe('First one. Second one. Second two. Third one.');
     expect(paragraphs[0].querySelector('del')?.textContent).toBe('Second one. ');
-    expect(paragraphs[0].querySelector('ins')?.textContent).toBe('Second ones. ');
+    expect(paragraphs[0].querySelector('ins')?.textContent).toBe('Second two. ');
+  });
+
+  it('marks only the words slipped into a sentence', () => {
+    const { container } = render('Second one.', 'Second new one.');
+    expect(container.querySelector('del')).not.toBeInTheDocument();
+    expect(container.querySelector('ins')?.textContent).toBe('new ');
+  });
+
+  it('draws a word changed into a longer one as the sentence rewritten, not a letter added', () => {
+    const { container } = render('Second one.', 'Second ones.');
+    expect(container.querySelector('del')?.textContent).toBe('Second one.');
+    expect(container.querySelector('ins')?.textContent).toBe('Second ones.');
   });
 
   /* `<del>` and `<ins>` rather than two coloured spans: a screen reader has something to announce,

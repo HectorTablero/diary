@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyUnitOps, diffSentences, diffUnits, graphemes, sentences } from './textDiff';
+import { applyUnitOps, diffSentences, diffUnits, graphemes, sentences, words } from './textDiff';
 
 describe('sentences', () => {
   /* The invariant the storage format and the merge both rest on. Everything else in this file is
@@ -65,6 +65,17 @@ describe('sentences', () => {
   it('ends a segment at a newline even with no terminator', () => {
     expect(sentences('- milk\n- bread')).toEqual(['- milk\n', '- bread']);
     expect(sentences('a\n\nb')).toEqual(['a\n', '\n', 'b']);
+  });
+});
+
+describe('words', () => {
+  it('splits words from the spaces and punctuation between them', () => {
+    expect(words('I went, then.')).toEqual(['I', ' ', 'went', ',', ' ', 'then', '.']);
+  });
+
+  it('tiles the text exactly, like sentences does', () => {
+    const text = 'Él dijo: «hola»\n\nこんにちは、世界。 42 👍🏽';
+    expect(words(text).join('')).toBe(text);
   });
 });
 
