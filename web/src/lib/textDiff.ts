@@ -39,7 +39,7 @@
  * same three texts. A fixed locale keeps (text) → (segments) the same function everywhere. */
 const SEGMENT_LOCALE = 'und';
 
-type Granularity = 'sentence' | 'grapheme';
+type Granularity = 'sentence' | 'word' | 'grapheme';
 
 /* Constructing a Segmenter loads ICU data and costs far more than using one, and the merge path
    reaches for one per conflicted region. Two instances, for the life of the tab. */
@@ -103,6 +103,28 @@ export function sentences(text: string): string[] {
   if (text === '') return [];
   const segmenter = segmenterFor('sentence');
   if (!segmenter) return fallbackSentences(text);
+  const out: string[] = [];
+  for (const { segment } of segmenter.segment(text)) out.push(segment);
+  return out;
+}
+
+/* Fallback only: a run of letters and digits, a run of whitespace, or any other single character.
+   Tiles the text like every other segmentation here. It cannot split CJK into words — a run of
+   kanji is one "word" — which only makes a change there read as a rewrite rather than an insertion. */
+const FALLBACK_WORD = /[\p{L}\p{M}\p{N}]+|\s+|[^\p{L}\p{M}\p{N}\s]/gu;
+
+/**
+ * A text as its words, and the spaces and punctuation between them, tiling it exactly.
+ *
+ * The unit the notebook uses to tell an insertion into a sentence from a rewrite of it (see
+ * `survivingEdges` in plugins/notebook/history.ts): letters are too fine for that, because a word
+ * changed into a longer one (`one` → `ones`) would read as a letter added rather than a word
+ * rewritten.
+ */
+export function words(text: string): string[] {
+  if (text === '') return [];
+  const segmenter = segmenterFor('word');
+  if (!segmenter) return text.match(FALLBACK_WORD) ?? [];
   const out: string[] = [];
   for (const { segment } of segmenter.segment(text)) out.push(segment);
   return out;

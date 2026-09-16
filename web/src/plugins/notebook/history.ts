@@ -1,5 +1,5 @@
 import type { PluginDocumentDto } from '@diary/shared';
-import { diffSentences, sentences } from '@/lib/textDiff';
+import { diffSentences, sentences, words } from '@/lib/textDiff';
 import { applyPatch, decodePatch, diffText, encodePatch, type PatchOp } from './patch';
 
 /**
@@ -109,6 +109,14 @@ export function baseTextBefore(revisions: readonly PluginDocumentDto[], dateKey:
  * reports and what the diff shows can never disagree. It also reads *lower* than it used to, and
  * that is the improvement: at line granularity, fixing a typo in a six-sentence paragraph was
  * reported as the whole paragraph rewritten.
+ *
+ * The one exception is a change that only *inserted* or only *cut* text. Segments own their trailing
+ * whitespace and a sentence is only closed by its terminator, so adding a line after the last one
+ * (`Line` → `Line\nNew`) or carrying on an unfinished sentence (`I went to the` → `I went to the
+ * store.`) rewrites a segment that lost nothing. Counted per segment, that reported the untouched
+ * sentence as removed and written again — a `−n` on a day nothing was taken out. So each run of
+ * changed segments is checked first: if everything on one side survives, intact, around what the
+ * other side put in or cut, only the difference is counted. See `settleHunk`.
  */
 export function revisionFor(
   base: string,
@@ -120,16 +128,28 @@ export function revisionFor(
   let added = 0;
   let removed = 0;
   let cursor = 0;
+  let cut = '';
+  let put = '';
+  const settle = () => {
+    const counts = settleHunk(cut, put);
+    added += counts.added;
+    removed += counts.removed;
+    cut = '';
+    put = '';
+  };
   for (const op of ops) {
     if (op[0] === '=') {
+      settle();
       cursor += op[1];
     } else if (op[0] === '-') {
-      removed += source.slice(cursor, cursor + op[1]).join('').length;
+      if (put) settle(); // `+` then `-` is two edits, as in `changesBetween`
+      cut += source.slice(cursor, cursor + op[1]).join('');
       cursor += op[1];
     } else {
-      added += op[1].join('').length;
+      put += op[1].join('');
     }
   }
+  settle();
 
   return {
     patch: encodePatch(ops),
@@ -139,6 +159,49 @@ export function revisionFor(
        undone. Storing that would put a day in the timeline whose diff is empty. */
     changed: ops.some((op) => op[0] !== '='),
   };
+}
+
+/**
+ * Whether one run of changed segments only inserted or only cut text — and if so, how much of it
+ * stood still either side.
+ *
+ * `cut` is what the run took from between two unchanged segments and `put` is what it left there.
+ * It was a pure insertion when the whole of `cut` is still there, as a head of `put` and a tail of
+ * it with the new text between them; a pure deletion the other way round. `null` means a rewrite,
+ * which everything here treats at sentence granularity — a typo fixed mid-sentence still reads as
+ * that sentence rewritten.
+ *
+ * Compared word by word, not letter by letter: `one` → `ones` is a word rewritten, not an `s`
+ * inserted, and a history or an export quoting a lone `s` says nothing. `head` and `tail` are still
+ * returned in characters, because that is what every caller slices by.
+ *
+ * All-or-nothing on purpose. Trimming whatever words two unrelated sentences happen to share
+ * (`The cat sat.` → `The dog ran.` share `The ` and `.`) would shave coincidental text off a
+ * genuine rewrite; the question asked here is only "did anything actually go?".
+ *
+ * One function for the counts, the history view and the export, so the three can never disagree
+ * about which edits were rewrites.
+ */
+function survivingEdges(cut: string, put: string): { head: number; tail: number } | null {
+  if (!cut || !put) return null;
+  const a = words(cut);
+  const b = words(put);
+  const shorter = Math.min(a.length, b.length);
+  let head = 0;
+  let headChars = 0;
+  while (head < shorter && a[head] === b[head]) headChars += a[head++].length;
+  let tail = 0;
+  let tailChars = 0;
+  while (tail < shorter - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) {
+    tailChars += a[a.length - 1 - tail++].length;
+  }
+  return head + tail === shorter ? { head: headChars, tail: tailChars } : null;
+}
+
+/** The counts for one run of changed segments — see `survivingEdges` for what is left out. */
+function settleHunk(cut: string, put: string): { added: number; removed: number } {
+  const kept = survivingEdges(cut, put) ? Math.min(cut.length, put.length) : 0;
+  return { added: put.length - kept, removed: cut.length - kept };
 }
 
 /**
@@ -168,25 +231,41 @@ export interface DiffPiece {
 export type DiffBlock =
   { kind: 'paragraph'; changed: boolean; pieces: DiffPiece[] } | { kind: 'gap' };
 
+/** Push a run of text as pieces, cut after each newline — `paragraphs` closes a block only at a
+    piece that *ends* with one. */
+function pushPieces(out: DiffPiece[], kind: DiffPiece['kind'], text: string): void {
+  for (const part of text.split(/(?<=\n)/u)) if (part) out.push({ kind, text: part });
+}
+
 /**
- * Fold away a change that is only in the whitespace at the end of a segment.
+ * Fold away what a run of changed segments did not actually change.
+ *
+ * Two cases, both the diff telling the truth about its own units and lying about the document.
  *
  * A segment owns its own trailing newline — that is what makes segments tile a document exactly
  * (see textDiff.ts) — so *appending* to a document rewrites the segment appended to, purely to give
  * it the newline that now separates it from what follows. Left alone, the commonest edit anyone
  * makes would draw the last paragraph struck through and then immediately retyped, identically,
- * above the new one. It is the diff telling the truth about its own units and lying about the
- * document.
+ * above the new one. Matched from the front of each run, because that is the shape the case has:
+ * one segment reappears unchanged and the genuinely new segments follow it.
  *
- * Matched from the front of each removed/added run, because that is the shape the case has: one
- * segment reappears unchanged and the genuinely new segments follow it.
+ * And a sentence only ends at its terminator, so carrying on an unfinished one (`I went to the` →
+ * `I went to the store.`) or slipping a word into one replaces the whole segment. What is left of the
+ * run after the first rule is checked with `survivingEdges`, and a pure insertion or deletion is
+ * drawn as just the words that came or went, standing where they stand.
  */
-function settleWhitespace(pieces: readonly DiffPiece[]): DiffPiece[] {
+function settleHunks(pieces: readonly DiffPiece[]): DiffPiece[] {
   const out: DiffPiece[] = [];
-  for (let i = 0; i < pieces.length; i++) {
+  let i = 0;
+  while (i < pieces.length) {
+    if (pieces[i].kind === 'context') {
+      out.push(pieces[i++]);
+      continue;
+    }
     const removed: DiffPiece[] = [];
-    while (pieces[i]?.kind === 'removed') removed.push(pieces[i++]);
     const added: DiffPiece[] = [];
+    // Removed then added, and no further: `+` then `-` is two edits (see `changesBetween`).
+    while (pieces[i]?.kind === 'removed') removed.push(pieces[i++]);
     while (pieces[i]?.kind === 'added') added.push(pieces[i++]);
 
     let paired = 0;
@@ -199,8 +278,25 @@ function settleWhitespace(pieces: readonly DiffPiece[]): DiffPiece[] {
       out.push({ kind: 'context', text: added[paired].text });
       paired++;
     }
-    out.push(...removed.slice(paired), ...added.slice(paired));
-    if (i < pieces.length && pieces[i].kind === 'context') out.push(pieces[i]);
+
+    const cut = removed.slice(paired);
+    const put = added.slice(paired);
+    const cutText = cut.map((piece) => piece.text).join('');
+    const putText = put.map((piece) => piece.text).join('');
+    const edges = survivingEdges(cutText, putText);
+    if (!edges) {
+      out.push(...cut, ...put);
+      continue;
+    }
+    const inserted = putText.length >= cutText.length;
+    const longer = inserted ? putText : cutText;
+    pushPieces(out, 'context', longer.slice(0, edges.head));
+    pushPieces(
+      out,
+      inserted ? 'added' : 'removed',
+      longer.slice(edges.head, longer.length - edges.tail),
+    );
+    pushPieces(out, 'context', longer.slice(longer.length - edges.tail));
   }
   return out;
 }
@@ -288,7 +384,7 @@ export function diffView(before: string, after: string, context = 2): DiffBlock[
       for (const text of op[1]) pieces.push({ kind: 'added', text });
     }
   }
-  return collapse(paragraphs(settleWhitespace(pieces)), context);
+  return collapse(paragraphs(settleHunks(pieces)), context);
 }
 
 /** Whether a rendered diff has anything to show — a day can legitimately have changed nothing. */
@@ -297,8 +393,10 @@ export const hasChanges = (blocks: readonly DiffBlock[]): boolean =>
 
 /** One change a day made to a document, at the same sentence granularity everything else here uses. */
 export type TextChange =
-  | { kind: 'added'; text: string }
-  | { kind: 'removed'; text: string }
+  /* `within` is the sentence the words went into, or came out of, when the rest of it stood still —
+     a fragment like "store." says nothing on its own. */
+  | { kind: 'added'; text: string; within?: string }
+  | { kind: 'removed'; text: string; within?: string }
   | { kind: 'replaced'; before: string; after: string };
 
 /** A run of segments as one quotable line: the newlines segments carry are what separate them *in
@@ -318,10 +416,12 @@ const oneLine = (text: string): string => text.replace(/\s+/gu, ' ').trim();
  * sentence should say it was reworded. Runs pair whole: four sentences becoming one is one
  * replacement of four by one, not four replacements with three of them empty.
  *
- * The front-matching loop is `settleWhitespace`'s rule, for its reason (see above): a segment owns
- * its trailing newline, so appending to a document rewrites the segment appended to purely to give
- * it the separator it now needs. Left alone, the commonest edit anyone makes would export as a
- * sentence replaced by a character-for-character copy of itself.
+ * Both of `settleHunks`' rules apply, for its reasons (see above). The front-matching loop: a
+ * segment owns its trailing newline, so appending to a document rewrites the segment appended to
+ * purely to give it the separator it now needs, and would otherwise export as a sentence replaced by
+ * a character-for-character copy of itself. And `survivingEdges`: a sentence carried on or with a
+ * word slipped in is an addition of those words, quoted with the sentence they landed in, not a
+ * replacement of the sentence by a longer copy of itself.
  */
 export function changesBetween(before: string, after: string): TextChange[] {
   const source = sentences(before);
@@ -340,11 +440,25 @@ export function changesBetween(before: string, after: string): TextChange[] {
     ) {
       paired++;
     }
-    const cutText = oneLine(cut.slice(paired).join(''));
-    const putText = oneLine(put.slice(paired).join(''));
+    const rawCut = cut.slice(paired).join('');
+    const rawPut = put.slice(paired).join('');
     cut = [];
     put = [];
 
+    const edges = survivingEdges(rawCut, rawPut);
+    if (edges) {
+      const inserted = rawPut.length >= rawCut.length;
+      const longer = inserted ? rawPut : rawCut;
+      const text = oneLine(longer.slice(edges.head, longer.length - edges.tail));
+      if (!text) return; // only whitespace moved
+      const kept = oneLine(inserted ? rawCut : rawPut);
+      const within = kept ? { within: oneLine(longer) } : {};
+      changes.push({ kind: inserted ? 'added' : 'removed', text, ...within });
+      return;
+    }
+
+    const cutText = oneLine(rawCut);
+    const putText = oneLine(rawPut);
     if (cutText && putText) changes.push({ kind: 'replaced', before: cutText, after: putText });
     else if (cutText) changes.push({ kind: 'removed', text: cutText });
     else if (putText) changes.push({ kind: 'added', text: putText });

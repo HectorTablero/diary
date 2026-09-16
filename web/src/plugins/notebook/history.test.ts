@@ -138,6 +138,38 @@ describe('revisionFor', () => {
     expect(removed).toBe('drop'.length);
   });
 
+  /* A segment owns its trailing newline, so adding a line after the last one rewrites that segment
+     only to give it the separator. Nothing was taken out, and the count must say so. */
+  it('counts appending a line as purely added', () => {
+    expect(revisionFor('Line', 'Line\nNew')).toMatchObject({ added: 4, removed: 0 });
+    expect(revisionFor('A.\nB.', 'A.\nB.\nC.')).toMatchObject({ added: 3, removed: 0 });
+  });
+
+  it('counts carrying on an unfinished sentence as purely added', () => {
+    expect(revisionFor('I went to the', 'I went to the store.')).toMatchObject({
+      added: ' store.'.length,
+      removed: 0,
+    });
+    expect(revisionFor('Hello.', 'Hello. World.')).toMatchObject({ added: 7, removed: 0 });
+  });
+
+  it('counts an insertion inside a sentence as purely added', () => {
+    expect(revisionFor('The cat sat.', 'The big cat sat.')).toMatchObject({ added: 4, removed: 0 });
+  });
+
+  it('counts cutting the last line as purely removed', () => {
+    expect(revisionFor('A\nB', 'A')).toMatchObject({ added: 0, removed: 2 });
+  });
+
+  it('still counts a reworded sentence whole on both sides', () => {
+    expect(revisionFor('The cat sat.', 'The cat sit.')).toMatchObject({ added: 12, removed: 12 });
+  });
+
+  /* By word, not by letter: `one` becoming `ones` is a word rewritten, not an `s` slipped in. */
+  it('counts a word changed into a longer one as the sentence rewritten', () => {
+    expect(revisionFor('Second one.', 'Second ones.')).toMatchObject({ added: 12, removed: 11 });
+  });
+
   it('reports no change when an edit was typed and undone', () => {
     expect(revisionFor(TUE, TUE)).toMatchObject({ added: 0, removed: 0, changed: false });
     expect(revisionFor(TUE, WED).changed).toBe(true);
@@ -181,18 +213,15 @@ describe('diffView', () => {
      is marked where it stands — not lifted out into rows of its own with nothing to say that the
      sentences either side of it were its neighbours all along. */
   it('marks a rewritten sentence inside the paragraph it belongs to', () => {
-    const view = diffView(
-      'First one. Second one. Third one.',
-      'First one. Second ones. Third one.',
-    );
+    const view = diffView('First one. Second one. Third one.', 'First one. Second two. Third one.');
     expect(view).toHaveLength(1);
-    expect(rendered(view)).toEqual(['First one. -[Second one. ]+[Second ones. ]Third one.']);
+    expect(rendered(view)).toEqual(['First one. -[Second one. ]+[Second two. ]Third one.']);
   });
 
   it('keeps two edits to one paragraph in that one paragraph', () => {
-    const view = diffView('One. Two. Three.', 'One changed. Two. Three changed.');
+    const view = diffView('One. Two. Three.', 'Won. Two. Tres.');
     expect(view).toHaveLength(1);
-    expect(rendered(view)).toEqual(['-[One. ]+[One changed. ]Two. -[Three.]+[Three changed.]']);
+    expect(rendered(view)).toEqual(['-[One. ]+[Won. ]Two. -[Three.]+[Tres.]']);
   });
 
   /* The other half of the same distinction, and it falls out of the line break rather than being
@@ -211,10 +240,10 @@ describe('diffView', () => {
   /* The blank line between two paragraphs is a block of its own, so the shape of the document
      survives into its history rather than every paragraph looking equally spaced. */
   it('keeps a blank line between paragraphs as a block of its own', () => {
-    expect(rendered(diffView('One.\n\nTwo.', 'One.\n\nTwo, revised.'))).toEqual([
+    expect(rendered(diffView('One.\n\nTwo.', 'One.\n\nToo.'))).toEqual([
       'One.',
       '',
-      '-[Two.]+[Two, revised.]',
+      '-[Two.]+[Too.]',
     ]);
   });
 
@@ -239,6 +268,37 @@ describe('diffView', () => {
     expect(rendered(diffView('One thought.', 'One thought.\nAnd another.'))).toEqual([
       'One thought.',
       '+[And another.]',
+    ]);
+  });
+
+  /* A sentence only ends at its terminator, so carrying one on replaces the whole segment. Drawn
+     naively, the words that were already there read as struck through and retyped. */
+  it('marks only the words that carried on an unfinished sentence', () => {
+    expect(rendered(diffView('I went to the', 'I went to the store.'))).toEqual([
+      'I went to the+[ store.]',
+    ]);
+  });
+
+  it('marks only the word slipped into a sentence, or cut from one', () => {
+    expect(rendered(diffView('A. The cat sat.', 'A. The big cat sat.'))).toEqual([
+      'A. The +[big ]cat sat.',
+    ]);
+    expect(rendered(diffView('The big cat sat.\nB.', 'The cat sat.\nB.'))).toEqual([
+      'The -[big ]cat sat.',
+      'B.',
+    ]);
+  });
+
+  it('keeps paragraph breaks inside a carried-on sentence', () => {
+    expect(rendered(diffView('I went', 'I went out\nand back.'))).toEqual([
+      'I went+[ out]',
+      '+[and back.]',
+    ]);
+  });
+
+  it('still draws a reworded sentence struck through and rewritten', () => {
+    expect(rendered(diffView('The cat sat.', 'The cat sit.'))).toEqual([
+      '-[The cat sat.]+[The cat sit.]',
     ]);
   });
 
@@ -313,15 +373,29 @@ describe('changesBetween', () => {
   });
 
   it('reports separated changes separately, in the order they occur', () => {
-    expect(narrated('A. B. C. D. E.', 'A2. B. D. F. E.')).toEqual(['A.>A2.', '-C.', '+F.']);
+    expect(narrated('A. B. C. D. E.', 'Z. B. D. F. E.')).toEqual(['A.>Z.', '-C.', '+F.']);
   });
 
-  /* The reason `settleWhitespace`'s rule is repeated here. A segment owns its trailing newline, so
+  /* The reason `settleHunks`' first rule is repeated here. A segment owns its trailing newline, so
      appending a paragraph rewrites the one above purely to give it the blank line that now separates
      them. Narrated naively, the commonest edit anyone makes reads as a paragraph replaced by an
      identical copy of itself. */
   it('says nothing about a paragraph rewritten only to gain its separator', () => {
     expect(narrated('A.\n\nB.', 'A.\n\nB.\n\nC.')).toEqual(['+C.']);
+  });
+
+  it('quotes the words that carried on a sentence with the sentence they went into', () => {
+    expect(changesBetween('I went to the', 'I went to the store.')).toEqual([
+      { kind: 'added', text: 'store.', within: 'I went to the store.' },
+    ]);
+    expect(changesBetween('The big cat sat.', 'The cat sat.')).toEqual([
+      { kind: 'removed', text: 'big', within: 'The big cat sat.' },
+    ]);
+  });
+
+  it('still narrates a reworded sentence as a replacement', () => {
+    expect(narrated('The cat sat.', 'The cat sit.')).toEqual(['The cat sat.>The cat sit.']);
+    expect(narrated('Second one.', 'Second ones.')).toEqual(['Second one.>Second ones.']);
   });
 
   it('flattens a multi-line run onto one quotable line', () => {

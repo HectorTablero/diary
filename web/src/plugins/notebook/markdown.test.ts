@@ -152,7 +152,7 @@ describe('the history option', () => {
     // leaving the − side off entirely rather than printing −0.
     expect(markdown).toContain('### 2026-08-01 — +123');
     expect(markdown).not.toContain('−0');
-    expect(markdown).toContain('### 2026-08-02 — +56 −51');
+    expect(markdown).toContain('### 2026-08-02 — +32 −27');
     expect(markdown!.indexOf('2026-08-01')).toBeLessThan(markdown!.indexOf('2026-08-02'));
   });
 
@@ -164,7 +164,7 @@ describe('the history option', () => {
       '- Added: "Walking helps me think. Sleep matters most. I should try cold showers.',
     );
     expect(markdown).toContain(
-      '- Replaced: "Walking helps me think." → "Walking helps me think — but only alone."',
+      '- Added: "— but only alone" (in "Walking helps me think — but only alone.")',
     );
     expect(markdown).toContain('- Removed: "I should try cold showers."');
     expect(markdown).toContain('- Added: "Naps help too."');
@@ -214,7 +214,7 @@ describe('the history option', () => {
     const [withHistory] = await buildNotebookZipEntries({ history: true });
     expect(withHistory.name).toBe('Walking.md');
     expect(withHistory.content).toContain('## History');
-    expect(withHistory.content).toContain('### 2026-08-02 — +56 −51');
+    expect(withHistory.content).toContain('### 2026-08-02 — +32 −27');
   });
 });
 
