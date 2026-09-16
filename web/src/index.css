@@ -268,6 +268,22 @@
  * with a Japanese face ahead of a Chinese one renders Chinese in Japanese letterforms — legible,
  * and wrong in the way a native reader notices immediately.
  *
+ * But :lang() is the UI language, not the language of what was written, and those come apart
+ * constantly: the diary is where a Spanish-reading user quotes a line of Japanese, names a
+ * Chinese dish, or pastes a lyric. Under a `ui-sans-serif` default those characters left the
+ * design system the moment they were typed — not because a font was missing, but because none
+ * was named, so each platform picked its own. The default below names one, which is the whole
+ * fix: CSS font fallback is per *character*, so Geist still renders every latin letter and only
+ * the characters it has no glyph for reach --font-cjk. No detection pass is needed or wanted —
+ * the cascade already does it, on text this file never has to see.
+ *
+ * The default is the Chinese cut. Something has to win for Han with no other signal, and the
+ * honest framing is that this is a tiebreak, not a detection: a Japanese sentence on a Spanish
+ * page renders in SC letterforms too, kana included (Noto's SC cut covers kana — it is a
+ * pan-CJK family). Switching the UI to Japanese still gets the JP cut, as before. Telling the
+ * two apart by content would take a script-detection pass over every rendered string, and that
+ * buys correct letterforms for one case while costing a scan of all of them.
+ *
  * This works before any JavaScript has run: index.html sets documentElement.lang from
  * localStorage in the pre-paint script, for exactly this class of reason.
  *
@@ -288,17 +304,21 @@
  * vite.config.ts keeps these subsets out of the service worker's precache manifest.
  */
 :root {
-  --font-cjk: ui-sans-serif;
+  /* Named once each, so the default and the :lang() rule that shares it cannot drift apart. */
+  --font-cjk-ja:
+    'Noto Sans JP Variable', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic UI', ui-sans-serif;
+  --font-cjk-zh:
+    'Noto Sans SC Variable', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif;
+
+  --font-cjk: var(--font-cjk-zh);
 }
 
 :root:lang(ja) {
-  --font-cjk:
-    'Noto Sans JP Variable', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic UI', ui-sans-serif;
+  --font-cjk: var(--font-cjk-ja);
 }
 
 :root:lang(zh) {
-  --font-cjk:
-    'Noto Sans SC Variable', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif;
+  --font-cjk: var(--font-cjk-zh);
 }
 
 @layer base {
