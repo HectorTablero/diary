@@ -21,6 +21,7 @@
   "imageNotFound": "Immagine non trovata",
   "documentNotFound": "Documento non trovato",
   "mathInvalid": "Non è stato possibile comporre questa formula, quindi è mostrata come l'hai scritta. {{reason}}",
+  "diagramInvalid": "Non è stato possibile disegnare questo diagramma, quindi è mostrato come l'hai scritto.",
   "edit": "Modifica",
   "preview": "Anteprima",
   "previewEmpty": "Non c'è ancora niente da vedere in anteprima.",

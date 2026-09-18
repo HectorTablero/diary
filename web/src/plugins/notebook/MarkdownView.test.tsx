@@ -8,6 +8,17 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import en from './locales/en.json';
 import { MarkdownView, parseBlocks, toggleTaskAtLine } from './MarkdownView';
 
+/* Mermaid can't run in jsdom — it measures text with real layout — so the lazily loaded renderer is
+   stood in for. What these tests cover is everything around it: when a diagram is drawn, what shows
+   before and instead, and that the source reaches it untouched. */
+vi.mock('./renderDiagram', () => ({
+  renderDiagram: vi.fn(async (source: string) =>
+    source.includes('broken')
+      ? { error: 'Parse error on line 2: expecting NODE' }
+      : { svg: '<svg data-testid="diagram-svg" viewBox="0 0 400 200"><text>drawn</text></svg>' },
+  ),
+}));
+
 /* The parser's own regression net (headings, lists, code, rule — unchanged by this pass) plus the
  * four constructs added on top of it: links, images, task checkboxes and `[[id]]` document
  * references. Rendering is exercised with the real Dexie-backed `useDocumentLabels` (via
@@ -128,6 +139,12 @@ describe('parseBlocks — math', () => {
     ]);
   });
 
+  it('reads a ```mermaid fence as a diagram, handing on exactly what is inside', () => {
+    expect(parseBlocks('```mermaid\nflowchart LR\n  A --> B\n```')).toEqual([
+      { kind: 'diagram', source: 'flowchart LR\n  A --> B' },
+    ]);
+  });
+
   it('ends a paragraph where a formula starts, the way Obsidian reads it', () => {
     const blocks = parseBlocks('The sum is\n$$\nn^2\n$$\nand that is all.');
     expect(blocks.map((block) => block.kind)).toEqual(['paragraph', 'math', 'paragraph']);
@@ -234,6 +251,30 @@ describe('MarkdownView', () => {
   it('numbers an ordered list from wherever it starts', () => {
     render('3. third\n4. fourth');
     expect(screen.getByRole('list')).toHaveAttribute('start', '3');
+  });
+});
+
+describe('MarkdownView — diagrams', () => {
+  it('draws a ```mermaid block once the renderer arrives', async () => {
+    render('Before\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\nAfter');
+    expect(await screen.findByTestId('diagram-svg')).toBeInTheDocument();
+    // The source it stood in for is gone once the drawing is there.
+    expect(screen.queryByText(/A --> B/)).not.toBeInTheDocument();
+  });
+
+  it('shows a diagram Mermaid refuses as its source, with the reason', async () => {
+    render('```mermaid\nflowchart LR\n  broken -->\n```');
+    expect(
+      await screen.findByText("Couldn't draw this diagram, so it's shown as written."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/broken -->/)).toBeInTheDocument();
+    expect(screen.getByText('Parse error on line 2: expecting NODE')).toBeInTheDocument();
+    expect(screen.queryByTestId('diagram-svg')).not.toBeInTheDocument();
+  });
+
+  it('leaves any other fenced block as code', () => {
+    render('```js\nconst a = 1;\n```');
+    expect(screen.getByText('const a = 1;').closest('pre')).toBeInTheDocument();
   });
 });
 

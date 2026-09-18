@@ -21,6 +21,7 @@
   "imageNotFound": "找不到图片",
   "documentNotFound": "找不到该文档",
   "mathInvalid": "无法排版此公式，因此按原样显示。{{reason}}",
+  "diagramInvalid": "无法绘制此图表，因此按原样显示。",
   "edit": "编辑",
   "preview": "预览",
   "previewEmpty": "还没有可预览的内容。",

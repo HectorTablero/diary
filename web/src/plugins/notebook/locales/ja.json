@@ -21,6 +21,7 @@
   "imageNotFound": "画像が見つかりません",
   "documentNotFound": "ドキュメントが見つかりません",
   "mathInvalid": "この数式は表示できないため、入力したとおりに表示しています。{{reason}}",
+  "diagramInvalid": "この図は描画できないため、入力したとおりに表示しています。",
   "edit": "編集",
   "preview": "プレビュー",
   "previewEmpty": "プレビューするものがまだありません。",

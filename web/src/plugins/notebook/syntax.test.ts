@@ -3,6 +3,7 @@ import {
   documentReferenceAt,
   highlightSource,
   mathBlockAt,
+  mermaidMath,
   readMathToken,
   referencedDocumentIds,
   type HighlightKind,
@@ -343,6 +344,58 @@ describe('readMathToken', () => {
   it('is nothing for any other token', () => {
     expect(readMathToken('**bold**')).toBeNull();
     expect(readMathToken('[[abc]]')).toBeNull();
+  });
+});
+
+/* Mermaid typesets `$$…$$` and nothing else; a label written the way the rest of the note is written
+   must still come out typeset. */
+describe('mermaidMath', () => {
+  const NBSP = ' ';
+
+  it('respells the notebook’s inline math the way Mermaid reads it', () => {
+    expect(mermaidMath('A["$N$"] --> B["\\(n-1\\)"]')).toBe('A["$$N$$"] --> B["$$n-1$$"]');
+  });
+
+  it('reaches edge labels too', () => {
+    expect(mermaidMath('F -.->|$n$| C')).toBe('F -.->|$$n$$| C');
+  });
+
+  /* Mermaid lays a label with math out as a flex row, which swallowed the space: "Nsamples". */
+  it('makes the space either side of a formula one that can’t collapse', () => {
+    expect(mermaidMath('A["$N$ samples"]')).toBe(`A["$$N$$${NBSP}samples"]`);
+    expect(mermaidMath('B["Splitting to $n$ subsets"]')).toBe(
+      `B["Splitting to${NBSP}$$n$$${NBSP}subsets"]`,
+    );
+    expect(mermaidMath('F -.->|$n$ times| C')).toBe(`F -.->|$$n$$${NBSP}times| C`);
+  });
+
+  it('leaves what Mermaid already reads, and prices, alone', () => {
+    expect(mermaidMath('A["$$x^2$$"]')).toBe('A["$$x^2$$"]');
+    expect(mermaidMath('A["costs $5 or $10"]')).toBe('A["costs $5 or $10"]');
+  });
+});
+
+describe('highlightSource — diagrams', () => {
+  const DIAGRAM = '```mermaid\nflowchart TD\n  A["$N$ samples"] --> B\n```';
+
+  it('reassembles into exactly the source', () => {
+    expect(rebuild(paint(DIAGRAM))).toBe(DIAGRAM);
+  });
+
+  it('tints a mermaid block as a diagram rather than as code, fences as syntax', () => {
+    const spans = paint(DIAGRAM);
+    expect(textOf(spans, 'code')).toEqual([]);
+    expect(textOf(spans, 'syntax')).toEqual(['```mermaid', '$', '$', '```']);
+    // Everything but the formula — which splits the label it sits in.
+    expect(textOf(spans, 'diagram')).toEqual(['\nflowchart TD\n  A["', ' samples"] --> B\n']);
+  });
+
+  it('paints a formula in a label as a formula', () => {
+    expect(kinds(paint(DIAGRAM)).filter(([kind]) => kind === 'math')).toEqual([['math', 'N']]);
+  });
+
+  it('leaves any other fence as code', () => {
+    expect(textOf(paint('```js\nconst a = 1;\n```'), 'code')).toEqual(['\nconst a = 1;\n']);
   });
 });
 
