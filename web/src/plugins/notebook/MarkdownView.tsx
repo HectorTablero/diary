@@ -1,5 +1,5 @@
 import type { PersonDto } from '@diary/shared';
-import { Fragment, useMemo, type ReactNode } from 'react';
+import { Fragment, useMemo, type Key, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -7,7 +7,14 @@ import { useEntityLinks } from '@/lib/entityLinks';
 import { segmentContent } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 import { NotebookImage } from './NotebookImage';
-import { INLINE_PATTERN, referencedDocumentIds } from './syntax';
+import {
+  INLINE_PATTERN,
+  MATH_FENCE,
+  mathBlockAt,
+  readMathToken,
+  referencedDocumentIds,
+} from './syntax';
+import { TexMath } from './TexMath';
 import { useDocumentLabels } from './useNotebook';
 
 /**
@@ -16,12 +23,17 @@ import { useDocumentLabels } from './useNotebook';
  *
  * ## Why a renderer rather than a library
  *
- * The whole surface is headings, quotes, lists (including task items), rules, emphasis, code, links,
- * images and cross-document references — a wider set than when this comment was first written, but
- * still none of it needing a parser generator. A Markdown library is 30–100 kB, would have to be kept
- * out of `VENDOR_CHUNKS` (registry rule 5), and would still need a second pass afterwards to turn
- * `@Ana` into a link and `[[id]]` into one to another document, since no Markdown dialect knows what
- * either of those is.
+ * The whole surface is headings, quotes, lists (nested, and including task items), rules, emphasis,
+ * code, math, links, images and cross-document references — a wider set than when this comment was
+ * first written, but still none of it needing a parser generator. A Markdown library is 30–100 kB,
+ * would have to be kept out of `VENDOR_CHUNKS` (registry rule 5), and would still need a second pass
+ * afterwards to turn `@Ana` into a link and `[[id]]` into one to another document, since no Markdown
+ * dialect knows what either of those is.
+ *
+ * Math is the one construct that *does* take a library, because typesetting LaTeX is not something
+ * to hand-roll — but only for the typesetting. Finding a formula is this file's and syntax.ts's job
+ * like everything else; KaTeX is handed the LaTeX between the delimiters, and is itself only fetched
+ * once there is some to hand it. See TexMath.tsx.
  *
  * ## Why no HTML
  *
@@ -30,6 +42,9 @@ import { useDocumentLabels } from './useNotebook';
  * same parse-don't-trust posture the plugin layer takes toward every row it reads. It also means
  * raw HTML in a document is shown rather than honoured, which for a private notebook is the right
  * way round: what you typed is what you see.
+ *
+ * The one exception is KaTeX's output, inserted by TexMath.tsx — see the note there on why it has to
+ * be markup, and on why that markup is safe to insert when the LaTeX it came from is not.
  *
  * ## Mentions
  *
@@ -45,13 +60,109 @@ import { useDocumentLabels } from './useNotebook';
  * why resolving it never costs a read proportional to the notebook's size.
  */
 
-interface Block {
-  kind: 'heading' | 'paragraph' | 'quote' | 'bullets' | 'numbers' | 'rule' | 'code';
-  level?: number;
-  lines: string[];
-  /** Absolute index into `text.split('\n')` for each entry of `lines`. Only meaningful for
-      `bullets`/`numbers`, where a task item's checkbox needs to know which raw line to flip. */
-  lineNumbers?: number[];
+interface ListItem {
+  /** The item's own words: indentation and marker removed, a task's `[ ]` still on. */
+  text: string;
+  /** Absolute index into `text.split('\n')` of the line this item is — what a task item's checkbox
+      needs in order to know which raw line to flip. */
+  lineNumber: number;
+  /** The lists indented under this item. Usually one; more when the marker kind changes partway
+      down (`- a` and then `1. b` at the same depth are two lists, as everywhere else in Markdown). */
+  children: List[];
+}
+
+interface List {
+  kind: 'list';
+  ordered: boolean;
+  /** The first item's number, which an `<ol>` has to be told — `3.` starts at three. */
+  start: number;
+  items: ListItem[];
+}
+
+type Block =
+  | { kind: 'heading'; level: number; text: string }
+  | { kind: 'paragraph' | 'quote' | 'code'; text: string }
+  /** `source` is the block exactly as typed, delimiters and all — shown until KaTeX has rendered it,
+      and instead of it when it can't. */
+  | { kind: 'math'; tex: string; source: string }
+  | { kind: 'rule' }
+  | List;
+
+const RULE_LINE = /^\s*(?:---+|\*\*\*+|___+)\s*$/;
+const QUOTE_LINE = /^\s*>\s?/;
+const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+
+/** Columns of indentation, with a tab reaching the next multiple of four — so a list indented with
+    tabs on one line and spaces on the next still nests the way it looks. */
+function indentWidth(whitespace: string): number {
+  let width = 0;
+  for (const char of whitespace) width = char === '\t' ? width + 4 - (width % 4) : width + 1;
+  return width;
+}
+
+/**
+ * The run of list lines starting at `start`, as a tree.
+ *
+ * Nesting is decided by indentation alone: an item indented further than the one above it goes
+ * *inside* that one, and an item indented less closes every list deeper than itself. How much further
+ * doesn't matter — two spaces, four, a tab — because people indent however their keyboard or the
+ * app they pasted from did, and "more than the line above" is the one reading all of them share.
+ *
+ * Returns a list per marker kind at the top level: `- a` then `1. b` are two lists one after the
+ * other, as they were before items could nest.
+ */
+function parseList(lines: readonly string[], start: number): { lists: List[]; end: number } {
+  const lists: List[] = [];
+  /* The lists still open, outermost first: the indent their items sit at, and the array they live
+     in — which is where a new sibling list goes when the marker kind changes at that depth. */
+  const open: { indent: number; list: List; siblings: List[] }[] = [];
+  let index = start;
+
+  for (; index < lines.length; index++) {
+    const match = LIST_ITEM.exec(lines[index]);
+    if (!match) break;
+    const indent = indentWidth(match[1]);
+    const ordered = /^\d/.test(match[2]);
+    const item: ListItem = { text: match[3], lineNumber: index, children: [] };
+    const fresh = (): List => ({
+      kind: 'list',
+      ordered,
+      start: ordered ? Number.parseInt(match[2], 10) : 1,
+      items: [item],
+    });
+
+    // The outermost list is never closed by this: an item left of it is still one of its items.
+    while (open.length > 1 && open.at(-1)!.indent > indent) open.pop();
+    const top = open.at(-1);
+
+    if (!top) {
+      const list = fresh();
+      lists.push(list);
+      open.push({ indent, list, siblings: lists });
+    } else if (indent > top.indent) {
+      /* Inside the item above. If that item already holds a list of this kind — this line is less
+         indented than its earlier children, but still more than the item itself — it joins that one
+         rather than starting a second list directly beneath it. */
+      const parent = top.list.items.at(-1)!;
+      const previous = parent.children.at(-1);
+      if (previous?.ordered === ordered) {
+        previous.items.push(item);
+        open.push({ indent, list: previous, siblings: parent.children });
+      } else {
+        const list = fresh();
+        parent.children.push(list);
+        open.push({ indent, list, siblings: parent.children });
+      }
+    } else if (top.list.ordered === ordered) {
+      top.list.items.push(item);
+    } else {
+      const list = fresh();
+      top.siblings.push(list);
+      top.list = list;
+    }
+  }
+
+  return { lists, end: index };
 }
 
 /** Group lines into blocks. Deliberately line-based: a blank line ends whatever was open. */
@@ -69,56 +180,70 @@ export function parseBlocks(text: string): Block[] {
     }
 
     if (/^```/.test(line)) {
+      const opened = index;
       const body: string[] = [];
       index++;
       while (index < lines.length && !/^```/.test(lines[index])) body.push(lines[index++]);
       index++; // the closing fence, or the end of the document if it was never closed
-      blocks.push({ kind: 'code', lines: body });
+      blocks.push(
+        MATH_FENCE.test(line)
+          ? { kind: 'math', tex: body.join('\n'), source: lines.slice(opened, index).join('\n') }
+          : { kind: 'code', text: body.join('\n') },
+      );
       continue;
     }
 
-    if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) {
-      blocks.push({ kind: 'rule', lines: [] });
+    const formula = mathBlockAt(lines, index);
+    if (formula) {
+      const source = lines.slice(index, formula.end + 1).join('\n');
+      blocks.push({ kind: 'math', tex: formula.tex, source });
+      index = formula.end + 1;
+      continue;
+    }
+
+    if (RULE_LINE.test(line)) {
+      blocks.push({ kind: 'rule' });
       index++;
       continue;
     }
 
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) {
-      blocks.push({ kind: 'heading', level: heading[1].length, lines: [heading[2]] });
+      blocks.push({ kind: 'heading', level: heading[1].length, text: heading[2] });
       index++;
       continue;
     }
 
-    /* The three run-on blocks: consecutive lines of the same kind become one element, so a list is
-       a list rather than five one-item lists. */
-    const runOn = (pattern: RegExp, kind: Block['kind']): boolean => {
-      if (!pattern.test(line)) return false;
+    // Consecutive quoted lines are one quote, rather than five one-line quotes.
+    if (QUOTE_LINE.test(line)) {
       const body: string[] = [];
-      const lineNumbers: number[] = [];
-      while (index < lines.length && pattern.test(lines[index])) {
-        body.push(lines[index].replace(pattern, ''));
-        lineNumbers.push(index);
-        index++;
+      while (index < lines.length && QUOTE_LINE.test(lines[index])) {
+        body.push(lines[index++].replace(QUOTE_LINE, ''));
       }
-      blocks.push({ kind, lines: body, lineNumbers });
-      return true;
-    };
+      blocks.push({ kind: 'quote', text: body.join('\n') });
+      continue;
+    }
 
-    if (runOn(/^\s*>\s?/, 'quote')) continue;
-    if (runOn(/^\s*[-*+]\s+/, 'bullets')) continue;
-    if (runOn(/^\s*\d+[.)]\s+/, 'numbers')) continue;
+    if (LIST_ITEM.test(line)) {
+      const { lists, end } = parseList(lines, index);
+      blocks.push(...lists);
+      index = end;
+      continue;
+    }
 
+    /* A paragraph runs until a blank line or the start of anything else — a display formula
+       included, so `The sum is` on one line and `$$` on the next reads the way it does in Obsidian. */
     const body: string[] = [];
     while (
       index < lines.length &&
       lines[index].trim() !== '' &&
       !/^(?:#{1,6}\s|```|\s*>|\s*[-*+]\s|\s*\d+[.)]\s)/.test(lines[index]) &&
-      !/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(lines[index])
+      !RULE_LINE.test(lines[index]) &&
+      !(body.length && mathBlockAt(lines, index))
     ) {
       body.push(lines[index++]);
     }
-    blocks.push({ kind: 'paragraph', lines: body });
+    blocks.push({ kind: 'paragraph', text: body.join('\n') });
   }
 
   return blocks;
@@ -153,6 +278,12 @@ const HEADING_CLASS: Record<number, string> = {
   6: 'mt-4 mb-1 text-xs font-medium tracking-wide uppercase first:mt-0',
 };
 
+/* A marker per depth, cycling, so a nested list reads as nested even before the indent is noticed —
+   the browser would do this for bullets on its own, but `list-disc` pins the outermost one and so
+   every level has to be named. Written out whole so Tailwind sees each class. */
+const BULLET_MARKERS = ['list-disc', 'list-[circle]', 'list-[square]'];
+const NUMBER_MARKERS = ['list-decimal', 'list-[lower-alpha]', 'list-[lower-roman]'];
+
 export function MarkdownView({
   text,
   people,
@@ -171,38 +302,53 @@ export function MarkdownView({
   // same way — as the text the user typed — so it has no use for `loading`. See DocumentLabels.
   const { labels: documentLabels } = useDocumentLabels(documentIds);
 
-  const list = (block: Block, ordered: boolean) => {
-    const Tag = ordered ? 'ol' : 'ul';
-    return (
-      <Tag className={cn('my-3 space-y-1 pl-5', ordered ? 'list-decimal' : 'list-disc')}>
-        {block.lines.map((line, i) => {
-          const task = TASK_PATTERN.exec(line);
-          if (!task) {
-            return (
-              <li key={i}>
-                <Inline text={line} people={people} documentLabels={documentLabels} />
-              </li>
-            );
-          }
-          const checked = task[1] !== ' ';
-          const lineNumber = block.lineNumbers?.[i];
-          return (
-            <li key={i} className="-ml-5 flex list-none items-start gap-2">
-              <TaskCheckbox
-                checked={checked}
-                disabled={!onToggleTask || lineNumber === undefined}
-                label={task[2]}
-                onToggle={() =>
-                  lineNumber !== undefined && onToggleTask?.(toggleTaskAtLine(text, lineNumber))
-                }
-              />
-              <span className={cn('flex-1', checked && 'text-muted-foreground line-through')}>
-                <Inline text={task[2]} people={people} documentLabels={documentLabels} />
-              </span>
-            </li>
-          );
-        })}
-      </Tag>
+  const list = (block: List, depth: number, key: Key): ReactNode => {
+    const markers = block.ordered ? NUMBER_MARKERS : BULLET_MARKERS;
+    const className = cn(
+      depth === 0 ? 'my-3' : 'mt-1',
+      'space-y-1 pl-5',
+      markers[depth % markers.length],
+    );
+    const items = block.items.map((item, i) => {
+      const nested = item.children.map((child, j) => list(child, depth + 1, j));
+      const task = TASK_PATTERN.exec(item.text);
+      if (!task) {
+        return (
+          <li key={i}>
+            <Inline text={item.text} people={people} documentLabels={documentLabels} />
+            {nested}
+          </li>
+        );
+      }
+      const checked = task[1] !== ' ';
+      return (
+        <li key={i} className="-ml-5 list-none">
+          <div className="flex items-start gap-2">
+            <TaskCheckbox
+              checked={checked}
+              disabled={!onToggleTask}
+              label={task[2]}
+              onToggle={() => onToggleTask?.(toggleTaskAtLine(text, item.lineNumber))}
+            />
+            <span className={cn('flex-1', checked && 'text-muted-foreground line-through')}>
+              <Inline text={task[2]} people={people} documentLabels={documentLabels} />
+            </span>
+          </div>
+          {/* Under the task's words rather than under its checkbox, which is where a plain item's
+              children sit too: `ml-6` is the checkbox and the gap beside it. Never struck through
+              with it — ticking a task doesn't finish the ones inside it. */}
+          {nested.length > 0 && <div className="ml-6">{nested}</div>}
+        </li>
+      );
+    });
+    return block.ordered ? (
+      <ol key={key} start={block.start} className={className}>
+        {items}
+      </ol>
+    ) : (
+      <ul key={key} className={className}>
+        {items}
+      </ul>
     );
   };
 
@@ -212,10 +358,10 @@ export function MarkdownView({
         const key = `${block.kind}-${index}`;
         switch (block.kind) {
           case 'heading': {
-            const Tag = `h${Math.min(6, (block.level ?? 1) + 1)}` as 'h2';
+            const Tag = `h${Math.min(6, block.level + 1)}` as 'h2';
             return (
-              <Tag key={key} className={HEADING_CLASS[block.level ?? 1]}>
-                <Inline text={block.lines[0]} people={people} documentLabels={documentLabels} />
+              <Tag key={key} className={HEADING_CLASS[block.level]}>
+                <Inline text={block.text} people={people} documentLabels={documentLabels} />
               </Tag>
             );
           }
@@ -227,34 +373,26 @@ export function MarkdownView({
                 key={key}
                 className="my-3 overflow-x-auto rounded-lg bg-muted p-3 text-xs leading-6"
               >
-                <code>{block.lines.join('\n')}</code>
+                <code>{block.text}</code>
               </pre>
             );
+          case 'math':
+            return <TexMath key={key} tex={block.tex} display source={block.source} />;
           case 'quote':
             return (
               <blockquote
                 key={key}
                 className="my-3 border-l-2 border-border pl-4 text-muted-foreground italic"
               >
-                <Inline
-                  text={block.lines.join('\n')}
-                  people={people}
-                  documentLabels={documentLabels}
-                />
+                <Inline text={block.text} people={people} documentLabels={documentLabels} />
               </blockquote>
             );
-          case 'bullets':
-            return <Fragment key={key}>{list(block, false)}</Fragment>;
-          case 'numbers':
-            return <Fragment key={key}>{list(block, true)}</Fragment>;
+          case 'list':
+            return list(block, 0, key);
           default:
             return (
               <p key={key} className="my-3 whitespace-pre-wrap first:mt-0">
-                <Inline
-                  text={block.lines.join('\n')}
-                  people={people}
-                  documentLabels={documentLabels}
-                />
+                <Inline text={block.text} people={people} documentLabels={documentLabels} />
               </p>
             );
         }
@@ -318,7 +456,10 @@ function Inline({
   const after = text.slice(match.index + token.length);
 
   let content: ReactNode;
-  if (token.startsWith('[[')) {
+  const math = readMathToken(token);
+  if (math) {
+    content = <TexMath tex={math.tex} display={math.display} source={token} />;
+  } else if (token.startsWith('[[')) {
     const id = token.slice(2, -2);
     content = <DocumentLink id={id} label={documentLabels.get(id)} />;
   } else if (token.startsWith('![')) {

@@ -20,6 +20,7 @@
   "taskCheckbox": "Task",
   "imageNotFound": "Image not found",
   "documentNotFound": "Document not found",
+  "mathInvalid": "Couldn't typeset this formula, so it's shown as written. {{reason}}",
   "edit": "Edit",
   "preview": "Preview",
   "previewEmpty": "Nothing to preview yet.",

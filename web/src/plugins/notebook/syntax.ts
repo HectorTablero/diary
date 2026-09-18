@@ -46,6 +46,9 @@ export type HighlightKind =
   | 'emphasis'
   /** A code span, or any line inside a fence. */
   | 'code'
+  /** The LaTeX inside a formula — inline, a display block, or a ` ```math ` fence. Delimiters are
+      `syntax`, like every other mark. */
+  | 'math'
   /** An `@mention` that resolves to a real person. */
   | 'person'
   /** A `[[id]]` cross-reference, whole. Carries the id so the caller can resolve it. */
@@ -64,6 +67,10 @@ export interface HighlightSpan {
       two references to the *same* document apart, which is what the editor needs to know in order to
       reveal the raw id of the one the caret is actually in. */
   start?: number;
+  /** Whether the formula is set on a line of its own (`$$`, `\[`, ` ```math `) rather than in the
+      running text. On `math` spans, and only on those — it is what the editor's hover preview needs
+      to typeset a formula the way the preview will. */
+  display?: boolean;
   /**
    * This span is inside a ticked `- [x]` item.
    *
@@ -93,10 +100,34 @@ export interface HighlightSpan {
 }
 
 /**
+ * Inline math, in the spellings people actually paste.
+ *
+ * `$…$` and `$$…$$` are what Obsidian, Pandoc, Typora and Jupyter write — and what this plugin's own
+ * export hands to them, since it passes a document's source through untouched. `\(…\)` and `\[…\]`
+ * are LaTeX's own, and what a chatbot's answer arrives in when it is pasted here.
+ *
+ * A single `$` follows Pandoc's rule, because this is a diary and prices are the common case: the
+ * opener must be followed by something other than a space, the closer preceded by something other
+ * than a space and *not* followed by a digit. So `$5 and $10` stays prose, `$x$` and `$a_1 + b_2$`
+ * are math, and a `\$` never opens or closes anything.
+ *
+ * One line each, like every other inline token here: the editor's overlay walks the source line by
+ * line, and a span that could run across lines is one the two surfaces would read differently.
+ */
+const INLINE_MATH = [
+  String.raw`\$\$(?:\\.|[^\\$\n])+?\$\$`,
+  String.raw`(?<![\\$])\$(?![\s$])(?:\\.|[^\\$\n])*?(?<!\s)\$(?!\d)`,
+  String.raw`\\\((?:\\.|[^\\\n])+?\\\)`,
+  String.raw`\\\[(?:\\.|[^\\\n])+?\\\]`,
+].join('|');
+
+/**
  * Inline syntax, innermost-binding first.
  *
  * Code spans come first and are not descended into, which is what lets a document explain
- * `**bold**` without the explanation turning bold.
+ * `**bold**` without the explanation turning bold. Math comes straight after, and for the same
+ * reason: the inside of a formula is LaTeX, where `_` is a subscript and `*` is a star, and reading
+ * either as emphasis would tear `$a_1 + b_2$` in half.
  *
  * The three link-shaped forms are checked before the code/emphasis marks resolve their own inner
  * text — `[[id]]` before the single-bracket link, so a document reference is never partially
@@ -104,8 +135,113 @@ export interface HighlightSpan {
  * a rendered link. None of the three is parsed recursively for nested emphasis inside its own
  * label/alt text, matching the rest of this hand-rolled, one-pass grammar.
  */
-export const INLINE_PATTERN =
-  /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(_[^_]+_)|(\[\[[^\]]+\]\])|(!\[[^\]]*\]\([^)]+\))|(\[[^\]]+\]\([^)]+\))/;
+export const INLINE_PATTERN = new RegExp(
+  [
+    '(`[^`]+`)',
+    `(${INLINE_MATH})`,
+    String.raw`(\*\*[^*]+\*\*)`,
+    String.raw`(\*[^*]+\*)`,
+    '(_[^_]+_)',
+    String.raw`(\[\[[^\]]+\]\])`,
+    String.raw`(!\[[^\]]*\]\([^)]+\))`,
+    String.raw`(\[[^\]]+\]\([^)]+\))`,
+  ].join('|'),
+);
+
+/** A math token, taken apart: the delimiters, the LaTeX between them, and whether it is displayed
+    on a line of its own (`$$`, `\[`) or set in the running text (`$`, `\(`). */
+export interface MathToken {
+  open: string;
+  tex: string;
+  close: string;
+  display: boolean;
+}
+
+/* Longest first, so `$$x$$` is never read as `$` + `$x$` + `$`. */
+const MATH_DELIMITERS: readonly (readonly [string, string, boolean])[] = [
+  ['$$', '$$', true],
+  ['$', '$', false],
+  ['\\(', '\\)', false],
+  ['\\[', '\\]', true],
+];
+
+/** `piece` read as math, or `null` if it is some other token. Only meaningful on a whole match of
+    `INLINE_PATTERN` — it checks delimiters, not the rules that decided the match. */
+export function readMathToken(piece: string): MathToken | null {
+  for (const [open, close, display] of MATH_DELIMITERS) {
+    if (
+      piece.length > open.length + close.length &&
+      piece.startsWith(open) &&
+      piece.endsWith(close)
+    ) {
+      return { open, tex: piece.slice(open.length, -close.length), close, display };
+    }
+  }
+  return null;
+}
+
+/** A ` ```math ` fence: GitHub's and GitLab's way of writing a display formula. */
+export const MATH_FENCE = /^\s*```\s*math\s*$/i;
+
+/** A display formula set on lines of its own, as `mathBlockAt` found it. */
+export interface MathBlock {
+  /** The line it closes on. The same line it opened on, for `$$ x $$`. */
+  end: number;
+  /** Where the LaTeX starts on the opening line: past its indentation and the `$$` or `\[`. */
+  texStart: number;
+  /** Where the closing delimiter starts on the closing line — everything from here is syntax. */
+  closeAt: number;
+  tex: string;
+}
+
+/**
+ * The display formula opening on `lines[index]`, if one does — and only if it also *closes*.
+ *
+ * A line opens one when it starts with `$$` or `\[`. It is the whole formula when it also ends with
+ * the matching delimiter (`$$ x $$`), and otherwise the formula runs to the first later line that
+ * ends with one. A line that closes the delimiter somewhere in the middle (`$$x$$ and then prose`) is
+ * not a block at all: that is a display formula *inside* a paragraph, and the inline grammar above
+ * already reads it.
+ *
+ * An opener with no closer is not a block either, unlike an unclosed code fence, which runs to the
+ * end of the document. A fence is a deliberate three backticks; a `$$` is also what a half-written
+ * formula looks like, and turning every line below it into LaTeX that cannot parse would punish the
+ * document for being in the middle of an edit.
+ *
+ * Shared by the preview's block parser and the editor's overlay, so the two can never disagree about
+ * where a formula begins and ends.
+ */
+export function mathBlockAt(lines: readonly string[], index: number): MathBlock | null {
+  const line = lines[index];
+  const indent = line.length - line.trimStart().length;
+  for (const [open, close, display] of MATH_DELIMITERS) {
+    if (!display || !line.startsWith(open, indent)) continue;
+    const texStart = indent + open.length;
+    const rest = line.slice(texStart).trimEnd();
+
+    if (rest.includes(close)) {
+      const closeAt = texStart + rest.length - close.length;
+      const alone = rest.indexOf(close) === rest.length - close.length;
+      return alone && closeAt > texStart
+        ? { end: index, texStart, closeAt, tex: line.slice(texStart, closeAt) }
+        : null;
+    }
+
+    for (let end = index + 1; end < lines.length; end++) {
+      const candidate = lines[end].trimEnd();
+      if (!candidate.endsWith(close)) continue;
+      const closeAt = candidate.length - close.length;
+      const tex = [
+        line.slice(texStart),
+        ...lines.slice(index + 1, end),
+        lines[end].slice(0, closeAt),
+      ].join('\n');
+      return { end, texStart, closeAt, tex };
+    }
+    return null;
+  }
+  return null;
+}
 
 /** Every `[[id]]` referenced anywhere in `text`, deduplicated — what `useDocumentLabels` needs. */
 export function referencedDocumentIds(text: string): string[] {
@@ -166,7 +302,7 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
   let quoted = false;
   let heading = false;
 
-  const push = (piece: string, kind: HighlightKind, id?: string) => {
+  const push = (piece: string, kind: HighlightKind, id?: string, display?: boolean) => {
     if (!piece) return;
     const start = at;
     at += piece.length;
@@ -176,6 +312,7 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
       last.kind === kind &&
       last.id === undefined &&
       id === undefined &&
+      last.display === display &&
       !last.struck === !struck &&
       !last.quoted === !quoted &&
       !last.heading === !heading;
@@ -188,6 +325,7 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
       span.id = id;
       span.start = start;
     }
+    if (display !== undefined) span.display = display;
     if (struck) span.struck = true;
     if (quoted) span.quoted = true;
     if (heading) span.heading = true;
@@ -203,6 +341,14 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
   };
 
   const token = (piece: string) => {
+    const math = readMathToken(piece);
+    if (math) {
+      // Never through `mentions`: an `@` inside LaTeX is a character, not a person.
+      push(math.open, 'syntax');
+      push(math.tex, 'math', undefined, math.display);
+      push(math.close, 'syntax');
+      return;
+    }
     if (piece.startsWith('[[')) {
       /* Whole, rather than brackets-then-id: it is one thing to the reader, and the id inside it is
          what the caller needs in order to look a title up. */
@@ -241,19 +387,52 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
     }
   };
 
-  let fenced = false;
+  /** What an open fence holds: `code`, or `math` for a ` ```math ` one. `null` outside a fence. */
+  let fenced: 'code' | 'math' | null = null;
+  /** The display formula the current line is inside, once its opening line has been painted. */
+  let formula: MathBlock | null = null;
 
-  text.split('\n').forEach((line, index) => {
-    /* The separators the split removed. Inside a fence they belong to the block, so its background
-       reads as one rectangle rather than as a stack of ragged strips. */
-    if (index > 0) push('\n', fenced ? 'code' : 'text');
+  /** A piece of a display formula — a `$$`/`\[` block or a ` ```math ` fence, never inline math. */
+  const displayed = (piece: string) => push(piece, 'math', undefined, true);
+
+  const lines = text.split('\n');
+  lines.forEach((line, index) => {
+    if (formula && index > formula.end) formula = null;
+
+    /* The separators the split removed. Inside a fence or a formula they belong to the block, so its
+       paint reads as one piece rather than as a stack of ragged strips. */
+    if (index > 0) {
+      const inside = fenced ?? (formula ? 'math' : 'text');
+      if (inside === 'math') displayed('\n');
+      else push('\n', inside);
+    }
+
+    if (formula) {
+      const { closeAt, end } = formula;
+      if (index < end) return displayed(line);
+      displayed(line.slice(0, closeAt));
+      return push(line.slice(closeAt), 'syntax');
+    }
 
     if (FENCE.test(line)) {
       push(line, 'syntax');
-      fenced = !fenced;
+      fenced = fenced ? null : MATH_FENCE.test(line) ? 'math' : 'code';
       return;
     }
-    if (fenced) return push(line, 'code');
+    if (fenced === 'math') return displayed(line);
+    if (fenced) return push(line, fenced);
+
+    const block = mathBlockAt(lines, index);
+    if (block) {
+      push(line.slice(0, block.texStart), 'syntax');
+      if (block.end > index) {
+        formula = block;
+        return displayed(line.slice(block.texStart));
+      }
+      displayed(line.slice(block.texStart, block.closeAt));
+      return push(line.slice(block.closeAt), 'syntax');
+    }
+
     if (RULE.test(line)) return push(line, 'syntax');
 
     let rest = line;

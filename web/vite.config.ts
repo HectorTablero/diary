@@ -28,6 +28,33 @@ function localePlaceholders(): Plugin {
   };
 }
 
+/**
+ * KaTeX's stylesheet down to the one font format anything this app runs on will use.
+ *
+ * Every `@font-face` in `katex.min.css` lists its face three times — woff2, then woff, then ttf —
+ * for browsers that predate woff2. Nothing this app supports is one of them, so the browser only
+ * ever fetches the first. The other two still get emitted into `dist/` for each of the twenty faces,
+ * though, and `cap sync` copies all of `dist/` into the APK and every live-update bundle: ~800 kB of
+ * fonts that can never be requested, shipped to every Android user whether they write math or not.
+ *
+ * Done at the source, before Vite resolves `url()`, so the unused files are never referenced and so
+ * never emitted — rather than filtered out of the output afterwards, where a missed pattern would
+ * fail silently. scripts/checkBundle.ts checks that it keeps working.
+ */
+function katexWoff2Only(): Plugin {
+  return {
+    name: 'diary-katex-woff2-only',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/[\\/]katex[\\/]dist[\\/]katex(?:\.min)?\.css(?:\?|$)/.test(id)) return undefined;
+      return {
+        code: code.replace(/,\s*url\([^)]+\.(?:woff|ttf)\)\s*format\("(?:woff|truetype)"\)/g, ''),
+        map: null,
+      };
+    },
+  };
+}
+
 // The API port lives in the repo-root .env (shared with the server).
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 const apiPort = process.env.PORT ?? '3000';
@@ -257,6 +284,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       localePlaceholders(),
+      katexWoff2Only(),
       react(),
       tailwindcss(),
       VitePWA({
@@ -315,8 +343,31 @@ export default defineConfig(({ mode }) => {
              at runtime instead — see the CacheFirst rule below — which costs one fetch on enable
              and is offline-durable from then on. See assetFileNames above for why they need their
              own directory before this line can work at all. */
-          globIgnores: ['**/noto-sans-{jp,sc}-*.woff2', 'assets/plugin-locales/**'],
+          globIgnores: [
+            '**/noto-sans-{jp,sc}-*.woff2',
+            'assets/plugin-locales/**',
+            /* The notebook's math renderer: KaTeX's script, its stylesheet and its fonts, ~560 kB
+               together. The third case of the same reasoning, and the one with the most at stake —
+               `js`, `css` and `woff2` are all in the pattern above, so without this every visitor
+               would precache it, notebook or not, to cover the few who write formulas. It is
+               fetched the first time a formula is shown (see plugins/notebook/renderMath.ts) and
+               runtime-cached below from then on. */
+            'assets/renderMath-*',
+            'assets/KaTeX_*',
+          ],
           runtimeCaching: [
+            {
+              urlPattern: /\/assets\/(?:renderMath-[^/]*\.(?:js|css)|KaTeX_[^/]*\.woff2)$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'math-renderer',
+                // Hashed filenames, so an entry is immutable and only ever falls out on eviction.
+                // Twenty font faces, the script and the stylesheet, with room for a release's worth
+                // of stale hashes before the oldest go.
+                expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
             {
               urlPattern: /\/assets\/plugin-locales\/[^/]*\.json$/,
               handler: 'CacheFirst',

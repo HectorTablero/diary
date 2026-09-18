@@ -20,6 +20,10 @@ import { fileURLToPath } from 'node:url';
  *      separate them and they get precached anyway.
  *   4. Core locales *not* precached. The mirror-image mistake: over-broad exclusion, and the app
  *      comes up offline with no strings at all.
+ *   5. A plugin's heavy library precached anyway. Being in a plugin's chunk is not enough on its own:
+ *      the service worker precaches every script, stylesheet and font it can see, so KaTeX in the
+ *      notebook's chunk would still be ~560 kB for every visitor. It has to stay in a chunk of its
+ *      own, and that chunk and its fonts have to stay out of the precache.
  *
  * Run after a build: `npm run check:bundle -w web`.
  */
@@ -150,6 +154,45 @@ if (!exists(swPath)) {
   }
 }
 
+// --- 5. the notebook's math renderer is fetched on use, never precached --------------------------
+
+/* KaTeX is reached only through `import('./renderMath')` in plugins/notebook/TexMath.tsx, so it
+   should land in `renderMath-*.js` and nowhere else. Detected by one of KaTeX's own error strings,
+   which no app code spells out. */
+const KATEX_MARKER = 'KaTeX parse error';
+const mathChunks = assetNames.filter((name) => /^renderMath-.*\.js$/.test(name));
+if (!mathChunks.length) {
+  problems.push(
+    'no renderMath-*.js chunk — KaTeX was folded into another chunk, which the service worker ' +
+      'precaches for everyone (is plugins/notebook/renderMath.ts imported statically somewhere?)',
+  );
+}
+for (const name of assetNames.filter(
+  (file) => file.endsWith('.js') && !mathChunks.includes(file),
+)) {
+  if (readFileSync(join(ASSETS, name), 'utf8').includes(KATEX_MARKER)) {
+    problems.push(`${name} contains KaTeX — it belongs in renderMath-*.js alone`);
+  }
+}
+
+/* woff2 only: the other two formats are never requested by anything the app supports, and would
+   ship ~800 kB of dead fonts in every APK (see katexWoff2Only in vite.config.ts). */
+for (const name of assetNames.filter((file) => /^KaTeX_.*\.(?:woff|ttf)$/.test(file))) {
+  problems.push(`${name} was emitted — KaTeX's stylesheet should reference woff2 alone`);
+}
+
+if (exists(swPath)) {
+  const sw = readFileSync(swPath, 'utf8');
+  for (const name of assetNames.filter((file) => /^(?:renderMath-|KaTeX_)/.test(file))) {
+    if (sw.includes(name)) problems.push(`math renderer file ${name} is in the precache`);
+  }
+  if (!sw.includes('math-renderer')) {
+    problems.push(
+      'no runtime-caching rule for the math renderer — formulas would not work offline',
+    );
+  }
+}
+
 if (problems.length) {
   console.error(`bundle check failed (${problems.length}):\n  ${problems.join('\n  ')}`);
   process.exit(1);
@@ -157,5 +200,6 @@ if (problems.length) {
 
 console.log(
   `bundle ok — entry ${(entryBytes / 1024).toFixed(1)} kB (budget ${ENTRY_BUDGET_BYTES / 1024} kB), ` +
-    `${pluginIds.length} plugin(s) fully out of it, locales external and unprecached.`,
+    `${pluginIds.length} plugin(s) fully out of it, locales external and unprecached, ` +
+    'math renderer lazy and unprecached.',
 );
