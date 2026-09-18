@@ -21,9 +21,9 @@ import { fileURLToPath } from 'node:url';
  *   4. Core locales *not* precached. The mirror-image mistake: over-broad exclusion, and the app
  *      comes up offline with no strings at all.
  *   5. A plugin's heavy library precached anyway. Being in a plugin's chunk is not enough on its own:
- *      the service worker precaches every script, stylesheet and font it can see, so KaTeX in the
- *      notebook's chunk would still be ~560 kB for every visitor. It has to stay in a chunk of its
- *      own, and that chunk and its fonts have to stay out of the precache.
+ *      the service worker precaches every script, stylesheet and font it can see, so the notebook's
+ *      KaTeX and Mermaid (~900 kB compressed between them) would be downloaded by every visitor.
+ *      They have to stay in on-demand chunks, and those — with KaTeX's fonts — out of the precache.
  *
  * Run after a build: `npm run check:bundle -w web`.
  */
@@ -154,24 +154,35 @@ if (!exists(swPath)) {
   }
 }
 
-// --- 5. the notebook's math renderer is fetched on use, never precached --------------------------
+// --- 5. the notebook's heavy renderers are fetched on use, never precached ----------------------
 
-/* KaTeX is reached only through `import('./renderMath')` in plugins/notebook/TexMath.tsx, so it
-   should land in `renderMath-*.js` and nowhere else. Detected by one of KaTeX's own error strings,
-   which no app code spells out. */
-const KATEX_MARKER = 'KaTeX parse error';
-const mathChunks = assetNames.filter((name) => /^renderMath-.*\.js$/.test(name));
-if (!mathChunks.length) {
-  problems.push(
-    'no renderMath-*.js chunk — KaTeX was folded into another chunk, which the service worker ' +
-      'precaches for everyone (is plugins/notebook/renderMath.ts imported statically somewhere?)',
+/* KaTeX and Mermaid are reached only through the notebook's `import('./renderMath')` and
+   `import('./renderDiagram')`, and vite.config.ts (`onDemandChunks`) keeps every file only those
+   reach out of the precache. Which files those are is the bundler's business — Mermaid alone is some
+   thirty chunks — so this doesn't look for names: it finds each library by a string only its own code
+   contains, and checks that no file carrying one is precached. Were the renderers pulled into an
+   eager chunk, or the graph walk to stop matching them, that chunk would be precached and fail here. */
+const LIBRARY_MARKERS: [string, string][] = [
+  ['KaTeX', 'KaTeX parse error'],
+  ['Mermaid', 'No diagram type detected matching given configuration'],
+];
+const sw = exists(swPath) ? readFileSync(swPath, 'utf8') : '';
+const scripts = assetNames.filter((file) => file.endsWith('.js'));
+for (const [library, marker] of LIBRARY_MARKERS) {
+  const carriers = scripts.filter((name) =>
+    readFileSync(join(ASSETS, name), 'utf8').includes(marker),
   );
-}
-for (const name of assetNames.filter(
-  (file) => file.endsWith('.js') && !mathChunks.includes(file),
-)) {
-  if (readFileSync(join(ASSETS, name), 'utf8').includes(KATEX_MARKER)) {
-    problems.push(`${name} contains KaTeX — it belongs in renderMath-*.js alone`);
+  if (!carriers.length) {
+    problems.push(
+      `no chunk contains ${library} — its marker string may have changed; update this check`,
+    );
+  }
+  for (const name of carriers) {
+    if (sw.includes(name)) {
+      problems.push(
+        `${name} contains ${library} and is in the precache — every visitor would download it`,
+      );
+    }
   }
 }
 
@@ -181,14 +192,15 @@ for (const name of assetNames.filter((file) => /^KaTeX_.*\.(?:woff|ttf)$/.test(f
   problems.push(`${name} was emitted — KaTeX's stylesheet should reference woff2 alone`);
 }
 
-if (exists(swPath)) {
-  const sw = readFileSync(swPath, 'utf8');
-  for (const name of assetNames.filter((file) => /^(?:renderMath-|KaTeX_)/.test(file))) {
-    if (sw.includes(name)) problems.push(`math renderer file ${name} is in the precache`);
+if (sw) {
+  /* The fonts are found through KaTeX's stylesheet, a step removed from the chunk graph — checked by
+     name, since a miss there would be ~290 kB of precache that nothing else would notice. */
+  for (const name of assetNames.filter((file) => /^KaTeX_/.test(file))) {
+    if (sw.includes(name)) problems.push(`KaTeX font ${name} is in the precache`);
   }
-  if (!sw.includes('math-renderer')) {
+  if (!sw.includes('on-demand')) {
     problems.push(
-      'no runtime-caching rule for the math renderer — formulas would not work offline',
+      'no runtime-caching rule for on-demand files — formulas and diagrams would not work offline',
     );
   }
 }
@@ -201,5 +213,5 @@ if (problems.length) {
 console.log(
   `bundle ok — entry ${(entryBytes / 1024).toFixed(1)} kB (budget ${ENTRY_BUDGET_BYTES / 1024} kB), ` +
     `${pluginIds.length} plugin(s) fully out of it, locales external and unprecached, ` +
-    'math renderer lazy and unprecached.',
+    'KaTeX and Mermaid on demand and unprecached.',
 );

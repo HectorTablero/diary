@@ -55,6 +55,73 @@ function katexWoff2Only(): Plugin {
   };
 }
 
+/**
+ * The notebook's heavy renderers — KaTeX (renderMath.ts) and Mermaid (renderDiagram.ts) — and
+ * everything only they reach, kept out of the service worker's precache.
+ *
+ * The precache takes every script, stylesheet and font in `dist/` (see globPatterns below), which
+ * is right for the app shell and wrong for these: ~900 kB compressed between them, needed only by
+ * someone who writes a formula or a diagram. Being lazily imported keeps them off first paint, but the
+ * service worker would still download them for every visitor at install.
+ *
+ * Names can't pick them out — Mermaid alone is some thirty chunks called whatever its own build
+ * called them — so the bundle's own graph does: walk from the app's entry through every static and
+ * dynamic import, stop at the two renderers, and whatever was never reached is on-demand. Their
+ * stylesheets go with them, and so do the files those stylesheets point at (KaTeX's fonts). The list
+ * is handed to workbox as a manifest filter, and the files are runtime-cached on first use instead
+ * — the `on-demand` rule below. scripts/checkBundle.ts fails the build if KaTeX or Mermaid still end
+ * up in the precache.
+ */
+const ON_DEMAND_ROOTS = /[\\/]src[\\/]plugins[\\/]notebook[\\/]render(?:Math|Diagram)\.ts$/;
+const onDemandFiles = new Set<string>();
+
+function onDemandChunks(): Plugin {
+  return {
+    name: 'diary-on-demand-chunks',
+    apply: 'build',
+    // After Vite's own CSS pass, so each chunk's stylesheet has been emitted and recorded.
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      onDemandFiles.clear();
+      const files = Object.values(bundle);
+      const chunks = new Map(
+        files.flatMap((file) => (file.type === 'chunk' ? [[file.fileName, file] as const] : [])),
+      );
+
+      const reached = new Set<string>();
+      const visit = (fileName: string) => {
+        const chunk = chunks.get(fileName);
+        if (!chunk || reached.has(fileName)) return;
+        if (chunk.facadeModuleId && ON_DEMAND_ROOTS.test(chunk.facadeModuleId)) return;
+        reached.add(fileName);
+        for (const next of [...chunk.imports, ...chunk.dynamicImports]) visit(next);
+      };
+      for (const chunk of chunks.values()) if (chunk.isEntry) visit(chunk.fileName);
+
+      for (const chunk of chunks.values()) {
+        if (reached.has(chunk.fileName)) continue;
+        onDemandFiles.add(chunk.fileName);
+        for (const css of chunk.viteMetadata?.importedCss ?? []) onDemandFiles.add(css);
+      }
+
+      const byBaseName = new Map(
+        files.map((file) => [file.fileName.split('/').pop()!, file.fileName]),
+      );
+      for (const fileName of [...onDemandFiles]) {
+        const file = bundle[fileName];
+        if (file?.type !== 'asset' || !fileName.endsWith('.css')) continue;
+        const css =
+          typeof file.source === 'string' ? file.source : new TextDecoder().decode(file.source);
+        for (const [, ref] of css.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
+          if (ref.startsWith('data:')) continue;
+          const target = byBaseName.get(ref.split(/[?#]/)[0].split('/').pop()!);
+          if (target) onDemandFiles.add(target);
+        }
+      }
+    },
+  };
+}
+
 // The API port lives in the repo-root .env (shared with the server).
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 const apiPort = process.env.PORT ?? '3000';
@@ -285,6 +352,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       localePlaceholders(),
       katexWoff2Only(),
+      onDemandChunks(),
       react(),
       tailwindcss(),
       VitePWA({
@@ -343,31 +411,17 @@ export default defineConfig(({ mode }) => {
              at runtime instead — see the CacheFirst rule below — which costs one fetch on enable
              and is offline-durable from then on. See assetFileNames above for why they need their
              own directory before this line can work at all. */
-          globIgnores: [
-            '**/noto-sans-{jp,sc}-*.woff2',
-            'assets/plugin-locales/**',
-            /* The notebook's math renderer: KaTeX's script, its stylesheet and its fonts, ~560 kB
-               together. The third case of the same reasoning, and the one with the most at stake —
-               `js`, `css` and `woff2` are all in the pattern above, so without this every visitor
-               would precache it, notebook or not, to cover the few who write formulas. It is
-               fetched the first time a formula is shown (see plugins/notebook/renderMath.ts) and
-               runtime-cached below from then on. */
-            'assets/renderMath-*',
-            'assets/KaTeX_*',
+          globIgnores: ['**/noto-sans-{jp,sc}-*.woff2', 'assets/plugin-locales/**'],
+          /* The third case of the same reasoning, and the one with the most at stake: the notebook's
+             KaTeX and Mermaid, which `js`, `css` and `woff2` above would otherwise precache for every
+             visitor. Too many files with too many names for globIgnores — see `onDemandChunks`. */
+          manifestTransforms: [
+            (entries) => ({
+              manifest: entries.filter((entry) => !onDemandFiles.has(entry.url)),
+              warnings: [],
+            }),
           ],
           runtimeCaching: [
-            {
-              urlPattern: /\/assets\/(?:renderMath-[^/]*\.(?:js|css)|KaTeX_[^/]*\.woff2)$/,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'math-renderer',
-                // Hashed filenames, so an entry is immutable and only ever falls out on eviction.
-                // Twenty font faces, the script and the stylesheet, with room for a release's worth
-                // of stale hashes before the oldest go.
-                expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 },
-                cacheableResponse: { statuses: [0, 200] },
-              },
-            },
             {
               urlPattern: /\/assets\/plugin-locales\/[^/]*\.json$/,
               handler: 'CacheFirst',
@@ -387,6 +441,22 @@ export default defineConfig(({ mode }) => {
                 cacheName: 'cjk-font-subsets',
                 // Hashed filenames, so an entry is immutable and only ever falls out on eviction.
                 expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              /* Everything `onDemandChunks` kept out of the precache: KaTeX and Mermaid, cached the
+                 first time a formula or a diagram is shown and offline-durable from then on. The
+                 pattern can afford to be this broad because it only ever sees what nothing above
+                 answered — the precache route comes first, and the rules before this one claim their
+                 own files — so what reaches it is exactly the on-demand set. Last, for that reason. */
+              urlPattern: /\/assets\/[^/]+\.(?:js|css|woff2)$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'on-demand',
+                // Hashed filenames, so an entry is immutable and only ever falls out on eviction.
+                // ~55 files for KaTeX and Mermaid together, with room for a release of stale hashes.
+                expiration: { maxEntries: 160, maxAgeSeconds: 60 * 60 * 24 * 365 },
                 cacheableResponse: { statuses: [0, 200] },
               },
             },

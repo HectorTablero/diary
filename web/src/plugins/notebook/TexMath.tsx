@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { lazyModule } from './lazyModule';
 
 /**
  * One formula in the preview, typeset by KaTeX — once KaTeX is here.
@@ -33,44 +34,8 @@ import { cn } from '@/lib/utils';
  * tested to guarantee for untrusted LaTeX.
  */
 
-type Renderer = typeof import('./renderMath');
-
-let renderer: Renderer | null = null;
-let pending: Promise<Renderer> | null = null;
-
-/** The renderer, fetched at most once at a time. A failed fetch is forgotten rather than kept, so the
-    next formula that mounts — after the connection is back — asks again instead of inheriting it. */
-function loadRenderer(): Promise<Renderer> {
-  pending ??= import('./renderMath').then(
-    (module) => (renderer = module),
-    (error: unknown) => {
-      pending = null;
-      throw error;
-    },
-  );
-  return pending;
-}
-
-/** The renderer once it is here, `null` until then — and asked for only while `wanted`, so a caller
-    that may or may not have math to show can hold the hook unconditionally and pay nothing when it
-    has none. A failed fetch leaves it `null`; the caller's fallback is whatever it shows meanwhile. */
-export function useMathRenderer(wanted = true): Renderer | null {
-  const [loaded, setLoaded] = useState(renderer);
-  useEffect(() => {
-    if (loaded || !wanted) return;
-    let live = true;
-    loadRenderer().then(
-      (module) => {
-        if (live) setLoaded(module);
-      },
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [loaded, wanted]);
-  return loaded;
-}
+/** KaTeX, once it is here — see lazyModule.ts for how it is fetched and what happens offline. */
+export const useMathRenderer = lazyModule(() => import('./renderMath'));
 
 export function TexMath({
   tex,

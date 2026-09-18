@@ -125,6 +125,9 @@ const SHARED_TEXT_CLASSES =
  *    layer cannot draw — so the tint only says "this is a formula, hover it or see the preview". Its
  *    own hue, because the sky every link-shaped kind shares would read as something clickable — and
  *    red instead once KaTeX has said it won't typeset (`BROKEN_FORMULA_CLASS`).
+ *  - `diagram` — the inside of a ` ```mermaid ` block — is a colour too, teal, for the same reason
+ *    and in a hue of its own: a diagram's source is neither prose nor a formula, and a formula in one
+ *    of its labels keeps the violet it has everywhere else.
  */
 const KIND_CLASS: Record<HighlightKind, string> = {
   text: '',
@@ -135,6 +138,7 @@ const KIND_CLASS: Record<HighlightKind, string> = {
   emphasis: 'italic',
   code: 'rounded bg-muted',
   math: 'text-violet-700 dark:text-violet-300',
+  diagram: 'text-teal-700 dark:text-teal-300',
   person: 'text-sky-700 dark:text-sky-300',
   document: '',
   label: 'text-sky-700 dark:text-sky-300',

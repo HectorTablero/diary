@@ -49,6 +49,8 @@ export type HighlightKind =
   /** The LaTeX inside a formula — inline, a display block, or a ` ```math ` fence. Delimiters are
       `syntax`, like every other mark. */
   | 'math'
+  /** The inside of a ` ```mermaid ` fence, bar any formulas in its labels, which are `math`. */
+  | 'diagram'
   /** An `@mention` that resolves to a real person. */
   | 'person'
   /** A `[[id]]` cross-reference, whole. Carries the id so the caller can resolve it. */
@@ -182,6 +184,46 @@ export function readMathToken(piece: string): MathToken | null {
 
 /** A ` ```math ` fence: GitHub's and GitLab's way of writing a display formula. */
 export const MATH_FENCE = /^\s*```\s*math\s*$/i;
+
+/** A ` ```mermaid ` fence: a diagram, drawn in the preview by Mermaid. The editor paints its inside
+    in a tint of its own — it is a small language, and nothing about it is Markdown — with any
+    formula in a label painted as the formula it is. */
+export const DIAGRAM_FENCE = /^\s*```\s*mermaid\s*$/i;
+
+/** Every formula in a run of text, by the same rules as the running text — so `$5 and $10` in a
+    diagram's label stays a price there too. */
+const MATH_ANYWHERE = new RegExp(INLINE_MATH, 'g');
+
+/**
+ * A diagram's source with every formula spelled the one way Mermaid reads math: `$$…$$`.
+ *
+ * Mermaid typesets `$$…$$` in a label and nothing else, while everywhere else in a document a formula
+ * is `$…$` or `\(…\)` — so a label written the way the rest of the note is written would come out as
+ * dollar signs. Rewritten on the way to Mermaid, never in the document: the source stays what was
+ * typed, and still reads the same in Obsidian, which follows the notebook's spelling.
+ *
+ * The space either side of a formula becomes a non-breaking one on the way, too. Mermaid lays out a
+ * label that contains math as a flex row, and flex layout drops the whitespace at the edges of each
+ * run of text — so `$N$ samples` came out as "Nsamples". A no-break space isn't collapsible, and
+ * Mermaid measures the label with it in, so the box is sized for the gap as well.
+ */
+export function mermaidMath(source: string): string {
+  let out = '';
+  let at = 0;
+  for (const match of source.matchAll(MATH_ANYWHERE)) {
+    const math = readMathToken(match[0]);
+    if (!math) continue;
+    out += source.slice(at, match.index).replace(/ $/, NO_BREAK_SPACE) + `$$${math.tex}$$`;
+    at = match.index + match[0].length;
+    if (source[at] === ' ') {
+      out += NO_BREAK_SPACE;
+      at++;
+    }
+  }
+  return out + source.slice(at);
+}
+
+const NO_BREAK_SPACE = ' ';
 
 /** A display formula set on lines of its own, as `mathBlockAt` found it. */
 export interface MathBlock {
@@ -387,13 +429,30 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
     }
   };
 
-  /** What an open fence holds: `code`, or `math` for a ` ```math ` one. `null` outside a fence. */
-  let fenced: 'code' | 'math' | null = null;
+  /** What an open fence holds: `code`, `math` for a ` ```math ` one, `diagram` for a ` ```mermaid `
+      one. `null` outside a fence. */
+  let fenced: 'code' | 'math' | 'diagram' | null = null;
   /** The display formula the current line is inside, once its opening line has been painted. */
   let formula: MathBlock | null = null;
 
   /** A piece of a display formula — a `$$`/`\[` block or a ` ```math ` fence, never inline math. */
   const displayed = (piece: string) => push(piece, 'math', undefined, true);
+
+  /** One line of a diagram: its own tint, with each formula in it painted as a formula — the same
+      spans the running text would give it, so the editor's hover preview and red-if-broken apply
+      to a label's math as they do anywhere else. */
+  const diagramLine = (line: string) => {
+    let at = 0;
+    for (const match of line.matchAll(MATH_ANYWHERE)) {
+      const math = readMathToken(match[0])!;
+      push(line.slice(at, match.index), 'diagram');
+      push(math.open, 'syntax');
+      push(math.tex, 'math', undefined, math.display);
+      push(math.close, 'syntax');
+      at = match.index + match[0].length;
+    }
+    push(line.slice(at), 'diagram');
+  };
 
   const lines = text.split('\n');
   lines.forEach((line, index) => {
@@ -416,10 +475,17 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
 
     if (FENCE.test(line)) {
       push(line, 'syntax');
-      fenced = fenced ? null : MATH_FENCE.test(line) ? 'math' : 'code';
+      fenced = fenced
+        ? null
+        : MATH_FENCE.test(line)
+          ? 'math'
+          : DIAGRAM_FENCE.test(line)
+            ? 'diagram'
+            : 'code';
       return;
     }
     if (fenced === 'math') return displayed(line);
+    if (fenced === 'diagram') return diagramLine(line);
     if (fenced) return push(line, fenced);
 
     const block = mathBlockAt(lines, index);

@@ -6,8 +6,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useEntityLinks } from '@/lib/entityLinks';
 import { segmentContent } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
+import { MermaidDiagram } from './MermaidDiagram';
 import { NotebookImage } from './NotebookImage';
 import {
+  DIAGRAM_FENCE,
   INLINE_PATTERN,
   MATH_FENCE,
   mathBlockAt,
@@ -30,10 +32,11 @@ import { useDocumentLabels } from './useNotebook';
  * afterwards to turn `@Ana` into a link and `[[id]]` into one to another document, since no Markdown
  * dialect knows what either of those is.
  *
- * Math is the one construct that *does* take a library, because typesetting LaTeX is not something
- * to hand-roll — but only for the typesetting. Finding a formula is this file's and syntax.ts's job
- * like everything else; KaTeX is handed the LaTeX between the delimiters, and is itself only fetched
- * once there is some to hand it. See TexMath.tsx.
+ * Math and diagrams are the two constructs that *do* take a library, because typesetting LaTeX and
+ * laying out a graph are not things to hand-roll — but only for the drawing. Finding a formula or a
+ * ` ```mermaid ` block is this file's and syntax.ts's job like everything else; KaTeX and Mermaid are
+ * handed what is inside, and are themselves only fetched once there is some to hand them. See
+ * TexMath.tsx and MermaidDiagram.tsx.
  *
  * ## Why no HTML
  *
@@ -43,8 +46,9 @@ import { useDocumentLabels } from './useNotebook';
  * raw HTML in a document is shown rather than honoured, which for a private notebook is the right
  * way round: what you typed is what you see.
  *
- * The one exception is KaTeX's output, inserted by TexMath.tsx — see the note there on why it has to
- * be markup, and on why that markup is safe to insert when the LaTeX it came from is not.
+ * The two exceptions are KaTeX's and Mermaid's output, inserted by TexMath.tsx and MermaidDiagram.tsx
+ * — see the notes there on why each has to be markup, and on why that markup is safe to insert when
+ * the source it came from is not.
  *
  * ## Mentions
  *
@@ -85,6 +89,8 @@ type Block =
   /** `source` is the block exactly as typed, delimiters and all — shown until KaTeX has rendered it,
       and instead of it when it can't. */
   | { kind: 'math'; tex: string; source: string }
+  /** A ` ```mermaid ` fence; `source` is what is between the fences, handed to Mermaid as-is. */
+  | { kind: 'diagram'; source: string }
   | { kind: 'rule' }
   | List;
 
@@ -185,11 +191,17 @@ export function parseBlocks(text: string): Block[] {
       index++;
       while (index < lines.length && !/^```/.test(lines[index])) body.push(lines[index++]);
       index++; // the closing fence, or the end of the document if it was never closed
-      blocks.push(
-        MATH_FENCE.test(line)
-          ? { kind: 'math', tex: body.join('\n'), source: lines.slice(opened, index).join('\n') }
-          : { kind: 'code', text: body.join('\n') },
-      );
+      if (MATH_FENCE.test(line)) {
+        blocks.push({
+          kind: 'math',
+          tex: body.join('\n'),
+          source: lines.slice(opened, index).join('\n'),
+        });
+      } else if (DIAGRAM_FENCE.test(line)) {
+        blocks.push({ kind: 'diagram', source: body.join('\n') });
+      } else {
+        blocks.push({ kind: 'code', text: body.join('\n') });
+      }
       continue;
     }
 
@@ -376,6 +388,8 @@ export function MarkdownView({
                 <code>{block.text}</code>
               </pre>
             );
+          case 'diagram':
+            return <MermaidDiagram key={key} source={block.source} />;
           case 'math':
             return <TexMath key={key} tex={block.tex} display source={block.source} />;
           case 'quote':
