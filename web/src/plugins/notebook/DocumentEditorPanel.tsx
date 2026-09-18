@@ -1,5 +1,5 @@
 import { MAX_PLUGIN_DOCUMENT_BYTES } from '@diary/shared';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePeople } from '@/api/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,12 +38,6 @@ import { useDocumentEditor, useDocumentLabels } from './useNotebook';
  * is genuinely *not* being kept: a document past the size a row can hold.
  */
 
-/* The editor's resting height, in pixels, mirrored by the min-h-* classes on the textarea itself.
-   Both are needed: the class sizes the very first paint, before anything has been measured, and the
-   number is the floor the grow-to-fit pass must not shrink below. */
-const MIN_HEIGHT = 280;
-const MIN_HEIGHT_FOCUS = 480;
-
 export function DocumentEditorPanel({
   documentId,
   focus,
@@ -64,11 +58,12 @@ export function DocumentEditorPanel({
     onDiscarded,
   );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
   /* Writing happens at the end of a document, and the end of a document is the bottom of the page —
      so a browser left to itself keeps the caret on the last visible line, with the sentence being
-     written pinned against the keyboard. This holds it near the middle instead, and asks for the
-     blank space below that centring the *last* line needs. See useCaretCentering. */
-  const caretSpacer = useCaretCentering(textareaRef, !preview);
+     written pinned against the keyboard. This holds it near the middle instead, as far as the page
+     can scroll. See useCaretCentering. */
+  useCaretCentering(textareaRef, layerRef, !preview);
 
   /* Every other document, for `[[` autocomplete — but only once `[[` is actually typed. Loading the
      whole tree is otherwise reserved for the move picker and the export (see the docstrings on
@@ -98,20 +93,6 @@ export function DocumentEditorPanel({
      spends on links rather than what the notebook holds — which is why it can run on every edit
      while `loadLinkableDocuments` has to wait to be asked. */
   const documentLabels = useDocumentLabels(useMemo(() => referencedDocumentIds(body), [body]));
-
-  /* Grow the box to the text. A prose editor with an inner scrollbar puts the document in a window
-     inside a window — the page should scroll, not the field.
-
-     `useLayoutEffect`, and a floor that lives in CSS rather than only here. A plain effect measures
-     after the browser has already painted, so a reload showed a default-sized two-row textarea for a
-     frame and then jumped to full height. The class below sizes it correctly before any measurement
-     happens, and this only ever grows it past that. */
-  useLayoutEffect(() => {
-    const el = textareaRef.current;
-    if (!el || preview) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.max(el.scrollHeight, focus ? MIN_HEIGHT_FOCUS : MIN_HEIGHT)}px`;
-  }, [body, preview, focus]);
 
   /* Anything unwritten goes in before the tab does. `flush` is also called when this unmounts (see
      useDocumentEditor), which covers navigating inside the app; this is the other half — closing
@@ -152,6 +133,7 @@ export function DocumentEditorPanel({
             documentLabelsLoading={documentLabels.loading}
             onDocumentTokenActive={loadLinkableDocuments}
             textareaRef={textareaRef}
+            layerRef={layerRef}
             placeholder={t('plugins.notebook.bodyPlaceholder')}
             autoFocus={focus}
             className={focus ? 'min-h-120' : 'min-h-70'}
@@ -161,16 +143,12 @@ export function DocumentEditorPanel({
 
       {/* The one status worth showing — see the note on this component. Kept mounted and empty
           rather than conditionally rendered, so the live region exists before it has anything to
-          announce; a region inserted at the same moment as its text is often not read at all. */}
+          announce; a region inserted at the same moment as its text is often not read at all. It is
+          also fixed-height for that reason, which keeps the space under the editor the same whether
+          or not it has anything to say. */}
       <p aria-live="polite" className="h-4 text-xs text-destructive">
         {tooLong ? t('plugins.notebook.tooLong', { over: bytes - MAX_PLUGIN_DOCUMENT_BYTES }) : ''}
       </p>
-
-      {/* Room to scroll the last line of the document up to the middle of the screen, and nothing
-          else: zero unless the caret is somewhere the page cannot reach, and gone the moment the
-          box loses focus. Last, so the size warning above it never ends up below a screenful of
-          nothing. Untabbable and unspoken — there is nothing here to read or to reach. */}
-      {caretSpacer > 0 && <div aria-hidden style={{ height: caretSpacer }} />}
     </div>
   );
 }

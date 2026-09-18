@@ -1,36 +1,41 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { caretOffset, planCaretScroll, usableBand } from './caret';
+import { useCallback, useEffect, useRef } from 'react';
+import { caretPosition, planCaretScroll, usableBand } from './caret';
 
 /**
  * Keep the line being written near the middle of the screen instead of at the bottom edge.
  *
  * The rule itself is `planCaretScroll` in caret.ts, which is where the reasoning lives and is pure
- * enough to have tests. This is the plumbing around it: when to look, how to find the caret, and
- * what to do with an answer the page is too short to satisfy.
+ * enough to have tests. This is the plumbing around it: when to look, and how to find the caret.
  *
- * ## When it looks
+ * ## When it looks: after anything that could have moved the caret on screen
  *
- * Measuring the caret means laying the whole document out a second time, in a mirror — for a long
- * thought that is the difference between a free keystroke and one you can feel. So ordinary typing
- * is gated on the box having *changed height*: a character added inside a line cannot move the
- * caret's line, and one that wraps onto a new line grows the box, so wrapping is caught by the same
- * test. Everything that moves the caret without touching the text — an arrow key, a click, focus,
- * the keyboard opening — asks for a measurement explicitly.
+ * Every input, every caret key, every click, focus, and the on-screen keyboard opening.
  *
- * ## The blank space underneath
+ * Input used to count only when the editor had changed height, on the theory that a character typed
+ * inside a line cannot move that line. True of the line's place in the *document*, and beside the
+ * point: what this keeps steady is the line's place on the *screen*, and the page moves under a
+ * caret without its line changing at all. The browser runs its own scroll-into-view on every
+ * keystroke, which parks the caret on the bottom edge, and on a long document that is exactly what
+ * the gate let stand — the caret ended up at, or behind, the bottom of the screen. The gate existed
+ * because measuring the caret was a full layout of the document; it no longer is (see caret.ts), so
+ * there is nothing left to ration. On the other side of the keystroke, a caret already on its line
+ * costs one measurement and no scroll.
  *
- * The last line of a document has nothing below it to scroll into view. When the plan comes back
- * short, that shortfall is returned as `spacer` for the caller to leave as room under the editor.
+ * ## Where it listens
  *
- * It only ever grows while writing, and is dropped on blur. Shrinking it as the caret moves back up
- * would move the page under someone who is doing nothing at all, and the ceiling means no mistake
- * in here can leave more than a screenful of nothing at the bottom of a document.
+ * On `document`, filtered to this textarea, rather than on the textarea itself. The editor renders a
+ * skeleton until its document has loaded, so the textarea arrives a render or two after this hook
+ * first runs — and listeners attached to `ref.current` in an effect keyed on the ref *object* found
+ * nothing there and were never retried. The caret was followed only after something happened to
+ * re-run the effect, like a trip to the preview and back.
+ *
+ * ## What it never does
+ *
+ * Add room. Near the end of a document the page may not reach far enough to bring the caret all the
+ * way up, and then it is left as high as the page allows — see `planCaretScroll`.
  */
 
-/** Ceiling on the blank space below the editor, as a fraction of the usable height. */
-const MAX_SPACER = 0.75;
-
-/** Keys that move the caret without changing the text, so the height gate cannot see them. */
+/** Keys that move the caret without changing the text, so no `input` event reports them. */
 const CARET_KEYS = new Set([
   'ArrowUp',
   'ArrowDown',
@@ -44,116 +49,76 @@ const CARET_KEYS = new Set([
 
 export function useCaretCentering(
   textareaRef: React.RefObject<HTMLTextAreaElement | null>,
+  /** The highlight layer under the textarea — the copy of the text the caret is measured in. */
+  layerRef: React.RefObject<HTMLElement | null>,
   /** False while the preview is showing, when there is no caret to follow. */
   enabled: boolean,
-): number {
-  const [spacer, setSpacer] = useState(0);
+): void {
   const frameRef = useRef<number | null>(null);
-  /** The box's height as of the last measurement — see "When it looks", above. */
-  const heightRef = useRef(0);
-  /** Set when something moved the caret without touching the text, so the height gate is wrong. */
-  const forcedRef = useRef(false);
 
   const adjust = useCallback(() => {
     const el = textareaRef.current;
-    if (!el || el !== document.activeElement) return;
+    const layer = layerRef.current;
+    if (!el || !layer || el !== document.activeElement) return;
 
-    const forced = forcedRef.current;
-    forcedRef.current = false;
-    const height = el.offsetHeight;
-    const grew = height !== heightRef.current;
-    heightRef.current = height;
-    if (!forced && !grew) return;
-
-    const band = usableBand();
     const styles = window.getComputedStyle(el);
     const lineHeight = parseFloat(styles.lineHeight) || parseFloat(styles.fontSize) * 1.5 || 24;
-    const box = el.getBoundingClientRect();
+    const caret = caretPosition(layer, el.value, el.selectionStart ?? 0);
 
-    const plan = planCaretScroll({
-      caretY: box.top + caretOffset(el, el.selectionStart ?? 0).top + lineHeight / 2,
-      band,
+    const scrollBy = planCaretScroll({
+      caretY: layer.getBoundingClientRect().top + caret.top + lineHeight / 2,
+      band: usableBand(),
       lineHeight,
       scrollY: window.scrollY,
       maxScroll: Math.max(0, (document.scrollingElement?.scrollHeight ?? 0) - window.innerHeight),
     });
-
-    if (plan.shortfall > 0) {
-      const ceiling = Math.round((band.bottom - band.top) * MAX_SPACER);
-      // Grown to the high-water mark, and the effect below finishes the scroll once it is rendered.
-      setSpacer((held) => Math.min(Math.max(held, plan.shortfall), ceiling));
-    }
     /* `instant`, not `auto`: `auto` defers to the `scroll-behavior` CSS property, so one stylesheet
        turning on smooth scrolling would leave every new line chasing a caret that had already moved
        on. This is a correction, not a transition. */
-    if (plan.scrollBy !== 0) window.scrollBy({ top: plan.scrollBy, behavior: 'instant' });
-  }, [textareaRef]);
+    if (scrollBy !== 0) window.scrollBy({ top: scrollBy, behavior: 'instant' });
+  }, [textareaRef, layerRef]);
 
-  /* One measurement per frame at most. Every trigger below fires either during an event, before
-     React has re-rendered, or before the layout effect that resizes the box has run — so none of
-     the numbers are trustworthy until the frame is over. */
-  const schedule = useCallback(
-    (force = false) => {
-      forcedRef.current ||= force;
-      if (frameRef.current !== null) return;
-      frameRef.current = requestAnimationFrame(() => {
-        frameRef.current = null;
-        adjust();
-      });
-    },
-    [adjust],
-  );
+  /* One measurement per frame at most, and never during the event itself: every trigger below fires
+     before React has re-rendered the layer with the new text, so nothing is measurable until then.
+     Running in the frame callback also means the correction lands before the browser paints, so the
+     bottom edge the browser's own scroll-into-view left the caret on is never actually seen. */
+  const schedule = useCallback(() => {
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      adjust();
+    });
+  }, [adjust]);
 
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el || !enabled) return;
+    if (!enabled) return;
 
-    const onInput = () => schedule();
+    const ours = (event: Event) => event.target !== null && event.target === textareaRef.current;
+    const onEvent = (event: Event) => {
+      if (ours(event)) schedule();
+    };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (CARET_KEYS.has(event.key)) schedule(true);
+      if (ours(event) && CARET_KEYS.has(event.key)) schedule();
     };
-    const onPointer = () => schedule(true);
-    const onFocus = () => {
-      heightRef.current = el.offsetHeight;
-      schedule(true);
-    };
-    const onBlur = () => setSpacer(0);
     /* The keyboard opening is a resize of the visual viewport and of nothing else — no scroll, no
        input, no React render — and it is the moment the usable height halves. Without this, the
        first thing anyone sees on a phone is the caret pinned just above the keyboard, which is the
        complaint this hook exists for. */
-    const onViewport = () => schedule(true);
+    const onViewport = () => schedule();
 
-    el.addEventListener('input', onInput);
-    el.addEventListener('keyup', onKeyUp);
-    el.addEventListener('click', onPointer);
-    el.addEventListener('focus', onFocus);
-    el.addEventListener('blur', onBlur);
+    const events = ['input', 'click', 'focusin'] as const;
+    for (const type of events) document.addEventListener(type, onEvent);
+    document.addEventListener('keyup', onKeyUp);
     window.visualViewport?.addEventListener('resize', onViewport);
-    // Autofocus fires before this effect attaches, so the first focus would otherwise be missed.
-    if (el === document.activeElement) onFocus();
+    // Focus may have landed before this ran (autofocus, or coming back from the preview).
+    schedule();
 
     return () => {
-      el.removeEventListener('input', onInput);
-      el.removeEventListener('keyup', onKeyUp);
-      el.removeEventListener('click', onPointer);
-      el.removeEventListener('focus', onFocus);
-      el.removeEventListener('blur', onBlur);
+      for (const type of events) document.removeEventListener(type, onEvent);
+      document.removeEventListener('keyup', onKeyUp);
       window.visualViewport?.removeEventListener('resize', onViewport);
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
     };
   }, [textareaRef, enabled, schedule]);
-
-  // The room asked for on the last pass has been rendered; finish the scroll it was short of.
-  useEffect(() => {
-    if (spacer > 0) schedule(true);
-  }, [spacer, schedule]);
-
-  // Nothing to follow in the preview, and a gap left under it would be unexplainable.
-  useEffect(() => {
-    if (!enabled) setSpacer(0);
-  }, [enabled]);
-
-  return enabled ? spacer : 0;
 }
