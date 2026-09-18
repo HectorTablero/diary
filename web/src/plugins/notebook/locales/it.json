@@ -20,6 +20,7 @@
   "taskCheckbox": "Attività",
   "imageNotFound": "Immagine non trovata",
   "documentNotFound": "Documento non trovato",
+  "mathInvalid": "Non è stato possibile comporre questa formula, quindi è mostrata come l'hai scritta. {{reason}}",
   "edit": "Modifica",
   "preview": "Anteprima",
   "previewEmpty": "Non c'è ancora niente da vedere in anteprima.",

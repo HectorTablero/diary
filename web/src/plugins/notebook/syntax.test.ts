@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   documentReferenceAt,
   highlightSource,
+  mathBlockAt,
+  readMathToken,
   referencedDocumentIds,
   type HighlightKind,
   type HighlightSpan,
@@ -53,6 +55,14 @@ const SAMPLES = [
   'Mixed: # not a heading mid-line, - not a bullet mid-line.',
   'Trailing spaces   \nand a tab\tinside.',
   'Emoji 🌱 and accents café, with @Ana.',
+  '- a\n  - b\n    - [x] c with @Ana\n- d',
+  'Euler $e^{i\\pi}$, then $$x$$, \\(a\\) and \\[b\\].',
+  'Prices: $5 and $10, and an escaped \\$ too.',
+  '$$\n\\frac{a}{b} @Ana\n$$\nafter',
+  '  $$ x^2 $$  ',
+  '```math\na_1 + **b**\n```',
+  '$$\nnever closed\n\nprose',
+  '\\[\ny = mx\n\\]',
 ];
 
 describe('highlightSource', () => {
@@ -221,6 +231,118 @@ describe('highlightSource', () => {
 
   it('reads a rule as syntax rather than as a bullet', () => {
     expect(kinds(paint('---'))).toEqual([['syntax', '---']]);
+  });
+
+  it('paints nested list markers as syntax, however deep', () => {
+    expect(textOf(paint('- a\n  - b\n    1. c'), 'syntax')).toEqual(['- ', '  - ', '    1. ']);
+  });
+});
+
+describe('highlightSource — math', () => {
+  it('paints inline math as math between syntax delimiters, in every spelling', () => {
+    expect(kinds(paint('$x$ $$y$$ \\(z\\) \\[w\\]'))).toEqual([
+      ['syntax', '$'],
+      ['math', 'x'],
+      ['syntax', '$'],
+      ['text', ' '],
+      ['syntax', '$$'],
+      ['math', 'y'],
+      ['syntax', '$$'],
+      ['text', ' '],
+      ['syntax', '\\('],
+      ['math', 'z'],
+      ['syntax', '\\)'],
+      ['text', ' '],
+      ['syntax', '\\['],
+      ['math', 'w'],
+      ['syntax', '\\]'],
+    ]);
+  });
+
+  /* The reason math binds before emphasis: a subscript is an underscore. */
+  it('never reads an underscore or a star inside a formula as emphasis', () => {
+    const spans = paint('$a_1 + b_2 * c*$');
+    expect(textOf(spans, 'emphasis')).toEqual([]);
+    expect(textOf(spans, 'math')).toEqual(['a_1 + b_2 * c*']);
+  });
+
+  it('leaves an @ inside a formula alone, even when it spells a person', () => {
+    expect(textOf(paint('$@Ana$'), 'person')).toEqual([]);
+  });
+
+  it.each([
+    '$5 and $10',
+    'from $5 to $ 10',
+    'costs $5.',
+    'a $ b $ c',
+    'escaped \\$x\\$ dollars',
+    '$$$',
+  ])('leaves %j as prose', (source) => {
+    expect(textOf(paint(source), 'math')).toEqual([]);
+  });
+
+  it('paints a display block: delimiters as syntax, everything between as one run of math', () => {
+    expect(kinds(paint('before\n$$\n\\frac{a}{b}\n$$\nafter'))).toEqual([
+      ['text', 'before\n'],
+      ['syntax', '$$'],
+      ['math', '\n\\frac{a}{b}\n'],
+      ['syntax', '$$'],
+      ['text', '\nafter'],
+    ]);
+  });
+
+  it('paints a one-line display block, indentation and trailing space included', () => {
+    expect(kinds(paint('  $$ x^2 $$  '))).toEqual([
+      ['syntax', '  $$'],
+      ['math', ' x^2 '],
+      ['syntax', '$$  '],
+    ]);
+  });
+
+  it('paints a ```math fence as math rather than code', () => {
+    const spans = paint('```math\na_1\n```');
+    expect(textOf(spans, 'math')).toEqual(['\na_1\n']);
+    expect(textOf(spans, 'code')).toEqual([]);
+  });
+
+  /* Same rule as the preview's block parser, which is the point: see mathBlockAt. */
+  it('leaves a $$ that never closes as prose rather than painting the rest of the document', () => {
+    expect(textOf(paint('$$\nstill typing\n\n# Heading'), 'math')).toEqual([]);
+  });
+});
+
+describe('mathBlockAt', () => {
+  it('finds where a block closes, and what is between', () => {
+    expect(mathBlockAt(['$$', 'x', '$$'], 0)).toEqual({
+      end: 2,
+      texStart: 2,
+      closeAt: 0,
+      tex: '\nx\n',
+    });
+  });
+
+  it('takes LaTeX on the delimiter lines too', () => {
+    expect(mathBlockAt(['$$ a', 'b $$'], 0)?.tex).toBe(' a\nb ');
+  });
+
+  it('is nothing when the delimiter closes mid-line, or never', () => {
+    expect(mathBlockAt(['$$x$$ and prose'], 0)).toBeNull();
+    expect(mathBlockAt(['$$', 'x'], 0)).toBeNull();
+    expect(mathBlockAt(['$$$$'], 0)).toBeNull();
+  });
+});
+
+describe('readMathToken', () => {
+  it('takes a token apart, display or not', () => {
+    expect(readMathToken('$$x$$')).toEqual({ open: '$$', tex: 'x', close: '$$', display: true });
+    expect(readMathToken('$x$')).toEqual({ open: '$', tex: 'x', close: '$', display: false });
+    expect(readMathToken('\\(x\\)')?.display).toBe(false);
+    expect(readMathToken('\\[x\\]')?.display).toBe(true);
+  });
+
+  it('is nothing for any other token', () => {
+    expect(readMathToken('**bold**')).toBeNull();
+    expect(readMathToken('[[abc]]')).toBeNull();
   });
 });
 

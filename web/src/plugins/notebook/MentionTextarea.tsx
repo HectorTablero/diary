@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { detectActiveToken, fuzzyIncludes } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 import { caretOffset } from './caret';
+import { FormulaPreview, useFormulaHover, useInvalidFormulas } from './FormulaPreview';
 import { documentReferenceAt, highlightSource, type HighlightKind } from './syntax';
 
 /**
@@ -56,6 +57,9 @@ import { documentReferenceAt, highlightSource, type HighlightKind } from './synt
  * `caretOffset` in caret.ts, which is the only way to ask a textarea where its caret actually is.
  * The same anchor carries the title of the reference the caret is inside, which is the one place
  * that title cannot be drawn over the reference itself.
+ *
+ * A formula gets the same treatment from the mouse rather than the caret: the overlay can only ever
+ * show its LaTeX, so hovering one floats the typeset result beneath it. See FormulaPreview.tsx.
  */
 
 /** The `[[` trigger — see the note above on why this lives here rather than in `lib/tokens.ts`. Stays
@@ -102,6 +106,11 @@ const SHARED_TEXT_CLASSES =
  *  - `code` is a tinted background rather than a monospace face, which is the one place this rule
  *    genuinely costs something: a monospace font is a different width for every character in the
  *    span, so it is the one kind of emphasis that cannot be shown at all.
+ *  - `math` is a colour and nothing else. The editor shows the LaTeX, never the typeset formula —
+ *    a fraction is taller and narrower than the source that spells it, which is exactly what this
+ *    layer cannot draw — so the tint only says "this is a formula, hover it or see the preview". Its
+ *    own hue, because the sky every link-shaped kind shares would read as something clickable — and
+ *    red instead once KaTeX has said it won't typeset (`BROKEN_FORMULA_CLASS`).
  */
 const KIND_CLASS: Record<HighlightKind, string> = {
   text: '',
@@ -111,11 +120,17 @@ const KIND_CLASS: Record<HighlightKind, string> = {
   strong: '',
   emphasis: 'italic',
   code: 'rounded bg-muted',
+  math: 'text-violet-700 dark:text-violet-300',
   person: 'text-sky-700 dark:text-sky-300',
   document: '',
   label: 'text-sky-700 dark:text-sky-300',
   url: 'text-muted-foreground',
 };
+
+/** A formula KaTeX can't typeset, in place of `KIND_CLASS.math` rather than on top of it — merged, the
+    violet's `dark:` half would outlive the red and a broken formula would look fine in dark mode.
+    The same red a reference to a deleted document gets: something here won't come out right. */
+const BROKEN_FORMULA_CLASS = 'text-destructive';
 
 /** Kinds carrying no colour of their own, so a ticked task item can grey them out without fighting a
     tint. Its mentions and references keep theirs, exactly as the preview keeps them clickable — see
@@ -244,6 +259,9 @@ export function MentionTextarea({
      text and the people list alone: a caret move, a suggestion opening or a title arriving must
      never re-parse a thousand words. */
   const spans = useMemo(() => highlightSource(value, people), [value, people]);
+  const layerRef = useRef<HTMLDivElement>(null);
+  const formulaHover = useFormulaHover(layerRef, spans);
+  const brokenFormulas = useInvalidFormulas(spans);
 
   const insert = (suggestion: { inserted: string }) => {
     const el = textareaRef.current;
@@ -295,6 +313,7 @@ export function MentionTextarea({
           screen reader reading the document twice would be the accessibility cost of a purely
           visual convenience. */}
       <div
+        ref={layerRef}
         aria-hidden="true"
         className={cn(
           SHARED_TEXT_CLASSES,
@@ -326,8 +345,13 @@ export function MentionTextarea({
           ) : (
             <span
               key={index}
+              // What the hover preview hit-tests against — see FormulaPreview.tsx.
+              data-formula={span.kind === 'math' ? index : undefined}
               style={span.heading || span.kind === 'strong' ? STROKE : undefined}
-              className={cn(KIND_CLASS[span.kind], line)}
+              className={cn(
+                brokenFormulas.has(index) ? BROKEN_FORMULA_CLASS : KIND_CLASS[span.kind],
+                line,
+              )}
             >
               {span.text}
             </span>
@@ -356,6 +380,8 @@ export function MentionTextarea({
         onKeyUp={(event) => {
           if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) refreshToken();
         }}
+        onPointerMove={formulaHover.onPointerMove}
+        onPointerLeave={formulaHover.onPointerLeave}
         onBlur={() => {
           // The caret has gone, so the reference it was in goes with it — otherwise a document left
           // unfocused keeps one token showing its raw id, and a label hanging under it.
@@ -422,6 +448,10 @@ export function MentionTextarea({
           Never while the suggestion list is open: they share an anchor, and that list is already
           naming documents. Never before the lookup has answered either, since "not found" and "not
           asked yet" would otherwise read the same. */}
+      {/* The typeset form of the formula under the mouse. Not while the suggestion list is open: that
+          list is what the user is looking at, and it hangs from the same line. */}
+      {formulaHover.formula && !expanded && <FormulaPreview {...formulaHover.formula} />}
+
       {reference && !expanded && !documentLabelsLoading && (
         <div
           style={{ top: reference.top, left: reference.left }}
