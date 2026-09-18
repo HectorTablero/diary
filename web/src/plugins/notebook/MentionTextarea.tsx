@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { detectActiveToken, fuzzyIncludes } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
-import { caretOffset } from './caret';
+import { caretPosition } from './caret';
 import { FormulaPreview, useFormulaHover, useInvalidFormulas } from './FormulaPreview';
 import { documentReferenceAt, highlightSource, type HighlightKind } from './syntax';
 
@@ -49,14 +49,28 @@ import { documentReferenceAt, highlightSource, type HighlightKind } from './synt
  * the token keeps the width it has in the textarea and the rest of the line never moves — see
  * `DocumentReference` at the bottom of this file, which is also where the caret gets its id back.
  *
+ * ## The overlay is what gives the editor its height
+ *
+ * A prose editor with an inner scrollbar puts the document in a window inside a window — the page
+ * should scroll, not the field — so the editor grows with its text. The layer is in normal flow and
+ * the textarea is stretched over it, so the text's own layout sets the height and CSS does the
+ * growing: nothing is measured and nothing is resized.
+ *
+ * It used to be the other way round: the textarea in flow, sized on every keystroke by setting its
+ * height to `auto`, reading `scrollHeight`, and setting it back. For that instant the page was only
+ * as tall as the editor's minimum height, and on a long document scrolled down, the browser clamped
+ * the page's scroll to fit — snapping it back up, with the caret pushed off the bottom of the screen
+ * as the text came down to meet it. The layer already lays the text out glyph for glyph, so it was
+ * always the thing that knew how tall the text is.
+ *
  * ## The popup, and the label under the caret
  *
  * A composer can hang its suggestions off the bottom edge, because the caret is never more than a
  * line or two away from it. In a full-page document the bottom edge can be a screen and a half
- * below what you are typing, so the list is positioned at the caret instead — measured by
- * `caretOffset` in caret.ts, which is the only way to ask a textarea where its caret actually is.
- * The same anchor carries the title of the reference the caret is inside, which is the one place
- * that title cannot be drawn over the reference itself.
+ * below what you are typing, so the list is positioned at the caret instead — found in the layer by
+ * `caretPosition` in caret.ts, since a textarea has no way to say where its caret is. The same
+ * anchor carries the title of the reference the caret is inside, which is the one place that title
+ * cannot be drawn over the reference itself.
  *
  * A formula gets the same treatment from the mouse rather than the caret: the overlay can only ever
  * show its LaTeX, so hovering one floats the typeset result beneath it. See FormulaPreview.tsx.
@@ -79,8 +93,8 @@ type Token =
   | { kind: 'document'; query: string; start: number };
 
 /* Every property that decides where a line breaks, on both layers. The textarea's own `border` and
-   `padding` are zero — the box around it belongs to DocumentEditorPanel — so there is nothing else
-   for the mirror to copy. */
+   `padding` are zero — the box around it belongs to DocumentEditorPanel — so the two boxes are the
+   same box, and a line breaks at the same word in both. */
 const SHARED_TEXT_CLASSES =
   'w-full p-0 font-sans text-[15px] leading-7 whitespace-pre-wrap break-words';
 
@@ -153,6 +167,7 @@ export function MentionTextarea({
   autoFocus,
   className,
   textareaRef: externalRef,
+  layerRef: externalLayerRef,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -172,12 +187,18 @@ export function MentionTextarea({
   onDocumentTokenActive?: () => void;
   placeholder?: string;
   autoFocus?: boolean;
+  /** On the box both layers share — this is where a minimum height goes, since the box grows with
+      the text from there (see "The overlay is what gives the editor its height"). */
   className?: string;
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /** The highlight layer, for a caller that needs to find the caret in it (see useCaretCentering). */
+  layerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useTranslation();
   const internalRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = externalRef ?? internalRef;
+  const internalLayerRef = useRef<HTMLDivElement>(null);
+  const layerRef = externalLayerRef ?? internalLayerRef;
   const listboxId = useId();
   const [token, setToken] = useState<Token | null>(null);
   const [anchor, setAnchor] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -193,7 +214,8 @@ export function MentionTextarea({
 
   const refreshToken = () => {
     const el = textareaRef.current;
-    if (!el) {
+    const layer = layerRef.current;
+    if (!el || !layer) {
       setToken(null);
       return setReference(null);
     }
@@ -210,20 +232,24 @@ export function MentionTextarea({
           })();
     if (next?.kind === 'document') onDocumentTokenActive?.();
     setToken(next);
-    if (next) setAnchor(caretOffset(el, caret));
+    if (next) setAnchor(caretPosition(layer, value, caret));
 
     /* Measured from the token's own start rather than from the caret, so the title sits under the
        reference it belongs to and stops jittering sideways as the caret moves through it. */
     const inside = documentReferenceAt(value, caret);
     setReference(
-      inside && { id: inside.id, start: inside.start, ...caretOffset(el, inside.start) },
+      inside && {
+        id: inside.id,
+        start: inside.start,
+        ...caretPosition(layer, value, inside.start),
+      },
     );
   };
 
   useEffect(() => {
     refreshToken();
     // Only on text changes — caret moves come through the click/key handlers, which is what keeps
-    // this from measuring a mirror on every render.
+    // this from re-running on renders that change neither.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
@@ -259,7 +285,6 @@ export function MentionTextarea({
      text and the people list alone: a caret move, a suggestion opening or a title arriving must
      never re-parse a thousand words. */
   const spans = useMemo(() => highlightSource(value, people), [value, people]);
-  const layerRef = useRef<HTMLDivElement>(null);
   const formulaHover = useFormulaHover(layerRef, spans);
   const brokenFormulas = useInvalidFormulas(spans);
 
@@ -307,18 +332,16 @@ export function MentionTextarea({
   const optionId = (id: string) => `${listboxId}-${id}`;
 
   return (
-    <div className="relative">
-      {/* The highlight layer: identical metrics to the textarea, sitting behind it. Hidden from
-          assistive technology outright — every character of it is already in the textarea, and a
-          screen reader reading the document twice would be the accessibility cost of a purely
-          visual convenience. */}
+    <div className={cn('relative', className)}>
+      {/* The highlight layer: identical metrics to the textarea, sitting behind it, and in normal
+          flow so its height is the editor's — see "The overlay is what gives the editor its height".
+          Hidden from assistive technology outright — every character of it is already in the
+          textarea, and a screen reader reading the document twice would be the accessibility cost of
+          a purely visual convenience. */}
       <div
         ref={layerRef}
         aria-hidden="true"
-        className={cn(
-          SHARED_TEXT_CLASSES,
-          'pointer-events-none absolute inset-0 overflow-hidden text-foreground',
-        )}
+        className={cn(SHARED_TEXT_CLASSES, 'pointer-events-none text-foreground')}
       >
         {spans.map((span, index) => {
           /* What the *line* does to this span, on top of what the span is. Applied to a reference's
@@ -357,6 +380,12 @@ export function MentionTextarea({
             </span>
           );
         })}
+        {/* A textarea gives a trailing newline a line of its own for the caret to sit on; a div
+            doesn't, so a document ending in one would come out a line shorter than the textarea it
+            is sizing — and the caret, typing on that line, would be below the box. A zero-width
+            space is something for that last line to hold. Not source, so caret measurement skips
+            it (`data-overlay-only`, see caret.ts). */}
+        <span data-overlay-only>{'​'}</span>
       </div>
 
       <textarea
@@ -394,8 +423,13 @@ export function MentionTextarea({
              shape of this technique. The selection has to be translucent for the same reason: a
              textarea paints its selection above everything behind it, and an opaque one would black
              out the very highlighting it is selecting. */
-          'relative block resize-none bg-transparent text-transparent caret-foreground outline-none selection:bg-foreground/20 placeholder:text-muted-foreground',
-          className,
+          'resize-none bg-transparent text-transparent caret-foreground outline-none selection:bg-foreground/20 placeholder:text-muted-foreground',
+          /* Stretched over the box the layer sizes. `h-full` as well as `inset-0`, because a
+             textarea has a height of its own (two rows) that `top`/`bottom` alone don't override.
+             `overflow-hidden`, because its content is exactly as tall as the box — a scrollbar
+             appearing for a stray pixel would narrow the lines and break them at different words
+             from the layer's. */
+          'absolute inset-0 h-full overflow-hidden',
         )}
       />
 
@@ -533,7 +567,8 @@ function DocumentReference({
   return (
     <span className={cn('relative rounded-sm', background, 'text-transparent')}>
       {raw}
-      <span className="absolute inset-0 flex items-center overflow-hidden">
+      {/* Painted over the id, not part of the text — so caret measurement skips it (caret.ts). */}
+      <span data-overlay-only className="absolute inset-0 flex items-center overflow-hidden">
         <span className={cn('w-full truncate text-center leading-none', ink, line)}>{title}</span>
       </span>
     </span>
