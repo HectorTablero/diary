@@ -2,6 +2,7 @@
   "name": "Period tracker",
   "description": "Log your period and get a heads-up before it's due.",
   "title": "Period tracker",
+  "openControl": "Log a period for this day",
   "flowLabel": "Flow intensity",
   "flowLight": "Light",
   "flowMedium": "Medium",

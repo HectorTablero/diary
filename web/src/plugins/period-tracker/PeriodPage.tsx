@@ -35,9 +35,9 @@ import { dateKeysBetween, type Cycle } from './predict';
 import { usePeriodHistory } from './useCycle';
 
 /**
- * The period tracker's own screen: the history the day card doesn't have room for, and — since the
- * restructure that made the day card stop offering to mark an arbitrary blank day — the only place
- * a forgotten period gets entered or its shape corrected at all.
+ * The period tracker's own screen: the history the day card doesn't have room for, and the place a
+ * forgotten period is entered or corrected as a whole range at once, rather than one day at a time
+ * from the day page.
  *
  * The split with the day widget is the same one habits draws between its card and its page: the day
  * card answers "what's true about today", one or two taps and done; this answers "how has it been

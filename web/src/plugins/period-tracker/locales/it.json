@@ -2,6 +2,7 @@
   "name": "Monitoraggio del ciclo",
   "description": "Registra il tuo ciclo e ricevi un avviso prima che arrivi.",
   "title": "Monitoraggio del ciclo",
+  "openControl": "Registra il ciclo per questo giorno",
   "flowLabel": "Intensità del flusso",
   "flowLight": "Leggero",
   "flowMedium": "Medio",

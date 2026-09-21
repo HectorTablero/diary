@@ -2,6 +2,7 @@
   "name": "经期追踪",
   "description": "记录你的经期，并在到来前收到提醒。",
   "title": "经期追踪",
+  "openControl": "记录这一天的经期",
   "flowLabel": "经量",
   "flowLight": "少量",
   "flowMedium": "中量",

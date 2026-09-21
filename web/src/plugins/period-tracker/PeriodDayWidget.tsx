@@ -1,5 +1,5 @@
 import { Droplet, Lock, LockOpen } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
@@ -13,18 +13,25 @@ import { usePeriodDay } from './useCycle';
 /**
  * The period tracker's card on the day page.
  *
- * Deliberately absent most days — the complaint a plugin present on every single day earns, whether
- * or not there is anything to say. This only ever renders for a reason:
+ * On today and every past day, in one of two sizes, so the flow buttons are always within reach
+ * of any day that has happened:
  *
- *   - **today**, if a period is predicted soon, already ongoing and undecided for today, or already
- *     marked;
- *   - a **past** day, only if it *was* actually marked when this mount last checked — nothing to say
- *     about an ordinary day gone by, and nothing to *add* to one either: that belongs to the
- *     plugin's own page now (see PeriodPage, "add a past period"). Once shown, it stays shown for
- *     the visit even if unmarking it right there would, on its own, argue for hiding it again — see
- *     `wantsShown` vs. `shown` below;
- *   - a **future** day, only if it falls inside a predicted window — and then only the words, never
- *     the control. Nobody can mark a day that hasn't happened.
+ *   - the **full card** opens by itself when there's something to say — **today** if a period is
+ *     predicted soon, already ongoing and undecided for today, or already marked; a **past** day if
+ *     it was marked;
+ *   - any other such day gets a single **quiet button** in its place, the same arrangement the
+ *     expense tracker uses for a past day with nothing on it. Pressing it opens the full card, and
+ *     since that is already a deliberate act, the card opens unlocked.
+ *
+ * A marked past day opens **locked**, behind the padlock habits uses: correcting history is a
+ * deliberate act rather than a stray tap.
+ *
+ * A **future** day never has the buttons, nor the quiet button — nobody can mark a day that hasn't
+ * happened. It shows only the prediction's words, and only inside a predicted window.
+ *
+ * Once open, the card stays open for the visit even if an edit would, on its own, argue for closing
+ * it again — tapping "no period" on a marked day must not make the card that button lives on vanish
+ * out from under the tap that pressed it.
  *
  * ## Why no day ever shows a day-count
  *
@@ -33,76 +40,82 @@ import { usePeriodDay } from './useCycle';
  * earns the number, and it never appears.
  */
 export function PeriodDayWidget({ dateKey }: { dateKey: string }) {
-  const { day, outlook, ongoing, loading, setFlow } = usePeriodDay(dateKey);
+  const { t } = useTranslation();
+  const { day, outlook, ongoing, ready, setFlow } = usePeriodDay(dateKey);
   const today = todayKey();
+  const isToday = dateKey === today;
   const isPast = dateKey < today;
   const isFuture = dateKey > today;
 
-  // Whether *this render's* data says the card belongs on screen — see the class comment for what
-  // each branch is watching for.
-  const wantsShown = isFuture
-    ? outlook.kind !== 'none'
-    : isPast
-      ? day !== undefined
-      : day !== undefined || ongoing || outlook.kind !== 'none';
+  // Whether *this day's* data opens the full card by itself — see the class comment.
+  const opensByItself = isPast
+    ? day !== undefined
+    : day !== undefined || ongoing || outlook.kind !== 'none';
 
-  /* But once a card has actually appeared, it stays for the life of this mount even if a later edit
-     would, on its own, have answered `wantsShown` differently — tapping "no period" on an
-     already-marked day must not make the card that button lives on vanish out from under the tap
-     that pressed it. The card's *content* still tracks `day`/`outlook`/`ongoing` live (the pill
-     moves to reflect what was just pressed); only the decision to show it at all is sticky. Reset
-     whenever the viewed day changes, so a different date starts this fresh — "shown" is a fact about
-     a visit to *this* day, not a flag that should survive navigating to another one. */
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    setShown(false);
-  }, [dateKey]);
-  useEffect(() => {
-    if (!loading && wantsShown) setShown(true);
-  }, [loading, wantsShown]);
+  /* Both keyed by the day they were set for rather than reset by an effect, so moving to another day
+     starts from "closed, locked" in that same render — never showing one day's answer for the next.
+     `openedFor` is set during render (React's pattern for state derived from props) the moment this
+     day's own data says to open, and then stays: that is what makes an opened card sticky. */
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+  const [unlockedFor, setUnlockedFor] = useState<string | null>(null);
+  if (ready && opensByItself && openedFor !== dateKey) setOpenedFor(dateKey);
 
-  if (loading || !shown) return null;
-
-  if (isPast) {
-    // A past day speaks for itself — see the class comment. What it does speak is still editable,
-    // behind the same lock every other day-but-today opens under: correcting a mistaken flow, or
-    // unmarking the day outright, is a deliberate act on history, not a casual one. `day` may already
-    // be gone by the time this renders (the day was just unmarked) — `'off'` is the honest reading of
-    // that, not a reason to have hidden the card `wantsShown` no longer asks for.
-    return (
-      <PastCard
-        dateKey={dateKey}
-        value={day ? day.flow : 'off'}
-        onSelect={(choice) => void setFlow(choice === 'off' ? null : choice)}
-      />
-    );
-  }
+  if (!ready) return null;
 
   if (isFuture) {
-    return (
+    return outlook.kind === 'none' ? null : (
       <Card>
         <OutlookText outlook={outlook} />
       </Card>
     );
   }
 
-  // Today. The control's own "selected" reading differs by which of the three reasons in the class
-  // comment applied when the card appeared:
-  //   - already marked: the recorded flow, exactly as habits' own controls always defer to what was
-  //     actually stored;
-  //   - a run left open since yesterday, with today not yet answered: nothing selected, because
-  //     defaulting to "no period" would misstate a question that hasn't been decided yet;
-  //   - otherwise (a fresh prediction, nothing ongoing): "no period" selected, which is simply true
-  //     until told otherwise.
-  const selected: FlowLevel | 'off' | undefined = day ? day.flow : ongoing ? undefined : 'off';
+  if (openedFor !== dateKey) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="gap-1.5 text-xs text-muted-foreground"
+        onClick={() => {
+          setOpenedFor(dateKey);
+          setUnlockedFor(dateKey);
+        }}
+      >
+        <Droplet className="size-3.5" aria-hidden />
+        {t('plugins.period-tracker.openControl')}
+      </Button>
+    );
+  }
+
+  const locked = !isToday && unlockedFor !== dateKey;
+
+  /* What the control reads as selected:
+       - a marked day: the recorded flow, as habits' controls always defer to what was stored;
+       - today, with a run left open since yesterday: nothing, because defaulting to "no period"
+         would answer a question that hasn't been decided yet;
+       - otherwise: "no period", which is simply true until told otherwise. */
+  const selected: FlowLevel | 'off' | undefined = day
+    ? day.flow
+    : isToday && ongoing
+      ? undefined
+      : 'off';
 
   return (
-    <Card>
-      {!day && outlook.kind !== 'none' && <OutlookText outlook={outlook} />}
-      <PeriodControl
-        value={selected}
-        onSelect={(choice) => void setFlow(choice === 'off' ? null : choice)}
-      />
+    <Card
+      action={
+        isToday ? undefined : (
+          <DayLockButton locked={locked} onToggle={() => setUnlockedFor(locked ? dateKey : null)} />
+        )
+      }
+    >
+      <div className="space-y-3">
+        {!day && outlook.kind !== 'none' && <OutlookText outlook={outlook} />}
+        <PeriodControl
+          value={selected}
+          onSelect={(choice) => void setFlow(choice === 'off' ? null : choice)}
+          disabled={locked}
+        />
+      </div>
     </Card>
   );
 }
@@ -129,43 +142,9 @@ export function Card({ children, action }: { children: ReactNode; action?: React
   );
 }
 
-/**
- * A past, marked day — the one case the control is shown locked. Its own small component only
- * because it is the one branch that owns unlock state; every other branch is a pure function of
- * `usePeriodDay`'s own return.
- */
-function PastCard({
-  dateKey,
-  value,
-  onSelect,
-}: {
-  dateKey: string;
-  value: FlowLevel | 'off';
-  onSelect: (choice: FlowLevel | 'off') => void;
-}) {
-  /* Opens read-only, with a lock the day can be unlocked from — the same friction habits puts in
-     front of editing a day that is not the one being lived. Local state, not persisted: reopening
-     this day, or simply leaving and coming back, starts locked again. The point is friction at the
-     moment of editing history, not a setting to configure once. */
-  const [unlocked, setUnlocked] = useState(false);
-  useEffect(() => {
-    setUnlocked(false);
-  }, [dateKey]);
-
-  return (
-    <Card
-      action={
-        <DayLockButton locked={!unlocked} onToggle={() => setUnlocked((current) => !current)} />
-      }
-    >
-      <PeriodControl value={value} onSelect={onSelect} disabled={!unlocked} />
-    </Card>
-  );
-}
-
-/** Own copy of habits' day-lock button, simplified: every day this appears on is in the past — a
-    future day never carries a control to lock in the first place — so there is only ever one reason
-    the padlock is showing, not two. See HabitsDayWidget.tsx for the pattern this follows. */
+/** Own copy of habits' day-lock button, simplified: it only ever appears on a past day — a future
+    day never carries the buttons to lock — so there is only one reason to give. See
+    HabitsDayWidget.tsx for the pattern this follows. */
 function DayLockButton({ locked, onToggle }: { locked: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   const reason = t(

@@ -2,6 +2,7 @@
   "name": "生理管理",
   "description": "生理を記録して、来る前にお知らせを受け取ります。",
   "title": "生理管理",
+  "openControl": "この日の生理を記録",
   "flowLabel": "経血量",
   "flowLight": "少ない",
   "flowMedium": "普通",

@@ -194,7 +194,10 @@ average at all. The day page turns that into an outlook — quiet, "in ~N days",
 7-day grace period past the predicted end — never a day count within the window, since a prediction
 is a guess at a window, not at which day inside it.
 
-Surfaces: the day widget, a calendar view shading logged days by flow and predicted days lighter
+Surfaces: the day widget — on today and every past day, so the flow buttons are always reachable: in
+full when there's something to say (today with a prediction or an open run, a marked past day),
+otherwise as one quiet button that opens it; a marked past day opens locked. A future day shows only
+the prediction's words, inside a predicted window, and never the buttons — a calendar view shading logged days by flow and predicted days lighter
 still, `/plugins/period-tracker` for the history, a Settings card for a device-local heads-up a
 couple of days before the next predicted start, and a plain-log export. No Android widget, unlike
 habits.

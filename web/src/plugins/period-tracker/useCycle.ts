@@ -51,8 +51,8 @@ export interface PeriodDayState {
   day: PeriodDay | undefined;
   /**
    * What to say about a day that has *not* been marked. Always `{ kind: 'none' }` for a day before
-   * today — see the note on PeriodDayWidget for why a prediction never speaks about the past, which
-   * is always either a marked day or a day nothing happened on, and both are already certain.
+   * today: a prediction never speaks about the past, which is always either a marked day or a day
+   * nothing happened on, and both are already certain.
    */
   outlook: PeriodOutlook;
   /**
@@ -64,7 +64,12 @@ export interface PeriodDayState {
    * future day cannot continue a run that hasn't reached it yet.
    */
   ongoing: boolean;
-  loading: boolean;
+  /**
+   * Whether `day` is *this* day's answer. While the next day's read is in flight the previous day's
+   * values are still returned — so a card already on screen doesn't flash — but nothing may decide
+   * what kind of card to draw from them: that is how a marked day ended up drawn as an unmarked one.
+   */
+  ready: boolean;
   /** `null` unmarks the day; otherwise marks it (or changes its flow, if already marked). */
   setFlow: (flow: FlowLevel | null) => Promise<void>;
 }
@@ -73,7 +78,7 @@ export function usePeriodDay(dateKey: string): PeriodDayState {
   const today = todayKey();
   const [day, setDay] = useState<PeriodDay | undefined>(undefined);
   const [cycles, setCycles] = useState<Cycle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const windowStart = toDateKey(addDays(parseDateKey(today), -HISTORY_WINDOW_DAYS));
@@ -84,15 +89,13 @@ export function usePeriodDay(dateKey: string): PeriodDayState {
     setDay(parsePeriodDay(dayRow));
     const marked = historyRows.flatMap((row) => (parsePeriodDay(row) ? [row.dateKey] : []));
     setCycles(groupCycles(marked));
-    setLoading(false);
+    setLoadedFor(dateKey);
   }, [dateKey, today]);
 
   useEffect(() => {
-    // Not `setLoading(true)` here: `load` also changes identity on every `dateKey` change (arrow-key
-    // navigation on the day page), and flipping back to loading for that is a layout shift for no
-    // reason — the data is local IndexedDB, the read is fast, and the previous day's card staying on
-    // screen for the instant it takes is strictly better than a skeleton immediately replaced again.
-    // `loading` now only ever describes the very first read, from its `useState(true)` initial value.
+    // `load` changes identity on every `dateKey` change (arrow-key navigation on the day page);
+    // `ready` goes false for the instant the new read takes, by comparing `loadedFor` — nothing here
+    // has to reset it.
     void load();
     return onSyncApplied(() => void load());
   }, [load]);
@@ -125,7 +128,7 @@ export function usePeriodDay(dateKey: string): PeriodDayState {
     [dateKey, load],
   );
 
-  return { day, outlook, ongoing, loading, setFlow };
+  return { day, outlook, ongoing, ready: loadedFor === dateKey, setFlow };
 }
 
 /* --- The calendar view ------------------------------------------------------------------------- */

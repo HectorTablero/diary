@@ -2,6 +2,7 @@
   "name": "Control del periodo",
   "description": "Registra tu periodo y recibe un aviso antes de que llegue.",
   "title": "Control del periodo",
+  "openControl": "Registrar la regla en este día",
   "flowLabel": "Intensidad del flujo",
   "flowLight": "Ligero",
   "flowMedium": "Medio",
