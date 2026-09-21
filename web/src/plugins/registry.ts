@@ -1,4 +1,4 @@
-import { CircleCheckBig, Droplet, NotebookPen, type LucideIcon } from 'lucide-react';
+import { CircleCheckBig, Droplet, NotebookPen, Wallet, type LucideIcon } from 'lucide-react';
 import type { PluginModule, PluginSurface } from './types';
 
 /**
@@ -141,6 +141,21 @@ export const PLUGINS: readonly PluginManifest[] = [
        is the prose as it stands. Someone who wants how a thought moved asks for it. */
     exportOptions: { history: false },
     load: () => import('./notebook'),
+  },
+  {
+    id: 'expenses',
+    icon: Wallet,
+    surfaces: ['day', 'page', 'settings', 'export', 'calendar', 'onboarding'],
+    // After habits and the period tracker, before the notebook: something recorded about the day,
+    // like them, rather than a prompt to write.
+    dayOrder: 0.5,
+    /* A warm orange (Tailwind's orange-600/orange-400, the same light/dark split the others use),
+       distinct from habits' violet, the period tracker's red and the notebook's green. Deliberately
+       not red, which would read as "overspent", nor green, as "saved": a day's shading on this
+       calendar is how much was spent, not whether it should have been. The page's own charts are
+       gray — see charts.tsx — so this is the plugin's only colour. */
+    hue: { light: '234, 88, 12', dark: '251, 146, 60' },
+    load: () => import('./expenses'),
   },
 ];
 

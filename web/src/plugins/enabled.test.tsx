@@ -121,6 +121,28 @@ describe('changing enablement', () => {
     expect(await getPluginSettings('habits')).toEqual({ weekGoal: 5 });
   });
 
+  it('records the stretches of days a plugin was on, and keeps them through settings writes', async () => {
+    const { setPluginEnabled, savePluginSettings, getPluginActivePeriods } = await freshStore();
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-08-01T12:00:00') });
+    try {
+      await setPluginEnabled('expenses', true);
+      // Re-asserting a state it's already in is not a new period.
+      await setPluginEnabled('expenses', true);
+      vi.setSystemTime(new Date('2026-08-10T12:00:00'));
+      await setPluginEnabled('expenses', false);
+      vi.setSystemTime(new Date('2026-09-01T12:00:00'));
+      await setPluginEnabled('expenses', true);
+      await savePluginSettings('expenses', { currency: 'EUR' });
+
+      expect(await getPluginActivePeriods('expenses')).toEqual([
+        { from: '2026-08-01', to: '2026-08-10' },
+        { from: '2026-09-01', to: null },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('updates the same row rather than adding a second one', async () => {
     const { setPluginEnabled } = await freshStore();
 

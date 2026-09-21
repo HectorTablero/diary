@@ -259,6 +259,41 @@ notifications (a thought is not a task), **no** Android widget (a paragraph is n
 and **no** Settings card (there is nothing device-local to configure). Deleting leaves an Undo on the
 toast, and a document created but never written in is discarded when you navigate away.
 
+### Expenses
+
+What money went on, and how much. Built to be **non-judgemental**: no budgets, no over/under, no
+month-on-month arrows, amounts in plain foreground text however large, the page's charts in gray
+and the calendar in a neutral orange. The stats say what happened; what to make of it is the
+reader's business.
+
+Four decisions are worth knowing before touching it:
+
+- **One row per expense, not per day.** An expense is _added_, so the one-row-per-day shape habits
+  uses would turn two devices logging on the same day into last-write-wins losing one of them. The
+  `dateKey` is still the day. Amounts are integers in the currency's minor unit (`currencyDigits`,
+  via `Intl`), because every figure on the page is a sum.
+- **Currencies are never converted.** Each expense keeps its own; the default (synced, in the config
+  row's `settings`) only pre-fills the form. With more than one in use the page gets a currency
+  switcher and everything below it is that currency alone — a rate is either fetched (a network
+  dependency and a server change) or invented.
+- **The starter categories are never written.** They're built in with fixed ids, translated names
+  and their own icons; a row appears only once one is renamed or retired. Seeding them as rows would
+  duplicate the set when two devices enabled the plugin offline. Categories in use are retired,
+  never deleted; an unused _custom_ one is deleted outright.
+- **The per-day average only counts days the tracker was there for** — days it was switched on,
+  plus any day with an expense. That needs to know when a plugin was off, which a plugin can't record
+  itself, so `setPluginEnabled` now keeps `periods` (from/to date keys) in the config row, for any
+  plugin to read with `getPluginActivePeriods`. With none recorded (a restored backup, say) it falls
+  back to every day since the first expense.
+
+Surfaces: the day card (always on today; on a past day only if something was recorded, otherwise one
+quiet "add an expense for this day" button that opens it unlocked; never on a future day),
+`/plugins/expenses` (month total, per-day average, a cumulative line for the month, twelve months
+of columns, a per-category breakdown, the month's expenses by day), a synced Settings card for the
+default currency, a calendar view shaded by spend relative to the month on screen, `expenses.md` in
+the export, and a tour. Deliberately **no** notifications — a nudge to log spending is a nudge to feel
+watched — and no Android widget.
+
 ## Security and privacy
 
 - **App lock** — an optional passcode (PBKDF2, device-local) in front of the diary, with the

@@ -1,6 +1,7 @@
 import { UNDATED_KEY } from '@diary/shared';
 import { useSyncExternalStore } from 'react';
 import { getAllPluginConfigs, getPluginConfig, putPluginRecord } from '@/db/pluginRecords';
+import { todayKey } from '@/lib/dates';
 import { clearEnabledMirror, readEnabledMirror, writeEnabledMirror } from './enabledMirror';
 
 /**
@@ -41,6 +42,49 @@ import { clearEnabledMirror, readEnabledMirror, writeEnabledMirror } from './ena
 interface PluginConfig {
   enabled: boolean;
   settings: Record<string, unknown>;
+  /** See `ActivePeriod`. Absent on rows written before it existed. */
+  periods?: ActivePeriod[];
+}
+
+/**
+ * One stretch of days a plugin was switched on, as date keys, inclusive at both ends; `to` is null
+ * while it still is.
+ *
+ * Kept by this module rather than by any plugin because a plugin cannot record its own switching
+ * off — by then none of its code is running. It is what lets a plugin tell "nothing happened that
+ * day" apart from "I wasn't there that day": the expense tracker's per-day average, say, must not
+ * count a month the tracker was off as a month of spending nothing.
+ *
+ * Starts on the day this was introduced; a plugin enabled earlier has no record of that, and must
+ * fall back to something of its own (the expense tracker uses its earliest expense).
+ */
+export interface ActivePeriod {
+  from: string;
+  to: string | null;
+}
+
+/** Enough for years of toggling, and far inside MAX_PLUGIN_DATA_BYTES. Oldest are dropped first —
+    the recent past is what anything reading this is asking about. */
+const MAX_PERIODS = 60;
+
+function nextPeriods(current: readonly ActivePeriod[], value: boolean): ActivePeriod[] {
+  const today = todayKey();
+  const last = current.at(-1);
+  const open = last !== undefined && last.to === null;
+  if (value && !open) return [...current, { from: today, to: null }].slice(-MAX_PERIODS);
+  if (!value && open) return [...current.slice(0, -1), { from: last.from, to: today }];
+  return [...current];
+}
+
+/** Parse-don't-trust, like every read of a plugin row: another build may have written this. */
+function readPeriods(raw: unknown): ActivePeriod[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item: unknown) => {
+    if (typeof item !== 'object' || item === null) return [];
+    const { from, to } = item as Record<string, unknown>;
+    if (typeof from !== 'string' || (to !== null && typeof to !== 'string')) return [];
+    return [{ from, to }];
+  });
 }
 
 /* Replaced rather than mutated: useSyncExternalStore compares snapshots by identity, so a mutated
@@ -94,8 +138,18 @@ export async function setPluginEnabled(pluginId: string, value: boolean): Promis
 
   // Preserve whatever settings the plugin has already stored: this row is shared with it.
   const existing = await getPluginConfig(pluginId);
-  const settings = (existing?.data as Partial<PluginConfig> | undefined)?.settings ?? {};
-  await putPluginRecord(pluginId, 'config', UNDATED_KEY, { enabled: value, settings });
+  const current = (existing?.data as Partial<PluginConfig> | undefined) ?? {};
+  await putPluginRecord(pluginId, 'config', UNDATED_KEY, {
+    enabled: value,
+    settings: current.settings ?? {},
+    periods: nextPeriods(readPeriods(current.periods), value),
+  });
+}
+
+/** When a plugin has been on — see `ActivePeriod`. Oldest first; empty if never recorded. */
+export async function getPluginActivePeriods(pluginId: string): Promise<ActivePeriod[]> {
+  const row = await getPluginConfig(pluginId);
+  return readPeriods((row?.data as Partial<PluginConfig> | undefined)?.periods);
 }
 
 /** Read a plugin's synced settings. Shape is the plugin's business — parse before trusting. */
@@ -114,6 +168,7 @@ export async function savePluginSettings(
   await putPluginRecord(pluginId, 'config', UNDATED_KEY, {
     enabled: current.enabled ?? enabled.has(pluginId),
     settings: { ...(current.settings ?? {}), ...patch },
+    periods: readPeriods(current.periods),
   });
 }
 
