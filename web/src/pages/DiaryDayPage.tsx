@@ -21,6 +21,7 @@ import {
   SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH,
   useContainerWidth,
 } from '@/lib/useContainerWidth';
+import { useStickyColumn } from '@/lib/useStickyColumn';
 import { useEnabledPlugins } from '@/plugins/enabled';
 import { PluginDaySlot } from '@/plugins/PluginDaySlot';
 import { PLUGINS } from '@/plugins/registry';
@@ -48,8 +49,6 @@ export default function DiaryDayPage() {
      most the one shift a genuine change in content actually requires. */
   const [hasPluginContent, setHasPluginContent] = useState(false);
 
-  if (!valid) return <Navigate to={`/diary/${todayKey()}`} replace />;
-
   const goTo = (key: string) => navigate(`/diary/${key}`);
   const shift = (days: number) => goTo(toDateKey(addDays(parseDateKey(dateKey), days)));
   const isToday = dateKey === todayKey();
@@ -65,6 +64,10 @@ export default function DiaryDayPage() {
      other page when the user has opted into single-column mode outright. */
   const useTwoColumns =
     prefs.twoColumnLayout && hasSideContent && splitWidth >= SIDEBAR_SPLIT_MIN_WIDTH;
+  const [mainColumnRef, mainColumnStyle] = useStickyColumn<HTMLDivElement>(useTwoColumns);
+  const [sideColumnRef, sideColumnStyle] = useStickyColumn<HTMLElement>(useTwoColumns);
+
+  if (!valid) return <Navigate to={`/diary/${todayKey()}`} replace />;
 
   return (
     <>
@@ -148,7 +151,11 @@ export default function DiaryDayPage() {
           )}
         >
           {/* Main column: entries & composer */}
-          <div className={cn(useTwoColumns && 'col-span-7')}>
+          <div
+            ref={mainColumnRef}
+            style={mainColumnStyle}
+            className={cn(useTwoColumns && 'col-span-7')}
+          >
             {isLoading ? (
               <div className="flex flex-col gap-3">
                 <Skeleton className="h-8 w-3/4" />
@@ -172,8 +179,13 @@ export default function DiaryDayPage() {
 
           {/* Side content: birthdays & plugins (sidebar when useTwoColumns is true, single-column below composer when useTwoColumns is false) */}
           {(hasSideContent || enabledPlugins.size > 0) && (
+            /* Both columns are sticky (see useStickyColumn): whichever is shorter scrolls until its
+               end is on screen and then waits for the other, rather than leaving a screen of empty
+               space beside it at the bottom of the page. */
             <aside
-              className={cn('mt-6 space-y-6', useTwoColumns && 'mt-0 col-span-5 sticky top-6')}
+              ref={sideColumnRef}
+              style={sideColumnStyle}
+              className={cn('mt-6 space-y-6', useTwoColumns && 'mt-0 col-span-5')}
             >
               {/**
                * Whose birthday it is, in the same card the habit checklist uses.

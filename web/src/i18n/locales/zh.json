@@ -304,6 +304,8 @@
     "markEventAsked": "标记为已问过",
     "eventMarkedAsked": "已标记为问过",
     "eventFollowUpTitle": "有 {{count}} 件事可以问",
+    "pendingFollowUpsHint": "有 {{count}} 件事还没问过",
+    "talkingPointsHint": "有 {{count}} 条谈资可以聊",
     "eventFollowUpDescription": "这些刚刚结束 — 问问{{name}}进展如何。",
     "eventDeleteConfirmTitle": "删除「{{title}}」？",
     "eventDeleteConfirmDescription": "这会移除该经历和它的提醒。此操作无法撤销。",

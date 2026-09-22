@@ -77,6 +77,7 @@ import {
   SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH,
   useContainerWidth,
 } from '@/lib/useContainerWidth';
+import { useStickyColumn } from '@/lib/useStickyColumn';
 import { cn } from '@/lib/utils';
 
 /** Shared by all four profile tabs — see the note at the TabsList below for why it un-sets
@@ -477,9 +478,11 @@ function EventRow({
         </DropdownMenu>
       </div>
 
-      {/* Footer only appears when you owe them something, and says *why* it's here. */}
+      {/* Footer only appears when you owe them something, and says *why* it's here. Sky, the
+          colour a person's name already wears in the diary, rather than amber: at this faint a
+          tint amber turns muddy brown, especially in dark mode, and nothing else here is brown. */}
       {followUpDue && (
-        <div className="flex flex-col items-stretch gap-2 border-t border-amber-500/30 bg-amber-500/[0.07] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-stretch gap-2 rounded-b-xl border-t border-sky-500/25 bg-sky-500/[0.06] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="min-w-0 text-xs text-muted-foreground">
             {t('people.eventEndedDaysAgo', { count: daysSinceEnd })}
           </span>
@@ -623,6 +626,8 @@ export default function PersonProfilePage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [splitRef, splitWidth] = useContainerWidth<HTMLDivElement>();
   const useTwoColumns = splitWidth >= SIDEBAR_SPLIT_MIN_WIDTH;
+  const [mainColumnRef, mainColumnStyle] = useStickyColumn<HTMLDivElement>(useTwoColumns);
+  const [sideColumnRef, sideColumnStyle] = useStickyColumn<HTMLElement>(useTwoColumns);
 
   /* The Events tab disappears in two-column mode — its content moves to the sidebar instead — so a
      resize that crosses the threshold while it's the active tab would otherwise leave the page on a
@@ -724,7 +729,11 @@ export default function PersonProfilePage() {
           useTwoColumns && (splitWidth >= SIDEBAR_SPLIT_WIDE_GAP_MIN_WIDTH ? 'gap-8' : 'gap-6'),
         )}
       >
-        <div className={cn(useTwoColumns && 'col-span-7')}>
+        <div
+          ref={mainColumnRef}
+          style={mainColumnStyle}
+          className={cn(useTwoColumns && 'col-span-7')}
+        >
           <PersonIdentity
             name={person.name}
             tags={person.tags}
@@ -773,17 +782,18 @@ export default function PersonProfilePage() {
 
           {!useTwoColumns && checkupBanner}
 
-          {/* Same idiom as the checkup banner above — an unanswered "how did it go?" is the same
-          kind of debt, so it should look like one.
+          {/* Same shape as the checkup banner above — an unanswered "how did it go?" is the same
+          kind of debt — but in the sky tint the event rows' own "mark as asked" footers use, so
+          the two places that ask the same question look alike.
 
           Suppressed in two-column mode: it exists to surface something a tab was hiding, and once
           the events section sits in the sidebar at all times, nothing is hidden — the same overdue
           events are right there, each already carrying this exact nudge on its own `EventRow`
           footer (the `followUpDue` block, above). Keeping both would just say it twice. */}
           {!useTwoColumns && pendingFollowUps.length > 0 && (
-            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] p-4">
               <div className="flex items-start gap-2.5">
-                <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-sky-600 dark:text-sky-400" />
                 <div>
                   <p className="text-sm font-medium">
                     {t('people.eventFollowUpTitle', { count: pendingFollowUps.length })}
@@ -797,7 +807,7 @@ export default function PersonProfilePage() {
                 {pendingFollowUps.map((event) => (
                   <li
                     key={event.id}
-                    className="flex flex-col items-stretch gap-2 rounded-lg border border-amber-500/25 bg-background/40 p-2.5 sm:flex-row sm:items-start sm:justify-between"
+                    className="flex flex-col items-stretch gap-2 rounded-lg border border-sky-500/20 bg-background/60 p-2.5 sm:flex-row sm:items-start sm:justify-between"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{event.title}</p>
@@ -887,10 +897,10 @@ export default function PersonProfilePage() {
 
         {/* The tab's replacement: always on screen rather than a click away, which is also why the
             amber follow-up banner above stands down in this mode — an overdue event is right here,
-            not hidden behind anything. `sticky` so it stays put while the (often longer) tab content
-            beside it scrolls. */}
+            not hidden behind anything. Both columns are sticky (see useStickyColumn), so whichever
+            is shorter holds once its end is on screen while the other carries on scrolling. */}
         {useTwoColumns && (
-          <aside className="col-span-5 sticky top-6">
+          <aside ref={sideColumnRef} style={sideColumnStyle} className="col-span-5">
             {checkupBanner}
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <CalendarClock className="size-4 text-muted-foreground" aria-hidden />

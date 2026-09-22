@@ -310,6 +310,8 @@
     "markEventAsked": "聞いたことにする",
     "eventMarkedAsked": "聞いたことにしました",
     "eventFollowUpTitle": "聞きたいことが{{count}}件",
+    "pendingFollowUpsHint": "まだ聞いていない出来事が{{count}}件",
+    "talkingPointsHint": "話したいネタが{{count}}件",
     "eventFollowUpDescription": "最近終わったばかりです — {{name}}さんにどうだったか聞いてみましょう。",
     "eventDeleteConfirmTitle": "「{{title}}」を削除しますか？",
     "eventDeleteConfirmDescription": "この出来事とそのリマインダーが消えます。この操作は取り消せません。",

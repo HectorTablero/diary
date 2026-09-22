@@ -1,11 +1,57 @@
 import * as React from 'react';
 import { Select as SelectPrimitive } from 'radix-ui';
 
+import { bottomBarHeight, collisionPaddingAboveBar } from '@/lib/bottomBar';
 import { cn } from '@/lib/utils';
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from 'lucide-react';
 
-function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />;
+/* Radix closes an open Select on every window `resize` — and on a phone, the on-screen keyboard
+   going away *is* a resize. Tapping a select while typing in a field blurs that field, the keyboard
+   folds, the window grows, and the list that just opened shuts again before the user can pick
+   anything. So resizes that only change the height (the keyboard, a browser's toolbar) are noted
+   here, and the Select below ignores a close that arrives during one. A width change (rotation, a
+   resized desktop window) still closes it, as Radix intends.
+
+   A capture listener on window: for an event targeted at the window itself, capturing listeners
+   run before bubbling ones, so the flag is already set when Radix's own handler asks to close. */
+let heightOnlyResize = false;
+let lastWindowWidth = typeof window === 'undefined' ? 0 : window.innerWidth;
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'resize',
+    () => {
+      heightOnlyResize = window.innerWidth === lastWindowWidth;
+      lastWindowWidth = window.innerWidth;
+      queueMicrotask(() => (heightOnlyResize = false));
+    },
+    { capture: true },
+  );
+}
+
+function Select({
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Root>) {
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
+  const open = openProp ?? uncontrolledOpen;
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (!next && heightOnlyResize) return;
+      if (openProp === undefined) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [openProp, onOpenChange],
+  );
+  return (
+    <SelectPrimitive.Root
+      data-slot="select"
+      open={open}
+      onOpenChange={handleOpenChange}
+      {...props}
+    />
+  );
 }
 
 function SelectGroup({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Group>) {
@@ -64,10 +110,16 @@ function SelectTrigger({ className, size = 'default', children, ...props }: Sele
 function SelectContent({
   className,
   children,
-  position = 'item-aligned',
+  position: positionProp,
   align = 'center',
+  collisionPadding,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
+  /* Item-aligned lists clamp themselves to the window with a fixed margin and take no collision
+     padding, so with the tab bar showing their bottom rows end up behind it. Where the bar is on
+     screen, the list opens as a popper instead, which does take padding — the bar's top edge
+     becomes the bottom of the screen, and a long list scrolls above it. */
+  const position = positionProp ?? (bottomBarHeight() > 0 ? 'popper' : 'item-aligned');
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -81,6 +133,9 @@ function SelectContent({
         )}
         position={position}
         align={align}
+        collisionPadding={
+          position === 'popper' ? collisionPaddingAboveBar(collisionPadding) : undefined
+        }
         {...props}
       >
         <SelectScrollUpButton />

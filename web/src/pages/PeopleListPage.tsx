@@ -243,15 +243,21 @@ function PersonRow({
         </div>
       </Link>
 
-      {/* Outside the link but under its stretched ::before, so these still read as part of the
-          row and clicking one still opens the profile. */}
+      {/* Outside the link, so they read as part of the row. The two count badges are lifted above
+          the link's stretched ::before so they can be hovered for their tooltip — the two speech
+          bubbles are otherwise hard to tell apart — and are links to the profile themselves, so
+          clicking one still opens it like the rest of the row does. */}
       {/* Same destructive tint the row already uses for an overdue checkup — an unanswered
           "how did it go?" is the same kind of debt. */}
       {pending > 0 && (
-        <Badge variant="outline" className="shrink-0 gap-1 border-destructive/40 text-destructive">
-          <MessageCircleQuestion className="size-3" />
-          {pending}
-        </Badge>
+        <HintTooltip content={t('people.pendingFollowUpsHint', { count: pending })}>
+          <Link to={`/people/${person.id}`} tabIndex={-1} className="relative z-10 shrink-0">
+            <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+              <MessageCircleQuestion className="size-3" />
+              {pending}
+            </Badge>
+          </Link>
+        </HintTooltip>
       )}
       {person.checkupIntervalDays != null && (
         <span
@@ -265,10 +271,14 @@ function PersonRow({
         </span>
       )}
       {person.talkingPointCount > 0 && (
-        <Badge variant="secondary" className="gap-1">
-          <MessageCircle className="size-3" />
-          {person.talkingPointCount}
-        </Badge>
+        <HintTooltip content={t('people.talkingPointsHint', { count: person.talkingPointCount })}>
+          <Link to={`/people/${person.id}`} tabIndex={-1} className="relative z-10 shrink-0">
+            <Badge variant="secondary" className="gap-1">
+              <MessageCircle className="size-3" />
+              {person.talkingPointCount}
+            </Badge>
+          </Link>
+        </HintTooltip>
       )}
 
       {/* `relative z-10` lifts the menu above the link's overlay — without it the anchor would
