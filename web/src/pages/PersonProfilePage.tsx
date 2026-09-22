@@ -478,11 +478,9 @@ function EventRow({
         </DropdownMenu>
       </div>
 
-      {/* Footer only appears when you owe them something, and says *why* it's here. Sky, the
-          colour a person's name already wears in the diary, rather than amber: at this faint a
-          tint amber turns muddy brown, especially in dark mode, and nothing else here is brown. */}
+      {/* Footer only appears when you owe them something, and says *why* it's here. */}
       {followUpDue && (
-        <div className="flex flex-col items-stretch gap-2 rounded-b-xl border-t border-sky-500/25 bg-sky-500/[0.06] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-stretch gap-2 border-t border-amber-500/15 bg-amber-500/[0.035] dark:border-amber-400/10 dark:bg-amber-400/[0.02] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="min-w-0 text-xs text-muted-foreground">
             {t('people.eventEndedDaysAgo', { count: daysSinceEnd })}
           </span>
@@ -665,49 +663,56 @@ export default function PersonProfilePage() {
      only one column, or above Events in the sidebar when there are two — checking up on someone is
      as much "context for reaching out" as an overdue event is, so it belongs beside Events rather
      than buried above tab content the sidebar has already made unnecessary to scroll past. */
+  /* Laid out by its own width (a container query), not the viewport's: the same banner sits in the
+     full-width column on a phone and in the narrow sidebar on a desktop, and `sm:` put it side by
+     side in the sidebar — where there's no room for that — while a small phone overflowed the two
+     unwrappable buttons. Stacked, the buttons share the row and wrap onto their own lines if even
+     that is too tight. */
   const checkupBanner = checkupDue && (
-    <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-2.5">
-        <BellRing className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-        <div>
-          <p className="text-sm font-medium">
-            {t('people.checkupDueTitle', { name: person.name })}
-          </p>
-          <p className="text-xs text-muted-foreground">{t('people.checkupDueDescription')}</p>
+    <div className="@container mb-6">
+      <div className="flex flex-col gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] dark:border-amber-400/15 dark:bg-amber-400/[0.03] p-4 @xl:flex-row @xl:items-center @xl:justify-between">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <BellRing className="mt-0.5 size-4 shrink-0 text-amber-600/80 dark:text-amber-300/70" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {t('people.checkupDueTitle', { name: person.name })}
+            </p>
+            <p className="text-xs text-muted-foreground">{t('people.checkupDueDescription')}</p>
+          </div>
         </div>
-      </div>
-      <div className="flex shrink-0 gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={() =>
-            markCheckup.mutate(person.id, {
-              onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
-              onError: () => notifyError(t('errors.unknown')),
-            })
-          }
-        >
-          <Check className="size-3.5" />
-          {t('people.markCheckupDone')}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={() =>
-            updatePerson.mutate(
-              { id: person.id, input: { checkupIntervalDays: null } },
-              {
-                onSuccess: () => notifySuccess(t('people.checkupsDisabled')),
+        <div className="flex flex-wrap gap-2 @xl:shrink-0 @xl:flex-nowrap">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1.5 @xl:flex-none"
+            onClick={() =>
+              markCheckup.mutate(person.id, {
+                onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
                 onError: () => notifyError(t('errors.unknown')),
-              },
-            )
-          }
-        >
-          <BellOff className="size-3.5" />
-          {t('people.disableCheckups')}
-        </Button>
+              })
+            }
+          >
+            <Check className="size-3.5" />
+            {t('people.markCheckupDone')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1.5 @xl:flex-none"
+            onClick={() =>
+              updatePerson.mutate(
+                { id: person.id, input: { checkupIntervalDays: null } },
+                {
+                  onSuccess: () => notifySuccess(t('people.checkupsDisabled')),
+                  onError: () => notifyError(t('errors.unknown')),
+                },
+              )
+            }
+          >
+            <BellOff className="size-3.5" />
+            {t('people.disableCheckups')}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -782,18 +787,17 @@ export default function PersonProfilePage() {
 
           {!useTwoColumns && checkupBanner}
 
-          {/* Same shape as the checkup banner above — an unanswered "how did it go?" is the same
-          kind of debt — but in the sky tint the event rows' own "mark as asked" footers use, so
-          the two places that ask the same question look alike.
+          {/* Same idiom as the checkup banner above — an unanswered "how did it go?" is the same
+          kind of debt, so it should look like one.
 
           Suppressed in two-column mode: it exists to surface something a tab was hiding, and once
           the events section sits in the sidebar at all times, nothing is hidden — the same overdue
           events are right there, each already carrying this exact nudge on its own `EventRow`
           footer (the `followUpDue` block, above). Keeping both would just say it twice. */}
           {!useTwoColumns && pendingFollowUps.length > 0 && (
-            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] p-4">
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] dark:border-amber-400/15 dark:bg-amber-400/[0.03] p-4">
               <div className="flex items-start gap-2.5">
-                <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-amber-600/80 dark:text-amber-300/70" />
                 <div>
                   <p className="text-sm font-medium">
                     {t('people.eventFollowUpTitle', { count: pendingFollowUps.length })}
@@ -807,7 +811,7 @@ export default function PersonProfilePage() {
                 {pendingFollowUps.map((event) => (
                   <li
                     key={event.id}
-                    className="flex flex-col items-stretch gap-2 rounded-lg border border-sky-500/20 bg-background/60 p-2.5 sm:flex-row sm:items-start sm:justify-between"
+                    className="flex flex-col items-stretch gap-2 rounded-lg border border-amber-500/15 bg-background/60 dark:border-amber-400/10 p-2.5 sm:flex-row sm:items-start sm:justify-between"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{event.title}</p>

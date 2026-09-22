@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { bottomBarHeight } from '@/lib/bottomBar';
 
-/** Gap kept above a column pinned to the top of the screen, and below one pinned to the bottom. */
+/** Gap kept below a column pinned to the bottom of the screen. */
 const STICKY_GAP = 24;
 
 /**
@@ -19,7 +19,8 @@ const STICKY_GAP = 24;
  * to two entries scrolls the entries away and leaves a screen of empty space beside the plugins. So
  * the `top` offset is worked out from the column's height instead:
  *
- * - shorter than the screen → `top: 24px`, pinned at the top like before;
+ * - fits on screen → `top` is where it already rests with the page scrolled to the top, so it
+ *   never moves at all (a fixed `top-6` let it creep up by the height of the header first);
  * - taller → a negative `top` that puts its bottom edge 24px above the bottom of the screen (or of
  *   the tab bar), so it scrolls normally until its last card comes into view and then holds there.
  *
@@ -36,12 +37,19 @@ export function useStickyColumn<T extends HTMLElement>(
   useLayoutEffect(() => {
     if (!node || !enabled) return;
     const update = () => {
+      /* Where the column rests before any scrolling, measured off the grid rather than the column
+         itself — the column's own rect already includes whatever offset `sticky` has given it. */
+      const grid = node.parentElement ?? node;
+      const restingTop = grid.getBoundingClientRect().top + window.scrollY;
       const room = window.innerHeight - bottomBarHeight() - STICKY_GAP;
-      setTop(Math.min(STICKY_GAP, room - node.offsetHeight));
+      setTop(Math.min(restingTop, room - node.offsetHeight));
     };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(node);
+    // Content above the split (a banner appearing, the header wrapping) moves where it rests
+    // without resizing it, but it does resize the page.
+    observer.observe(document.body);
     window.addEventListener('resize', update);
     return () => {
       observer.disconnect();

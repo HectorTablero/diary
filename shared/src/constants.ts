@@ -213,9 +213,15 @@ export const MAX_PLUGIN_RECORDS_PER_PLUGIN = 20_000;
     for a shape no per-field rule anticipated. */
 export const MAX_PLUGIN_DATA_BYTES = 4096;
 
-/** How deep a `data` blob may nest. Plugin data is settings and per-day values; anything deeper is
-    a document, and documents belong in the pluginDocument collection below. */
-export const MAX_PLUGIN_DATA_DEPTH = 3;
+/** How deep a `data` blob may nest, counting `data` itself as the first level. Plugin data is
+    settings and per-day values; anything deeper is a document, and documents belong in the
+    pluginDocument collection below.
+
+    5, not 3: a habit keeps its superseded configurations in `revisions`, and one on a weekday
+    schedule is `data.revisions[i].schedule.days` — five containers deep. At 3 that row was refused
+    by the server (so it never synced) and by the backup importer (so a backup holding one could not
+    be restored at all). */
+export const MAX_PLUGIN_DATA_DEPTH = 5;
 
 /** The sentinel `dateKey` for a row that isn't about a particular day.
  *

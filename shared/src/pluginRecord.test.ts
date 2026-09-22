@@ -86,6 +86,28 @@ describe('data bounds', () => {
     expect(create({ data: { a: [1, 2, 3] } }).success).toBe(true);
   });
 
+  it('accepts a habit whose superseded configuration had a weekday schedule', () => {
+    // revisions[i].schedule.days[j] — the shape that made backups holding one unimportable.
+    const habit = {
+      kind: 'habit',
+      name: 'Gym',
+      type: 'check',
+      schedule: { kind: 'weekly', days: [1, 3, 5] },
+      since: '2026-09-01',
+      revisions: [
+        {
+          since: '2026-08-01',
+          changedAt: '2026-09-01T10:00:00.000Z',
+          name: 'Gym',
+          schedule: { kind: 'weekly', days: [2, 4] },
+        },
+      ],
+      order: 0,
+      archivedAt: null,
+    };
+    expect(create({ data: habit }).success).toBe(true);
+  });
+
   it('rejects nesting past the limit', () => {
     // depth 0 is the record itself; each level of object/array costs one.
     let deep: unknown = 'leaf';

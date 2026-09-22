@@ -20,7 +20,6 @@ import { initLocalNotifications, refreshNotifications } from './lib/notification
 import { subscribePreferences } from './lib/preferences';
 import { queryClient } from './lib/queryClient';
 import { initPlugins } from './plugins/lifecycle';
-import { initRevisionRecount } from './plugins/notebook/recountRevisions';
 import { initReducedMotion, useReducedMotion } from './lib/reducedMotion';
 import { initTelemetry } from './lib/telemetry';
 import { logVersion } from './lib/version';
@@ -79,8 +78,6 @@ onSyncApplied(() => refreshNotifications());
    both, in that order, and also does the startup pass that lets a fresh device discover the plugins
    the account already has switched on. See plugins/lifecycle.ts for the bug this fixes. */
 initPlugins();
-// OBSOLETE: one-off v9.8.4 repair of the notebook's +/− counts. Remove from v9.8.5 onwards.
-initRevisionRecount();
 // Turning a reminder off has to cancel the alarm that's already armed for tonight, and changing a
 // time has to move it — neither happens until a reconcile runs.
 subscribePreferences(() => refreshNotifications());
