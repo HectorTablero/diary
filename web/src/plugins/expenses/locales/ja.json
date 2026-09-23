@@ -67,9 +67,14 @@
   "defaultCurrency": "既定の通貨",
   "defaultCurrencyDescription": "新しい支出にあらかじめ選ばれる通貨です。個々の支出では別の通貨も選べます。",
   "dateColumn": "日付",
-  "descriptionColumn": "内容",
   "categoryColumn": "カテゴリ",
   "amountColumn": "金額",
+  "exportDayTotal": "支出（{{total}}）:",
+  "exportNoteHeading": "支出の行",
+  "exportNote": "支出のあった日には合計の行があり、その下に `- <金額>: <内容> (<カテゴリ>)` の形式で支出が1行ずつ並びます。内容とカテゴリは、ない場合は省略されます。金額は通貨間で換算されないため、複数の通貨がある日はそれぞれの合計を個別に示します。",
+  "exportByMonth": "カテゴリ別・月別の合計",
+  "exportCurrenciesSeparate": "金額は通貨間で換算されないため、通貨ごとに個別に合計しています。",
+  "exportTotal": "合計",
   "onboarding": {
     "previewNote": "プレビューです。ここでの操作は保存されません。",
     "day": {

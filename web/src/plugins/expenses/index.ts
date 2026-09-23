@@ -5,7 +5,7 @@ import { ExpensesCalendarView } from './ExpensesCalendarView';
 import { ExpensesDayWidget } from './ExpensesDayWidget';
 import ExpensesPage from './ExpensesPage';
 import { ExpensesSettingsSection } from './ExpensesSettingsSection';
-import { exportExpensesMarkdown } from './markdown';
+import { exportExpensesDayLines, exportExpensesMarkdown } from './markdown';
 import { parseCategoryRow, parseExpense } from './model';
 import { expensesOnboardingSteps } from './onboarding/steps';
 
@@ -20,6 +20,9 @@ const expenses: PluginModule = {
   DayWidget: ExpensesDayWidget,
   Page: ExpensesPage,
   SettingsSection: ExpensesSettingsSection,
+  /* Both halves of the `export` surface: what was spent on a day goes under that day, and the
+     totals that no single day can show go in a section at the end. See markdown.ts. */
+  exportDayLines: exportExpensesDayLines,
   exportMarkdown: exportExpensesMarkdown,
   CalendarView: ExpensesCalendarView,
   describeRecord: (record) => {

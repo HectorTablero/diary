@@ -537,6 +537,8 @@
       "from": "从",
       "to": "到",
       "tags": "标签",
+      "pluginSections": "插件数据",
+      "pluginSectionsHint": "附在日记条目之后，涵盖相同日期。",
       "people": "人物",
       "selectAll": "全选",
       "selectAllMatching": "选中所有匹配项（{{count}}）",

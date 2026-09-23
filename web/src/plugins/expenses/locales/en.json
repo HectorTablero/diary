@@ -69,9 +69,14 @@
   "defaultCurrency": "Default currency",
   "defaultCurrencyDescription": "Pre-selected for new expenses. You can still pick another one for any single expense.",
   "dateColumn": "Date",
-  "descriptionColumn": "Description",
   "categoryColumn": "Category",
   "amountColumn": "Amount",
+  "exportDayTotal": "Expenses ({{total}}):",
+  "exportNoteHeading": "Expense lines",
+  "exportNote": "A day with spending carries a total line, then one line per expense as `- <amount>: <description> (<category>)`. The description and the category are each left out when absent. Amounts are never converted between currencies, so a day with more than one lists each total separately.",
+  "exportByMonth": "Totals by category and month",
+  "exportCurrenciesSeparate": "Amounts are never converted between currencies, so each currency is totalled on its own.",
+  "exportTotal": "Total",
   "onboarding": {
     "previewNote": "Just a preview — nothing here is saved.",
     "day": {

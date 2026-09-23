@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db/db';
 import { createPluginRecord } from '@/db/pluginRecords';
 import i18n from '@/i18n';
+import type { PluginExportRange } from '@/plugins/types';
 import en from './locales/en.json';
 import { exportHabitsMarkdown } from './markdown';
 import { habitData, type Habit } from './model';
@@ -39,8 +40,11 @@ const habit = (patch: Partial<Omit<Habit, 'id'>> & { name: string }) =>
 const day = (dateKey: string, values: Record<string, number>) =>
   createPluginRecord('habits', 'record', dateKey, { values });
 
-const markdown = async (): Promise<string> => {
-  const sections = await exportHabitsMarkdown();
+/** No date picker touched — what the export dialog sends when the user asks for everything. */
+const ALL: PluginExportRange = { from: null, to: null };
+
+const markdown = async (range: PluginExportRange = ALL): Promise<string> => {
+  const sections = await exportHabitsMarkdown(range);
   expect(sections).toHaveLength(1);
   expect(sections[0].filename).toBe('habits.md');
   return sections[0].markdown;
@@ -65,9 +69,9 @@ afterEach(() => {
 
 describe('exportHabitsMarkdown', () => {
   it('contributes nothing when there are no habits, and nothing when none has been recorded', async () => {
-    expect(await exportHabitsMarkdown()).toEqual([]);
+    expect(await exportHabitsMarkdown(ALL)).toEqual([]);
     await habit({ name: 'Gym' });
-    expect(await exportHabitsMarkdown()).toEqual([]);
+    expect(await exportHabitsMarkdown(ALL)).toEqual([]);
   });
 
   it('tells an off-day apart from a day the habit was genuinely missed', async () => {
@@ -172,5 +176,89 @@ describe('exportHabitsMarkdown', () => {
     expect(text).toContain('- `–` — the habit was still being kept');
     expect(text).toContain('An empty cell means');
     expect(text).toContain('Only days something was recorded on have a row.');
+  });
+});
+
+/* The export used to read its whole table out of the database whatever range the dialog was set to,
+ * so an export of one week carried every habit ever kept. Clipping the rows is the easy half; the
+ * half worth testing is that nothing above the rows goes on describing days the table no longer
+ * shows, because a lifetime count over a week of rows reads as a week of failure. */
+describe('a date range', () => {
+  it("keeps only the days inside it, and counts over that window rather than the habit's life", async () => {
+    const gym = await habit({ name: 'Gym' });
+
+    await day('2026-09-01', { [gym.id]: 1 });
+    await day('2026-09-05', { [gym.id]: 1 });
+    await day('2026-09-09', { [gym.id]: 1 });
+
+    const text = await markdown({ from: '2026-09-04', to: '2026-09-06' });
+    expect(rowFor(text, '2026-09-05')).toBe('| 2026-09-05 | × |');
+    expect(rowFor(text, '2026-09-01')).toBe('no row for 2026-09-01');
+    expect(rowFor(text, '2026-09-09')).toBe('no row for 2026-09-09');
+    // Three days asked about in the window, one of them recorded — not the nine and three the
+    // habit has to its name.
+    expect(text).toContain('asked about on 3 days · 1 day recorded');
+  });
+
+  it('says outright that the counts have been clipped, and how', async () => {
+    const gym = await habit({ name: 'Gym' });
+    await day('2026-09-05', { [gym.id]: 1 });
+
+    // The tracked period stays absolute — it is when the habit came to be, which the clipped table
+    // cannot say — so the note is what stops the count beneath it reading as a lifetime.
+    expect(await markdown({ from: '2026-09-04', to: '2026-09-06' })).toContain(
+      'Tracked from 2026-09-01 onwards. (counts clipped to 2026-09-04 – 2026-09-06)',
+    );
+    expect(await markdown({ from: '2026-09-04', to: null })).toContain(
+      '(counts clipped to 2026-09-04 onwards)',
+    );
+    expect(await markdown({ from: null, to: '2026-09-06' })).toContain(
+      '(counts clipped to 2026-09-06 and earlier)',
+    );
+    // And no note at all when nothing was clipped, rather than one saying "clipped to everything".
+    expect(await markdown()).not.toContain('counts clipped');
+  });
+
+  it('drops a habit whose whole life falls outside the range, column and all', async () => {
+    const gym = await habit({ name: 'Gym', order: 0 });
+    const yoga = await habit({
+      name: 'Yoga',
+      since: '2026-09-01',
+      archivedAt: '2026-09-03T10:00:00.000Z',
+      order: 1,
+    });
+
+    await day('2026-09-02', { [gym.id]: 1, [yoga.id]: 1 });
+    await day('2026-09-08', { [gym.id]: 1 });
+
+    // Yoga was retired before this window opened, so every cell of its column would be the empty
+    // "not tracked then" marker — a name with nothing under it for the reader to go and explain.
+    const text = await markdown({ from: '2026-09-07', to: '2026-09-09' });
+    expect(text).toContain('| Date | Gym |');
+    expect(text).not.toContain('Yoga');
+  });
+
+  it('contributes nothing at all when no day falls inside the range', async () => {
+    const gym = await habit({ name: 'Gym' });
+    await day('2026-09-02', { [gym.id]: 1 });
+
+    expect(await exportHabitsMarkdown({ from: '2026-09-20', to: '2026-09-30' })).toEqual([]);
+  });
+
+  it('still resolves a late task against the whole log, not just the range', async () => {
+    const passport = await habit({ name: 'Passport', type: 'task', order: 0 });
+    const water = await habit({ name: 'Water', type: 'numeric', order: 1 });
+
+    await day('2026-09-01', { [water.id]: 1 }); // the day it was due
+    await day('2026-09-03', { [water.id]: 1 }); // still owed
+    await day('2026-09-08', { [water.id]: 1, [passport.id]: 1 }); // done, late — outside the range
+
+    // The task was finished on the 8th, which this range excludes. Judging "still pending on the
+    // 3rd" off the clipped log alone would never see that, and would mark it owed forever.
+    const text = await markdown({ from: '2026-09-01', to: '2026-09-05' });
+    expect(rowFor(text, '2026-09-01')).toBe('| 2026-09-01 | · | 1 |');
+    expect(rowFor(text, '2026-09-03')).toBe('| 2026-09-03 | · | 1 |');
+    // Recorded nowhere inside the window, though it was asked about there.
+    expect(text).toContain('asked about on 1 day · 0 days recorded');
   });
 });

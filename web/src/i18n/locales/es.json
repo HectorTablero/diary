@@ -566,6 +566,8 @@
       "from": "Desde",
       "to": "Hasta",
       "tags": "Etiquetas",
+      "pluginSections": "Datos de los complementos",
+      "pluginSectionsHint": "Se añaden después de las entradas, con las mismas fechas.",
       "people": "Personas",
       "selectAll": "Seleccionar todo",
       "selectAllMatching": "Seleccionar coincidencias ({{count}})",

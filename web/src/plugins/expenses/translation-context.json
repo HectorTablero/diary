@@ -64,9 +64,14 @@
         "defaultCurrency": "Label of the default-currency setting.",
         "defaultCurrencyDescription": "Under it: it only pre-selects, and each expense can still use another currency.",
         "dateColumn": "Markdown export table header.",
-        "descriptionColumn": "Markdown export table header.",
         "categoryColumn": "Markdown export table header.",
         "amountColumn": "Markdown export table header.",
+        "exportDayTotal": "Heads the expenses block under a day in the Markdown export, with that day's total interpolated. A day that mixed currencies gets each total in turn, joined with ·, since this plugin never converts between them. Keep the colon: the lines beneath it are a list it introduces.",
+        "exportNoteHeading": "A `##` heading in the export's preamble, above exportNote. These exports are read by an AI agent, so the document explains every notation before using it — this is the expenses half of that, beside the diary's own notes on tags and importance.",
+        "exportNote": "One paragraph telling the reader how to parse an expense line. The `- <amount>: <description> (<category>)` fragment is the literal shape of the output: translate the words inside the angle brackets, and leave the backticks, the colon, the hyphen and the round brackets exactly as they are in every language — they are punctuation the parser sees, not prose.",
+        "exportByMonth": "A `###` heading over the export's closing table, which totals categories (rows) against months (columns).",
+        "exportCurrenciesSeparate": "Sits above that table when more than one currency is in play, explaining why there is one table per currency instead of one total. Omitted entirely when only one currency was used.",
+        "exportTotal": "Both the last column's header and the last row's label in that table — the same word has to serve for a row total and a column total, so prefer the noun that works for both.",
         "onboarding": "The tour's three screens: `day` (a live copy of the day card), `stats` (the page's figures and charts over a made-up year) and `calendar` (the calendar tab). Each has a `title` and a one- or two-sentence `lede`. `previewNote` sits under the live previews. `day.demoCoffee` and `day.demoGroceries` are the descriptions of the two made-up expenses on the demo card — ordinary, everyday purchases."
       }
     }

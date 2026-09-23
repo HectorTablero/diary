@@ -69,9 +69,14 @@
   "defaultCurrency": "Moneda predeterminada",
   "defaultCurrencyDescription": "Viene seleccionada en los gastos nuevos. Puedes elegir otra para cualquier gasto concreto.",
   "dateColumn": "Fecha",
-  "descriptionColumn": "Descripción",
   "categoryColumn": "Categoría",
   "amountColumn": "Importe",
+  "exportDayTotal": "Gastos ({{total}}):",
+  "exportNoteHeading": "Líneas de gastos",
+  "exportNote": "Un día con gastos lleva una línea con el total y después una línea por gasto con la forma `- <importe>: <descripción> (<categoría>)`. La descripción y la categoría se omiten cuando no las hay. Los importes nunca se convierten entre monedas, así que un día con varias muestra cada total por separado.",
+  "exportByMonth": "Totales por categoría y mes",
+  "exportCurrenciesSeparate": "Los importes nunca se convierten entre monedas, así que cada moneda se suma por separado.",
+  "exportTotal": "Total",
   "onboarding": {
     "previewNote": "Solo es una vista previa: aquí no se guarda nada.",
     "day": {

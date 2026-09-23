@@ -30,6 +30,46 @@ export type PluginSurface =
 export type PluginExportOptions = Readonly<Record<string, boolean>>;
 
 /**
+ * The slice of time an Entries export covers, as the user picked it in the export dialog.
+ *
+ * Passed to `exportMarkdown` because a plugin's data is day-scoped and gets appended to a document
+ * whose entries have already been filtered to this range — a habit log or an expense table that
+ * ran from the first day of the diary to the last, under a heading saying "March", is not a longer
+ * answer to the question asked, it is a different one. `null` on either side means unbounded, the
+ * same convention `getEntriesInRange` uses.
+ *
+ * Both ends are inclusive, and both are `dateKey`s (`YYYY-MM-DD`), so a plugin can compare them to
+ * its own rows' keys as plain strings — which is what `inExportRange` in plugins/markdown.ts does,
+ * and what every plugin's export should filter with so they cannot disagree at the edges.
+ */
+export interface PluginExportRange {
+  from: string | null;
+  to: string | null;
+}
+
+/**
+ * A plugin's per-day contribution to an entries export: the blocks themselves, and the paragraph
+ * that teaches the reader to parse them.
+ *
+ * The note exists because these exports are written to be read by an agent with no app to check
+ * against, which is the same reason the document already explains its own `Tags:` lines and its
+ * importance scale before using them. A block of `- €4.00: Metro (Transport)` under a date is
+ * perfectly clear to the person who recorded it and guesswork to anything else.
+ *
+ * It is a *brief* note about notation, not a description of the feature — the reader needs to know
+ * what the fields are and when one is omitted, and nothing else. It is dropped automatically when
+ * `days` turns out empty, so an export that happens to contain no spending does not carry a
+ * paragraph explaining a line that never appears.
+ */
+export interface PluginDayContribution {
+  /** Markdown lines for the document's preamble, heading included. Omit when there is nothing the
+      reader could not work out from the lines themselves. */
+  note?: readonly string[];
+  /** The blocks, keyed by `dateKey`. */
+  days: ReadonlyMap<string, readonly string[]>;
+}
+
+/**
  * One day's worth of a plugin's calendar data — just enough to colour and label a cell.
  *
  * `level` is 0 (nothing to show) to 1 (fully met), on the same scale regardless of what the plugin
@@ -73,8 +113,46 @@ export interface PluginModule {
    * from `pluginNotificationId(slot, key)` with the slot the app passes in.
    */
   collectNotifications?: (context: PluginNotificationContext) => Promise<LocalNotificationSchema[]>;
-  /** Markdown files to add to the export archive. */
-  exportMarkdown?: () => Promise<{ filename: string; markdown: string }[]>;
+  /**
+   * Markdown sections appended after the whole diary, covering `range` and nothing outside it.
+   *
+   * Honouring the range is the plugin's own job, not the collector's: only the plugin knows which
+   * of its rows are day-scoped, which are definitions that describe the whole period, and what a
+   * clipped count should say — so a filter applied over the finished Markdown could only cut rows
+   * out of a table and leave every total above it wrong.
+   *
+   * Return `[]` when nothing of this plugin's falls inside the range. A section consisting of a
+   * heading and an empty table is worse than no section: the reader cannot tell it apart from a
+   * plugin that has never recorded anything.
+   *
+   * What belongs down here is what reads as a *whole*: a habit grid scanned column by column, a
+   * month-by-month total. What belongs beside the day it happened on goes in `exportDayLines`
+   * instead, and a plugin may well fill both.
+   */
+  exportMarkdown?: (range: PluginExportRange) => Promise<{ filename: string; markdown: string }[]>;
+  /**
+   * Lines to place under a day's own entries, keyed by `dateKey` — this plugin's account of what
+   * else happened that day.
+   *
+   * The other half of `exportMarkdown`, and the right half for anything that is *about* a
+   * particular day. A ledger of every expense ever recorded, parked under a heading at the end of
+   * the document, asks the reader to carry a date back and forth between two places to answer
+   * "what did I spend on the day I wrote this" — which is the only question a diary's reader is
+   * likely to have. Three lines under the day answer it where it is asked.
+   *
+   * So the division is by what the data is, not by which plugin it came from: the same plugin can
+   * put its per-day lines here and its totals in `exportMarkdown`, and the expenses plugin does
+   * exactly that.
+   *
+   * Each day's lines are written verbatim as a block, blank-line separated from the entries above
+   * and from any other plugin's block. A day that only appears in this map — something recorded on
+   * a day with no entry written — still gets its heading, because it is a day the diary has
+   * something to say about.
+   *
+   * Keys outside `range` are ignored rather than trusted, so a plugin that forgets to filter cannot
+   * widen an export past what was asked for.
+   */
+  exportDayLines?: (range: PluginExportRange) => Promise<PluginDayContribution>;
   /**
    * A whole export type of its own in the Markdown export dialog, for plugin data that doesn't fit
    * the Entries export's day-scoped concatenation (`exportMarkdown` above) — a tree of documents,

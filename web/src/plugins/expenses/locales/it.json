@@ -69,9 +69,14 @@
   "defaultCurrency": "Valuta predefinita",
   "defaultCurrencyDescription": "Preselezionata per le nuove spese. Puoi comunque sceglierne un'altra per una singola spesa.",
   "dateColumn": "Data",
-  "descriptionColumn": "Descrizione",
   "categoryColumn": "Categoria",
   "amountColumn": "Importo",
+  "exportDayTotal": "Spese ({{total}}):",
+  "exportNoteHeading": "Righe delle spese",
+  "exportNote": "Un giorno con spese riporta una riga di totale e poi una riga per spesa nella forma `- <importo>: <descrizione> (<categoria>)`. La descrizione e la categoria vengono omesse quando mancano. Gli importi non vengono mai convertiti tra valute, quindi un giorno con più valute riporta ogni totale separatamente.",
+  "exportByMonth": "Totali per categoria e mese",
+  "exportCurrenciesSeparate": "Gli importi non vengono mai convertiti tra valute, quindi ogni valuta è sommata a sé.",
+  "exportTotal": "Totale",
   "onboarding": {
     "previewNote": "Solo un'anteprima: qui non viene salvato nulla.",
     "day": {

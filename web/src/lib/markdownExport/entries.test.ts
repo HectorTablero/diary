@@ -39,6 +39,14 @@ const build = (over: Partial<EntryDto> & { content: string }) => {
 const whole = (over: Partial<EntryDto> & { content: string }) =>
   buildEntriesMarkdown([entry(over)], { from: null, to: null });
 
+/* Plugin content is the document's second author: an enabled plugin puts a block under the day it
+   is about, and a note in the preamble teaching the reader to parse it. The builder's side of that
+   is placement — it never looks inside a block — so what is worth pinning down is that a block
+   lands under the right day, that it stays a separate list from the entries above it, and that a
+   day the diary itself has nothing for still gets written. */
+const NO_ENTRIES: EntryDto[] = [];
+const ALL = { from: null, to: null };
+
 describe('buildEntriesMarkdown — tags and mentions', () => {
   it('says nothing about a mention the entry already writes as a token', () => {
     const markdown = build({
@@ -96,5 +104,62 @@ describe('buildEntriesMarkdown — tags and mentions', () => {
     expect(markdown.indexOf('## Tags and mentions')).toBeLessThan(
       markdown.indexOf('## Importance scale'),
     );
+  });
+});
+
+describe('buildEntriesMarkdown — plugin blocks', () => {
+  it("puts a day's block under that day's entries, blank-line separated", () => {
+    const markdown = buildEntriesMarkdown([entry({ content: 'Long day.' })], ALL, {
+      dayLines: new Map([['2026-09-01', [['Expenses (€9.90):', '- €9.90: Milk']]]]),
+    });
+    expect(markdown).toContain(
+      ['- [importance 3] Long day.', '', 'Expenses (€9.90):', '- €9.90: Milk'].join('\n'),
+    );
+  });
+
+  it('writes a day the diary itself has nothing for', () => {
+    // A day with an expense and no entry is still a day the export can answer a question about —
+    // and dropping it would make the plugin's own total disagree with the lines above it.
+    const markdown = buildEntriesMarkdown(NO_ENTRIES, ALL, {
+      dayLines: new Map([['2026-09-04', [['Expenses (€5.00):', '- €5.00: Coffee']]]]),
+    });
+    // One blank line after the heading, not two: the second would read as a day whose entries went
+    // missing rather than a day that never had any.
+    expect(markdown).toContain(
+      ['## 2026-09-04', '', 'Expenses (€5.00):', '- €5.00: Coffee'].join('\n'),
+    );
+  });
+
+  it("keeps two plugins' blocks apart rather than running them into one list", () => {
+    const markdown = buildEntriesMarkdown(NO_ENTRIES, ALL, {
+      dayLines: new Map([
+        [
+          '2026-09-01',
+          [
+            ['First:', '- a'],
+            ['Second:', '- b'],
+          ],
+        ],
+      ]),
+    });
+    // Without the blank line the second heading reads as an item of the first plugin's list.
+    expect(markdown).toContain(['First:', '- a', '', 'Second:', '- b'].join('\n'));
+  });
+
+  it("carries each contributing plugin's note into the preamble, above the entries", () => {
+    const markdown = buildEntriesMarkdown([entry({ content: 'Long day.' })], ALL, {
+      dayLines: new Map([['2026-09-01', [['Expenses (€9.90):']]]]),
+      notes: [['## Expense lines', '', 'How to read them.']],
+    });
+    expect(markdown.indexOf('## Expense lines')).toBeGreaterThan(
+      markdown.indexOf('## Importance scale'),
+    );
+    expect(markdown.indexOf('## Expense lines')).toBeLessThan(markdown.indexOf('## 2026-09-01'));
+  });
+
+  it('says nothing at all when no plugin contributed', () => {
+    const markdown = buildEntriesMarkdown([entry({ content: 'Long day.' })], ALL);
+    expect(markdown).toContain('- [importance 3] Long day.\n');
+    expect(markdown).not.toContain('Expenses');
   });
 });

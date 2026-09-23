@@ -571,6 +571,8 @@
       "from": "From",
       "to": "To",
       "tags": "Tags",
+      "pluginSections": "Plugin data",
+      "pluginSectionsHint": "Appended after the entries, covering the same dates.",
       "people": "People",
       "selectAll": "Select all",
       "selectAllMatching": "Select all matching ({{count}})",

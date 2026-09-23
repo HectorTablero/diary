@@ -3,6 +3,8 @@ import { UNDATED_KEY, type PluginRecordDto } from '@diary/shared';
 import { db } from '@/db/db';
 import i18n from '@/i18n';
 import { parseDateKey, toDateKey, todayKey } from '@/lib/dates';
+import { inExportRange } from '@/plugins/markdown';
+import type { PluginExportRange } from '@/plugins/types';
 import { describeSchedule, habitChanges, habitSummary } from './changes';
 import {
   formatHabitValue,
@@ -42,6 +44,21 @@ import { doneDaysOf, pendingTask } from './tasks';
  * over, the schedule it was asked on, and the edits that period contains. All of it judged through
  * `habitOccursOn` and `pendingTask` — the same functions the day page and the grid ask — so the
  * document cannot disagree with the app it came out of.
+ *
+ * ## What a date range does to all of that
+ *
+ * An export of March gets March's rows, and the counts above them are counted over March. The
+ * alternative — a clipped table under a habit's lifetime totals — reads as a run of missing days:
+ * "asked about on 264 days · 190 days recorded" over a table holding 31 rows invites exactly one
+ * conclusion, and it is the wrong one. So the counting window is the tracked period intersected
+ * with the range, and the "tracked from" line says outright that it has been clipped, because a
+ * count of 31 with no such note is indistinguishable from a habit that only existed for a month.
+ *
+ * Two things are deliberately *not* clipped. `doneDays` is computed over the whole log, because an
+ * unfinished task carries forward and whether it is still pending on 3 March depends on whether it
+ * was ever completed — including in April. And a habit's origin and edit history stay absolute:
+ * they say when the thing being tabulated came to be, which is context the clipped table cannot
+ * supply and the reader has no other way to get.
  */
 
 /** A ticked box. A count, a duration or a rating prints what it actually was instead. */
@@ -76,33 +93,54 @@ const asked = (habit: Habit, dateKey: string, doneDays: ReadonlySet<string>): bo
   habitOccursOn(habit, dateKey) ||
   (isTask(habit) && pendingTask(habit, dateKey, doneDays) !== undefined);
 
-export async function exportHabitsMarkdown(): Promise<{ filename: string; markdown: string }[]> {
+export async function exportHabitsMarkdown(
+  range: PluginExportRange,
+): Promise<{ filename: string; markdown: string }[]> {
   const rows = await db.pluginRecords.where('pluginId').equals('habits').toArray();
 
   /* Retired habits are included. The export is a record of what happened, and a month where a
      habit was still being tracked does not stop having happened because it was retired later. */
-  const habits = rows
+  const allHabits = rows
     .filter((row) => row.scope === 'record' && row.dateKey === UNDATED_KEY)
     .flatMap((row) => parseHabit(row) ?? [])
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-  if (!habits.length) return [];
+  if (!allHabits.length) return [];
 
-  const days = rows
+  const allDays = rows
     .filter((row) => row.scope === 'record' && row.dateKey !== UNDATED_KEY)
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  if (!days.length) return [];
+  if (!allDays.length) return [];
 
-  const history = new Map(days.map((day) => [day.dateKey, parseValues(day)] as const));
-  const doneDays = new Map(habits.map((habit) => [habit.id, doneDaysOf(habit.id, history)]));
+  /* Over the whole log, not the range: an unfinished task keeps being asked about on the days after
+     it was due, so whether it was still pending on a day inside the range depends on whether it was
+     ever done — which may well have been after the range ends. Clipping this would turn a task
+     finished in April into one still outstanding through all of March. */
+  const history = new Map(allDays.map((day) => [day.dateKey, parseValues(day)] as const));
+  const doneDays = new Map(allHabits.map((habit) => [habit.id, doneDaysOf(habit.id, history)]));
+
+  const days = allDays.filter((day) => inExportRange(day.dateKey, range));
+  if (!days.length) return [];
 
   const lng = i18n.language;
   const escape = (text: string) => text.replace(/\|/g, '\\|');
 
   /* How far forward "still being tracked" reaches. Today, normally — but a day page can be
      unlocked and written on ahead of time, and a horizon behind the log would report a habit as
-     never having been asked on a day it was plainly recorded on. */
-  const lastLogged = days[days.length - 1].dateKey;
+     never having been asked on a day it was plainly recorded on. Taken from the whole log rather
+     than the clipped one: it bounds the habit's life, which a date picker does not shorten. */
+  const lastLogged = allDays[allDays.length - 1].dateKey;
   const horizon = todayKey() > lastLogged ? todayKey() : lastLogged;
+
+  /* The clipped counting window, as a note for the "tracked from" line. Only one end may be set, so
+     there are three ways of saying it and no way to build them by concatenation — `from` and `to`
+     land in different places in different languages. */
+  const clipNote = !range.from
+    ? range.to
+      ? i18n.t('plugins.habits.exportClippedTo', { to: range.to })
+      : null
+    : range.to
+      ? i18n.t('plugins.habits.exportClippedRange', { from: range.from, to: range.to })
+      : i18n.t('plugins.habits.exportClippedFrom', { from: range.from });
 
   const legend = [
     `### ${i18n.t('plugins.habits.exportHowToRead')}`,
@@ -116,20 +154,35 @@ export async function exportHabitsMarkdown(): Promise<{ filename: string; markdo
     '',
   ];
 
-  const descriptions = habits.flatMap((habit) => {
+  /* Each habit with the window its counts are taken over: the period it was tracked for, clipped to
+     the export's range. A habit whose whole life falls outside the range is dropped along with its
+     column — it has nothing to say about these days, and an all-blank column under a name is a
+     question the reader has to go and answer somewhere else. */
+  const tracked = allHabits.flatMap((habit) => {
     /* From the day it came into existence — the same anchor `occursOn` counts an interval from —
        to the day it was retired, or to the horizon while it is still being kept. A row written
        before edits were tracked has no origin at all, and the log's own first day is the earliest
        thing that can honestly be claimed for it. */
-    const origin = habitOrigin(habit) || days[0].dateKey;
+    const origin = habitOrigin(habit) || allDays[0].dateKey;
     const retiredOn = habit.archivedAt?.slice(0, 10) ?? null;
+    const from = range.from && range.from > origin ? range.from : origin;
+    const to = range.to && range.to < horizon ? range.to : horizon;
     /* Counted by asking `habitOccursOn` day by day rather than from the shape of the schedule, so a
        habit that spent March on weekdays and April on Mondays is counted as each of them in turn,
-       and so the count stops of its own accord on the day the habit was retired. */
-    const occurrences = dateRange(origin, horizon).filter((day) =>
-      habitOccursOn(habit, day),
+       and so the count stops of its own accord on the day the habit was retired — which is also
+       what keeps a habit retired before the range began out of the table below. */
+    const occurrences = dateRange(from, to).filter((day) => habitOccursOn(habit, day)).length;
+    const recorded = [...(doneDays.get(habit.id) ?? [])].filter((day) =>
+      inExportRange(day, range),
     ).length;
-    const recorded = doneDays.get(habit.id)?.size ?? 0;
+    if (!occurrences && !recorded) return [];
+    return [{ habit, origin, retiredOn, occurrences, recorded }];
+  });
+  if (!tracked.length) return [];
+
+  const habits = tracked.map(({ habit }) => habit);
+
+  const descriptions = tracked.flatMap(({ habit, origin, retiredOn, occurrences, recorded }) => {
     const changes = habitChanges(habit, i18n.t, lng);
 
     return [
@@ -137,11 +190,15 @@ export async function exportHabitsMarkdown(): Promise<{ filename: string; markdo
       '',
       `- ${habitSummary(habit, i18n.t)}`,
       `- ${describeSchedule(scheduleAt(habit), i18n.t, lng)}`,
+      /* The tracked period is the habit's own, absolute — it says when the thing being tabulated
+         came to be, which the clipped table cannot. The note after it is what stops the counts on
+         the next line reading as a lifetime: without it, "asked about on 31 days" under a habit
+         kept for two years is a plain falsehood rather than a figure with a stated scope. */
       `- ${
         retiredOn
           ? i18n.t('plugins.habits.exportTrackedClosed', { from: origin, to: retiredOn })
           : i18n.t('plugins.habits.exportTrackedOpen', { from: origin })
-      }`,
+      }${clipNote ? ` (${clipNote})` : ''}`,
       `- ${i18n.t('plugins.habits.exportAskedDays', { count: occurrences })} · ${i18n.t(
         'plugins.habits.recordedDays',
         { count: recorded },

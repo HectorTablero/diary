@@ -38,7 +38,11 @@ import { fuzzyIncludes } from '@/lib/tokens';
 import { zipTextFiles } from '@/lib/zip';
 import { useEnabledPlugins } from '@/plugins/enabled';
 import { ensurePluginLocales } from '@/plugins/i18n';
-import { collectPluginMarkdown } from '@/plugins/markdown';
+import {
+  collectPluginMarkdown,
+  defaultEntriesExportSelection,
+  entriesExportPlugins,
+} from '@/plugins/markdown';
 import { PLUGINS } from '@/plugins/registry';
 
 /* 'entries' and 'people' are the app's own two; anything else is a plugin id — one that declares
@@ -121,6 +125,18 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
   const [exporting, setExporting] = useState(false);
   const enabledPlugins = useEnabledPlugins();
 
+  /* The plugins that can append a section to an Entries export, and which of them are ticked.
+     Discovered the same way `ownExportPlugins` below is — off `surfaces`, without loading a chunk —
+     so this dialog still names no plugin, and the starting position of each box comes from that
+     plugin's own manifest rather than from a list here. Reset whenever the set changes, matching
+     how the per-plugin `exportOptions` boxes further down behave: reopening the dialog starts from
+     the declared defaults rather than from whatever was ticked last time. */
+  const entriesPlugins = useMemo(() => entriesExportPlugins(enabledPlugins), [enabledPlugins]);
+  const [entryPluginSelection, setEntryPluginSelection] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setEntryPluginSelection(defaultEntriesExportSelection(enabledPlugins));
+  }, [enabledPlugins]);
+
   /* Every enabled plugin with an export type of its own — checked off `surfaces`, readable without
      loading any plugin's chunk, the same rule every other slot in this app follows (registry.ts
      rule 3). `type` matching one of these ids is what picks it out below; there is no other branch
@@ -147,18 +163,21 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
   }, [ownExportPlugin]);
 
   /* A plugin's name and export hint live in its own locale bundle, fetched only once it is enabled
-     — same as PluginsSection.tsx fetching every plugin's strings to show a name beside its switch. */
+     — same as PluginsSection.tsx fetching every plugin's strings to show a name beside its switch.
+     Both lists at once: a plugin can appear as its own export type and as a tickable section of the
+     Entries export, and both places label it out of the same bundle. */
   const [pluginLabelsReady, setPluginLabelsReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setPluginLabelsReady(false);
-    void Promise.all(
-      ownExportPlugins.map((plugin) => ensurePluginLocales(plugin.id).catch(() => {})),
-    ).then(() => !cancelled && setPluginLabelsReady(true));
+    const ids = new Set([...ownExportPlugins, ...entriesPlugins].map((plugin) => plugin.id));
+    void Promise.all([...ids].map((id) => ensurePluginLocales(id).catch(() => {}))).then(
+      () => !cancelled && setPluginLabelsReady(true),
+    );
     return () => {
       cancelled = true;
     };
-  }, [ownExportPlugins]);
+  }, [ownExportPlugins, entriesPlugins]);
 
   const toggleTag = (id: string) =>
     setTagIds((prev) =>
@@ -221,14 +240,26 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
     setExporting(true);
     try {
       if (type === 'entries') {
-        const entries = await getEntriesInRange(from || null, to || null, tagIds);
-        const markdown = buildEntriesMarkdown(entries, { from: from || null, to: to || null });
-        /* Appended to the same document rather than downloaded beside it. Plugin data is day-scoped
-           — a habit log is another thing that happened on the days these entries describe — so two
-           files would just hand the reader something to line up by date themselves. A plugin that
+        const range = { from: from || null, to: to || null };
+        /* One document rather than a download beside it, and — for the day-scoped half — woven into
+           the days themselves rather than appended after them. A habit log or a day's spending is
+           another thing that happened on the days these entries describe, so it belongs under the
+           day, where a reader asking what a day was like is already looking. What genuinely reads
+           as a whole (a habit grid, a month-by-month total) still goes at the end.
+
+           Collected before the document is written, because the day blocks go *inside* it. The same
+           range the entries were filtered by goes down with them: a plugin dumping its whole table
+           under a heading that states a range would be answering a question nobody asked — and, for
+           the personal ones, sharing years of data out of an export of one month. A plugin that
            fails to load contributes nothing and the export goes ahead without it. */
-        const pluginSections = await collectPluginMarkdown(enabledPlugins);
-        const full = [markdown, ...pluginSections.map((section) => section.markdown)].join('\n\n');
+        const [entries, contributed] = await Promise.all([
+          getEntriesInRange(range.from, range.to, tagIds),
+          collectPluginMarkdown(enabledPlugins, range, entryPluginSelection),
+        ]);
+        const markdown = buildEntriesMarkdown(entries, range, contributed);
+        const full = [markdown, ...contributed.sections.map((section) => section.markdown)].join(
+          '\n\n',
+        );
         await saveTextFile(`diary-entries-${Date.now()}.md`, full, 'text/markdown');
       } else if (ownExportPlugin) {
         /* `load()` is the manifest's own thunk (a literal `import('./notebook')` and so on, per
@@ -436,6 +467,45 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                     />
                   </div>
                 </div>
+                {/* One box per enabled plugin that has a section to contribute, labelled out of that
+                    plugin's own bundle (`plugins.<id>.name`) — the same string the Plugins list in
+                    Settings shows it by, and the same arrangement as the `exportOptions` boxes on
+                    the ownExport branch above. Nothing here names a plugin; the list, the labels
+                    and the starting positions all come off the manifests.
+
+                    Hidden entirely when no such plugin is enabled, rather than shown empty: a
+                    labelled box with nothing in it reads as something failing to load. */}
+                {entriesPlugins.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label>{t('settings.markdownExport.pluginSections')}</Label>
+                    <div className="rounded-lg border">
+                      <ul className="divide-y">
+                        {entriesPlugins.map((plugin) => (
+                          <li key={plugin.id}>
+                            <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-accent/40">
+                              <Checkbox
+                                checked={entryPluginSelection[plugin.id] === true}
+                                onCheckedChange={(v) =>
+                                  setEntryPluginSelection((prev) => ({
+                                    ...prev,
+                                    [plugin.id]: v === true,
+                                  }))
+                                }
+                              />
+                              <plugin.icon className="size-4 shrink-0 text-muted-foreground" />
+                              <span className="text-sm">
+                                {pluginLabelsReady ? t(`plugins.${plugin.id}.name`) : '…'}
+                              </span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.markdownExport.pluginSectionsHint')}
+                    </p>
+                  </div>
+                )}
               </>
             ) : (
               <>

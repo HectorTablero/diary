@@ -7,6 +7,20 @@ export interface EntriesMarkdownOptions {
   to: string | null;
 }
 
+/**
+ * What enabled plugins want added to the document (see `collectPluginMarkdown`), already filtered
+ * to the range and ordered by the manifest.
+ *
+ * Passed in rather than fetched here so this file stays what it is: a pure function from entries to
+ * Markdown, with no database and no knowledge that plugins exist beyond these two shapes.
+ */
+export interface EntriesPluginContent {
+  /** Blocks to place under a day's entries, keyed by `dateKey` — one inner array per plugin. */
+  dayLines: ReadonlyMap<string, readonly (readonly string[])[]>;
+  /** Each contributing plugin's note on how to read its lines, for the preamble. */
+  notes: readonly (readonly string[])[];
+}
+
 /** A letter or a digit in any script — what has to sit either side of a name for it to be part of a
     longer word rather than the name itself. */
 const WORD_CHARACTER = /[\p{L}\p{N}]/u;
@@ -41,8 +55,17 @@ function writtenInText(name: string, content: string): boolean {
 /* Flat per-entry blocks, grouped by date — not a tree reconstruction. A date-range slice can
    legitimately include a child without its out-of-range parent, so tree fidelity isn't attempted.
    Mentioned people appear as names only (EntryDto.people is already {id, name}), so no contact
-   info about them can leak into the export by construction. */
-export function buildEntriesMarkdown(entries: EntryDto[], options: EntriesMarkdownOptions): string {
+   info about them can leak into the export by construction.
+
+   Plugin blocks land under the day they are about, after its entries. A day is therefore any date
+   that either side has something for: a day with an expense and no entry written still gets its
+   heading, because it is a day the diary can answer a question about. */
+export function buildEntriesMarkdown(
+  entries: EntryDto[],
+  options: EntriesMarkdownOptions,
+  plugins: Partial<EntriesPluginContent> = {},
+): string {
+  const { dayLines = new Map<string, readonly (readonly string[])[]>(), notes = [] } = plugins;
   const range =
     options.from || options.to ? ` (${options.from ?? '…'} – ${options.to ?? '…'})` : '';
   const lines: string[] = [
@@ -50,6 +73,11 @@ export function buildEntriesMarkdown(entries: EntryDto[], options: EntriesMarkdo
     '',
     buildMentionNote(),
     buildImportanceLegend(),
+    /* Beside the document's own two notes, and for the same reason they exist: everything this
+       export uses a notation for explains it before using it, because the reader is an agent with
+       no app to check against. A plugin only gets a paragraph here if it actually put lines in the
+       document below — see `collectPluginMarkdown`. */
+    ...notes.map((note) => `${note.join('\n')}\n`),
     '---',
     '',
   ];
@@ -61,9 +89,12 @@ export function buildEntriesMarkdown(entries: EntryDto[], options: EntriesMarkdo
     else byDate.set(entry.dateKey, [entry]);
   }
 
-  for (const date of [...byDate.keys()].sort()) {
+  const dates = [...new Set([...byDate.keys(), ...dayLines.keys()])].sort();
+  for (const date of dates) {
     lines.push(`## ${date}`, '');
-    const dayEntries = byDate.get(date)!.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const dayEntries = (byDate.get(date) ?? []).sort((a, b) =>
+      a.createdAt.localeCompare(b.createdAt),
+    );
     for (const entry of dayEntries) {
       lines.push(`- [importance ${entry.importance}] ${entry.content}`);
       /* Only what the entry does not already say. A tag typed as #work, or a person the sentence
@@ -75,6 +106,16 @@ export function buildEntriesMarkdown(entries: EntryDto[], options: EntriesMarkdo
       if (tags.length) lines.push(`  Tags: ${tags.map((t) => `#${t.name}`).join(', ')}`);
       if (people.length) lines.push(`  Mentions: ${people.map((p) => p.name).join(', ')}`);
     }
+    /* Each plugin's block set off by a blank line, from the entries and from each other — they are
+       separate lists that would otherwise run together into one, with the second plugin's heading
+       reading as an item of the first's. Not before the first block on a day that has no entries,
+       though: the heading has already left a blank line, and a second one reads as a day whose
+       entries went missing. */
+    const blocks = dayLines.get(date) ?? [];
+    blocks.forEach((block, index) => {
+      if (index > 0 || dayEntries.length) lines.push('');
+      lines.push(...block);
+    });
     lines.push('');
   }
 

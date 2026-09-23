@@ -14,16 +14,20 @@ import type { PluginModule, PluginSurface } from './types';
  * test needs decides which file it lives in.
  */
 
-const MEMBER_FOR: Record<PluginSurface, keyof PluginModule> = {
-  day: 'DayWidget',
-  page: 'Page',
-  settings: 'SettingsSection',
-  notifications: 'collectNotifications',
-  export: 'exportMarkdown',
-  ownExport: 'exportOwn',
-  calendar: 'CalendarView',
-  widget: 'syncNativeWidget',
-  onboarding: 'onboardingSteps',
+/* Most surfaces are one slot and one member. `export` is two: a plugin may put lines under each day
+   (`exportDayLines`), a section after the diary (`exportMarkdown`), or both — the expenses plugin
+   does both. Declaring the surface means filling at least one of them, and neither may appear
+   without the surface being declared, which is the direction rule 3 actually depends on. */
+const MEMBERS_FOR: Record<PluginSurface, readonly (keyof PluginModule)[]> = {
+  day: ['DayWidget'],
+  page: ['Page'],
+  settings: ['SettingsSection'],
+  notifications: ['collectNotifications'],
+  export: ['exportMarkdown', 'exportDayLines'],
+  ownExport: ['exportOwn'],
+  calendar: ['CalendarView'],
+  widget: ['syncNativeWidget'],
+  onboarding: ['onboardingSteps'],
 };
 
 describe('declared surfaces match what each plugin exports', () => {
@@ -32,16 +36,21 @@ describe('declared surfaces match what each plugin exports', () => {
 
     for (const surface of plugin.surfaces) {
       expect(
-        module[MEMBER_FOR[surface]],
+        MEMBERS_FOR[surface].some((member) => module[member] !== undefined),
         `declares "${surface}" but exports nothing for it`,
-      ).toBeDefined();
+      ).toBe(true);
     }
-    for (const [surface, member] of Object.entries(MEMBER_FOR) as [
+    for (const [surface, members] of Object.entries(MEMBERS_FOR) as [
       PluginSurface,
-      keyof PluginModule,
+      readonly (keyof PluginModule)[],
     ][]) {
       if (plugin.surfaces.includes(surface)) continue;
-      expect(module[member], `exports ${member} but does not declare "${surface}"`).toBeUndefined();
+      for (const member of members) {
+        expect(
+          module[member],
+          `exports ${member} but does not declare "${surface}"`,
+        ).toBeUndefined();
+      }
     }
   });
 });

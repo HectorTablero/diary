@@ -543,6 +543,8 @@
       "from": "開始",
       "to": "終了",
       "tags": "タグ",
+      "pluginSections": "プラグインのデータ",
+      "pluginSectionsHint": "同じ期間のものを日記のあとに追加します。",
       "people": "人物",
       "selectAll": "すべて選択",
       "selectAllMatching": "該当するすべてを選択（{{count}}）",

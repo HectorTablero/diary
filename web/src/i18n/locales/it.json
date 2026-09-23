@@ -565,6 +565,8 @@
       "from": "Da",
       "to": "A",
       "tags": "Etichette",
+      "pluginSections": "Dati dei moduli",
+      "pluginSectionsHint": "Aggiunti dopo le voci, sulle stesse date.",
       "people": "Persone",
       "selectAll": "Seleziona tutto",
       "selectAllMatching": "Seleziona tutti i risultati ({{count}})",

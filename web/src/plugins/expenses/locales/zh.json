@@ -67,9 +67,14 @@
   "defaultCurrency": "默认货币",
   "defaultCurrencyDescription": "新支出会预先选中这种货币。单笔支出仍可选择其他货币。",
   "dateColumn": "日期",
-  "descriptionColumn": "内容",
   "categoryColumn": "类别",
   "amountColumn": "金额",
+  "exportDayTotal": "支出（{{total}}）:",
+  "exportNoteHeading": "支出行",
+  "exportNote": "有支出的日子会有一行合计，其后每笔支出占一行，格式为 `- <金额>: <说明> (<类别>)`。说明和类别若为空则省略。金额不会在货币之间换算，因此同一天若有多种货币，会分别列出各自的合计。",
+  "exportByMonth": "按类别和月份汇总",
+  "exportCurrenciesSeparate": "金额不会在货币之间换算，因此每种货币单独汇总。",
+  "exportTotal": "合计",
   "onboarding": {
     "previewNote": "仅为预览，这里的内容不会被保存。",
     "day": {

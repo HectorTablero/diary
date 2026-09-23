@@ -79,6 +79,22 @@ export interface PluginManifest {
    * the dialog never spells out an option, only looks one up.
    */
   exportOptions?: Readonly<Record<string, boolean>>;
+  /**
+   * Whether this plugin's `export` section starts ticked in the Entries export, for a plugin that
+   * declares that surface. Defaults to `false`.
+   *
+   * Every `export` plugin used to be appended unconditionally, which made an Entries export the sum
+   * of everything the diary holds rather than the thing the user asked for — and for the more
+   * personal plugins, it meant a file passed to an agent to summarise a month of entries also
+   * carried a year of cycle data nobody had asked to share. So each one is now a checkbox, and this
+   * is where its starting position is declared.
+   *
+   * On the manifest, like `exportOptions`, for the same reason: the dialog draws these boxes before
+   * anyone presses Export, and rule 3 says a slot must know what to draw without fetching a chunk
+   * to ask. `false` is the default a plugin gets by saying nothing, so the quiet failure mode is a
+   * section left out rather than data included unasked.
+   */
+  entriesExportDefault?: boolean;
   /** Literal path. See rule 2. */
   load: () => Promise<{ default: PluginModule }>;
 }
@@ -104,6 +120,10 @@ export const PLUGINS: readonly PluginManifest[] = [
        declaring hues, leaving one to fall through to the default made habits' colour the only one
        that would change if the default were ever retuned for something else. */
     hue: { light: '124, 58, 237', dark: '196, 165, 255' },
+    /* The one export plugin on by default. What a habit log is *for* is reading it against the days
+       it describes — it answers "what was I doing that week", which is the same question the entries
+       beside it answer. The other two are records kept for their own sake, and get asked for. */
+    entriesExportDefault: true,
     load: () => import('./habits'),
   },
   {
@@ -116,6 +136,10 @@ export const PLUGINS: readonly PluginManifest[] = [
     // kind of thing shaded two different amounts. Brighter in dark mode for the same reason the
     // entries heatmap's own five colours are, further down this file's CalendarPage counterpart.
     hue: { light: '220, 38, 38', dark: '248, 113, 113' },
+    /* Off, and stated rather than left to the default. This is the most personal thing the app
+       records and an Entries export is a file that gets handed to someone else's model; it goes in
+       when it is asked for by name. */
+    entriesExportDefault: false,
     load: () => import('./period-tracker'),
   },
   {
@@ -155,6 +179,9 @@ export const PLUGINS: readonly PluginManifest[] = [
        calendar is how much was spent, not whether it should have been. The page's own charts are
        gray — see charts.tsx — so this is the plugin's only colour. */
     hue: { light: '234, 88, 12', dark: '251, 146, 60' },
+    /* Off: a line-by-line ledger is long, rarely says anything about the day it sits under, and is
+       read on its own page against its own charts rather than beside an entry. */
+    entriesExportDefault: false,
     load: () => import('./expenses'),
   },
 ];
