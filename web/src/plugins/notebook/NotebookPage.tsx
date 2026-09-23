@@ -12,7 +12,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -32,10 +32,12 @@ import { notifyDeleted } from '@/lib/undo';
 import { cn } from '@/lib/utils';
 import { DocumentEditorPanel } from './DocumentEditorPanel';
 import { HistoryDialog } from './HistoryDialog';
-import { documentLabel, documentPreview, ROOT_ID } from './model';
+import { documentLabel, ROOT_ID } from './model';
 import { MoveDialog } from './MoveDialog';
+import { documentPreview } from './preview';
+import { referencedDocumentIds } from './syntax';
 import { TitleField } from './TitleField';
-import { createDocument, deleteDocument, useNotebookLevel } from './useNotebook';
+import { createDocument, deleteDocument, useDocumentLabels, useNotebookLevel } from './useNotebook';
 
 /**
  * The notebook, as one page shape used at every level.
@@ -115,6 +117,13 @@ export default function NotebookPage() {
   }, [current, go, t]);
 
   const label = current ? documentLabel(current, t('plugins.notebook.untitled')) : '';
+
+  /* One lookup for every `[[id]]` in every row's preview, rather than one per row. */
+  const referencedIds = useMemo(
+    () => [...new Set(children.flatMap((child) => referencedDocumentIds(child.body)))],
+    [children],
+  );
+  const { labels: documentLabels } = useDocumentLabels(referencedIds);
 
   if (loading) {
     return (
@@ -228,7 +237,7 @@ export default function NotebookPage() {
             <ul className="divide-y rounded-lg border">
               {children.map((child) => {
                 const childLabel = documentLabel(child, t('plugins.notebook.untitled'));
-                const preview = documentPreview(child, childLabel);
+                const preview = documentPreview(child.body, childLabel, documentLabels);
                 return (
                   <li key={child.id}>
                     <button

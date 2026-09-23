@@ -5,6 +5,7 @@ import {
   UNDATED_KEY,
   type PluginDocumentDto,
 } from '@diary/shared';
+import { plainText } from './preview';
 
 /**
  * What a notebook row is, and the handful of rules about the tree.
@@ -37,27 +38,17 @@ export const ROOT_ID = NO_PARENT_KEY;
 export function documentLabel(doc: PluginDocumentDto, untitled: string): string {
   const explicit = doc.title.trim();
   if (explicit) return explicit;
+  /* As plain text, so `**Ideas**` is labelled "Ideas" — and a first line that is nothing but markup
+     (a rule, an empty checkbox) is skipped for the next one with words in it. A `[[id]]` in it is
+     left out: resolving it would make every label a database read. */
   const firstLine = doc.body
     .split('\n')
-    .map((line) => line.replace(/^#{1,6}\s+/, '').trim())
+    .map((line) => plainText(line))
     .find((line) => line.length > 0);
   if (!firstLine) return untitled;
   return firstLine.length > MAX_PLUGIN_DOCUMENT_TITLE_LENGTH
     ? `${firstLine.slice(0, MAX_PLUGIN_DOCUMENT_TITLE_LENGTH - 1)}…`
     : firstLine;
-}
-
-/** A one-line taste of what is inside, for the child rows under a document. */
-export function documentPreview(doc: PluginDocumentDto, label: string, max = 140): string {
-  const body = doc.body
-    .split('\n')
-    .map((line) => line.replace(/^[#>\-*\s]+/, '').trim())
-    .filter(Boolean)
-    /* The line the label was taken from is dropped, not shown twice — an untitled document would
-       otherwise render its first line as both its name and its preview. */
-    .filter((line) => line !== label)
-    .join(' ');
-  return body.length > max ? `${body.slice(0, max - 1)}…` : body;
 }
 
 export const sortDocuments = (docs: PluginDocumentDto[]): PluginDocumentDto[] =>
