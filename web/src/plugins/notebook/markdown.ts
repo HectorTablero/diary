@@ -45,10 +45,35 @@ const resolve = (options?: Partial<NotebookExportOptions>): NotebookExportOption
   ...options,
 });
 
+/* Which documents the export leaves out, remembered on this device (ExportPicker.tsx edits it).
+   Stored as the *excluded* ids so a document written after the last export is in by default. */
+const EXCLUDED_KEY = 'diary.notebook.exportExcluded';
+
+export function loadExportExclusions(): Set<string> {
+  try {
+    const ids: unknown = JSON.parse(localStorage.getItem(EXCLUDED_KEY) ?? '[]');
+    return new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveExportExclusions(ids: ReadonlySet<string>): void {
+  try {
+    if (ids.size) localStorage.setItem(EXCLUDED_KEY, JSON.stringify([...ids]));
+    else localStorage.removeItem(EXCLUDED_KEY);
+  } catch {
+    // storage unavailable (private browsing, quota) — the choice just isn't remembered
+  }
+}
+
 interface ExportRow {
   doc: PluginDocumentDto;
   /** Ancestor labels, root first, not including this document's own. */
   ancestry: string[];
+  /** Left out by the user's selection. Still walked, so a kept child's `path` and ZIP folder name
+      its excluded ancestors exactly as if they were there. */
+  excluded: boolean;
 }
 
 interface Collected {
@@ -60,7 +85,7 @@ interface Collected {
 /** Walks the tree once (same order every other tree walk in this plugin uses — root first, siblings
     in sortKey order) and gathers what every row's frontmatter needs. `null` when the notebook is
     empty, so callers can tell "nothing to export" from "exported nothing went wrong". */
-async function collect(): Promise<Collected | null> {
+async function collect(excluded: ReadonlySet<string>): Promise<Collected | null> {
   const documents = await getAllPluginDocuments(NOTEBOOK_PLUGIN_ID);
   if (!documents.length) return null;
 
@@ -75,7 +100,7 @@ async function collect(): Promise<Collected | null> {
   const rows: ExportRow[] = [];
   const walk = (parentId: string, ancestry: string[]) => {
     for (const doc of sortDocuments(childrenOf.get(parentId) ?? [])) {
-      rows.push({ doc, ancestry });
+      rows.push({ doc, ancestry, excluded: excluded.has(doc.id) });
       walk(doc.id, [...ancestry, labelOf.get(doc.id) ?? untitled]);
     }
   };
@@ -86,7 +111,9 @@ async function collect(): Promise<Collected | null> {
      section that replays them. */
   const revisionsOf = new Map(
     await Promise.all(
-      rows.map(async ({ doc }) => [doc.id, await getDocumentRevisions(doc.id)] as const),
+      rows
+        .filter((row) => !row.excluded)
+        .map(async ({ doc }) => [doc.id, await getDocumentRevisions(doc.id)] as const),
     ),
   );
 
@@ -202,12 +229,14 @@ function buildBlock(
     separated. `null` when there is nothing to export. */
 export async function buildNotebookMergedMarkdown(
   options?: Partial<NotebookExportOptions>,
+  excluded: ReadonlySet<string> = loadExportExclusions(),
 ): Promise<string | null> {
-  const collected = await collect();
+  const collected = await collect(excluded);
   if (!collected) return null;
   const { rows, labelOf, revisionsOf } = collected;
   const resolved = resolve(options);
   return rows
+    .filter((row) => !row.excluded)
     .map((row) => buildBlock(row, labelOf, revisionsOf.get(row.doc.id) ?? [], resolved))
     .join('\n\n');
 }
@@ -232,8 +261,9 @@ function sanitizeSegment(name: string, fallback: string): string {
  */
 export async function buildNotebookZipEntries(
   options?: Partial<NotebookExportOptions>,
+  excluded: ReadonlySet<string> = loadExportExclusions(),
 ): Promise<ZipTextFile[]> {
-  const collected = await collect();
+  const collected = await collect(excluded);
   if (!collected) return [];
   const { rows, labelOf, revisionsOf } = collected;
   const resolved = resolve(options);
@@ -255,6 +285,7 @@ export async function buildNotebookZipEntries(
     used.add(candidate);
 
     dirOf.set(doc.id, parentDir ? `${parentDir}/${candidate}` : candidate);
+    if (row.excluded) continue;
     files.push({
       name: `${parentDir ? `${parentDir}/` : ''}${candidate}.md`,
       content: buildBlock(row, labelOf, revisionsOf.get(doc.id) ?? [], resolved),

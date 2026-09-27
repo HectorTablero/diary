@@ -1,5 +1,5 @@
 import { Hash, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { type ComponentType, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePeople, useTags } from '@/api/hooks';
 import { TagChip } from '@/components/entry/chips';
@@ -160,6 +160,24 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
   );
   useEffect(() => {
     setPluginOptions({ ...(ownExportPlugin?.exportOptions ?? {}) });
+  }, [ownExportPlugin]);
+
+  /* The plugin's own extra controls (PluginModule.exportOwn.Picker), if it has any. Needs the chunk,
+     so it's loaded once the type is picked — the same `load()` the export itself calls. */
+  const [OwnPicker, setOwnPicker] = useState<ComponentType | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setOwnPicker(null);
+    void ownExportPlugin
+      ?.load()
+      .then(({ default: module }) => {
+        const Picker = module.exportOwn?.Picker;
+        if (!cancelled && Picker) setOwnPicker(() => Picker);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [ownExportPlugin]);
 
   /* A plugin's name and export hint live in its own locale bundle, fetched only once it is enabled
@@ -416,6 +434,7 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                     </ul>
                   </div>
                 )}
+                {pluginLabelsReady && OwnPicker && <OwnPicker />}
               </div>
             ) : type === 'entries' ? (
               <>

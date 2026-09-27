@@ -1,4 +1,5 @@
 import type { PluginModule } from '../types';
+import { NotebookExportPicker } from './ExportPicker';
 import { buildNotebookMergedMarkdown, buildNotebookZipEntries } from './markdown';
 import { NotebookCalendarView } from './NotebookCalendarView';
 import { NotebookDayWidget } from './NotebookDayWidget';
@@ -45,6 +46,7 @@ const notebook: PluginModule = {
   exportOwn: {
     buildMerged: (options) => buildNotebookMergedMarkdown({ history: options.history === true }),
     buildZip: (options) => buildNotebookZipEntries({ history: options.history === true }),
+    Picker: NotebookExportPicker,
   },
   onboardingSteps: notebookOnboardingSteps,
 };

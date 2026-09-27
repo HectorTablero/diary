@@ -285,3 +285,31 @@ describe('buildNotebookZipEntries', () => {
     expect(files[0].name).not.toMatch(/[\\/:*?"<>|]/);
   });
 });
+
+describe('excluded documents', () => {
+  it('leaves an excluded document out of both exports while its kept child keeps its full path and folder', async () => {
+    const parent = await createPluginDocument('notebook', {
+      parentId: '',
+      title: 'Psychology',
+      body: 'Parent body.',
+      sortKey: 'a0',
+    });
+    const child = await createPluginDocument('notebook', {
+      parentId: parent.id,
+      title: 'Enneagram',
+      body: 'Child body.',
+      sortKey: 'a0',
+    });
+    const excluded = new Set([parent.id]);
+
+    const markdown = await buildNotebookMergedMarkdown({}, excluded);
+    expect(markdown).not.toContain('Parent body.');
+    expect(markdown).toContain(`id: ${child.id}`);
+    expect(markdown).toContain('path: Psychology / Enneagram');
+
+    const files = await buildNotebookZipEntries({}, excluded);
+    expect(files.map((file) => file.name)).toEqual(['Psychology/Enneagram.md']);
+
+    expect(await buildNotebookMergedMarkdown({}, new Set([parent.id, child.id]))).toBe('');
+  });
+});

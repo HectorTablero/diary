@@ -172,6 +172,9 @@ export interface PluginModule {
         folders, when the plugin's own data has a shape that wants one (`lib/zip.ts` stores it
         verbatim). */
     buildZip: (options: PluginExportOptions) => Promise<{ name: string; content: string }[]>;
+    /** Extra controls drawn under the option checkboxes — e.g. which items to include. Owns and
+        persists its own state; `buildMerged`/`buildZip` are expected to read it themselves. */
+    Picker?: ComponentType;
   };
   /**
    * A view in the calendar page's switcher: replaces the diary's own entry heatmap with this

@@ -52,10 +52,13 @@
   "touchedThatDay_one": "Scritto quel giorno",
   "touchedThatDay_other": "Scritto quel giorno",
   "charactersDeltaLabel": "{{added}} caratteri scritti, {{removed}} rimossi",
-  "exportHint": "Ogni documento, con i suoi metadati come frontmatter YAML. La cronologia è esclusa, a meno che tu non la chieda qui sotto.",
+  "exportHint": "I documenti selezionati, ognuno con i suoi metadati come frontmatter YAML. La cronologia è esclusa, a meno che tu non la chieda qui sotto.",
   "exportOption": {
     "history": "Includi la cronologia di ogni documento"
   },
+  "exportDocuments": "Documenti",
+  "exportIncludeChildren": "Includi tutto ciò che è dentro «{{name}}»",
+  "exportExcludeChildren": "Escludi tutto ciò che è dentro «{{name}}»",
   "settingsTitle": "Immagini",
   "settingsDescription": "Conserva su questo dispositivo le immagini collegate dai tuoi documenti, così restano visibili anche offline.",
   "cacheImages": "Metti in cache le immagini",
