@@ -1,10 +1,16 @@
 import type { SettingsDto } from '@diary/shared';
 import { DEFAULT_SETTINGS, MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
-import { Compass, Hash, Moon, RotateCcw, Sun, SunMoon } from 'lucide-react';
+import { Compass, GitBranch, Hash, Moon, RotateCcw, Sun, SunMoon } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
-import { useSaveSettings, useSettings, useTags } from '@/api/hooks';
+import {
+  useSaveSettings,
+  useSetThreadsEnabled,
+  useSettings,
+  useTags,
+  useThreadsEnabled,
+} from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
@@ -57,6 +63,8 @@ export default function SettingsPage() {
   const { data: settings, isLoading } = useSettings();
   const { data: allTags = [] } = useTags();
   const saveSettings = useSaveSettings();
+  const threadsOn = useThreadsEnabled();
+  const setThreadsEnabled = useSetThreadsEnabled();
 
   const prefs = usePreferences();
   const markerClass = useImportanceMarkerClass();
@@ -416,6 +424,23 @@ export default function SettingsPage() {
                   />
                 </div>
               )}
+              {/* With an icon, like a plugin's switch: it turns a whole feature on or off, and
+                  off only hides it — entries keep their threads for when it comes back. Saved on
+                  its own rather than through the draft; see buildPayload. */}
+              <ToggleRow
+                id="threads-enabled"
+                icon={GitBranch}
+                label={t('settings.entries.threads')}
+                description={t('settings.entries.threadsDescription')}
+                checked={threadsOn}
+                onCheckedChange={(checked) =>
+                  setThreadsEnabled.mutate(checked, {
+                    onSuccess: () =>
+                      notifySuccess(t('settings.settingsSaved'), { important: true }),
+                    onError: () => notifyError(t('errors.unknown')),
+                  })
+                }
+              />
             </>
           }
         >

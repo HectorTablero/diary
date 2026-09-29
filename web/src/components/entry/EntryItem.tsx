@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDeleteEntry, useSettings } from '@/api/hooks';
+import { useDeleteEntry, useSettings, useThreadsEnabled } from '@/api/hooks';
 import { VoiceSubEntryDialog } from '@/components/ai/VoiceSubEntryDialog';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
@@ -68,6 +68,7 @@ export function EntryItem({
 }) {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
+  const threadsOn = useThreadsEnabled();
   const { entriesExpanded } = usePreferences();
   const { personTo, tagTo } = useEntityLinks();
   // Only the starting state: collapsing stays per-entry and per-visit, as it always did.
@@ -100,6 +101,7 @@ export function EntryItem({
   // take a child while its own depth is still below it.
   const maxDepth = settings?.maxSubEntryDepth ?? DEFAULT_SUB_ENTRY_DEPTH;
   const canAddSub = depth < maxDepth;
+  const chipThreads = threadsOn ? entry.threads : [];
 
   return (
     <div
@@ -145,14 +147,14 @@ export function EntryItem({
         <ImportanceDot importance={entry.importance} className="mt-2" />
         <div className="min-w-0 flex-1">
           <EntryContent entry={entry} />
-          {(chipTags.length > 0 || chipPeople.length > 0 || entry.threads.length > 0) && (
+          {(chipTags.length > 0 || chipPeople.length > 0 || chipThreads.length > 0) && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {chipTags.map((tag) => (
                 <TagChip key={tag.id} tag={tag} to={tagTo(tag.id)} />
               ))}
               {/* Always shown, unlike tags and people: a thread is never a token in the text, so
                   there's no inline copy for a chip to duplicate. */}
-              {entry.threads.map((thread) => (
+              {chipThreads.map((thread) => (
                 <ThreadChip key={thread.id} thread={thread} />
               ))}
               {chipPeople.map((person) => (
@@ -231,9 +233,11 @@ export function EntryItem({
                   )}
                 </div>
               )}
-              <DropdownMenuItem onClick={() => setThreading(true)}>
-                <GitBranch className="size-3.5" /> {t('threads.addToThread')}
-              </DropdownMenuItem>
+              {threadsOn && (
+                <DropdownMenuItem onClick={() => setThreading(true)}>
+                  <GitBranch className="size-3.5" /> {t('threads.addToThread')}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
                 <Trash2 className="size-3.5" /> {t('common.delete')}
               </DropdownMenuItem>

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { EntryContent } from '@/components/entry/EntryContent';
 import { ImportanceDot } from '@/components/entry/ImportanceDot';
 import { TagChip } from '@/components/entry/chips';
+import { ThreadsToggleCard } from '@/components/thread/ThreadsToggleCard';
 import { Button } from '@/components/ui/button';
 import { formatDateKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,9 @@ function ThreadEntryRow({ entry, crossedOut }: { entry: EntryDto; crossedOut?: b
  *
  * The "Mark all as said" button is a live toggle (like PeopleStep's "Mark as said"), crossing out
  * the entries when pressed and toggling back when pressed again.
+ *
+ * Threads are opt-in, so the switch sits under the demo, the way the importance step carries the
+ * shapes switch: right after seeing what the feature does is when someone can decide on it.
  */
 export function ThreadsStep() {
   const { t, i18n } = useTranslation();
@@ -61,93 +65,96 @@ export function ThreadsStep() {
   const [said, setSaid] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-4">
-      {/* The threads page itself. */}
-      <DemoCard className="bg-background p-3">
-        <div className="mb-2.5 flex items-center gap-2">
-          <h3 className="font-heading text-base font-semibold">{t('threads.title')}</h3>
-          {/* Six threads, one shown — the same "there are more of these" as the people list's 276. */}
-          <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground">
-            <span className="sr-only">{t('threads.count', { count: 6 })}</span>
-            <span className="px-2">6</span>
-          </span>
-        </div>
-
-        {/* The thread row, drawn like the real page's `ThreadRow` but with every control taken out. */}
-        <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
-          <GitBranch aria-hidden className="size-4 shrink-0 text-foreground" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-foreground">{demo.thread.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {t('threads.entriesCount', { count: demo.threadEntries.length })}
-            </p>
-          </div>
-          {/* Pointing up = the thread is shown expanded, which is how the members below read. */}
-          <ChevronDown aria-hidden className="size-4 rotate-180 text-muted-foreground" />
-        </div>
-
-        {/* Member list, matching the real page's own `border-l pl-3` framing. */}
-        <ul className="mt-2 flex flex-col gap-1.5 border-l pl-3">
-          {demo.threadEntries.map((entry) => (
-            <ThreadEntryRow key={entry.id} entry={entry} />
-          ))}
-        </ul>
-      </DemoCard>
-
-      {/* The two panels are one screen and the screen after it; this is the tap between them. */}
-      <ChevronRight
-        aria-hidden
-        className="mx-auto size-4 shrink-0 -rotate-90 text-muted-foreground lg:rotate-0"
-      />
-
-      {/* The same thread seen on a person's profile, matching the real PersonProfilePage's layout. */}
-      <DemoCard className="bg-background p-3">
-        {/* PersonIdentity — matches the real component's `size-14` monogram + name + tags. */}
-        <div className="mb-4 flex items-start gap-4">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary uppercase">
-            {demo.profilePerson.name.slice(0, 2)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xl font-semibold tracking-tight">
-              {demo.profilePerson.name}
-            </p>
-            {/* Tag chips: projectTag and one from otherTags. */}
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              <TagChip tag={demo.projectTag} />
-              <TagChip tag={demo.otherTags[0]} />
-            </div>
-          </div>
-        </div>
-
-        {/* Drawn like the real `TalkingPointGroup`: a thread header binding one person's rows. The
-            "Mark all" button is a live toggle, matching PeopleStep's pattern. */}
-        <section className="rounded-xl border border-foreground/20 bg-muted/30 p-1.5">
-          <header className="flex items-center gap-2 px-1.5 pt-0.5 pb-1.5">
-            <GitBranch aria-hidden className="size-3.5 shrink-0 text-foreground" />
-            <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-              {demo.thread.name}
-            </h4>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {t('threads.toTell', { count: demo.threadEntries.length })}
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-4">
+        {/* The threads page itself. */}
+        <DemoCard className="bg-background p-3">
+          <div className="mb-2.5 flex items-center gap-2">
+            <h3 className="font-heading text-base font-semibold">{t('threads.title')}</h3>
+            {/* Six threads, one shown — the same "there are more of these" as the people list's 276. */}
+            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-muted text-[12px] font-medium text-muted-foreground">
+              <span className="sr-only">{t('threads.count', { count: 6 })}</span>
+              <span className="px-2">6</span>
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 shrink-0 gap-1 px-2 text-xs"
-              aria-pressed={said}
-              onClick={() => setSaid((was) => !was)}
-            >
-              <Check className="size-3.5" />
-              {said ? t('people.markedSaid') : t('threads.markAllSaid')}
-            </Button>
-          </header>
-          <ul className="flex flex-col gap-2">
+          </div>
+
+          {/* The thread row, drawn like the real page's `ThreadRow` but with every control taken out. */}
+          <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
+            <GitBranch aria-hidden className="size-4 shrink-0 text-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium text-foreground">{demo.thread.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {t('threads.entriesCount', { count: demo.threadEntries.length })}
+              </p>
+            </div>
+            {/* Pointing up = the thread is shown expanded, which is how the members below read. */}
+            <ChevronDown aria-hidden className="size-4 rotate-180 text-muted-foreground" />
+          </div>
+
+          {/* Member list, matching the real page's own `border-l pl-3` framing. */}
+          <ul className="mt-2 flex flex-col gap-1.5 border-l pl-3">
             {demo.threadEntries.map((entry) => (
-              <ThreadEntryRow key={entry.id} entry={entry} crossedOut={said} />
+              <ThreadEntryRow key={entry.id} entry={entry} />
             ))}
           </ul>
-        </section>
-      </DemoCard>
+        </DemoCard>
+
+        {/* The two panels are one screen and the screen after it; this is the tap between them. */}
+        <ChevronRight
+          aria-hidden
+          className="mx-auto size-4 shrink-0 -rotate-90 text-muted-foreground lg:rotate-0"
+        />
+
+        {/* The same thread seen on a person's profile, matching the real PersonProfilePage's layout. */}
+        <DemoCard className="bg-background p-3">
+          {/* PersonIdentity — matches the real component's `size-14` monogram + name + tags. */}
+          <div className="mb-4 flex items-start gap-4">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary uppercase">
+              {demo.profilePerson.name.slice(0, 2)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xl font-semibold tracking-tight">
+                {demo.profilePerson.name}
+              </p>
+              {/* Tag chips: projectTag and one from otherTags. */}
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                <TagChip tag={demo.projectTag} />
+                <TagChip tag={demo.otherTags[0]} />
+              </div>
+            </div>
+          </div>
+
+          {/* Drawn like the real `TalkingPointGroup`: a thread header binding one person's rows. The
+            "Mark all" button is a live toggle, matching PeopleStep's pattern. */}
+          <section className="rounded-xl border border-foreground/20 bg-muted/30 p-1.5">
+            <header className="flex items-center gap-2 px-1.5 pt-0.5 pb-1.5">
+              <GitBranch aria-hidden className="size-3.5 shrink-0 text-foreground" />
+              <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                {demo.thread.name}
+              </h4>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {t('threads.toTell', { count: demo.threadEntries.length })}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-1 px-2 text-xs"
+                aria-pressed={said}
+                onClick={() => setSaid((was) => !was)}
+              >
+                <Check className="size-3.5" />
+                {said ? t('people.markedSaid') : t('threads.markAllSaid')}
+              </Button>
+            </header>
+            <ul className="flex flex-col gap-2">
+              {demo.threadEntries.map((entry) => (
+                <ThreadEntryRow key={entry.id} entry={entry} crossedOut={said} />
+              ))}
+            </ul>
+          </section>
+        </DemoCard>
+      </div>
+      <ThreadsToggleCard id="onboarding-threads-enabled" />
     </div>
   );
 }

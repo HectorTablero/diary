@@ -340,6 +340,8 @@
     "duplicate_name": "その名前のタグはすでにあります"
   },
   "threads": {
+    "disabledTitle": "スレッドはオフになっています",
+    "disabledDescription": "オンにすると、別々の日の記録をひとつの続いている話題にまとめられます。",
     "title": "スレッド",
     "count": "スレッド{{count}}件",
     "addThread": "新しいスレッド",
@@ -437,7 +439,9 @@
       "exactAlarmsDescription": "許可しないと、Android がリマインダーを数時間遅らせることがあります。"
     },
     "entries": {
-      "title": "新しい記録",
+      "title": "記録",
+      "threads": "スレッド",
+      "threadsDescription": "別々の日の記録を、ひとつの続いている話題にまとめます。オフにするとスレッドはどこにも表示されませんが、記録からは消えません。",
       "defaultImportance": "最初の重要度",
       "importanceLastUsed": "前回使ったもの",
       "autoSaid": "人物に触れたら「伝えた」にする",

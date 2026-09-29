@@ -200,7 +200,12 @@ export async function getSettings(): Promise<SettingsDto> {
   const stored = await getMeta<SettingsDto>('settings');
   // Spread over the defaults so metas saved before a field existed (e.g. groqApiKey) still
   // come back with a complete SettingsDto instead of `undefined`.
-  return { ...DEFAULT_SETTINGS, ...stored };
+  const settings = { ...DEFAULT_SETTINGS, ...stored };
+  // Never chosen: the server's rule (on if any thread exists), for local-only accounts and the
+  // moment before the first pull brings the server's answer down.
+  if (stored?.threadsEnabled === undefined)
+    settings.threadsEnabled = (await db.threads.count()) > 0;
+  return settings;
 }
 
 // --- Diary day ---
@@ -415,7 +420,10 @@ export async function getTalkingPointCounts(): Promise<Record<string, number>> {
   // Indexed rather than read-everything-then-filter: nothing before the scoring cutoff can score
   // above epsilon, so entries older than it cannot affect any count.
   const entries = await db.entries.where('dateKey').aboveOrEqual(cutoff).toArray();
-  const recent = entries.map(toClusterCandidate);
+  // Threads switched off must not fold a person's clusters into one row the profile won't draw.
+  const recent = entries
+    .map(toClusterCandidate)
+    .map((c) => (settings.threadsEnabled ? c : { ...c, threadIds: [] }));
   const broadcastTagIds = new Set(settings.broadcastTagIds);
 
   const counts: Record<string, number> = {};

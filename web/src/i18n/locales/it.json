@@ -356,6 +356,8 @@
     "duplicate_name": "Esiste già un'etichetta con questo nome"
   },
   "threads": {
+    "disabledTitle": "I filoni sono disattivati",
+    "disabledDescription": "Attivali per raggruppare voci di giorni diversi sotto un unico argomento.",
     "title": "Filoni",
     "count": "{{count}} filone",
     "count_other": "{{count}} filoni",
@@ -459,7 +461,9 @@
       "exactAlarmsDescription": "Senza questo, Android può consegnare i promemoria in ritardo, a volte di ore."
     },
     "entries": {
-      "title": "Voci nuove",
+      "title": "Voci",
+      "threads": "Filoni",
+      "threadsDescription": "Raggruppa voci di giorni diversi sotto un unico argomento. Se disattivato, i filoni spariscono dall’app; le voci li conservano.",
       "defaultImportance": "Importanza di partenza",
       "importanceLastUsed": "L'ultima che ho usato",
       "autoSaid": "Menzionare qualcuno la segna come raccontata",

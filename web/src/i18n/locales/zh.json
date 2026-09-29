@@ -334,6 +334,8 @@
     "duplicate_name": "已经有同名的标签了"
   },
   "threads": {
+    "disabledTitle": "话题已关闭",
+    "disabledDescription": "开启后，可以把不同日期的记录归到同一个持续的话题下。",
     "title": "话题",
     "count": "{{count}} 个话题",
     "addThread": "新建话题",
@@ -431,7 +433,9 @@
       "exactAlarmsDescription": "不允许的话，Android 可能会延迟送达提醒，有时会晚几个小时。"
     },
     "entries": {
-      "title": "新记录",
+      "title": "记录",
+      "threads": "话题",
+      "threadsDescription": "把不同日期的记录归到同一个持续的话题下。关闭后话题在各处隐藏，记录仍保留它们。",
       "defaultImportance": "初始重要度",
       "importanceLastUsed": "上次用的那个",
       "autoSaid": "提到某人就标记为已告诉",

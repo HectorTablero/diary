@@ -1,6 +1,7 @@
 import type { SettingsDto } from '@diary/shared';
 import { DEFAULT_SETTINGS } from '@diary/shared';
 import { Types } from 'mongoose';
+import { Thread } from '../models/thread';
 import { UserSettings } from '../models/userSettings';
 
 /** Read the user's settings, creating the defaults row on first access. */
@@ -22,6 +23,9 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     quietNotifications: doc.quietNotifications,
     defaultImportance: doc.defaultImportance ?? null,
     autoSaidOnMention: doc.autoSaidOnMention,
+    // Never chosen → on for an account that already has a thread, off otherwise. Resolved on every
+    // read (settings ride every sync pull), so it follows threads arriving from an import too.
+    threadsEnabled: doc.threadsEnabled ?? !!(await Thread.exists({ userId })),
     maxSubEntryDepth: doc.maxSubEntryDepth ?? DEFAULT_SETTINGS.maxSubEntryDepth,
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
     // Presence only. The keys stay here; see getProviderKeys.

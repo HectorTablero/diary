@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   useCreateThread,
   useDeleteThread,
+  useSettings,
   useThreadEntries,
   useThreads,
   useUpdateThread,
@@ -15,6 +16,7 @@ import { Spinner } from '@/components/common/Spinner';
 import { BOTTOM_NAV_ONLY, SIDEBAR_ONLY, SIDEBAR_ONLY_SR } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EntryRow } from '@/components/person/EntryRow';
+import { ThreadsToggleCard } from '@/components/thread/ThreadsToggleCard';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -181,7 +183,30 @@ function ThreadRow({
   );
 }
 
+/* Threads are opt-in, but /threads stays a real route: a deep link or an old bookmark lands here
+   either way, and this is the one place where switching the feature on answers the question the
+   visit was asking. Nothing renders until settings load, so an enabled user never sees the notice
+   flash past. */
 export default function ThreadsPage() {
+  const { t } = useTranslation();
+  const { data: settings } = useSettings();
+  if (!settings) return null;
+  if (settings.threadsEnabled) return <ThreadsList />;
+  return (
+    <>
+      <PageHeader title={<span className={SIDEBAR_ONLY_SR}>{t('threads.title')}</span>} />
+      <EmptyState
+        icon={GitBranch}
+        title={t('threads.disabledTitle')}
+        description={t('threads.disabledDescription')}
+      >
+        <ThreadsToggleCard id="threads-page-enabled" className="mt-3 w-full max-w-sm" />
+      </EmptyState>
+    </>
+  );
+}
+
+function ThreadsList() {
   const { t } = useTranslation();
   const { data: threads, isLoading } = useThreads();
   const deleteThread = useDeleteThread();

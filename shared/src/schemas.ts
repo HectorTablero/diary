@@ -338,6 +338,7 @@ export const settingsSchema = z.object({
   // survive the round trip, while absence still means "an older client didn't know about this".
   defaultImportance: importanceSchema.nullable().optional(),
   autoSaidOnMention: z.boolean().optional(),
+  threadsEnabled: z.boolean().optional(),
   maxSubEntryDepth: z.number().int().min(1).max(MAX_SUB_ENTRY_DEPTH).optional(),
   defaultCheckupIntervalDays: checkupIntervalDaysSchema,
   /* Provider keys are write-only — the only place they appear in the contract is here, on the way

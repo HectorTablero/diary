@@ -45,6 +45,9 @@ export function buildPayload(
     quietNotifications: draft.quietNotifications,
     defaultImportance: draft.defaultImportance,
     autoSaidOnMention: draft.autoSaidOnMention,
+    /* No threadsEnabled either: it has its own write (useSetThreadsEnabled), because the tour can
+       flip it while this page is open underneath, and a draft loaded before that would resend the
+       old value on the next autosave. */
     maxSubEntryDepth: Math.min(
       MAX_SUB_ENTRY_DEPTH,
       Math.max(1, Math.round(draft.maxSubEntryDepth)),

@@ -43,6 +43,7 @@ import {
   useSetSaid,
   useSettings,
   useTalkingPoints,
+  useThreadsEnabled,
   useUpdatePerson,
 } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -219,9 +220,16 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
   const setSaid = useSetSaid();
   const [alreadyToldOpen, setAlreadyToldOpen] = useState(false);
 
+  const threadsOn = useThreadsEnabled();
+
   // Threads come off the entries themselves, so grouping needs no extra query. With no threads
-  // defined this returns one singleton group per cluster, in the order the forest already had.
-  const groups = useMemo(() => (data ? groupTalkingPointsByThread(data.active) : []), [data]);
+  // defined this returns one singleton group per cluster, in the order the forest already had —
+  // which is also what threads switched off in Settings gets, built directly.
+  const groups = useMemo(() => {
+    if (!data) return [];
+    if (threadsOn) return groupTalkingPointsByThread(data.active);
+    return data.active.map((cluster) => ({ thread: null, clusters: [cluster] }));
+  }, [data, threadsOn]);
 
   if (isLoading) {
     return (

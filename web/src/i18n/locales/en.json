@@ -362,6 +362,8 @@
     "duplicate_name": "A tag with that name already exists"
   },
   "threads": {
+    "disabledTitle": "Threads are turned off",
+    "disabledDescription": "Switch them on to group entries from different days under one ongoing topic.",
     "title": "Threads",
     "count": "{{count}} thread",
     "count_other": "{{count}} threads",
@@ -465,7 +467,9 @@
       "exactAlarmsDescription": "Without this, Android may deliver reminders late — sometimes hours late."
     },
     "entries": {
-      "title": "New entries",
+      "title": "Entries",
+      "threads": "Threads",
+      "threadsDescription": "Group entries from different days under one ongoing topic. Off hides threads everywhere; entries keep them.",
       "defaultImportance": "Importance to start at",
       "importanceLastUsed": "Whatever I used last",
       "autoSaid": "Mentioning someone marks it as told",

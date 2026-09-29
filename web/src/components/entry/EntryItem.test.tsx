@@ -114,6 +114,7 @@ describe('EntryItem', () => {
       tags: [work],
       people: [ana],
       threads: [jobHunt],
+      settings: { threadsEnabled: true },
       entries: [
         anEntry({
           id: 'e1',
@@ -137,6 +138,23 @@ describe('EntryItem', () => {
     expect(screen.getByText('#work')).toBeInTheDocument();
     // A thread is never a token in the text, so it is always a chip — there is no inline copy.
     expect(screen.getByText('Job hunt')).toBeInTheDocument();
+  });
+
+  /* Threads are opt-in. Off hides them without touching the data: the entry keeps its thread, the
+     row just stops showing it or offering to add another. */
+  it('hides its threads and the thread action while threads are off', async () => {
+    const jobHunt = aThread({ id: 'th1', name: 'Job hunt' });
+    await seed({
+      threads: [jobHunt],
+      entries: [anEntry({ id: 'e1', content: 'Sent the CV', dateKey: DAY, threads: [jobHunt] })],
+    });
+    const { user } = await renderRow('e1');
+
+    await entryText('Sent the CV');
+    expect(screen.queryByText('Job hunt')).not.toBeInTheDocument();
+    const menu = await openActions(user, 'Sent the CV');
+    expect(within(menu).queryByRole('menuitem', { name: 'Add to thread' })).not.toBeInTheDocument();
+    expect((await db.entries.get('e1'))?.threadIds).toEqual(['th1']);
   });
 
   it('deletes on confirmation, queues the delete, and never on the first click', async () => {

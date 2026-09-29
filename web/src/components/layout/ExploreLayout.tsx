@@ -2,6 +2,7 @@ import { GitBranch, Search, Tag } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet } from 'react-router';
+import { useThreadsEnabled } from '@/api/hooks';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { isNative } from '@/lib/native';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,12 @@ export const EXPLORE_SEGMENTS: Segment[] = [
   { to: '/threads', icon: GitBranch, labelKey: 'nav.threads' },
 ];
 
+/** EXPLORE_SEGMENTS minus Threads when the user has switched it off in Settings. */
+export function useExploreSegments(): Segment[] {
+  const threadsOn = useThreadsEnabled();
+  return threadsOn ? EXPLORE_SEGMENTS : EXPLORE_SEGMENTS.filter((s) => s.to !== '/threads');
+}
+
 /** Whether a path belongs to this group — the tab bar lights its More slot on any of them. */
 export const isExplorePath = (pathname: string): boolean =>
   EXPLORE_SEGMENTS.some(
@@ -55,14 +62,19 @@ export const isExplorePath = (pathname: string): boolean =>
 
 export default function ExploreLayout() {
   const { t } = useTranslation();
+  const segments = useExploreSegments();
 
   return (
     <PageContainer>
       <nav
-        className={cn('mb-6 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1', BOTTOM_NAV_ONLY)}
+        className={cn(
+          'mb-6 grid gap-1 rounded-xl bg-muted p-1',
+          segments.length === 3 ? 'grid-cols-3' : 'grid-cols-2',
+          BOTTOM_NAV_ONLY,
+        )}
         aria-label={t('nav.explore')}
       >
-        {EXPLORE_SEGMENTS.map((segment) => (
+        {segments.map((segment) => (
           <NavLink
             key={segment.to}
             to={segment.to}

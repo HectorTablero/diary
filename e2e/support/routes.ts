@@ -44,6 +44,7 @@ export const ROUTES: AppRoute[] = [
   { path: '/people', proof: (page) => page.getByRole('button', { name: 'Add person' }).first() },
   { path: '/search', proof: (page) => page.getByPlaceholder('Search your entries…') },
   { path: '/tags', proof: (page) => page.getByRole('button', { name: 'Add tag' }) },
-  { path: '/threads', proof: (page) => page.getByRole('button', { name: 'New thread' }) },
+  /* Threads are off by default, so a fresh account lands on the notice with its switch on. */
+  { path: '/threads', proof: (page) => page.getByRole('switch', { name: 'Threads' }) },
   { path: '/settings', proof: (page) => page.getByRole('switch', { name: 'Require a passcode' }) },
 ];

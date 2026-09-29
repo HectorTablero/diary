@@ -123,6 +123,7 @@ describe('PersonProfilePage · talking points', () => {
   it('gathers a thread’s talking points under one header', async () => {
     const jobHunt = aThread({ id: 'th1', name: 'Job hunt' });
     await seed({
+      settings: { threadsEnabled: true },
       people: [aPerson({ id: PERSON, name: 'Ana' })],
       threads: [jobHunt],
       entries: [
@@ -143,6 +144,7 @@ describe('PersonProfilePage · talking points', () => {
   it('marks a whole thread as said in one action, queueing one op per entry', async () => {
     const jobHunt = aThread({ id: 'th1', name: 'Job hunt' });
     await seed({
+      settings: { threadsEnabled: true },
       people: [aPerson({ id: PERSON, name: 'Ana' })],
       threads: [jobHunt],
       entries: [
@@ -173,6 +175,7 @@ describe('PersonProfilePage · talking points', () => {
   it('undoes a bulk mark against exactly the entries it wrote', async () => {
     const jobHunt = aThread({ id: 'th1', name: 'Job hunt' });
     await seed({
+      settings: { threadsEnabled: true },
       people: [aPerson({ id: PERSON, name: 'Ana' })],
       threads: [jobHunt],
       entries: [mention('e1', 'Ana got an interview', { threads: [jobHunt] })],

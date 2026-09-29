@@ -1110,9 +1110,21 @@ export async function saveSettings(input: SettingsInput): Promise<SettingsDto> {
     ...(openRouterApiKey !== undefined ? { hasOpenRouterKey: openRouterApiKey !== '' } : {}),
     ...(cerebrasApiKey !== undefined ? { hasCerebrasKey: cerebrasApiKey !== '' } : {}),
   };
-  await db.meta.put({ key: 'settings', value: settings });
+  // A threadsEnabled that getSettings derived stays derived: writing it back here would turn "never
+  // chosen" into a choice the moment any other setting is saved.
+  const stored = (await db.meta.get('settings'))?.value as Partial<SettingsDto> | undefined;
+  const { threadsEnabled: _derived, ...withoutThreads } = settings;
+  const keepDerived = input.threadsEnabled === undefined && stored?.threadsEnabled === undefined;
+  await db.meta.put({ key: 'settings', value: keepDerived ? withoutThreads : settings });
   await enqueue('PUT', '/settings', input);
   return settings;
+}
+
+/** One field changed from outside the Settings page. PUT /settings takes the whole payload, so this
+    resends the current settings; the has*Key flags are dropped because they aren't input fields. */
+export async function setThreadsEnabled(threadsEnabled: boolean): Promise<SettingsDto> {
+  const { hasGroqKey, hasOpenRouterKey, hasCerebrasKey, ...current } = await getSettings();
+  return saveSettings({ ...current, threadsEnabled });
 }
 
 // --- Backup import ---

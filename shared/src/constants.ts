@@ -63,6 +63,10 @@ export const DEFAULT_SETTINGS = {
   /** Whether the "already told them" box is pre-ticked when an entry mentions someone. The box is
       always offered either way; this only decides which way it starts. */
   autoSaidOnMention: true,
+  /** Whether the Threads feature is shown at all; off only hides it, entries keep their threads.
+      This is the value for an account with no threads. Until the user chooses, an account that
+      has one reads as on — see getSettings on the server and in web/src/db/repo.ts. */
+  threadsEnabled: false,
   /** How deep sub-entries may nest, up to MAX_SUB_ENTRY_DEPTH. */
   maxSubEntryDepth: DEFAULT_SUB_ENTRY_DEPTH,
   /** Default checkup interval inherited by new people. `null` = checkups off by default. */

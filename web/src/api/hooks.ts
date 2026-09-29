@@ -394,6 +394,22 @@ export const useSettings = () =>
     queryFn: () => repo.getSettings(),
   });
 
+/** Undefined while settings load counts as off, so the default case never flickers. */
+export const useThreadsEnabled = () => useSettings().data?.threadsEnabled === true;
+
+/** The Threads switch for places other than the Settings page (the /threads gate, the tour). */
+export function useSetThreadsEnabled() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => mutations.setThreadsEnabled(enabled),
+    onSuccess: (data) => {
+      qc.setQueryData(['settings'], data);
+      // The people list's talking-point counts fold thread rows only while threads are on.
+      qc.invalidateQueries({ queryKey: ['people'] });
+    },
+  });
+}
+
 // --- Backup import ---
 
 export const useEntryIndex = () =>

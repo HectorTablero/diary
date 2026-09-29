@@ -18,9 +18,9 @@ import type { LucideIcon } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
-import { usePeople } from '@/api/hooks';
+import { usePeople, useThreadsEnabled } from '@/api/hooks';
 import { FullScreenSpinner } from '@/components/common/Spinner';
-import { EXPLORE_SEGMENTS, isExplorePath } from '@/components/layout/ExploreLayout';
+import { isExplorePath, useExploreSegments } from '@/components/layout/ExploreLayout';
 import { shouldShowBlocker } from '@/components/layout/syncPill';
 import {
   DropdownMenu,
@@ -136,6 +136,7 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
      entry chunk from carrying plugin nav at all. Above Settings, below Tags and Threads: a plugin
      is more like a place in the app than like a setting. */
   const pluginNav = usePluginNav();
+  const threadsOn = useThreadsEnabled();
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r bg-sidebar px-3 py-5 md:flex">
       <NavLink to="/diary" className="mb-6 flex items-center gap-2.5 px-3">
@@ -151,7 +152,7 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
           />
         ))}
         <div className="mt-auto flex flex-col gap-1">
-          {SECONDARY_NAV.map((item) =>
+          {SECONDARY_NAV.filter((item) => threadsOn || item.to !== '/threads').map((item) =>
             item.to === '/settings' ? (
               <Fragment key={item.to}>
                 {pluginNav.map((plugin) => (
@@ -236,6 +237,7 @@ function MoreTabSlot() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const pluginNav = usePluginNav();
+  const segments = useExploreSegments();
   const shown = pluginNav.slice(0, MAX_PLUGIN_MENU_ITEMS);
   const active = isExplorePath(pathname) || pathname.startsWith('/plugins/');
 
@@ -249,7 +251,7 @@ function MoreTabSlot() {
       {/* side="top" so it opens over the app rather than off the bottom of the screen, and
           sideOffset clears the gesture-nav inset the bar grows by. */}
       <DropdownMenuContent side="top" align="center" sideOffset={8} className="min-w-40">
-        {EXPLORE_SEGMENTS.map((segment) => (
+        {segments.map((segment) => (
           <DropdownMenuItem key={segment.to} onSelect={() => void navigate(segment.to)}>
             <segment.icon className="size-4" />
             {t(segment.labelKey)}

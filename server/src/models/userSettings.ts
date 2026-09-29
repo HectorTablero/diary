@@ -39,6 +39,9 @@ const userSettingsSchema = new Schema(
     // optional — Mongoose would otherwise drop it and the default would come back.
     defaultImportance: { type: Number, default: DEFAULT_SETTINGS.defaultImportance },
     autoSaidOnMention: { type: Boolean, default: DEFAULT_SETTINGS.autoSaidOnMention },
+    // No default on purpose: unset means "never chosen", which getSettings resolves from whether
+    // the account has any threads. A stored default would freeze that answer at signup.
+    threadsEnabled: { type: Boolean },
     maxSubEntryDepth: { type: Number, default: DEFAULT_SETTINGS.maxSubEntryDepth },
   },
   { timestamps: true },

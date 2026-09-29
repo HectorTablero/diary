@@ -10,6 +10,7 @@ import {
   useSettings,
   useTags,
   useThreads,
+  useThreadsEnabled,
   useUpdateEntry,
 } from '@/api/hooks';
 import { VoiceEntryButton } from '@/components/ai/VoiceEntryButton';
@@ -52,6 +53,7 @@ export function EntryComposer({
   const { data: allPeople = [] } = usePeople();
   const { data: allThreads = [] } = useThreads();
   const { data: settings } = useSettings();
+  const threadsOn = useThreadsEnabled();
   const { data: session } = useSession();
   const { blocker } = useSyncStatus();
   const prefs = usePreferences();
@@ -137,7 +139,9 @@ export function EntryComposer({
       importance,
       tags: tags.map((tag) => tag.id),
       people: people.map((p) => p.id),
-      threads: threads.map((th) => th.id),
+      // Off hides threads rather than removing them: an edit keeps the entry's own, and only a new
+      // entry drops whatever the composer was still carrying from before the switch.
+      threads: (threadsOn || isEditing ? threads : []).map((th) => th.id),
       saidTo,
     };
     try {
@@ -194,7 +198,7 @@ export function EntryComposer({
         onSubmit={submit}
       />
 
-      {(tags.length > 0 || people.length > 0 || threads.length > 0) && (
+      {(tags.length > 0 || people.length > 0 || (threadsOn && threads.length > 0)) && (
         <div className="flex flex-wrap items-center gap-1.5">
           {tags.map((tag) => (
             <TagChip
@@ -203,13 +207,14 @@ export function EntryComposer({
               onRemove={() => setTags((p) => p.filter((tg) => tg.id !== tag.id))}
             />
           ))}
-          {threads.map((thread) => (
-            <ThreadChip
-              key={thread.id}
-              thread={thread}
-              onRemove={() => setThreads((p) => p.filter((th) => th.id !== thread.id))}
-            />
-          ))}
+          {threadsOn &&
+            threads.map((thread) => (
+              <ThreadChip
+                key={thread.id}
+                thread={thread}
+                onRemove={() => setThreads((p) => p.filter((th) => th.id !== thread.id))}
+              />
+            ))}
           {people.map((person) => (
             <PersonChip key={person.id} person={person} onRemove={() => removePerson(person.id)} />
           ))}
@@ -277,28 +282,30 @@ export function EntryComposer({
             }}
             placeholder={t('people.namePlaceholder')}
           />
-          <EntityPicker
-            trigger={
-              <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-muted-foreground">
-                <GitBranch className="size-3.5" />
-                {t('threads.addToThread')}
-              </Button>
-            }
-            // No `color`: EntityPicker falls back to a muted dot, which is right for threads.
-            items={allThreads.map((th) => ({ id: th.id, label: th.name }))}
-            selectedIds={threads.map((th) => th.id)}
-            onToggle={(id) => {
-              const thread = allThreads.find((th) => th.id === id);
-              if (!thread) return;
-              if (threads.some((th) => th.id === id))
-                setThreads((p) => p.filter((th) => th.id !== id));
-              else addThread(thread);
-            }}
-            onCreate={(name) => void handleCreateThread(name)}
-            createLabel={(name) => t('threads.createThread', { name })}
-            placeholder={t('threads.namePlaceholder')}
-            contentClassName="w-64"
-          />
+          {threadsOn && (
+            <EntityPicker
+              trigger={
+                <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-muted-foreground">
+                  <GitBranch className="size-3.5" />
+                  {t('threads.addToThread')}
+                </Button>
+              }
+              // No `color`: EntityPicker falls back to a muted dot, which is right for threads.
+              items={allThreads.map((th) => ({ id: th.id, label: th.name }))}
+              selectedIds={threads.map((th) => th.id)}
+              onToggle={(id) => {
+                const thread = allThreads.find((th) => th.id === id);
+                if (!thread) return;
+                if (threads.some((th) => th.id === id))
+                  setThreads((p) => p.filter((th) => th.id !== id));
+                else addThread(thread);
+              }}
+              onCreate={(name) => void handleCreateThread(name)}
+              createLabel={(name) => t('threads.createThread', { name })}
+              placeholder={t('threads.namePlaceholder')}
+              contentClassName="w-64"
+            />
+          )}
         </div>
         {showDateInput && (
           <DatePicker

@@ -178,6 +178,8 @@ export interface SettingsDto {
   defaultImportance: number | null;
   /** Whether the "already told them" box starts ticked when an entry mentions someone. */
   autoSaidOnMention: boolean;
+  /** Show threads everywhere they appear. Off hides the UI and leaves the data untouched. */
+  threadsEnabled: boolean;
   /** How deep sub-entries may nest, 1..MAX_SUB_ENTRY_DEPTH. */
   maxSubEntryDepth: number;
   /** Default `checkupIntervalDays` inherited by newly created people. `null` = off by default. */

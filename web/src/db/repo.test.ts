@@ -355,3 +355,30 @@ describe('joinMaps caching', () => {
     expect((await repo.getPeople()).map((p) => p.name)).toEqual(['Carmen']);
   });
 });
+
+/* Unset means "never chosen": on for an account that already has a thread, off otherwise — the
+   server's rule, applied locally for local-only accounts and before the first pull. */
+describe('getSettings · threadsEnabled', () => {
+  const { threadsEnabled: _unset, ...unchosen } = DEFAULT_SETTINGS;
+  const aThread = { id: 'th1', name: 'Job hunt', createdAt: '', updatedAt: '' };
+
+  it('derives the default from whether any thread exists', async () => {
+    await setMeta('settings', unchosen);
+    expect((await repo.getSettings()).threadsEnabled).toBe(false);
+
+    await db.threads.add(aThread);
+    expect((await repo.getSettings()).threadsEnabled).toBe(true);
+  });
+
+  it('keeps it derived when another setting is saved', async () => {
+    const { saveSettings } = await import('./mutations');
+    await setMeta('settings', unchosen);
+    const { hasGroqKey, hasOpenRouterKey, hasCerebrasKey, threadsEnabled, ...input } =
+      await repo.getSettings();
+
+    await saveSettings({ ...input, epsilon: 0.02 });
+    await db.threads.add(aThread);
+
+    expect((await repo.getSettings()).threadsEnabled).toBe(true);
+  });
+});

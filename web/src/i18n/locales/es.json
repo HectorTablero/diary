@@ -357,6 +357,8 @@
     "duplicate_name": "Ya existe una etiqueta con ese nombre"
   },
   "threads": {
+    "disabledTitle": "Los hilos están desactivados",
+    "disabledDescription": "Actívalos para agrupar entradas de distintos días bajo un mismo tema.",
     "title": "Hilos",
     "count": "{{count}} hilo",
     "count_other": "{{count}} hilos",
@@ -460,7 +462,9 @@
       "exactAlarmsDescription": "Sin esto, Android puede entregar los recordatorios tarde, a veces con horas de retraso."
     },
     "entries": {
-      "title": "Entradas nuevas",
+      "title": "Entradas",
+      "threads": "Hilos",
+      "threadsDescription": "Agrupa entradas de distintos días bajo un mismo tema. Si lo desactivas, los hilos se ocultan en toda la app; las entradas los conservan.",
       "defaultImportance": "Importancia inicial",
       "importanceLastUsed": "La última que usé",
       "autoSaid": "Mencionar a alguien lo marca como contado",

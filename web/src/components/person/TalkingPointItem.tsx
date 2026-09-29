@@ -13,7 +13,7 @@ import {
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { useSetHidden, useSetSaid } from '@/api/hooks';
+import { useSetHidden, useSetSaid, useThreadsEnabled } from '@/api/hooks';
 import { EntryRow } from '@/components/person/EntryRow';
 import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +56,7 @@ export function TalkingPointItem({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [threading, setThreading] = useState(false);
+  const threadsOn = useThreadsEnabled();
   const setSaid = useSetSaid();
   const setHidden = useSetHidden();
 
@@ -153,10 +154,12 @@ export function TalkingPointItem({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {/* Right where you notice this is one of several entries about the same topic. */}
-                  <DropdownMenuItem onClick={() => setThreading(true)}>
-                    <GitBranch className="size-3.5" />
-                    {t('threads.addToThread')}
-                  </DropdownMenuItem>
+                  {threadsOn && (
+                    <DropdownMenuItem onClick={() => setThreading(true)}>
+                      <GitBranch className="size-3.5" />
+                      {t('threads.addToThread')}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={hide}>
                     <EyeOff className="size-3.5" />
                     {t('people.hideForPerson', { name: personName })}
