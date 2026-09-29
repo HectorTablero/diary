@@ -58,6 +58,8 @@
         "runningTotalColumn": "Screen-reader-only column header in that table: the cumulative total up to that day.",
         "byCategory": "Caption above the per-category bars.",
         "nothingThisMonth": "Shown in place of the category bars for a month with nothing recorded.",
+        "listFilterLabel": "Text before a dropdown above the month's list of expenses; the dropdown's value (a category name, or allCategories) completes the phrase.",
+        "allCategories": "The dropdown's default option: the list is not filtered.",
         "calendarLabel": "Calendar tooltip for a day with expenses. {{amounts}} is one or more formatted totals (one per currency, already joined); {{count}} is how many expenses.",
         "settingsTitle": "Heading of the plugin's settings card.",
         "settingsDescription": "Under that heading. Unlike the other plugins' cards (device-only reminders) this setting follows the account, and says so.",

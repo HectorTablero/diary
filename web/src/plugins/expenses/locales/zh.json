@@ -61,6 +61,8 @@
   "runningTotalColumn": "累计",
   "byCategory": "按类别",
   "nothingThisMonth": "本月没有记录。",
+  "listFilterLabel": "显示的支出：",
+  "allCategories": "所有类别",
   "calendarLabel": "{{amounts}} · {{count}} 笔",
   "settingsTitle": "支出",
   "settingsDescription": "在你的所有设备间同步。",

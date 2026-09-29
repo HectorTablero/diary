@@ -62,6 +62,8 @@
   "runningTotalColumn": "Totale progressivo",
   "byCategory": "Per categoria",
   "nothingThisMonth": "Niente annotato questo mese.",
+  "listFilterLabel": "Spese mostrate da",
+  "allCategories": "Tutte le categorie",
   "calendarLabel_one": "{{amounts}} · {{count}} spesa",
   "calendarLabel_other": "{{amounts}} · {{count}} spese",
   "settingsTitle": "Spese",

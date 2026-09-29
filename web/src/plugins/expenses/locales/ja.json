@@ -61,6 +61,8 @@
   "runningTotalColumn": "累計",
   "byCategory": "カテゴリ別",
   "nothingThisMonth": "今月の記録はありません。",
+  "listFilterLabel": "表示中の支出：",
+  "allCategories": "すべてのカテゴリ",
   "calendarLabel": "{{amounts}} · {{count}}件",
   "settingsTitle": "支出",
   "settingsDescription": "すべてのデバイスで同期されます。",

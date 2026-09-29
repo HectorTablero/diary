@@ -62,6 +62,8 @@
   "runningTotalColumn": "Total acumulado",
   "byCategory": "Por categoría",
   "nothingThisMonth": "Nada anotado este mes.",
+  "listFilterLabel": "Mostrando gastos de",
+  "allCategories": "Todas las categorías",
   "calendarLabel_one": "{{amounts}} · {{count}} gasto",
   "calendarLabel_other": "{{amounts}} · {{count}} gastos",
   "settingsTitle": "Gastos",

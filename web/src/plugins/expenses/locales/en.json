@@ -62,6 +62,8 @@
   "runningTotalColumn": "Running total",
   "byCategory": "By category",
   "nothingThisMonth": "Nothing recorded this month.",
+  "listFilterLabel": "Showing expenses from",
+  "allCategories": "All categories",
   "calendarLabel_one": "{{amounts}} · {{count}} expense",
   "calendarLabel_other": "{{amounts}} · {{count}} expenses",
   "settingsTitle": "Expenses",

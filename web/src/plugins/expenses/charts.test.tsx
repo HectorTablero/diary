@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '@/i18n';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { MonthlyColumns } from './charts';
+import { CategoryBars, MonthlyColumns } from './charts';
 import en from './locales/en.json';
 import { monthlyTotals } from './stats';
 
@@ -37,5 +39,28 @@ describe('MonthlyColumns', () => {
       />,
     );
     expect(dividers(container)).toBe(0);
+  });
+});
+
+describe('CategoryBars', () => {
+  it('reports the picked category, null for the uncategorised row', async () => {
+    const onSelect = vi.fn();
+    renderWithProviders(
+      <CategoryBars
+        breakdown={[
+          { category: 'food', minor: 500, count: 2 },
+          { category: null, minor: 100, count: 1 },
+        ]}
+        byId={new Map()}
+        currency="EUR"
+        selected="food"
+        onSelect={onSelect}
+      />,
+    );
+    const [food, none] = screen.getAllByRole('button');
+    expect(food).toHaveAttribute('aria-pressed', 'true');
+    expect(none).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(none);
+    expect(onSelect).toHaveBeenCalledWith(null);
   });
 });

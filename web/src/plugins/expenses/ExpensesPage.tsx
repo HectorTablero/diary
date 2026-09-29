@@ -23,6 +23,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDateKey, todayKey } from '@/lib/dates';
@@ -32,11 +39,12 @@ import { CategoriesDialog } from './CategoriesDialog';
 import { CategoryBars, monthLabel, MonthlyColumns, MonthProgress } from './charts';
 import { formatMinor } from './currency';
 import { ExpenseRow } from './ExpensesDayWidget';
-import { ExpenseForm } from './ExpenseForm';
+import { ExpenseForm, useCategoryLabel } from './ExpenseForm';
 import type { Category, Expense } from './model';
 import {
   categoryBreakdown,
   currenciesUsed,
+  type CategoryTotal,
   monthlyTotals,
   monthOf,
   monthSummary,
@@ -78,6 +86,8 @@ export default function ExpensesPage() {
   const [adding, setAdding] = useState(false);
   const [managing, setManaging] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
+  /* Undefined for no filter; null filters to expenses without a category. */
+  const [pickedCategory, setPickedCategory] = useState<string | null | undefined>(undefined);
 
   const usage = useMemo(() => {
     const counts = new Map<string, number>();
@@ -110,17 +120,23 @@ export default function ExpensesPage() {
     () => categoryBreakdown(expenses, currency, month),
     [expenses, currency, month],
   );
+  /* Only while this month has that category, so moving to a month without it shows everything
+     rather than an empty list with no bar left to click off. */
+  const categoryFilter = breakdown.some((item) => item.category === pickedCategory)
+    ? pickedCategory
+    : undefined;
   const days = useMemo(() => {
     const byDay = new Map<string, Expense[]>();
     for (const expense of expenses) {
       if (expense.currency !== currency || monthOf(expense.dateKey) !== month) continue;
+      if (categoryFilter !== undefined && expense.category !== categoryFilter) continue;
       const list = byDay.get(expense.dateKey) ?? [];
       list.push(expense);
       byDay.set(expense.dateKey, list);
     }
     // Most recent day first, the order a history is read in; within a day, the order they happened.
     return [...byDay].sort(([a], [b]) => b.localeCompare(a));
-  }, [expenses, currency, month]);
+  }, [expenses, currency, month, categoryFilter]);
 
   const tell = (error: unknown) => {
     captureError(error, { scope: 'plugin.expenses.write' });
@@ -289,23 +305,41 @@ export default function ExpensesPage() {
                 onSelect={setMonth}
               />
             </div>
-            <div className="rounded-xl border bg-card p-4 shadow-xs">
-              {breakdown.length > 0 ? (
-                <CategoryBars
-                  breakdown={breakdown}
-                  byId={categoriesState.byId}
-                  currency={currency}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {t('plugins.expenses.nothingThisMonth')}
-                </p>
-              )}
+            {/* Side by side, the category list mustn't set the row's height: taken out of flow, it
+                fills whatever height the monthly chart gives the row and scrolls within it. */}
+            <div className="relative rounded-xl border bg-card shadow-xs">
+              <div className="flex max-h-80 flex-col p-4 md:absolute md:inset-0 md:max-h-none">
+                {breakdown.length > 0 ? (
+                  <CategoryBars
+                    breakdown={breakdown}
+                    byId={categoriesState.byId}
+                    currency={currency}
+                    selected={categoryFilter}
+                    onSelect={(category) =>
+                      setPickedCategory(category === categoryFilter ? undefined : category)
+                    }
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {t('plugins.expenses.nothingThisMonth')}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
+          {breakdown.length > 0 && (
+            <CategoryFilter
+              value={categoryFilter}
+              onChange={setPickedCategory}
+              categories={categoriesState.categories}
+              breakdown={breakdown}
+            />
+          )}
+
           {days.length > 0 && (
-            <ul className="space-y-3">
+            // Capped at the viewport so a busy month scrolls in place instead of stretching the page.
+            <ul className="max-h-[70vh] space-y-3 overflow-y-auto overscroll-contain">
               {days.map(([dateKey, dayExpenses]) => (
                 <DayGroup
                   key={dateKey}
@@ -320,6 +354,66 @@ export default function ExpensesPage() {
         </div>
       )}
     </PageContainer>
+  );
+}
+
+const ALL = '__all__';
+const NO_CATEGORY = '__none__';
+
+/**
+ * What the list below is narrowed to — the same choice as clicking a category's bar. Every category
+ * is offered so the list of choices doesn't reshuffle from month to month, but only the ones with
+ * something this month can be picked. Retired ones are left out unless the month still has some.
+ */
+function CategoryFilter({
+  value,
+  onChange,
+  categories,
+  breakdown,
+}: {
+  value: string | null | undefined;
+  onChange: (category: string | null | undefined) => void;
+  categories: readonly Category[];
+  breakdown: readonly CategoryTotal[];
+}) {
+  const { t } = useTranslation();
+  const labelOf = useCategoryLabel();
+  const present = new Set(breakdown.map((item) => item.category));
+  const offered = categories.filter((category) => !category.retired || present.has(category.id));
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <span id="expense-list-filter">{t('plugins.expenses.listFilterLabel')}</span>
+      <Select
+        value={value === undefined ? ALL : (value ?? NO_CATEGORY)}
+        onValueChange={(next) =>
+          onChange(next === ALL ? undefined : next === NO_CATEGORY ? null : next)
+        }
+      >
+        <SelectTrigger size="sm" aria-labelledby="expense-list-filter" className="text-foreground">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>{t('plugins.expenses.allCategories')}</SelectItem>
+          {offered.map((category) => {
+            const Icon = category.icon;
+            return (
+              <SelectItem
+                key={category.id}
+                value={category.id}
+                disabled={!present.has(category.id)}
+              >
+                <Icon className="size-3.5 text-muted-foreground" aria-hidden />
+                {labelOf(category)}
+              </SelectItem>
+            );
+          })}
+          <SelectItem value={NO_CATEGORY} disabled={!present.has(null)}>
+            {t('plugins.expenses.uncategorized')}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 

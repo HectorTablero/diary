@@ -129,10 +129,15 @@ export function CategoryBars({
   breakdown,
   byId,
   currency,
+  selected,
+  onSelect,
 }: {
   breakdown: readonly CategoryTotal[];
   byId: ReadonlyMap<string, Category>;
   currency: string;
+  /** The category the page's list is narrowed to — null for "no category", undefined for none. */
+  selected?: string | null;
+  onSelect?: (category: string | null) => void;
 }) {
   const { t, i18n } = useTranslation();
   const labelOf = useCategoryLabel();
@@ -141,35 +146,51 @@ export function CategoryBars({
   const percent = new Intl.NumberFormat(i18n.language, { style: 'percent' });
 
   return (
-    <figure>
+    // Fills its box and scrolls the list under a caption that stays put — see the page.
+    <figure className="flex min-h-0 flex-1 flex-col">
       <figcaption className="text-xs font-medium text-muted-foreground">
         {t('plugins.expenses.byCategory')}
       </figcaption>
-      <ul className="mt-3 space-y-3">
+      <ul className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain">
         {breakdown.map((item) => {
           const category = item.category ? byId.get(item.category) : undefined;
           const Icon = category?.icon;
+          const isSelected = selected !== undefined && item.category === selected;
           return (
             <li key={item.category ?? 'none'}>
-              <div className="flex items-center gap-2 text-sm">
-                {Icon && <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
-                <span className="min-w-0 flex-1 truncate">{labelOf(category)}</span>
-                <span className="shrink-0 tabular-nums">
-                  {formatMinor(item.minor, currency, i18n.language)}
-                </span>
-                <span className="w-10 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                  {percent.format(total > 0 ? item.minor / total : 0)}
-                </span>
-              </div>
-              <div className="mt-1.5 h-2 w-full" aria-hidden>
-                <div
-                  className="h-full rounded-r-[4px]"
-                  style={{
-                    width: `${max > 0 ? Math.max(1, (item.minor / max) * 100) : 0}%`,
-                    backgroundColor: gray(70),
-                  }}
-                />
-              </div>
+              {/* A button like the monthly columns': picking a category narrows the page's list to
+                  it, and picking it again lets go. */}
+              <button
+                type="button"
+                disabled={!onSelect}
+                aria-pressed={onSelect ? isSelected : undefined}
+                onClick={() => onSelect?.(item.category)}
+                className={cn(
+                  'block w-full rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default',
+                  onSelect && 'enabled:hover:opacity-80',
+                  selected !== undefined && !isSelected && 'opacity-50',
+                )}
+              >
+                <div className="flex items-center gap-2 text-sm">
+                  {Icon && <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
+                  <span className="min-w-0 flex-1 truncate">{labelOf(category)}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {formatMinor(item.minor, currency, i18n.language)}
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                    {percent.format(total > 0 ? item.minor / total : 0)}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 w-full" aria-hidden>
+                  <div
+                    className="h-full rounded-r-[4px]"
+                    style={{
+                      width: `${max > 0 ? Math.max(1, (item.minor / max) * 100) : 0}%`,
+                      backgroundColor: gray(isSelected ? 100 : 70),
+                    }}
+                  />
+                </div>
+              </button>
             </li>
           );
         })}
