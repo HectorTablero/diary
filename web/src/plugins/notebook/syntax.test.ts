@@ -6,6 +6,9 @@ import {
   mermaidMath,
   readMathToken,
   referencedDocumentIds,
+  stripComments,
+  tableAt,
+  tableCells,
   type HighlightKind,
   type HighlightSpan,
 } from './syntax';
@@ -434,5 +437,93 @@ describe('documentReferenceAt', () => {
      would link to. A second label saying the same thing would only be in the way. */
   it('ignores a reference that has not been closed yet', () => {
     expect(documentReferenceAt('see [[ab', 8)).toBeNull();
+  });
+});
+
+describe('highlightSource — emphasis around other tokens', () => {
+  it('still reads a reference, link or code span inside bold or italics', () => {
+    expect(paint('**[[abc]]**')).toContainEqual({
+      kind: 'document',
+      text: '[[abc]]',
+      id: 'abc',
+      start: 2,
+    });
+    expect(textOf(paint('*[home](https://x.y)*'), 'label')).toEqual(['home']);
+    expect(kinds(paint('**a `b` c**'))).toEqual([
+      ['syntax', '**'],
+      ['strong', 'a '],
+      ['syntax', '`'],
+      ['code', 'b'],
+      ['syntax', '`'],
+      ['strong', ' c'],
+      ['syntax', '**'],
+    ]);
+  });
+});
+
+describe('highlightSource — tables', () => {
+  const TABLE = '| Name | Qty |\n|:-----|----:|\n| **tea** | 2 \\| 3 |\nafter';
+
+  it.each([TABLE, 'a | b\n--- | ---\nc | d', '| a |\n| - |', 'x | y\n---'])(
+    'reassembles into exactly the source: %j',
+    (source) => expect(rebuild(paint(source))).toBe(source),
+  );
+
+  it('paints pipes and the delimiter row as syntax, and reads each cell inline', () => {
+    const spans = paint(TABLE);
+    expect(textOf(spans, 'syntax')).toContain('|:-----|----:|');
+    expect(textOf(spans, 'strong')).toEqual(['tea']);
+    // An escaped pipe stays in its cell.
+    expect(textOf(spans, 'text').join('')).toContain('2 \\| 3');
+  });
+
+  it('is no table without a pipe in the delimiter row, or with the wrong number of columns', () => {
+    expect(tableAt(['x | y', '---'], 0)).toBeNull();
+    expect(tableAt(['a | b', '| - |'], 0)).toBeNull();
+    expect(tableAt(TABLE.split('\n'), 0)).toBe(2);
+  });
+
+  it('splits cells GitHub’s way', () => {
+    expect(tableCells('| a | `b` | c \\| d |')).toEqual(['a', '`b`', 'c | d']);
+    expect(tableCells('a | | b')).toEqual(['a', '', 'b']);
+  });
+});
+
+describe('highlightSource — comments', () => {
+  it.each([
+    'a <!-- b --> c',
+    '<!--\n# not a heading\n```\n-->\nafter',
+    'a <!-- never closed\nb',
+    '`<!-- code -->` and $x <!-- y$',
+  ])('reassembles into exactly the source: %j', (source) => {
+    expect(rebuild(paint(source))).toBe(source);
+  });
+
+  it('paints a comment whole, across lines, and reads what follows it again', () => {
+    expect(kinds(paint('a <!-- b\n# c\n``` --> **d**'))).toEqual([
+      ['text', 'a '],
+      ['comment', '<!-- b\n# c\n``` -->'],
+      ['text', ' '],
+      ['syntax', '**'],
+      ['strong', 'd'],
+      ['syntax', '**'],
+    ]);
+  });
+
+  it('leaves an opener that never closes as prose, still reading what is after it', () => {
+    expect(kinds(paint('<!-- **x**'))).toEqual([
+      ['text', '<!-- '],
+      ['syntax', '**'],
+      ['strong', 'x'],
+      ['syntax', '**'],
+    ]);
+  });
+
+  it('never finds one inside code', () => {
+    expect(textOf(paint('`<!-- x -->`\n```\n<!-- y -->\n```'), 'comment')).toEqual([]);
+  });
+
+  it('strips comments, keeping every line break so line numbers still match', () => {
+    expect(stripComments('a <!-- b\nc --> d\n`<!-- e -->`')).toBe('a \n d\n`<!-- e -->`');
   });
 });

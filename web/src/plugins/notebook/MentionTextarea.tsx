@@ -143,6 +143,8 @@ const KIND_CLASS: Record<HighlightKind, string> = {
   document: '',
   label: 'text-sky-700 dark:text-sky-300',
   url: 'text-muted-foreground',
+  // Faded further than syntax: the preview doesn't show it at all.
+  comment: 'text-muted-foreground/50 italic',
 };
 
 /** A formula KaTeX can't typeset, in place of `KIND_CLASS.math` rather than on top of it — merged, the

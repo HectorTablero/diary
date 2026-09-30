@@ -15,6 +15,9 @@ import {
   mathBlockAt,
   readMathToken,
   referencedDocumentIds,
+  stripComments,
+  tableAt,
+  tableCells,
 } from './syntax';
 import { TexMath } from './TexMath';
 import { useDocumentLabels } from './useNotebook';
@@ -45,6 +48,10 @@ import { useDocumentLabels } from './useNotebook';
  * same parse-don't-trust posture the plugin layer takes toward every row it reads. It also means
  * raw HTML in a document is shown rather than honoured, which for a private notebook is the right
  * way round: what you typed is what you see.
+ *
+ * `<!-- comments -->` are the one piece of HTML syntax that is read, and only to be hidden — a note to
+ * yourself that stays in the source (and in the export, where Obsidian hides it too) without showing
+ * in the preview. Hiding produces nothing, so it needs no markup. Every other tag is still literal.
  *
  * The two exceptions are KaTeX's and Mermaid's output, inserted by TexMath.tsx and MermaidDiagram.tsx
  * — see the notes there on why each has to be markup, and on why that markup is safe to insert when
@@ -92,7 +99,20 @@ type Block =
   /** A ` ```mermaid ` fence; `source` is what is between the fences, handed to Mermaid as-is. */
   | { kind: 'diagram'; source: string }
   | { kind: 'rule' }
+  /** Every row is padded or cut to the header's width, as GitHub does. */
+  | { kind: 'table'; header: string[]; align: TableAlign[]; rows: string[][] }
   | List;
+
+type TableAlign = 'left' | 'center' | 'right' | undefined;
+
+function tableAlign(delimiter: string): TableAlign {
+  const left = delimiter.startsWith(':');
+  const right = delimiter.endsWith(':');
+  return left && right ? 'center' : right ? 'right' : left ? 'left' : undefined;
+}
+
+// `text-left` for an unaligned column too: a `<th>` is centred by default, a `<td>` is not.
+const ALIGN_CLASS = { left: 'text-left', center: 'text-center', right: 'text-right' };
 
 const RULE_LINE = /^\s*(?:---+|\*\*\*+|___+)\s*$/;
 const QUOTE_LINE = /^\s*>\s?/;
@@ -174,7 +194,8 @@ function parseList(lines: readonly string[], start: number): { lists: List[]; en
 /** Group lines into blocks. Deliberately line-based: a blank line ends whatever was open. */
 export function parseBlocks(text: string): Block[] {
   const blocks: Block[] = [];
-  const lines = text.split('\n');
+  // A line that held only a comment is left blank, so it ends a paragraph or list as CommonMark does.
+  const lines = stripComments(text).split('\n');
   let index = 0;
 
   while (index < lines.length) {
@@ -243,6 +264,19 @@ export function parseBlocks(text: string): Block[] {
       continue;
     }
 
+    const tableEnd = tableAt(lines, index);
+    if (tableEnd !== null) {
+      const [header, delimiter, ...rows] = lines.slice(index, tableEnd + 1).map(tableCells);
+      blocks.push({
+        kind: 'table',
+        header,
+        align: delimiter.map(tableAlign),
+        rows: rows.map((row) => header.map((_, i) => row[i] ?? '')),
+      });
+      index = tableEnd + 1;
+      continue;
+    }
+
     /* A paragraph runs until a blank line or the start of anything else — a display formula
        included, so `The sum is` on one line and `$$` on the next reads the way it does in Obsidian. */
     const body: string[] = [];
@@ -251,7 +285,8 @@ export function parseBlocks(text: string): Block[] {
       lines[index].trim() !== '' &&
       !/^(?:#{1,6}\s|```|\s*>|\s*[-*+]\s|\s*\d+[.)]\s)/.test(lines[index]) &&
       !RULE_LINE.test(lines[index]) &&
-      !(body.length && mathBlockAt(lines, index))
+      !(body.length && mathBlockAt(lines, index)) &&
+      tableAt(lines, index) === null
     ) {
       body.push(lines[index++]);
     }
@@ -403,6 +438,38 @@ export function MarkdownView({
             );
           case 'list':
             return list(block, 0, key);
+          case 'table': {
+            const cell = (content: string, i: number) => (
+              <Inline text={content} people={people} documentLabels={documentLabels} key={i} />
+            );
+            const align = (i: number) => ALIGN_CLASS[block.align[i] ?? 'left'];
+            return (
+              <div key={key} className="my-3 overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      {block.header.map((content, i) => (
+                        <th key={i} className={cn('px-3 py-1.5 font-semibold', align(i))}>
+                          {cell(content, i)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows.map((row, r) => (
+                      <tr key={r} className="border-b border-border/60 last:border-0">
+                        {row.map((content, i) => (
+                          <td key={i} className={cn('px-3 py-1.5', align(i))}>
+                            {cell(content, i)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          }
           default:
             return (
               <p key={key} className="my-3 whitespace-pre-wrap first:mt-0">
@@ -466,12 +533,15 @@ function Inline({
   if (!match) return <Mentions text={text} people={people} />;
 
   const before = text.slice(0, match.index);
-  const token = match[0];
-  const after = text.slice(match.index + token.length);
-
+  let token = match[0];
   let content: ReactNode;
   const math = readMathToken(token);
-  if (math) {
+  if (token.startsWith('<!--')) {
+    /* Only an opener that never closes gets this far — parseBlocks has already stripped every real
+       comment — and it is prose, as the editor paints it. */
+    token = '<!--';
+    content = token;
+  } else if (math) {
     content = <TexMath tex={math.tex} display={math.display} source={token} />;
   } else if (token.startsWith('[[')) {
     const id = token.slice(2, -2);
@@ -498,17 +568,18 @@ function Inline({
   } else if (token.startsWith('**')) {
     content = (
       <strong className="font-semibold">
-        <Mentions text={token.slice(2, -2)} people={people} />
+        <Inline text={token.slice(2, -2)} people={people} documentLabels={documentLabels} />
       </strong>
     );
   } else {
     content = (
       <em>
-        <Mentions text={token.slice(1, -1)} people={people} />
+        <Inline text={token.slice(1, -1)} people={people} documentLabels={documentLabels} />
       </em>
     );
   }
 
+  const after = text.slice(match.index + token.length);
   return (
     <>
       {before && <Mentions text={before} people={people} />}

@@ -10,12 +10,15 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { fuzzyIncludes } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
 export interface PickerItem {
   id: string;
   label: string;
   color?: string;
+  /** Other names the item can be found by — a person's nicknames. */
+  aliases?: string[];
 }
 
 interface EntityPickerProps {
@@ -48,6 +51,14 @@ export function EntityPicker({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [dialogContainer, setDialogContainer] = useState<HTMLElement | null>(null);
   const selected = new Set(selectedIds);
+  /* Filtered here rather than by cmdk, with the same accent-insensitive, alias-aware match the
+     composer's @ and # autocomplete use (TokenTextarea.tsx), so both ways of adding a person find
+     the same people. An item found only by an alias names it, as the autocomplete does. */
+  const matches = items.flatMap((item) => {
+    if (fuzzyIncludes(item.label, query)) return [{ item, label: item.label }];
+    const alias = item.aliases?.find((a) => fuzzyIncludes(a, query));
+    return alias ? [{ item, label: `${item.label} (aka. ${alias})` }] : [];
+  });
   const canCreate =
     onCreate &&
     query.trim().length > 0 &&
@@ -75,12 +86,12 @@ export function EntityPicker({
         className={cn('w-56 p-0', contentClassName)}
         align="start"
       >
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput placeholder={placeholder} value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>{t('common.noResults')}</CommandEmpty>
             <CommandGroup>
-              {items.map((item) => (
+              {matches.map(({ item, label }) => (
                 <CommandItem
                   key={item.id}
                   value={`${item.id}:${item.label}`}
@@ -90,7 +101,7 @@ export function EntityPicker({
                     className="mr-1 inline-block size-2 rounded-full"
                     style={{ backgroundColor: item.color ?? 'var(--muted-foreground)' }}
                   />
-                  <span className="flex-1 truncate">{item.label}</span>
+                  <span className="flex-1 truncate">{label}</span>
                   {selected.has(item.id) && (
                     <span className="text-xs text-muted-foreground">✓</span>
                   )}

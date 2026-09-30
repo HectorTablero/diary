@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { aTag } from '@/test/fixtures';
+import { aPerson, aTag } from '@/test/fixtures';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { outboxOps, seed, seedSettings } from '@/test/seed';
 import { db } from '@/db/db';
@@ -128,5 +128,15 @@ describe('EntryComposer', () => {
        asserting on both ends is what would catch them being wired to each other incorrectly. */
     const [op] = await outboxOps();
     expect((op.body as { tags: string[] }).tags).toEqual(['t1']);
+  });
+
+  it('finds a person in the Add people picker by a nickname, accents ignored, as @ does', async () => {
+    await seed({ people: [aPerson({ id: 'p1', name: 'Carmen', aliases: ['Mamá'] })] });
+    const { user } = setup();
+
+    await user.click(screen.getByRole('button', { name: 'People' }));
+    await user.type(await screen.findByPlaceholderText("Person's name"), 'mama');
+
+    expect(await screen.findByRole('option', { name: 'Carmen (aka. Mamá)' })).toBeInTheDocument();
   });
 });

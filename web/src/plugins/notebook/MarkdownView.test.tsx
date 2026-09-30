@@ -312,3 +312,59 @@ describe('MarkdownView — math', () => {
     expect(container.querySelector('em')).toBeNull();
   });
 });
+
+describe('MarkdownView — tables', () => {
+  it('renders a table with its header, alignment and inline content', () => {
+    render('| Name | Qty |\n|:--|--:|\n| **tea** | 2 |\n| coffee |');
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers.map((th) => th.textContent)).toEqual(['Name', 'Qty']);
+    expect(headers[1]).toHaveClass('text-right');
+    const cells = screen.getAllByRole('cell');
+    // The short row is padded to the header's width.
+    expect(cells.map((td) => td.textContent)).toEqual(['tea', '2', 'coffee', '']);
+    expect(cells[0].querySelector('strong')).not.toBeNull();
+  });
+
+  it('ends a paragraph where a table starts', () => {
+    const blocks = parseBlocks('intro\n| a | b |\n|---|---|\n| c | d |\n\nafter');
+    expect(blocks.map((block) => block.kind)).toEqual(['paragraph', 'table', 'paragraph']);
+  });
+});
+
+describe('MarkdownView — comments', () => {
+  it('hides a comment, inline or across lines, and keeps every other tag literal', () => {
+    const { container } = render('a <!-- secret --> b\n\n<!--\nhidden\n-->\n\n<b>shown</b>');
+    expect(container.textContent).not.toContain('secret');
+    expect(container.textContent).not.toContain('hidden');
+    expect(container.textContent).toContain('<b>shown</b>');
+    expect(container.querySelector('b')).toBeNull();
+  });
+
+  it('shows a comment inside code, and an opener that never closes', () => {
+    const { container } = render('`<!-- code -->`\n\n<!-- open **bold**');
+    expect(container.textContent).toContain('<!-- code -->');
+    expect(container.textContent).toContain('<!-- open bold');
+  });
+
+  it('keeps a task below a multi-line comment toggling its own line', () => {
+    const onToggle = vi.fn();
+    const text = '<!--\nnote\n-->\n- [ ] task';
+    render(text, onToggle);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'task' }));
+    expect(onToggle).toHaveBeenCalledWith('<!--\nnote\n-->\n- [x] task');
+  });
+});
+
+describe('MarkdownView — emphasis around other tokens', () => {
+  it('resolves a [[id]] inside bold', async () => {
+    const target = await createPluginDocument('notebook', {
+      parentId: '',
+      title: 'Bold target',
+      body: '',
+      sortKey: 'a0',
+    });
+    render(`See **[[${target.id}]]**.`);
+    const link = await screen.findByRole('link', { name: 'Bold target' });
+    expect(link.closest('strong')).not.toBeNull();
+  });
+});

@@ -58,7 +58,9 @@ export type HighlightKind =
   /** The visible half of a `[label](url)` or `![alt](url)`. */
   | 'label'
   /** The target half of the same. */
-  | 'url';
+  | 'url'
+  /** An `<!-- comment -->`, delimiters and all. Hidden by the preview — see `stripComments`. */
+  | 'comment';
 
 export interface HighlightSpan {
   text: string;
@@ -141,6 +143,9 @@ export const INLINE_PATTERN = new RegExp(
   [
     '(`[^`]+`)',
     `(${INLINE_MATH})`,
+    /* A comment, closed on this line or running to its end — whether one of the latter really is a
+       comment depends on the lines below, which only `highlightSource` can see. */
+    '(<!--.*?(?:-->|$))',
     String.raw`(\*\*[^*]+\*\*)`,
     String.raw`(\*[^*]+\*)`,
     '(_[^_]+_)',
@@ -312,6 +317,59 @@ export function documentReferenceAt(
   return null;
 }
 
+/**
+ * The cells of one table row, trimmed: the outer pipes dropped, `\|` read as a literal pipe.
+ *
+ * Split before anything inline is read, as GitHub does — so a pipe inside a code span still divides
+ * the cell, and has to be written `\|` to stay in it.
+ */
+export function tableCells(line: string): string[] {
+  const cells = line.split(TABLE_PIPE);
+  if (cells.length > 1 && cells[0].trim() === '') cells.shift();
+  if (cells.length > 1 && cells.at(-1)!.trim() === '') cells.pop();
+  return cells.map((cell) => cell.trim().replaceAll('\\|', '|'));
+}
+
+const TABLE_PIPE = /(?<!\\)\|/;
+const TABLE_DELIMITER = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
+
+/**
+ * The last line of the table whose header is `lines[index]`, or `null` if no table starts there.
+ *
+ * GitHub's shape: a header row, a delimiter row with one `---` (`:--`, `:-:`, `--:`) per header cell,
+ * and every following line that still has a pipe in it. Both of the first two need a pipe, so `---`
+ * under a line of prose stays a rule. Shared by the preview and the editor, like `mathBlockAt`.
+ */
+export function tableAt(lines: readonly string[], index: number): number | null {
+  const header = lines[index];
+  const delimiter = lines[index + 1];
+  if (
+    !header?.includes('|') ||
+    !delimiter?.includes('|') ||
+    !TABLE_DELIMITER.test(delimiter) ||
+    tableCells(header).length !== tableCells(delimiter).length
+  ) {
+    return null;
+  }
+  let end = index + 1;
+  while (lines[end + 1]?.includes('|')) end++;
+  return end;
+}
+
+/**
+ * `text` with every comment's characters removed and its line breaks kept, so line `n` of the result
+ * is still line `n` of the source — which is what a task checkbox uses to find the line it flips.
+ *
+ * Read off `highlightSource` rather than with a regex of its own, so the preview hides exactly what
+ * the editor greys out: never a `<!--` inside code or a formula, and never one that doesn't close.
+ */
+export function stripComments(text: string): string {
+  if (!text.includes('<!--')) return text;
+  return highlightSource(text, [])
+    .map((span) => (span.kind === 'comment' ? span.text.replace(/[^\n]/g, '') : span.text))
+    .join('');
+}
+
 /* Line shapes. Each captures its marker *including* the trailing space, so slicing the capture off
    the line leaves exactly the words — and the marker keeps its own width in the overlay. */
 const FENCE = /^\s*```/;
@@ -414,18 +472,37 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
     }
     const marks = piece.startsWith('**') ? 2 : 1;
     push(piece.slice(0, marks), 'syntax');
-    mentions(piece.slice(marks, -marks), marks === 2 ? 'strong' : 'emphasis');
+    // Read like any other text, so `**[[id]]**` is still a reference and `*[a](b)*` still a link.
+    inline(piece.slice(marks, -marks), marks === 2 ? 'strong' : 'emphasis');
     push(piece.slice(-marks), 'syntax');
   };
 
-  const inline = (source: string) => {
+  /** Whether the current line is inside an `<!--` opened on an earlier one. */
+  let commented = false;
+
+  /** `kind` is what the plain text in `source` is painted as — `strong` inside a `**…**`, and so on. */
+  const inline = (source: string, kind: HighlightKind = 'text') => {
     let rest = source;
     for (;;) {
       const match = INLINE_PATTERN.exec(rest);
-      if (!match) return mentions(rest);
-      mentions(rest.slice(0, match.index));
-      token(match[0]);
-      rest = rest.slice(match.index + match[0].length);
+      if (!match) return mentions(rest, kind);
+      mentions(rest.slice(0, match.index), kind);
+      let piece = match[0];
+      if (piece.startsWith('<!--')) {
+        const closed = piece.endsWith('-->');
+        /* An opener that never closes is prose, like a `$$` that never does: hiding everything below
+           it would punish a document for being halfway through an edit. */
+        if (!closed && !text.includes('-->', at + piece.length)) {
+          piece = '<!--';
+          mentions(piece, kind);
+        } else {
+          push(piece, 'comment');
+          commented = !closed;
+        }
+      } else {
+        token(piece);
+      }
+      rest = rest.slice(match.index + piece.length);
     }
   };
 
@@ -434,6 +511,17 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
   let fenced: 'code' | 'math' | 'diagram' | null = null;
   /** The display formula the current line is inside, once its opening line has been painted. */
   let formula: MathBlock | null = null;
+  /** The table the current line is inside: its delimiter row, and its last line. */
+  let table = { delimiter: -1, end: -1 };
+
+  /** One table row: the pipes are syntax and each cell is read on its own, as the preview reads it. */
+  const tableRow = (line: string, delimiter: boolean) => {
+    if (delimiter) return push(line, 'syntax');
+    line.split(TABLE_PIPE).forEach((cell, i) => {
+      if (i) push('|', 'syntax');
+      inline(cell);
+    });
+  };
 
   /** A piece of a display formula — a `$$`/`\[` block or a ` ```math ` fence, never inline math. */
   const displayed = (piece: string) => push(piece, 'math', undefined, true);
@@ -461,9 +549,17 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
     /* The separators the split removed. Inside a fence or a formula they belong to the block, so its
        paint reads as one piece rather than as a stack of ragged strips. */
     if (index > 0) {
-      const inside = fenced ?? (formula ? 'math' : 'text');
+      const inside = commented ? 'comment' : (fenced ?? (formula ? 'math' : 'text'));
       if (inside === 'math') displayed('\n');
       else push('\n', inside);
+    }
+
+    if (commented) {
+      const close = line.indexOf('-->');
+      if (close < 0) return push(line, 'comment');
+      push(line.slice(0, close + 3), 'comment');
+      commented = false;
+      return inline(line.slice(close + 3));
     }
 
     if (formula) {
@@ -472,6 +568,8 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
       displayed(line.slice(0, closeAt));
       return push(line.slice(closeAt), 'syntax');
     }
+
+    if (index <= table.end) return tableRow(line, index === table.delimiter);
 
     if (FENCE.test(line)) {
       push(line, 'syntax');
@@ -510,6 +608,13 @@ export function highlightSource(text: string, people: MentionEntity[]): Highligh
       inline(rest.slice(hashes[1].length));
       heading = false;
       return;
+    }
+
+    // Checked where MarkdownView checks it: after headings, quotes and lists have had their turn.
+    const tableEnd = QUOTE.test(line) || LIST.test(line) ? null : tableAt(lines, index);
+    if (tableEnd !== null) {
+      table = { delimiter: index + 1, end: tableEnd };
+      return tableRow(line, false);
     }
 
     const quote = QUOTE.exec(rest);

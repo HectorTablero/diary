@@ -272,7 +272,7 @@ export function EntryComposer({
                 {t('diary.addPeople')}
               </Button>
             }
-            items={allPeople.map((p) => ({ id: p.id, label: p.name }))}
+            items={allPeople.map((p) => ({ id: p.id, label: p.name, aliases: p.aliases }))}
             selectedIds={people.map((p) => p.id)}
             onToggle={(id) => {
               const person = allPeople.find((p) => p.id === id);
