@@ -4,7 +4,6 @@ import {
   Clock,
   Eye,
   FilePlus2,
-  FileText,
   FolderInput,
   Maximize2,
   Minimize2,
@@ -20,7 +19,6 @@ import { useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { updatePluginDocument } from '@/db/pluginDocuments';
 import { EmptyState } from '@/components/common/EmptyState';
-import { namedIcon } from '@/components/icons/iconCatalog';
 import { IconPickerDialog } from '@/components/icons/IconPickerDialog';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -35,6 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { notifyDeleted } from '@/lib/undo';
 import { cn } from '@/lib/utils';
 import { DocumentEditorPanel } from './DocumentEditorPanel';
+import { DocumentIcon } from './DocumentIcon';
 import { HistoryDialog } from './HistoryDialog';
 import { setDocumentIcon, useDocumentIcons } from './icons';
 import { documentLabel, ROOT_ID } from './model';
@@ -337,12 +336,6 @@ export default function NotebookPage() {
       )}
     </PageContainer>
   );
-}
-
-/** A document's chosen icon. Decorative: the title beside it already names the document. */
-function DocumentIcon({ icon, className }: { icon: string; className?: string }) {
-  const Icon = namedIcon(icon, FileText);
-  return <Icon aria-hidden className={className} />;
 }
 
 /** The way back up. The root is a link too, so there is always somewhere to go from any depth. */

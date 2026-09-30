@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { DocumentIcon } from './DocumentIcon';
+import { useDocumentIcons } from './icons';
 import { loadExportExclusions, saveExportExclusions } from './markdown';
 import { documentLabel, ROOT_ID, sortDocuments } from './model';
 import { useAllDocuments } from './useNotebook';
@@ -21,6 +23,7 @@ import { useAllDocuments } from './useNotebook';
 export function NotebookExportPicker() {
   const { t } = useTranslation();
   const documents = useAllDocuments();
+  const icons = useDocumentIcons();
   const [excluded, setExcluded] = useState(loadExportExclusions);
 
   const rows = useMemo(() => {
@@ -61,6 +64,7 @@ export function NotebookExportPicker() {
         <ul className="divide-y">
           {rows.map(({ doc, depth, descendants }) => {
             const label = documentLabel(doc, t('plugins.notebook.untitled'));
+            const icon = icons.get(doc.id);
             const anyBelowExcluded = descendants.some((id) => excluded.has(id));
             const toggleLabel = t(
               anyBelowExcluded
@@ -80,6 +84,9 @@ export function NotebookExportPicker() {
                       update((next) => (v === true ? next.delete(doc.id) : next.add(doc.id)))
                     }
                   />
+                  {icon && (
+                    <DocumentIcon icon={icon} className="size-4 shrink-0 text-muted-foreground" />
+                  )}
                   <span className="truncate text-sm">{label}</span>
                 </label>
                 {descendants.length > 0 && (

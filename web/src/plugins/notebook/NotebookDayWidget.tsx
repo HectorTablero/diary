@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { todayKey } from '@/lib/dates';
+import { DocumentIcon } from './DocumentIcon';
+import { useDocumentIcons } from './icons';
 import { documentLabel } from './model';
 import { useTouchedDocuments } from './useNotebook';
 
@@ -24,6 +26,7 @@ import { useTouchedDocuments } from './useNotebook';
 export function NotebookDayWidget({ dateKey }: { dateKey: string }) {
   const { t } = useTranslation();
   const { touched, loading } = useTouchedDocuments(dateKey);
+  const icons = useDocumentIcons();
   const isToday = dateKey === todayKey();
 
   // Nothing is drawn while loading: this sits below the composer, and a placeholder that resolves in
@@ -60,45 +63,51 @@ export function NotebookDayWidget({ dateKey }: { dateKey: string }) {
             })}
           </p>
           <ul className="mt-2 space-y-1">
-            {touched.map(({ id, document, added, removed }) => (
-              <li key={id}>
-                <Link
-                  to={`/plugins/notebook?doc=${id}`}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
-                >
-                  <span className="min-w-0 flex-1 truncate">
-                    {document ? documentLabel(document, t('plugins.notebook.untitled')) : ''}
-                  </span>
-                  {/* Both sides of the day's change, the way a diff states it — a day spent cutting
-                      a thought down is work, and a single net figure reports it as nothing. A side
-                      that is zero is left out rather than shown as "+0", which is a number that
-                      earns none of the space it takes in a row this tight.
-
-                      The app's own two colours, not a new pair: emerald-600/400 and `destructive`
-                      are what the backup import review already uses for a row added and a row lost
-                      (BackupConflictRow), which is the same distinction being drawn here.
-
-                      One accessible label for the pair, so a screen reader gets a sentence rather
-                      than two bare numbers with symbols in front of them. */}
-                  <span
-                    aria-label={t('plugins.notebook.charactersDeltaLabel', { added, removed })}
-                    className="flex shrink-0 gap-1.5 text-xs tabular-nums"
+            {touched.map(({ id, document, added, removed }) => {
+              const icon = icons.get(id);
+              return (
+                <li key={id}>
+                  <Link
+                    to={`/plugins/notebook?doc=${id}`}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
                   >
-                    {added > 0 && (
-                      <span aria-hidden className="text-emerald-600 dark:text-emerald-400">
-                        +{added}
-                      </span>
+                    {icon && (
+                      <DocumentIcon icon={icon} className="size-4 shrink-0 text-muted-foreground" />
                     )}
-                    {removed > 0 && (
-                      <span aria-hidden className="text-destructive">
-                        −{removed}
-                      </span>
-                    )}
-                  </span>
-                  <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-                </Link>
-              </li>
-            ))}
+                    <span className="min-w-0 flex-1 truncate">
+                      {document ? documentLabel(document, t('plugins.notebook.untitled')) : ''}
+                    </span>
+                    {/* Both sides of the day's change, the way a diff states it — a day spent cutting
+                        a thought down is work, and a single net figure reports it as nothing. A side
+                        that is zero is left out rather than shown as "+0", which is a number that
+                        earns none of the space it takes in a row this tight.
+
+                        The app's own two colours, not a new pair: emerald-600/400 and `destructive`
+                        are what the backup import review already uses for a row added and a row lost
+                        (BackupConflictRow), which is the same distinction being drawn here.
+
+                        One accessible label for the pair, so a screen reader gets a sentence rather
+                        than two bare numbers with symbols in front of them. */}
+                    <span
+                      aria-label={t('plugins.notebook.charactersDeltaLabel', { added, removed })}
+                      className="flex shrink-0 gap-1.5 text-xs tabular-nums"
+                    >
+                      {added > 0 && (
+                        <span aria-hidden className="text-emerald-600 dark:text-emerald-400">
+                          +{added}
+                        </span>
+                      )}
+                      {removed > 0 && (
+                        <span aria-hidden className="text-destructive">
+                          −{removed}
+                        </span>
+                      )}
+                    </span>
+                    <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
