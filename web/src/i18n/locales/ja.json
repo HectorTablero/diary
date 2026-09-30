@@ -419,6 +419,27 @@
       "twoColumnLayoutDescription": "十分な横幅がある場合、左側に日記エントリー、右側にプラグイン情報を表示します。",
       "replayOnboarding": "はじめの案内をもう一度見る"
     },
+    "shortcuts": {
+      "title": "キーボードショートカット",
+      "description": "Ctrl・Alt・⌘ をしばらく押し続けると、各キーの働きが表示されます。ブラウザによっては一部の組み合わせを独自に使っているため、反応しないものはここで別のキーに変更してください。",
+      "enabled": "キーボードショートカットを使う",
+      "hintDelay": "長押しでヒントを表示するまでの時間",
+      "hintDelayDescription": "Ctrl・Alt・⌘ をどれだけ押し続けると画面にキーが表示されるか。",
+      "hintDelaySeconds": "{{seconds}} 秒",
+      "hintDelayNever": "表示しない",
+      "groupNavigation": "移動",
+      "groupEntry": "エントリーの入力中",
+      "goTo": "「{{name}}」へ移動",
+      "setImportance": "重要度：{{level}}",
+      "none": "なし",
+      "record": "「{{action}}」のショートカットを変更",
+      "recording": "キーを押してください…",
+      "needsModifier": "Ctrl・Alt・⌘ のいずれかと組み合わせてください。",
+      "conflict": "{{actions}}と同じキーです。もう一度押すと順に切り替わります。",
+      "reset": "「{{action}}」を初期設定に戻す",
+      "clear": "「{{action}}」をオフにする",
+      "resetAll": "すべてのショートカットを初期設定に戻す"
+    },
     "reminders": {
       "title": "リマインダー",
       "description": "この端末が送る通知です。設定はこの端末に残り、時刻もこの端末のものです。",

@@ -442,6 +442,27 @@
       "twoColumnLayoutDescription": "Muestra las entradas a la izquierda y la información de los plugins a la derecha cuando hay suficiente espacio horizontal.",
       "replayOnboarding": "Volver a ver la introducción"
     },
+    "shortcuts": {
+      "title": "Atajos de teclado",
+      "description": "Mantén pulsado Ctrl, Alt o ⌘ un momento para ver qué hace cada tecla. Algunos navegadores se reservan ciertas combinaciones: si una no hace nada, asígnale otra aquí.",
+      "enabled": "Usar atajos de teclado",
+      "hintDelay": "Mostrar pistas al mantener pulsado",
+      "hintDelayDescription": "Cuánto tiempo hay que mantener Ctrl, Alt o ⌘ antes de que las teclas aparezcan en pantalla.",
+      "hintDelaySeconds": "{{seconds}} s",
+      "hintDelayNever": "Nunca",
+      "groupNavigation": "Navegación",
+      "groupEntry": "Al escribir una entrada",
+      "goTo": "Ir a {{name}}",
+      "setImportance": "Importancia: {{level}}",
+      "none": "Ninguno",
+      "record": "Cambiar el atajo de «{{action}}»",
+      "recording": "Pulsa las teclas…",
+      "needsModifier": "Combina la tecla con Ctrl, Alt o ⌘.",
+      "conflict": "Comparte teclas con {{actions}}: vuelve a pulsarlas para pasar de uno a otro.",
+      "reset": "Restablecer el atajo de «{{action}}»",
+      "clear": "Desactivar «{{action}}»",
+      "resetAll": "Restablecer todos los atajos"
+    },
     "reminders": {
       "title": "Recordatorios",
       "description": "Las notificaciones que envía este dispositivo. Se quedan en él, y sus horas son las suyas.",

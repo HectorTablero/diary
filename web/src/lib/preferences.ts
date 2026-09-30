@@ -72,6 +72,19 @@ export interface Preferences {
       build time; this is whether to. Device-local like everything else here, and deliberately
       outside the synced settings so opting out on a phone can't be undone by a laptop. */
   telemetry: boolean;
+  /** Keyboard shortcuts on this device — see shortcuts/. Device-local because keyboards are: the
+      laptop has one, the phone doesn't, and a Mac's ⌘ is not a PC's Ctrl. */
+  shortcuts: boolean;
+  /** How long a modifier has to be held before the shortcut hints appear, in ms. Null never shows
+      them — the shortcuts themselves still work. */
+  shortcutHintDelay: number | null;
+  /** Shortcuts that differ from their defaults, by action id: a binding when rebound, null when
+      turned off, absent when untouched.
+
+      One object despite the note on flat keys above, and safely so: the default is `{}`, so there
+      are no sub-keys for an older blob to shadow. A missing id already means "use the default",
+      which is also what keeps a newly added shortcut working for someone who customised others. */
+  shortcutOverrides: Record<string, string | null>;
   /** Whether the first-run tour has been shown on this device. Here rather than in the synced
       settings for the same reason as the reminders above, and the consequence is worse: signing out
       runs clearLocalData(), so a synced flag would reset to false and greet someone with a
@@ -111,6 +124,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // On by default: this is the only way a crash on someone else's device is ever seen, and the
   // switch below is one tap away for anyone who would rather it weren't.
   telemetry: true,
+  // On: every default needs Ctrl, Alt or ⌘, so none of them can fire while someone is just typing.
+  shortcuts: true,
+  // Half a second: long enough that a Ctrl+C never flashes them, short enough not to feel like waiting.
+  shortcutHintDelay: 500,
+  shortcutOverrides: {},
   // False: a device that has never stored a preference blob has, by definition, never run the app.
   onboardingSeen: false,
 };

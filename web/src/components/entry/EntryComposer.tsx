@@ -1,6 +1,6 @@
 import type { EntryDto, PersonRefDto, TagDto, ThreadDto } from '@diary/shared';
 import { AtSign, GitBranch, Hash, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useCreateEntry,
@@ -29,6 +29,7 @@ import { ApiError } from '@/lib/apiClient';
 import { useSession } from '@/lib/authClient';
 import { setPreference, usePreferences } from '@/lib/preferences';
 import { isNative } from '@/lib/native';
+import { useImportanceShortcuts } from '@/shortcuts/useImportanceShortcuts';
 
 interface EntryComposerProps {
   dateKey: string;
@@ -73,6 +74,8 @@ export function EntryComposer({
   const [threads, setThreads] = useState<ThreadDto[]>(entry?.threads ?? []);
   const [people, setPeople] = useState<PersonRefDto[]>(entry?.people ?? []);
   const [saidTo, setSaidTo] = useState<string[]>(entry?.saidTo.map((s) => s.personId) ?? []);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const importanceShortcuts = useImportanceShortcuts(rootRef, importance, setImportance);
 
   const isEditing = entry !== null;
   const pending = createEntry.isPending || updateEntry.isPending;
@@ -182,7 +185,13 @@ export function EntryComposer({
   };
 
   return (
-    <div className="flex flex-col gap-2.5" onFocus={scrollClearOfTabBar}>
+    <div
+      ref={rootRef}
+      // How the importance shortcuts find the composer they're for — see targetComposer.
+      data-entry-composer=""
+      className="flex flex-col gap-2.5"
+      onFocus={scrollClearOfTabBar}
+    >
       <TokenTextarea
         value={content}
         onChange={setContent}
@@ -241,7 +250,11 @@ export function EntryComposer({
       )}
 
       <div className="@container flex flex-wrap items-center gap-2">
-        <ImportancePicker value={importance} onChange={setImportance} />
+        <ImportancePicker
+          value={importance}
+          onChange={setImportance}
+          shortcuts={importanceShortcuts}
+        />
         {/* Grouped so they wrap to the next line together instead of splitting apart.
             The separator only makes sense when the group shares the line with the
             importance picker, so it's hidden once the container is too narrow for that. */}

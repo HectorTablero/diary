@@ -43,6 +43,9 @@ import { dismissUpdate, isDismissed } from '@/lib/updateCheck';
 import { cn } from '@/lib/utils';
 import { pageLoaders } from '@/pages/lazyPages';
 import { usePluginNav } from '@/plugins/usePluginNav';
+import { ariaKeyShortcuts, type Binding } from '@/shortcuts/bindings';
+import { ShortcutHintsProvider, ShortcutIcon } from '@/shortcuts/ShortcutHints';
+import { useNavShortcuts } from '@/shortcuts/useNavShortcuts';
 
 interface NavItem {
   to: string;
@@ -98,15 +101,18 @@ function SidebarLink({
   item,
   badge = 0,
   label,
+  shortcut,
 }: {
   item: NavItem;
   badge?: number;
   label?: string;
+  shortcut?: Binding;
 }) {
   const { t } = useTranslation();
   return (
     <NavLink
       to={item.to}
+      aria-keyshortcuts={shortcut ? ariaKeyShortcuts(shortcut) : undefined}
       className={({ isActive }) =>
         cn(
           'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -116,7 +122,9 @@ function SidebarLink({
         )
       }
     >
-      <item.icon className="size-4.5 shrink-0" />
+      {/* The key takes the icon's place while its modifier is held — in the icon's slot rather
+          than at the end of the row, where People's checkup badge lives. */}
+      <ShortcutIcon icon={item.icon} binding={shortcut ?? null} />
       <span className="flex-1 truncate">{label ?? t(item.labelKey)}</span>
       {badge > 0 && (
         <span className="flex h-5 items-center gap-0.5 rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white">
@@ -137,6 +145,9 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
      is more like a place in the app than like a setting. */
   const pluginNav = usePluginNav();
   const threadsOn = useThreadsEnabled();
+  /* Registered here because the sidebar is where the hints go. It stays mounted (just
+     `display: none`) on a narrow browser window, so the keys keep working there too. */
+  const shortcuts = useNavShortcuts(pluginNav);
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r bg-sidebar px-3 py-5 md:flex">
       <NavLink to="/diary" className="mb-6 flex items-center gap-2.5 px-3">
@@ -149,6 +160,7 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
             key={item.to}
             item={item}
             badge={item.to === '/people' ? pendingCheckups : 0}
+            shortcut={shortcuts.get(item.to)}
           />
         ))}
         <div className="mt-auto flex flex-col gap-1">
@@ -160,12 +172,13 @@ function Sidebar({ pendingCheckups }: { pendingCheckups: number }) {
                     key={plugin.to}
                     item={{ to: plugin.to, icon: plugin.icon, labelKey: '' }}
                     label={plugin.label}
+                    shortcut={shortcuts.get(plugin.to)}
                   />
                 ))}
-                <SidebarLink item={item} />
+                <SidebarLink item={item} shortcut={shortcuts.get(item.to)} />
               </Fragment>
             ) : (
-              <SidebarLink key={item.to} item={item} />
+              <SidebarLink key={item.to} item={item} shortcut={shortcuts.get(item.to)} />
             ),
           )}
         </div>
@@ -546,25 +559,27 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-dvh">
-      {/* Web only: the native build renders no sidebar, so there are no stops to bypass. Must come
+    <ShortcutHintsProvider>
+      <div className="flex min-h-dvh">
+        {/* Web only: the native build renders no sidebar, so there are no stops to bypass. Must come
           before the sidebar in the DOM to be the first thing Tab reaches, and `tabIndex={-1}` on
           the target is what makes the jump actually move focus rather than only scroll. */}
-      {!isNative && <SkipToContentLink />}
-      {!isNative && <Sidebar pendingCheckups={pendingCheckups} />}
-      <main
-        id="main"
-        tabIndex={-1}
-        className={cn(
-          'min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]',
-          !isNative && 'md:pb-0',
-        )}
-      >
-        <UpdateBanner />
-        <SyncStatusOverlay />
-        <Outlet />
-      </main>
-      <TabBar pendingCheckups={pendingCheckups} />
-    </div>
+        {!isNative && <SkipToContentLink />}
+        {!isNative && <Sidebar pendingCheckups={pendingCheckups} />}
+        <main
+          id="main"
+          tabIndex={-1}
+          className={cn(
+            'min-w-0 flex-1 pt-[var(--inset-top)] pb-[calc(5.5rem+var(--inset-bottom))]',
+            !isNative && 'md:pb-0',
+          )}
+        >
+          <UpdateBanner />
+          <SyncStatusOverlay />
+          <Outlet />
+        </main>
+        <TabBar pendingCheckups={pendingCheckups} />
+      </div>
+    </ShortcutHintsProvider>
   );
 }

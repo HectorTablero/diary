@@ -24,6 +24,7 @@ import { ApiKeyField } from '@/components/settings/ApiKeyField';
    device-only pickers, the reminders block, the version line — lives beside them in
    components/settings, so this file is the draft, its save path, and the order of the sections. */
 import { RemindersSection } from '@/components/settings/RemindersSection';
+import { ShortcutsSection } from '@/components/settings/ShortcutsSection';
 import { notifyDeviceSaved, Section, SubToggleRow, ToggleRow } from '@/components/settings/Section';
 import { PluginSettingsSections, PluginsSection } from '@/components/settings/PluginsSection';
 import { VersionFooter } from '@/components/settings/VersionFooter';
@@ -710,6 +711,9 @@ export default function SettingsPage() {
             </div>
           )}
         </Section>
+
+        {/* Web only: the native build registers no shortcuts. */}
+        {!isNative && <ShortcutsSection />}
 
         {/* `settings` is required here, not just `draft`: the has*Key flags below are read from
             the query rather than the draft, so the section waits for the query to have landed. */}

@@ -413,6 +413,27 @@
       "twoColumnLayoutDescription": "当有足够的水平空间时，在左侧显示日记条目，在右侧显示插件信息。",
       "replayOnboarding": "重看新手引导"
     },
+    "shortcuts": {
+      "title": "键盘快捷键",
+      "description": "按住 Ctrl、Alt 或 ⌘ 片刻，即可看到每个按键的作用。有些浏览器会保留部分组合键；如果某个快捷键没有反应，可以在这里换一个。",
+      "enabled": "使用键盘快捷键",
+      "hintDelay": "按住多久后显示提示",
+      "hintDelayDescription": "需要按住 Ctrl、Alt 或 ⌘ 多长时间，按键提示才会出现在屏幕上。",
+      "hintDelaySeconds": "{{seconds}} 秒",
+      "hintDelayNever": "从不",
+      "groupNavigation": "导航",
+      "groupEntry": "撰写条目时",
+      "goTo": "前往「{{name}}」",
+      "setImportance": "重要程度：{{level}}",
+      "none": "无",
+      "record": "更改「{{action}}」的快捷键",
+      "recording": "请按下按键…",
+      "needsModifier": "请将按键与 Ctrl、Alt 或 ⌘ 组合使用。",
+      "conflict": "与{{actions}}共用按键，再按一次即可依次切换。",
+      "reset": "将「{{action}}」恢复为默认",
+      "clear": "关闭「{{action}}」",
+      "resetAll": "恢复所有默认快捷键"
+    },
     "reminders": {
       "title": "提醒",
       "description": "本设备发送的通知。设置只保存在本设备，时间也按本设备的时钟。",

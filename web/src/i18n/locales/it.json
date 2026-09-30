@@ -441,6 +441,27 @@
       "twoColumnLayoutDescription": "Mostra le voci a sinistra e le informazioni dei plugin a destra quando c'è abbastanza spazio orizzontale.",
       "replayOnboarding": "Rivedi l'introduzione"
     },
+    "shortcuts": {
+      "title": "Scorciatoie da tastiera",
+      "description": "Tieni premuto Ctrl, Alt o ⌘ per un attimo per vedere cosa fa ogni tasto. Alcuni browser si riservano certe combinazioni: se una non fa nulla, assegnane un'altra qui.",
+      "enabled": "Usa le scorciatoie da tastiera",
+      "hintDelay": "Mostra i suggerimenti tenendo premuto per",
+      "hintDelayDescription": "Per quanto tempo tenere premuto Ctrl, Alt o ⌘ prima che i tasti compaiano sullo schermo.",
+      "hintDelaySeconds": "{{seconds}} s",
+      "hintDelayNever": "Mai",
+      "groupNavigation": "Navigazione",
+      "groupEntry": "Mentre scrivi una voce",
+      "goTo": "Vai a {{name}}",
+      "setImportance": "Importanza: {{level}}",
+      "none": "Nessuna",
+      "record": "Cambia la scorciatoia per «{{action}}»",
+      "recording": "Premi i tasti…",
+      "needsModifier": "Combina il tasto con Ctrl, Alt o ⌘.",
+      "conflict": "Condivide i tasti con {{actions}}: premili di nuovo per passare dall'uno all'altro.",
+      "reset": "Ripristina la scorciatoia predefinita per «{{action}}»",
+      "clear": "Disattiva «{{action}}»",
+      "resetAll": "Ripristina tutte le scorciatoie"
+    },
     "reminders": {
       "title": "Promemoria",
       "description": "Le notifiche che invia questo dispositivo. Restano qui, e i loro orari sono i suoi.",

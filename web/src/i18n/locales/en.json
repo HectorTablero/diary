@@ -447,6 +447,27 @@
       "twoColumnLayoutDescription": "Display entries on the left and plugin info on the right when enough horizontal space is available.",
       "replayOnboarding": "Replay the intro"
     },
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "description": "Hold Ctrl, Alt or ⌘ for a moment to see what each key does. Some browsers keep a few combinations for themselves — if one does nothing, give it another here.",
+      "enabled": "Use keyboard shortcuts",
+      "hintDelay": "Show hints after holding",
+      "hintDelayDescription": "How long Ctrl, Alt or ⌘ has to be held before the keys appear on screen.",
+      "hintDelaySeconds": "{{seconds}} s",
+      "hintDelayNever": "Never",
+      "groupNavigation": "Navigation",
+      "groupEntry": "While writing an entry",
+      "goTo": "Go to {{name}}",
+      "setImportance": "Importance: {{level}}",
+      "none": "None",
+      "record": "Change the shortcut for “{{action}}”",
+      "recording": "Press keys…",
+      "needsModifier": "Combine the key with Ctrl, Alt or ⌘.",
+      "conflict": "Shares its keys with {{actions}} — press them again to move between these.",
+      "reset": "Restore the default for “{{action}}”",
+      "clear": "Turn off “{{action}}”",
+      "resetAll": "Restore all default shortcuts"
+    },
     "reminders": {
       "title": "Reminders",
       "description": "The notifications this device sends. They stay on this device, and their times are local to it.",

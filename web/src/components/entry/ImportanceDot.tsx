@@ -2,6 +2,9 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { usePreferences } from '@/lib/preferences';
 import { cn } from '@/lib/utils';
+import { ariaKeyShortcuts } from '@/shortcuts/bindings';
+import { ShortcutHint } from '@/shortcuts/ShortcutHints';
+import type { ImportanceShortcuts } from '@/shortcuts/useImportanceShortcuts';
 
 const DOT_CLASSES: Record<number, string> = {
   1: 'bg-importance-1',
@@ -83,40 +86,53 @@ export function ImportanceDot({
 export function ImportancePicker({
   value,
   onChange,
+  shortcuts,
 }: {
   value: number;
   onChange: (importance: number) => void;
+  /** The composer's Ctrl+1–5, for the hint badges. Absent where the keys don't apply (the AI
+      suggestion review), so no badge promises a shortcut that isn't there. */
+  shortcuts?: ImportanceShortcuts;
 }) {
   const { t } = useTranslation();
   const markerClass = useImportanceMarkerClass();
   return (
     <div className="flex items-center gap-1" role="radiogroup" aria-label={t('importance.label')}>
-      {[1, 2, 3, 4, 5].map((importance) => (
-        <Tooltip key={importance}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={value === importance}
-              aria-label={t(`importance.levels.${importance}`)}
-              onClick={() => onChange(importance)}
-              className={cn(
-                'flex size-7 items-center justify-center rounded-full transition-all',
-                value === importance ? 'bg-accent ring-1 ring-ring' : 'hover:bg-accent/60',
-              )}
-            >
-              <span className={cn('size-3', markerClass(importance))} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p className="font-medium mr-1">{t(`importance.levels.${importance}`)}</p>
-            <div className="w-[0.75px] self-stretch bg-muted-foreground" />
-            <p className="max-w-48 text-xs opacity-80">
-              {t(`importance.descriptions.${importance}`)}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      ))}
+      {[1, 2, 3, 4, 5].map((importance) => {
+        const binding = shortcuts?.bindings[importance - 1] ?? null;
+        return (
+          <Tooltip key={importance}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={value === importance}
+                aria-label={t(`importance.levels.${importance}`)}
+                aria-keyshortcuts={binding ? ariaKeyShortcuts(binding) : undefined}
+                onClick={() => onChange(importance)}
+                className={cn(
+                  'relative flex size-7 items-center justify-center rounded-full transition-all',
+                  value === importance ? 'bg-accent ring-1 ring-ring' : 'hover:bg-accent/60',
+                )}
+              >
+                <span className={cn('size-3', markerClass(importance))} />
+                <ShortcutHint
+                  binding={binding}
+                  active={shortcuts?.isTarget}
+                  className="-top-1.5 -right-1.5"
+                />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p className="font-medium mr-1">{t(`importance.levels.${importance}`)}</p>
+              <div className="w-[0.75px] self-stretch bg-muted-foreground" />
+              <p className="max-w-48 text-xs opacity-80">
+                {t(`importance.descriptions.${importance}`)}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }
