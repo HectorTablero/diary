@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LUCIDE_CATALOG_MARKER } from './lucideIcons.mjs';
 
 /*
  * Guards the one promise the plugin system makes that nothing else can check: that a user who
@@ -24,6 +25,8 @@ import { fileURLToPath } from 'node:url';
  *      the service worker precaches every script, stylesheet and font it can see, so the notebook's
  *      KaTeX and Mermaid (~900 kB compressed between them) would be downloaded by every visitor.
  *      They have to stay in on-demand chunks, and those — with KaTeX's fonts — out of the precache.
+ *      The icon picker's data (every Lucide icon, ~66 kB brotli, and their search tags, ~35 kB) is
+ *      held to the same rule: it is needed only once someone chooses an icon.
  *
  * Run after a build: `npm run check:bundle -w web`.
  */
@@ -165,6 +168,9 @@ if (!exists(swPath)) {
 const LIBRARY_MARKERS: [string, string][] = [
   ['KaTeX', 'KaTeX parse error'],
   ['Mermaid', 'No diagram type detected matching given configuration'],
+  // The `marker` field scripts/lucideIcons.mjs writes into the catalog, and the tags file's header.
+  ['the Lucide icon catalog', LUCIDE_CATALOG_MARKER],
+  ['the Lucide icon tags', 'lucideVersion'],
 ];
 const sw = exists(swPath) ? readFileSync(swPath, 'utf8') : '';
 const scripts = assetNames.filter((file) => file.endsWith('.js'));

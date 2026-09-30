@@ -2,6 +2,8 @@ import { Archive, ArchiveRestore, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HintTooltip } from '@/components/common/HintTooltip';
+import { iconOrDefault } from '@/components/icons/iconCatalog';
+import { IconPickerDialog } from '@/components/icons/IconPickerDialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,21 +15,28 @@ import {
 import { Input } from '@/components/ui/input';
 import { notifyError } from '@/lib/notify';
 import { captureError } from '@/lib/telemetry';
-import { CATEGORY_NAME_MAX, type Category } from './model';
+import { cn } from '@/lib/utils';
+import {
+  CATEGORY_NAME_MAX,
+  CUSTOM_CATEGORY_ICON,
+  CUSTOM_CATEGORY_ICON_NAME,
+  type Category,
+} from './model';
 import type { CategoriesState } from './useExpenses';
 
 /**
- * Renaming, retiring and adding categories.
+ * Renaming, re-iconing, retiring, deleting and adding categories.
  *
  * A category that is in use is retired, never deleted — the rule habits follows, for the same
  * reason: expenses already filed under it are diary history, and deleting it would leave them
  * pointing at nothing. A retired category drops out of the picker and keeps its name everywhere it
  * was already used.
  *
- * A *custom* category nothing was ever filed under has no history to protect, so the same button
- * deletes it outright (with an Undo) instead of leaving an empty husk in the retired list. The
- * starters are never deleted, used or not: they are the only categories with their own icons, and
- * a retired one can always be brought back as it was.
+ * A category nothing was ever filed under has no history to protect, so the same button deletes it
+ * outright (with an Undo) instead of leaving an empty husk in the retired list. That includes the
+ * starters: they used to be retire-only because they were the only categories with icons, so
+ * deleting one lost something a custom category could not give back. Every category can have any
+ * icon now, and a starter's default is still one tap away under "Default" in the icon picker.
  */
 export function CategoriesDialog({
   open,
@@ -43,8 +52,15 @@ export function CategoriesDialog({
 }) {
   const { t } = useTranslation();
   const [newName, setNewName] = useState('');
+  const [newIcon, setNewIcon] = useState<string | null>(null);
+  /** Whose icon the picker is choosing: a category, the one being added, or nobody. */
+  const [picking, setPicking] = useState<Category | 'new' | null>(null);
   const active = state.categories.filter((category) => !category.retired);
   const retired = state.categories.filter((category) => category.retired);
+
+  const nameOf = (category: Category) =>
+    category.name ??
+    (category.builtinKey ? t(`plugins.expenses.category.${category.builtinKey}`) : '');
 
   const guard = (work: Promise<unknown>) =>
     work.catch((error: unknown) => {
@@ -55,18 +71,17 @@ export function CategoriesDialog({
   /* The Undo lives in the dialog rather than on a toast: a modal dialog makes everything outside it
      inert, so a toast's button would be unreachable until the dialog closed — by which point the
      undo is no longer the thing anyone is thinking about. */
-  const [deleted, setDeleted] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState<{ name: string; undo: () => Promise<void> } | null>(null);
 
   const remove = async (category: Category) => {
-    const name = category.name ?? '';
-    await state.deleteCategory(category);
-    setDeleted(name);
+    const name = nameOf(category);
+    const undo = await state.deleteCategory(category);
+    setDeleted({ name, undo });
   };
 
   const undoDelete = () => {
     if (deleted === null) return;
-    // A new row, not the old id back — nothing referred to it, which is why it could go.
-    void guard(state.addCategory(deleted));
+    void guard(deleted.undo());
     setDeleted(null);
   };
 
@@ -74,8 +89,12 @@ export function CategoriesDialog({
     const name = newName.trim();
     if (!name) return;
     setNewName('');
-    void guard(state.addCategory(name));
+    setNewIcon(null);
+    void guard(state.addCategory(name, newIcon));
   };
+
+  const NewIcon = iconOrDefault(newIcon, CUSTOM_CATEGORY_ICON);
+  const pickingCategory = picking !== null && picking !== 'new' ? picking : null;
 
   return (
     <Dialog
@@ -92,21 +111,21 @@ export function CategoriesDialog({
         </DialogHeader>
 
         <ul className="space-y-1.5">
-          {active.map((category) => (
-            <CategoryRow
-              key={category.id}
-              category={category}
-              onRename={(name) => void guard(state.renameCategory(category, name))}
-              deletable={!category.builtinKey && !usage.get(category.id)}
-              onToggleRetired={() =>
-                void guard(
-                  !category.builtinKey && !usage.get(category.id)
-                    ? remove(category)
-                    : state.setRetired(category, true),
-                )
-              }
-            />
-          ))}
+          {active.map((category) => {
+            const deletable = !usage.get(category.id);
+            return (
+              <CategoryRow
+                key={category.id}
+                category={category}
+                onRename={(name) => void guard(state.renameCategory(category, name))}
+                onPickIcon={() => setPicking(category)}
+                deletable={deletable}
+                onToggleRetired={() =>
+                  void guard(deletable ? remove(category) : state.setRetired(category, true))
+                }
+              />
+            );
+          })}
         </ul>
 
         {deleted !== null && (
@@ -115,7 +134,7 @@ export function CategoriesDialog({
             role="status"
           >
             <span className="min-w-0 flex-1 truncate text-muted-foreground">
-              {t('plugins.expenses.categoryDeleted', { name: deleted })}
+              {t('plugins.expenses.categoryDeleted', { name: deleted.name })}
             </span>
             <Button variant="ghost" size="sm" className="h-7" onClick={undoDelete}>
               {t('common.undo')}
@@ -130,6 +149,11 @@ export function CategoriesDialog({
             add();
           }}
         >
+          <IconButton
+            icon={NewIcon}
+            label={t('plugins.expenses.newCategoryIcon')}
+            onClick={() => setPicking('new')}
+          />
           <Input
             value={newName}
             maxLength={CATEGORY_NAME_MAX}
@@ -154,6 +178,7 @@ export function CategoriesDialog({
                   key={category.id}
                   category={category}
                   onRename={(name) => void guard(state.renameCategory(category, name))}
+                  onPickIcon={() => setPicking(category)}
                   onToggleRetired={() => void guard(state.setRetired(category, false))}
                 />
               ))}
@@ -161,24 +186,75 @@ export function CategoriesDialog({
           </div>
         )}
       </DialogContent>
+
+      <IconPickerDialog
+        open={picking !== null}
+        onOpenChange={(next) => !next && setPicking(null)}
+        title={
+          pickingCategory
+            ? t('plugins.expenses.iconFor', { name: nameOf(pickingCategory) })
+            : t('plugins.expenses.newCategoryIcon')
+        }
+        value={pickingCategory ? pickingCategory.iconName : newIcon}
+        emptyOption={{
+          label: t('iconPicker.default'),
+          icon: pickingCategory ? pickingCategory.defaultIcon : CUSTOM_CATEGORY_ICON,
+          iconName: pickingCategory ? pickingCategory.defaultIconName : CUSTOM_CATEGORY_ICON_NAME,
+        }}
+        onChange={(icon) => {
+          if (pickingCategory) void guard(state.setIcon(pickingCategory, icon));
+          else setNewIcon(icon);
+        }}
+      />
     </Dialog>
+  );
+}
+
+/** The round icon at the start of a row, which is also the way to change it. */
+function IconButton({
+  icon: Icon,
+  label,
+  onClick,
+  muted = false,
+}: {
+  icon: Category['icon'];
+  label: string;
+  onClick: () => void;
+  muted?: boolean;
+}) {
+  return (
+    <HintTooltip content={label}>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+        className={cn(
+          'flex size-8 shrink-0 items-center justify-center rounded-full bg-muted transition-colors',
+          'hover:bg-muted-foreground/15 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+          muted ? 'text-muted-foreground/70' : 'text-muted-foreground',
+        )}
+      >
+        <Icon aria-hidden className="size-3.5" />
+      </button>
+    </HintTooltip>
   );
 }
 
 function CategoryRow({
   category,
   onRename,
+  onPickIcon,
   onToggleRetired,
   deletable = false,
 }: {
   category: Category;
   onRename: (name: string) => void;
+  onPickIcon: () => void;
   onToggleRetired: () => void;
-  /** An unused custom category: the button deletes rather than retires, and says so. */
+  /** An unused category: the button deletes rather than retires, and says so. */
   deletable?: boolean;
 }) {
   const { t } = useTranslation();
-  const Icon = category.icon;
   const builtinName = category.builtinKey
     ? t(`plugins.expenses.category.${category.builtinKey}`)
     : null;
@@ -206,12 +282,12 @@ function CategoryRow({
 
   return (
     <li className="flex items-center gap-2">
-      <span
-        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-        aria-hidden
-      >
-        <Icon className="size-3.5" />
-      </span>
+      <IconButton
+        icon={category.icon}
+        label={t('plugins.expenses.changeIcon', { name: category.name ?? builtinName ?? '' })}
+        onClick={onPickIcon}
+        muted={category.retired}
+      />
       <Input
         value={draft}
         maxLength={CATEGORY_NAME_MAX}

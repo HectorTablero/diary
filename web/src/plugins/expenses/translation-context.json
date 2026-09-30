@@ -74,7 +74,10 @@
         "exportByMonth": "A `###` heading over the export's closing table, which totals categories (rows) against months (columns).",
         "exportCurrenciesSeparate": "Sits above that table when more than one currency is in play, explaining why there is one table per currency instead of one total. Omitted entirely when only one currency was used.",
         "exportTotal": "Both the last column's header and the last row's label in that table — the same word has to serve for a row total and a column total, so prefer the noun that works for both.",
-        "onboarding": "The tour's three screens: `day` (a live copy of the day card), `stats` (the page's figures and charts over a made-up year) and `calendar` (the calendar tab). Each has a `title` and a one- or two-sentence `lede`. `previewNote` sits under the live previews. `day.demoCoffee` and `day.demoGroceries` are the descriptions of the two made-up expenses on the demo card — ordinary, everyday purchases."
+        "onboarding": "The tour's three screens: `day` (a live copy of the day card), `stats` (the page's figures and charts over a made-up year) and `calendar` (the calendar tab). Each has a `title` and a one- or two-sentence `lede`. `previewNote` sits under the live previews. `day.demoCoffee` and `day.demoGroceries` are the descriptions of the two made-up expenses on the demo card — ordinary, everyday purchases.",
+        "changeIcon": "Accessible name and tooltip of the round icon at the start of a category's row in the categories dialog, which opens the icon picker. {{name}} is the category's name.",
+        "iconFor": "Title of the icon picker when opened for a category. {{name}} is its name.",
+        "newCategoryIcon": "Accessible name of the icon button beside the \"new category\" field, and the icon picker's title when opened from it."
       }
     }
   },

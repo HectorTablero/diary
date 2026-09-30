@@ -31,3 +31,7 @@ web/assets/
 web/public/icons/
 web/public/favicon.svg
 web/public/favicon-local.svg
+
+# Fetched by web/scripts/generateIconTags.ts and written one icon per line, so a lucide upgrade diffs
+# as the icons it added. Prettier would re-wrap every array across several lines.
+web/src/components/icons/lucide-tags.json

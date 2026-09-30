@@ -278,6 +278,20 @@
     },
     "dnd": {
       "where": "Screen-reader announcements while an entry is being reordered with the keyboard. Never shown visually. \"Position\" is the 1-based row number in the flattened list; \"level\" is the 1-based nesting depth (level 1 = a top-level entry)."
+    },
+    "iconPicker": {
+      "where": "The icon picker: a dialog opened from an expense category (its round icon, in the categories dialog) or from a notebook document (its menu, or the icon beside its title). A search box, one row for \"no chosen icon\", and a scrolling grid of ~1,800 unlabelled icons.",
+      "keys": {
+        "title": "Fallback dialog title; callers usually pass their own (\"Icon for Groceries\"), so this is rarely seen.",
+        "description": "One line under the title. The search matches icon names and keywords.",
+        "englishOnly": "Shown under the search box in every language except English, because the icon names and their search keywords come from Lucide and exist only in English — a search in this language will not find anything. A plain statement of fact, not an apology.",
+        "grid": "Accessible name of the scrolling grid of icons. Never shown.",
+        "count": "Screen-reader-only live announcement of how many icons the current search matches. Never shown.",
+        "noMatches": "Shown in place of the grid when nothing matches. {{query}} is what was typed.",
+        "loadFailed": "Shown in place of the grid when the icon set could not be downloaded — it is fetched the first time it is needed and kept for offline use after that. A Retry button (common.retry) follows.",
+        "default": "The option above the grid that clears the chosen icon, for things that have an icon of their own to fall back to (an expense category). Shown beside that default icon. An adjective or short noun.",
+        "none": "The same option for things that show no icon unless one is chosen (a notebook document)."
+      }
     }
   },
   "languageNotes": {

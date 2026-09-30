@@ -2,8 +2,10 @@ import { UNDATED_KEY, type PluginRecordDto } from '@diary/shared';
 import { describe, expect, it } from 'vitest';
 import { formatMinor, guessCurrency, minorToInput, parseAmountInput } from './currency';
 import {
+  BUILTIN_CATEGORIES,
   builtinCategoryId,
   categoryData,
+  CUSTOM_CATEGORY_ICON,
   expenseData,
   parseExpense,
   resolveCategories,
@@ -159,6 +161,48 @@ describe('resolveCategories', () => {
       rowId: 'b',
     });
     expect(categories.slice(-2).map((c) => c.name)).toEqual(['Books', 'Pets']);
+  });
+
+  it('draws the chosen icon, and the default one without a choice', () => {
+    const groceries = row(
+      categoryData({ builtin: 'groceries', name: null, retired: false, icon: 'apple' }),
+      UNDATED_KEY,
+    );
+    const pets = row(categoryData({ builtin: null, name: 'Pets', retired: false }), UNDATED_KEY);
+    const categories = resolveCategories([groceries, pets]);
+
+    const starter = categories.find((c) => c.builtinKey === 'groceries')!;
+    expect(starter.iconName).toBe('apple');
+    expect(starter.icon).not.toBe(starter.defaultIcon);
+    expect(starter.defaultIconName).toBe('shopping-basket');
+
+    const custom = categories.find((c) => c.name === 'Pets')!;
+    expect(custom).toMatchObject({ iconName: null, defaultIconName: 'tag' });
+    expect(custom.icon).toBe(CUSTOM_CATEGORY_ICON);
+  });
+
+  it('treats a malformed icon as no icon rather than dropping the category', () => {
+    const pets = row(
+      { kind: 'category', builtin: null, name: 'Pets', retired: false, icon: '<script>' },
+      UNDATED_KEY,
+    );
+    expect(resolveCategories([pets]).at(-1)).toMatchObject({ name: 'Pets', iconName: null });
+  });
+
+  it('hides a deleted starter, and writes it retired too for older clients', () => {
+    const data = categoryData({ builtin: 'bills', name: null, retired: false, deleted: true });
+    expect(data).toMatchObject({ deleted: true, retired: true });
+    const categories = resolveCategories([row(data, UNDATED_KEY)]);
+    expect(categories.some((c) => c.builtinKey === 'bills')).toBe(false);
+    expect(categories).toHaveLength(BUILTIN_CATEGORIES.length - 1);
+  });
+
+  it("names each starter's default icon by the component beside it", () => {
+    const pascal = (name: string) =>
+      name.replace(/(^|-)([a-z0-9])/g, (_, __, letter: string) => letter.toUpperCase());
+    for (const { icon, iconName } of BUILTIN_CATEGORIES) {
+      expect(icon.displayName).toBe(pascal(iconName));
+    }
   });
 });
 

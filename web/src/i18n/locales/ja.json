@@ -769,5 +769,17 @@
     "blocked": "{{position}}番目、レベル{{level}}には配置できません。",
     "dropped": "{{position}}番目、レベル{{level}}に配置しました。",
     "cancelled": "移動を取り消しました。"
+  },
+  "iconPicker": {
+    "title": "アイコンを選択",
+    "description": "名前や表しているもので検索できます。",
+    "englishOnly": "アイコン名と検索キーワードは英語です。",
+    "search": "アイコンを検索",
+    "grid": "アイコン",
+    "count_other": "{{count}}個のアイコン",
+    "noMatches": "「{{query}}」に一致するアイコンはありません。",
+    "loadFailed": "アイコンを読み込めませんでした。初回はインターネット接続が必要です。",
+    "default": "デフォルト",
+    "none": "アイコンなし"
   }
 }

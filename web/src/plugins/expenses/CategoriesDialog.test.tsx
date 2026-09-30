@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { UNDATED_KEY } from '@diary/shared';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db/db';
@@ -12,9 +12,8 @@ import en from './locales/en.json';
 import { builtinCategoryId, categoryData, resolveCategories } from './model';
 import { useCategories } from './useExpenses';
 
-/* The one place a category can disappear: a custom category with no expenses is deleted, one with
-   expenses is retired, and a starter is only ever retired, since it's the one kind with its own icon
-   and a retired one comes back exactly as it was. */
+/* The one place a category can disappear: any category with no expenses is deleted — a starter
+   included, now that every category can carry any icon — and one with expenses is only retired. */
 
 function Harness({ usage }: { usage: ReadonlyMap<string, number> }) {
   const state = useCategories();
@@ -46,9 +45,10 @@ describe('CategoriesDialog', () => {
     renderWithProviders(<Harness usage={new Map()} />);
 
     await screen.findByRole('textbox', { name: 'Rename Pets' });
-    // The starters' buttons retire; only the unused custom one offers to delete.
-    expect(screen.getAllByRole('button', { name: 'Delete category' })).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'Delete category' }));
+    // Nothing is in use, so every row — starters too — offers to delete. Pets is the last.
+    const deletes = screen.getAllByRole('button', { name: 'Delete category' });
+    expect(deletes).toHaveLength((await categories()).length);
+    await user.click(deletes.at(-1)!);
 
     await waitFor(async () => {
       expect((await categories()).some((c) => c.name === 'Pets')).toBe(false);
@@ -68,26 +68,68 @@ describe('CategoriesDialog', () => {
     renderWithProviders(<Harness usage={new Map([[row.id, 3]])} />);
 
     await screen.findByRole('textbox', { name: 'Rename Pets' });
-    expect(screen.queryByRole('button', { name: 'Delete category' })).not.toBeInTheDocument();
-    const retire = screen.getAllByRole('button', { name: 'Retire category' }).at(-1)!;
-    await user.click(retire);
+    // The unused starters still delete; Pets, the one in use, is the only row that retires.
+    await user.click(screen.getByRole('button', { name: 'Retire category' }));
 
     await waitFor(async () => {
       expect((await categories()).find((c) => c.name === 'Pets')?.retired).toBe(true);
     });
   });
 
-  it('retires an unused starter rather than deleting it', async () => {
+  it('deletes an unused starter, and undo brings it back as it was', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness usage={new Map()} />);
 
     await screen.findByRole('textbox', { name: 'Rename Groceries' });
-    await user.click(screen.getAllByRole('button', { name: 'Retire category' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete category' })[0]);
+
+    const groceries = async () =>
+      (await categories()).find((c) => c.id === builtinCategoryId('groceries'));
+    await waitFor(async () => expect(await groceries()).toBeUndefined());
+    expect(screen.queryByText('Retired')).not.toBeInTheDocument();
+
+    expect(await screen.findByText('Category “Groceries” deleted')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () => expect((await groceries())?.retired).toBe(false));
+    // The override row is reused rather than a second one piling up beside it.
+    expect(await getUndatedRecords('expenses')).toHaveLength(1);
+  });
+
+  it('retires a starter that has expenses', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness usage={new Map([[builtinCategoryId('groceries'), 2]])} />);
+
+    await screen.findByRole('textbox', { name: 'Rename Groceries' });
+    await user.click(screen.getByRole('button', { name: 'Retire category' }));
 
     await waitFor(async () => {
       const groceries = (await categories()).find((c) => c.id === builtinCategoryId('groceries'));
       expect(groceries?.retired).toBe(true);
     });
     expect(await screen.findByText('Retired')).toBeInTheDocument();
+  });
+
+  it("changes a starter's icon, showing its default as selected until then", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness usage={new Map()} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Change icon of Groceries' }));
+    const picker = await screen.findByRole('dialog', { name: 'Icon for Groceries' });
+    // On its default: the "Default" row and the starter's own icon in the grid are both marked.
+    expect(within(picker).getByRole('button', { name: 'Default' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(
+      await within(picker).findByRole('button', { name: 'shopping basket' }, { timeout: 5000 }),
+    ).toHaveAttribute('aria-pressed', 'true');
+
+    await user.type(within(picker).getByRole('searchbox', { name: 'Search icons' }), 'apple');
+    await user.click(await within(picker).findByRole('button', { name: 'apple' }));
+
+    await waitFor(async () => {
+      const groceries = (await categories()).find((c) => c.id === builtinCategoryId('groceries'));
+      expect(groceries?.iconName).toBe('apple');
+    });
   });
 });

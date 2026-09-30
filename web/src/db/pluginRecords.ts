@@ -203,3 +203,36 @@ export async function deletePluginRecord(id: string): Promise<void> {
   await db.pluginRecords.delete(id);
   await enqueue('DELETE', `${PATH}/${id}`);
 }
+
+/** Delete several rows in one go, handing back what was deleted so it can be put back. */
+export async function deletePluginRecords(ids: string[]): Promise<PluginRecordDto[]> {
+  if (!ids.length) return [];
+  // Read before deleting: this is the only copy of what is about to go.
+  const rows = (await db.pluginRecords.bulkGet(ids)).filter((row) => row !== undefined);
+  await db.pluginRecords.bulkDelete(ids);
+  await enqueueBatch(ids.map((id) => ({ method: 'DELETE' as const, path: `${PATH}/${id}` })));
+  return rows;
+}
+
+/**
+ * Put deleted rows back exactly as they were, under their original ids — an undo, not a copy.
+ * Re-creating a deleted id retracts its tombstone on the server, so the next pull keeps it.
+ */
+export async function restorePluginRecords(rows: readonly PluginRecordDto[]): Promise<void> {
+  if (!rows.length) return;
+  await db.pluginRecords.bulkPut([...rows]);
+  await enqueueBatch(
+    rows.map((row) => ({
+      method: 'POST' as const,
+      path: PATH,
+      body: {
+        id: row.id,
+        createdAt: row.createdAt,
+        pluginId: row.pluginId,
+        scope: row.scope,
+        dateKey: row.dateKey,
+        data: row.data,
+      },
+    })),
+  );
+}

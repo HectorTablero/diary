@@ -76,7 +76,10 @@
         "onboarding.history.before": "Two short notes in one document, as they stood the day before. Contains a literal newline escape (\\n\\n) separating them, which must be preserved: the diff is computed line by line, and the screen shows nothing useful if each version is a single line.",
         "onboarding.history.after": "The same two notes the next day. Keep the two-paragraph shape and the \\n\\n, and keep both *kinds* of change, since they are what the red and green lines demonstrate: the first line is refined (the same claim, narrowed by a condition), and the second is reversed outright (something once intended to be tried, since found to make no difference). Together they show the two things a history is for — watching a thought get sharper, and watching one turn out to be wrong.",
         "onboarding.calendar.title": "Heading of the tour's third screen: three weeks of the calendar's Notebook tab, drawn with the app's real tab switcher, weekday headings and less-to-more legend, shaded by the app's own function in the plugin's registered green.",
-        "onboarding.calendar.lede": "One line under it, carrying two facts: darker means more written that day across the whole notebook, and a day spent cutting rather than adding shows as a quiet one — a deliberate choice, so word it matter-of-factly rather than apologetically."
+        "onboarding.calendar.lede": "One line under it, carrying two facts: darker means more written that day across the whole notebook, and a day spent cutting rather than adding shows as a quiet one — a deliberate choice, so word it matter-of-factly rather than apologetically.",
+        "changeIcon": "Accessible name of the button to the left of a document's title: its icon, or a faint placeholder when it has none. Pressing it opens the icon picker.",
+        "iconFor": "Title of the icon picker for a document. {{name}} is its title.",
+        "iconRecord": "How a document's icon is described in the backup-import review. {{icon}} is the icon's English name, e.g. \"piggy bank\"."
       }
     }
   },

@@ -95,5 +95,8 @@
       "title": "A colpo d'occhio sul calendario",
       "lede": "I giorni si colorano in base a quanto è stato speso, rispetto al resto di quel mese."
     }
-  }
+  },
+  "changeIcon": "Cambia l'icona di {{name}}",
+  "iconFor": "Icona di {{name}}",
+  "newCategoryIcon": "Icona della nuova categoria"
 }

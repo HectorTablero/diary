@@ -93,5 +93,8 @@
       "title": "在日历上一目了然",
       "lede": "每天的颜色深浅取决于当天的支出，与当月其他日子相比较。"
     }
-  }
+  },
+  "changeIcon": "更改{{name}}的图标",
+  "iconFor": "{{name}}的图标",
+  "newCategoryIcon": "新类别的图标"
 }

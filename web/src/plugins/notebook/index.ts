@@ -1,5 +1,8 @@
+import { iconLabel } from '@/components/icons/iconCatalog';
+import i18n from '@/i18n';
 import type { PluginModule } from '../types';
 import { NotebookExportPicker } from './ExportPicker';
+import { parseIconRecord } from './icons';
 import { buildNotebookMergedMarkdown, buildNotebookZipEntries } from './markdown';
 import { NotebookCalendarView } from './NotebookCalendarView';
 import { NotebookDayWidget } from './NotebookDayWidget';
@@ -31,8 +34,9 @@ import { notebookOnboardingSteps } from './onboarding/steps';
  * module's `exportOwn` and the manifest's `ownExport` surface — it never imports anything from this
  * plugin directly, and never spells out "notebook".
  *
- * `describeRecord` is likewise absent: it describes a `pluginRecord`, and the only row this plugin
- * owns in that collection is the config row, which belongs to the app rather than to the plugin.
+ * `describeRecord` covers the one kind of `pluginRecord` the plugin owns itself: a document's icon,
+ * which lives there because `pluginDocument`'s fields are fixed (see icons.ts). The config row is
+ * the app's, not the plugin's, and is never handed to it.
  */
 
 const notebook: PluginModule = {
@@ -47,6 +51,12 @@ const notebook: PluginModule = {
     buildMerged: (options) => buildNotebookMergedMarkdown({ history: options.history === true }),
     buildZip: (options) => buildNotebookZipEntries({ history: options.history === true }),
     Picker: NotebookExportPicker,
+  },
+  describeRecord: (record) => {
+    const icon = parseIconRecord(record);
+    return icon
+      ? i18n.t('plugins.notebook.iconRecord', { icon: iconLabel(icon.icon) })
+      : record.dateKey;
   },
   onboardingSteps: notebookOnboardingSteps,
 };

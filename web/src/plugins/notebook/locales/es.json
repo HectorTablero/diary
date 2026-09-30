@@ -85,5 +85,8 @@
       "title": "Míralo en el calendario",
       "lede": "El calendario gana una pestaña de Cuaderno, sombreada según cuánto escribiste cada día en todo el cuaderno. Un día dedicado a recortar en vez de añadir se ve tranquilo."
     }
-  }
+  },
+  "changeIcon": "Cambiar icono",
+  "iconFor": "Icono de {{name}}",
+  "iconRecord": "Icono de un documento ({{icon}})"
 }

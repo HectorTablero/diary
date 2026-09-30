@@ -4,10 +4,12 @@ import {
   UNDATED_KEY,
   type PluginDocumentDto,
   type PluginDocumentUpdateInput,
+  type PluginRecordDto,
 } from '@diary/shared';
 import { db } from './db';
 import { enqueue, enqueueBatch } from './outbox';
 import { forgetDocumentBases, rememberDocumentBase } from './pluginDocumentMerge';
+import { restorePluginRecords } from './pluginRecords';
 
 /**
  * Read and write helpers for the plugin-document table.
@@ -230,6 +232,12 @@ export async function putDocumentRevision(
 export interface PluginDocumentDeletion {
   kind: 'pluginDocument';
   rows: PluginDocumentDto[];
+  /**
+   * Plugin records that belonged to those documents and went with them — the notebook's icons,
+   * which live in `pluginRecord` because this table's fields are fixed. Carried here so one Undo
+   * brings back the document *and* what was attached to it.
+   */
+  records?: PluginRecordDto[];
 }
 
 /**
@@ -259,6 +267,7 @@ export async function deletePluginDocuments(ids: string[]): Promise<PluginDocume
  * next pull doesn't delete it a second time.
  */
 export async function restorePluginDocuments(deletion: PluginDocumentDeletion): Promise<void> {
+  await restorePluginRecords(deletion.records ?? []);
   if (!deletion.rows.length) return;
   await db.pluginDocuments.bulkPut(deletion.rows);
   /* A restore re-creates rows the server has not got, so there is no ancestor to merge against and

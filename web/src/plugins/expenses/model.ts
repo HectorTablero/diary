@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { z } from 'zod';
+import { iconNameSchema, iconOrDefault } from '@/components/icons/iconCatalog';
 import { isCurrencyCode } from './currency';
 
 export const PLUGIN_ID = 'expenses';
@@ -42,8 +43,17 @@ export const PLUGIN_ID = 'expenses';
  * The starter set is built in, with fixed ids and translated names, rather than seeded as rows on
  * first use: two devices enabling the plugin offline would otherwise each seed a full set, and a
  * sync later the list holds every category twice. A starter only ever gets a row once someone
- * renames or retires it — an *override*, keyed by the starter's id. A custom category is a plain
- * undated row whose own id is its identity, the same idiom habits uses for its definitions.
+ * renames, re-icons, retires or deletes it — an *override*, keyed by the starter's id. A custom
+ * category is a plain undated row whose own id is its identity, the same idiom habits uses for its
+ * definitions.
+ *
+ * ## A deleted starter is a row that says so
+ *
+ * A custom category is deleted by deleting its row. A starter has no row of its own to delete — it
+ * is built in — so deleting one writes an override with `deleted` set, and that override is kept for
+ * good: without it the starter would simply come back. It is also written as `retired`, so an older
+ * copy of the app that predates `deleted` shows it tucked away under Retired rather than back in the
+ * picker.
  */
 
 export const DESCRIPTION_MAX = 120;
@@ -110,16 +120,18 @@ export const byCreation = (a: Expense, b: Expense) => a.createdAt.localeCompare(
  * where money went, not a verdict on whether it should have. Order here is the order they list in.
  */
 export const BUILTIN_CATEGORIES = [
-  { id: 'groceries', icon: ShoppingBasket },
-  { id: 'eatingOut', icon: UtensilsCrossed },
-  { id: 'transport', icon: Bus },
-  { id: 'home', icon: House },
-  { id: 'bills', icon: Receipt },
-  { id: 'health', icon: HeartPulse },
-  { id: 'leisure', icon: Ticket },
-  { id: 'shopping', icon: ShoppingBag },
-  { id: 'gifts', icon: Gift },
-] as const satisfies readonly { id: string; icon: LucideIcon }[];
+  { id: 'groceries', icon: ShoppingBasket, iconName: 'shopping-basket' },
+  { id: 'eatingOut', icon: UtensilsCrossed, iconName: 'utensils-crossed' },
+  { id: 'transport', icon: Bus, iconName: 'bus' },
+  { id: 'home', icon: House, iconName: 'house' },
+  { id: 'bills', icon: Receipt, iconName: 'receipt' },
+  { id: 'health', icon: HeartPulse, iconName: 'heart-pulse' },
+  { id: 'leisure', icon: Ticket, iconName: 'ticket' },
+  { id: 'shopping', icon: ShoppingBag, iconName: 'shopping-bag' },
+  { id: 'gifts', icon: Gift, iconName: 'gift' },
+  /* `iconName` is the same icon's Lucide name — what the icon picker marks as selected while the
+     category is on its default. model.test.ts checks each one names the component beside it. */
+] as const satisfies readonly { id: string; icon: LucideIcon; iconName: string }[];
 
 export type BuiltinCategoryId = (typeof BUILTIN_CATEGORIES)[number]['id'];
 
@@ -133,6 +145,10 @@ const categorySchema = z.object({
   /** A starter's name is translated until renamed, so null there means "the translated one". */
   name: z.string().max(CATEGORY_NAME_MAX).nullable().catch(null),
   retired: z.boolean().catch(false),
+  /** A Lucide icon name, or null for the category's default. See components/icons. */
+  icon: iconNameSchema.nullable().catch(null),
+  /** Starters only: deleted rather than retired. See "A deleted starter is a row that says so". */
+  deleted: z.boolean().catch(false),
 });
 
 export interface Category {
@@ -141,20 +157,36 @@ export interface Category {
   name: string | null;
   builtinKey: BuiltinCategoryId | null;
   retired: boolean;
+  /** What to draw: the chosen icon if there is one, otherwise `defaultIcon`. */
   icon: LucideIcon;
-  /** The row that stores this category, if any. A starter never renamed or retired has none. */
+  /** The chosen Lucide icon's name, or null for the default. */
+  iconName: string | null;
+  /** The starter's own icon, or the tag every custom category starts with. */
+  defaultIcon: LucideIcon;
+  /** `defaultIcon`'s Lucide name. */
+  defaultIconName: string;
+  /** The row that stores this category, if any. A starter never edited has none. */
   rowId: string | null;
 }
+
+/** What a custom category is drawn with until it is given an icon of its own. */
+export const CUSTOM_CATEGORY_ICON: LucideIcon = Tag;
+export const CUSTOM_CATEGORY_ICON_NAME = 'tag';
 
 export const categoryData = (fields: {
   builtin: BuiltinCategoryId | null;
   name: string | null;
   retired: boolean;
+  icon?: string | null;
+  deleted?: boolean;
 }) => ({
   kind: 'category' as const,
   builtin: fields.builtin,
   name: fields.name === null ? null : fields.name.trim().slice(0, CATEGORY_NAME_MAX),
-  retired: fields.retired,
+  // Deleted implies retired — for the older clients described at the top of this file.
+  retired: fields.retired || (fields.deleted ?? false),
+  icon: fields.icon ?? null,
+  deleted: fields.builtin !== null && (fields.deleted ?? false),
 });
 
 const isBuiltin = (id: string): id is BuiltinCategoryId =>
@@ -186,16 +218,23 @@ export function resolveCategories(undated: readonly PluginRecordDto[]): Category
     }
   }
 
-  const builtins: Category[] = BUILTIN_CATEGORIES.map(({ id, icon }) => {
+  const builtins: Category[] = BUILTIN_CATEGORIES.flatMap(({ id, icon, iconName: defaultName }) => {
     const override = overrides.get(id);
-    return {
-      id: builtinCategoryId(id),
-      name: override?.data.name || null,
-      builtinKey: id,
-      retired: override?.data.retired ?? false,
-      icon,
-      rowId: override?.row.id ?? null,
-    };
+    if (override?.data.deleted) return [];
+    const iconName = override?.data.icon ?? null;
+    return [
+      {
+        id: builtinCategoryId(id),
+        name: override?.data.name || null,
+        builtinKey: id,
+        retired: override?.data.retired ?? false,
+        icon: iconOrDefault(iconName, icon),
+        iconName,
+        defaultIcon: icon,
+        defaultIconName: defaultName,
+        rowId: override?.row.id ?? null,
+      },
+    ];
   });
 
   const customs: Category[] = custom
@@ -205,7 +244,10 @@ export function resolveCategories(undated: readonly PluginRecordDto[]): Category
       name: data.name,
       builtinKey: null,
       retired: data.retired,
-      icon: Tag,
+      icon: iconOrDefault(data.icon, CUSTOM_CATEGORY_ICON),
+      iconName: data.icon,
+      defaultIcon: CUSTOM_CATEGORY_ICON,
+      defaultIconName: CUSTOM_CATEGORY_ICON_NAME,
       rowId: row.id,
     }));
 

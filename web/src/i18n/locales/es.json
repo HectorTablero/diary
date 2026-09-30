@@ -816,5 +816,19 @@
     "blocked": "La posición {{position}}, nivel {{level}} no está permitida.",
     "dropped": "Soltado en la posición {{position}}, nivel {{level}}.",
     "cancelled": "Movimiento cancelado."
+  },
+  "iconPicker": {
+    "title": "Elige un icono",
+    "description": "Busca por nombre o por lo que muestra.",
+    "englishOnly": "Los nombres de los iconos y las palabras de búsqueda están en inglés.",
+    "search": "Buscar iconos",
+    "grid": "Iconos",
+    "count_one": "{{count}} icono",
+    "count_many": "{{count}} iconos",
+    "count_other": "{{count}} iconos",
+    "noMatches": "Ningún icono coincide con «{{query}}».",
+    "loadFailed": "No se han podido cargar los iconos. La primera vez necesitan conexión.",
+    "default": "Predeterminado",
+    "none": "Sin icono"
   }
 }

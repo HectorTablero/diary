@@ -4,12 +4,14 @@ import {
   Clock,
   Eye,
   FilePlus2,
+  FileText,
   FolderInput,
   Maximize2,
   Minimize2,
   MoreHorizontal,
   NotebookPen,
   Pencil,
+  SmilePlus,
   Trash2,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -18,6 +20,8 @@ import { useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { updatePluginDocument } from '@/db/pluginDocuments';
 import { EmptyState } from '@/components/common/EmptyState';
+import { namedIcon } from '@/components/icons/iconCatalog';
+import { IconPickerDialog } from '@/components/icons/IconPickerDialog';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +36,7 @@ import { notifyDeleted } from '@/lib/undo';
 import { cn } from '@/lib/utils';
 import { DocumentEditorPanel } from './DocumentEditorPanel';
 import { HistoryDialog } from './HistoryDialog';
+import { setDocumentIcon, useDocumentIcons } from './icons';
 import { documentLabel, ROOT_ID } from './model';
 import { MoveDialog } from './MoveDialog';
 import { documentPreview } from './preview';
@@ -73,6 +78,9 @@ export default function NotebookPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [iconOpen, setIconOpen] = useState(false);
+  const icons = useDocumentIcons();
+  const currentIcon = current ? (icons.get(current.id) ?? null) : null;
   /** The document `onNew` just created, so its `TitleField` can mount already in edit mode. Cleared
       by every navigation so revisiting it later doesn't reopen the title editor uninvited. */
   const [newDocId, setNewDocId] = useState<string | null>(null);
@@ -144,13 +152,35 @@ export default function NotebookPage() {
                See TitleField for why there is no second copy of it inside the editor. */
             title={
               current ? (
-                <TitleField
-                  key={current.id}
-                  title={current.title}
-                  label={label}
-                  startEditing={newDocId === current.id}
-                  onCommit={(next) => void onRename(next)}
-                />
+                <span className="flex items-center gap-2">
+                  {/* The icon is its own control, in front of the title it belongs to. With none
+                      chosen ("No icon" is the default) the slot stays, faint, so there is always
+                      somewhere to click to add one. */}
+                  <button
+                    type="button"
+                    onClick={() => setIconOpen(true)}
+                    aria-label={t('plugins.notebook.changeIcon')}
+                    className={cn(
+                      'shrink-0 rounded-md p-1 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',
+                      currentIcon ? 'text-muted-foreground' : 'text-muted-foreground/40',
+                    )}
+                  >
+                    {currentIcon ? (
+                      <DocumentIcon icon={currentIcon} className="size-5" />
+                    ) : (
+                      <SmilePlus aria-hidden className="size-5" />
+                    )}
+                  </button>
+                  <span className="min-w-0 flex-1">
+                    <TitleField
+                      key={current.id}
+                      title={current.title}
+                      label={label}
+                      startEditing={newDocId === current.id}
+                      onCommit={(next) => void onRename(next)}
+                    />
+                  </span>
+                </span>
               ) : (
                 t('plugins.notebook.title')
               )
@@ -238,6 +268,7 @@ export default function NotebookPage() {
               {children.map((child) => {
                 const childLabel = documentLabel(child, t('plugins.notebook.untitled'));
                 const preview = documentPreview(child.body, childLabel, documentLabels);
+                const childIcon = icons.get(child.id);
                 return (
                   <li key={child.id}>
                     <button
@@ -245,6 +276,12 @@ export default function NotebookPage() {
                       onClick={() => go(child.id)}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
                     >
+                      {childIcon && (
+                        <DocumentIcon
+                          icon={childIcon}
+                          className="size-4 shrink-0 text-muted-foreground"
+                        />
+                      )}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{childLabel}</span>
                         {preview && (
@@ -280,6 +317,16 @@ export default function NotebookPage() {
         />
       )}
       {current && (
+        <IconPickerDialog
+          open={iconOpen}
+          onOpenChange={setIconOpen}
+          title={t('plugins.notebook.iconFor', { name: label })}
+          value={currentIcon}
+          emptyOption={{ label: t('iconPicker.none') }}
+          onChange={(icon) => void setDocumentIcon(current.id, icon)}
+        />
+      )}
+      {current && (
         <ConfirmDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
@@ -290,6 +337,12 @@ export default function NotebookPage() {
       )}
     </PageContainer>
   );
+}
+
+/** A document's chosen icon. Decorative: the title beside it already names the document. */
+function DocumentIcon({ icon, className }: { icon: string; className?: string }) {
+  const Icon = namedIcon(icon, FileText);
+  return <Icon aria-hidden className={className} />;
 }
 
 /** The way back up. The root is a link too, so there is always somewhere to go from any depth. */

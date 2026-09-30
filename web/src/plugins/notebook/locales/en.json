@@ -85,5 +85,8 @@
       "title": "See the writing on the calendar",
       "lede": "The calendar grows a Notebook tab, shaded by how much you wrote each day across the whole notebook. A day spent cutting rather than adding shows as a quiet one."
     }
-  }
+  },
+  "changeIcon": "Change icon",
+  "iconFor": "Icon for {{name}}",
+  "iconRecord": "Document icon ({{icon}})"
 }

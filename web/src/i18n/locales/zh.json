@@ -763,5 +763,17 @@
     "blocked": "第 {{position}} 位，第 {{level}} 层不允许放置。",
     "dropped": "已放到第 {{position}} 位，第 {{level}} 层。",
     "cancelled": "已取消移动。"
+  },
+  "iconPicker": {
+    "title": "选择图标",
+    "description": "可按名称或图标内容搜索。",
+    "englishOnly": "图标名称和搜索关键词均为英文。",
+    "search": "搜索图标",
+    "grid": "图标",
+    "count_other": "{{count}} 个图标",
+    "noMatches": "没有与“{{query}}”匹配的图标。",
+    "loadFailed": "无法加载图标。首次使用需要联网。",
+    "default": "默认",
+    "none": "无图标"
   }
 }

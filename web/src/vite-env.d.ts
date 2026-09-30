@@ -10,3 +10,18 @@ declare const __APP_VERSION__: string;
 declare const __BUILD_TIME__: string;
 /** Hash of the Capacitor plugin set + config this bundle was built against. */
 declare const __NATIVE_FINGERPRINT__: string;
+
+/** Every Lucide icon as data, served by scripts/lucideIcons.mjs. Imported only through
+    src/components/icons/lucideIcons.ts, which is what keeps it out of the eager bundle. */
+declare module 'virtual:lucide-icons' {
+  const catalog: {
+    marker: string;
+    /** The lucide-react version the icons were read from. */
+    version: string;
+    /** Canonical kebab-case name → the icon's SVG children, without React keys. */
+    icons: Record<string, [string, Record<string, string>][]>;
+    /** A retired name → the canonical one it became. */
+    aliases: Record<string, string>;
+  };
+  export default catalog;
+}

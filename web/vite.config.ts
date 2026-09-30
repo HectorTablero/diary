@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { DEFAULT_LOCALE, localeCodes } from './scripts/locales.mjs';
+import { lucideIcons } from './scripts/lucideIcons.mjs';
 import { computeNativeFingerprint } from './scripts/nativeFingerprint.mjs';
 
 /**
@@ -71,8 +72,13 @@ function katexWoff2Only(): Plugin {
  * is handed to workbox as a manifest filter, and the files are runtime-cached on first use instead
  * — the `on-demand` rule below. scripts/checkBundle.ts fails the build if KaTeX or Mermaid still end
  * up in the precache.
+ *
+ * The icon picker's two data modules are the same case at a smaller size: every Lucide icon
+ * (lucideIcons.ts, ~66 kB brotli) and their English search tags (iconSearch.ts, ~35 kB), needed only
+ * once someone has chosen an icon or opened the picker. See scripts/lucideIcons.mjs.
  */
-const ON_DEMAND_ROOTS = /[\\/]src[\\/]plugins[\\/]notebook[\\/]render(?:Math|Diagram)\.ts$/;
+const ON_DEMAND_ROOTS =
+  /[\\/]src[\\/](?:plugins[\\/]notebook[\\/]render(?:Math|Diagram)|components[\\/]icons[\\/](?:lucideIcons|iconSearch))\.ts$/;
 const onDemandFiles = new Set<string>();
 
 function onDemandChunks(): Plugin {
@@ -352,6 +358,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       localePlaceholders(),
       katexWoff2Only(),
+      lucideIcons(),
       onDemandChunks(),
       react(),
       tailwindcss(),

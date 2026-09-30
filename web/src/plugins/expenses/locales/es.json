@@ -95,5 +95,8 @@
       "title": "De un vistazo en el calendario",
       "lede": "Los días se sombrean según lo gastado, en comparación con el resto de ese mes."
     }
-  }
+  },
+  "changeIcon": "Cambiar el icono de {{name}}",
+  "iconFor": "Icono de {{name}}",
+  "newCategoryIcon": "Icono de la nueva categoría"
 }

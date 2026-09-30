@@ -817,5 +817,18 @@
     "blocked": "Position {{position}}, level {{level}} is not allowed.",
     "dropped": "Dropped at position {{position}}, level {{level}}.",
     "cancelled": "Move cancelled."
+  },
+  "iconPicker": {
+    "title": "Choose an icon",
+    "description": "Search by name or by what it shows.",
+    "englishOnly": "Icon names and search words are in English.",
+    "search": "Search icons",
+    "grid": "Icons",
+    "count_one": "{{count}} icon",
+    "count_other": "{{count}} icons",
+    "noMatches": "No icons match “{{query}}”.",
+    "loadFailed": "The icons couldn't be loaded. They need a connection the first time.",
+    "default": "Default",
+    "none": "No icon"
   }
 }

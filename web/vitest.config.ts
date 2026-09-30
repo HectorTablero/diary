@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { lucideIcons } from './scripts/lucideIcons.mjs';
 
 /* Standalone from vite.config.ts on purpose: the app config pulls in the PWA plugin and the env
    assertions, none of which the tests need. Only the `@` alias has to match.
@@ -55,6 +56,9 @@ export default defineConfig({
     maxWorkers: 4,
     projects: [
       {
+        // Not optional either: `virtual:lucide-icons` exists only through it, and the icon catalog
+        // is imported by anything that draws a chosen icon. It costs nothing until then.
+        plugins: [lucideIcons()],
         define,
         resolve: { alias },
         test: {
@@ -64,7 +68,7 @@ export default defineConfig({
         },
       },
       {
-        plugins: [react()],
+        plugins: [react(), lucideIcons()],
         define,
         resolve: { alias },
         test: {

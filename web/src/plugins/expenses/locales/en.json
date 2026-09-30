@@ -95,5 +95,8 @@
       "title": "At a glance on the calendar",
       "lede": "Days shade by how much was spent, compared with the rest of that month."
     }
-  }
+  },
+  "changeIcon": "Change icon of {{name}}",
+  "iconFor": "Icon for {{name}}",
+  "newCategoryIcon": "Icon for the new category"
 }

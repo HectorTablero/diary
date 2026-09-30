@@ -110,11 +110,18 @@ export interface CategoriesState {
   categories: readonly Category[];
   byId: ReadonlyMap<string, Category>;
   loading: boolean;
-  addCategory: (name: string) => Promise<string>;
+  addCategory: (name: string, icon?: string | null) => Promise<string>;
   renameCategory: (category: Category, name: string) => Promise<void>;
   setRetired: (category: Category, retired: boolean) => Promise<void>;
-  /** Custom categories only, and only ones no expense uses — see CategoriesDialog. */
-  deleteCategory: (category: Category) => Promise<void>;
+  /** A Lucide icon name, or null to go back to the category's default. */
+  setIcon: (category: Category, icon: string | null) => Promise<void>;
+  /**
+   * Only for a category no expense uses — see CategoriesDialog. Resolves to what puts it back.
+   *
+   * A custom category's row is deleted; a starter gets a `deleted` override instead, since it has
+   * no row of its own to delete (see model.ts).
+   */
+  deleteCategory: (category: Category) => Promise<() => Promise<void>>;
 }
 
 export function useCategories(): CategoriesState {
@@ -133,27 +140,35 @@ export function useCategories(): CategoriesState {
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   /* A starter with no row yet gets one on its first edit; after that, edits go to the row. Every
-     edit writes the whole category, name and retired together, so the row is always complete. */
+     edit writes the whole category — name, icon, retired, deleted — so the row is always complete.
+     Resolves to the row's id, which a starter's first edit has only just created. */
   const writeCategory = useCallback(
-    async (category: Category, patch: { name?: string | null; retired?: boolean }) => {
+    async (
+      category: Category,
+      patch: { name?: string | null; retired?: boolean; icon?: string | null; deleted?: boolean },
+    ): Promise<string> => {
       const data = categoryData({
         builtin: category.builtinKey,
         name: patch.name !== undefined ? patch.name : category.name,
         retired: patch.retired ?? category.retired,
+        icon: patch.icon !== undefined ? patch.icon : category.iconName,
+        deleted: patch.deleted ?? false,
       });
-      if (category.rowId) await updatePluginRecord(category.rowId, data);
-      else await createPluginRecord(PLUGIN_ID, 'record', UNDATED_KEY, data);
+      let rowId = category.rowId;
+      if (rowId) await updatePluginRecord(rowId, data);
+      else rowId = (await createPluginRecord(PLUGIN_ID, 'record', UNDATED_KEY, data)).id;
       announceChange();
+      return rowId;
     },
     [],
   );
 
-  const addCategory = useCallback(async (name: string) => {
+  const addCategory = useCallback(async (name: string, icon: string | null = null) => {
     const row = await createPluginRecord(
       PLUGIN_ID,
       'record',
       UNDATED_KEY,
-      categoryData({ builtin: null, name, retired: false }),
+      categoryData({ builtin: null, name, retired: false, icon }),
     );
     announceChange();
     return row.id;
@@ -162,25 +177,54 @@ export function useCategories(): CategoriesState {
   const renameCategory = useCallback(
     // An empty name on a starter means "back to the translated one"; a custom category has no
     // such fallback, so the caller doesn't offer it.
-    (category: Category, name: string) =>
-      writeCategory(category, {
+    async (category: Category, name: string) => {
+      await writeCategory(category, {
         name: name.trim() || (category.builtinKey ? null : category.name),
-      }),
+      });
+    },
     [writeCategory],
   );
 
   const setRetired = useCallback(
-    (category: Category, retired: boolean) => writeCategory(category, { retired }),
+    async (category: Category, retired: boolean) => {
+      await writeCategory(category, { retired });
+    },
     [writeCategory],
   );
 
-  const deleteCategory = useCallback(async (category: Category) => {
-    if (category.builtinKey || !category.rowId) return;
-    await deletePluginRecord(category.rowId);
-    announceChange();
-  }, []);
+  const setIcon = useCallback(
+    async (category: Category, icon: string | null) => {
+      await writeCategory(category, { icon });
+    },
+    [writeCategory],
+  );
 
-  return { categories, byId, loading, addCategory, renameCategory, setRetired, deleteCategory };
+  const deleteCategory = useCallback(
+    async (category: Category): Promise<() => Promise<void>> => {
+      if (category.builtinKey) {
+        const rowId = await writeCategory(category, { deleted: true });
+        // Back to exactly what it was, on the row that now exists either way.
+        return () => writeCategory({ ...category, rowId }, {}).then(() => undefined);
+      }
+      if (!category.rowId) return async () => {};
+      await deletePluginRecord(category.rowId);
+      announceChange();
+      // A new row, not the old id back — nothing referred to it, which is why it could go.
+      return () => addCategory(category.name ?? '', category.iconName).then(() => undefined);
+    },
+    [writeCategory, addCategory],
+  );
+
+  return {
+    categories,
+    byId,
+    loading,
+    addCategory,
+    renameCategory,
+    setRetired,
+    setIcon,
+    deleteCategory,
+  };
 }
 
 /* --- Writing expenses ------------------------------------------------------------------------- */

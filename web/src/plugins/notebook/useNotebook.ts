@@ -27,6 +27,7 @@ import {
   wasWrittenIn,
   type HistoryDay,
 } from './history';
+import { deleteDocumentIcons, hasDocumentIcon } from './icons';
 import {
   ancestorPath,
   documentLabel,
@@ -156,6 +157,8 @@ export async function deleteDocument(
   const revisions = await Promise.all([...ids].map((id) => getDocumentRevisions(id)));
   const all = [...ids, ...revisions.flat().map((r) => r.id)];
   const deletion = await deletePluginDocuments(all);
+  // Their icons go too, and ride along in the deletion so Undo brings them back (see icons.ts).
+  deletion.records = await deleteDocumentIcons(ids);
   /* The count is documents, not rows: "3 documents deleted" is what happened, where the row total
      would also be counting however many days each of them was written on. The *deletion* still
      carries every row, because putting it back means putting the history back too. */
@@ -463,7 +466,7 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
    * a document you thought better of leaves an empty one behind, and a notebook slowly fills with
    * blanks nobody meant to make.
    *
-   * The four conditions are all necessary, and the third is the one that matters: **it must never
+   * The five conditions are all necessary, and the third is the one that matters: **it must never
    * have been written in**. A document with any revision at all is one that had prose in it on some
    * day, and emptying such a document is an edit — possibly a mistake, and undoing a mistake is
    * what the history is for. Deleting it here would be deleting the history along with it.
@@ -475,6 +478,8 @@ export function useDocumentEditor(documentId: string, onDiscarded?: () => void):
     if (revisionsRef.current.length) return;
     // A container, even an unwritten one, is doing a job: it is holding the documents inside it.
     if ((await getChildDocuments(PLUGIN_ID, current.id)).length) return;
+    // Choosing an icon is a decision about the document, not a stray tap on "New".
+    if (await hasDocumentIcon(current.id)) return;
 
     await deletePluginDocuments([current.id]);
     discardedRef.current?.();
