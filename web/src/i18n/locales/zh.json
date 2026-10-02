@@ -608,7 +608,9 @@
       "description": "可以开启的可选功能。启用后会应用到所有设备。",
       "hasData": "已关闭 — 此账户中有 {{count}} 条数据",
       "saveFailed": "无法更改该插件。",
-      "tourButton": "查看快速导览"
+      "tourButton": "查看快速导览",
+      "disabledTitle": "{{name}}已关闭",
+      "disabledDescription": "打开后即可在这里使用。设置会应用到所有设备，之前保存的内容也都还在。"
     }
   },
   "errors": {

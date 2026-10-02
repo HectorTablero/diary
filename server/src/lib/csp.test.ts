@@ -81,6 +81,14 @@ describe('buildCsp', () => {
     expect(connectSrc.some((src) => src.startsWith('https://*.'))).toBe(true);
   });
 
+  it('lets the expense tracker reach its exchange-rate mirrors', () => {
+    // Blocked, the fetch fails like any network error and the page silently falls back to the
+    // rates baked in at build time — so nothing on screen would say this had broken.
+    const { connectSrc } = buildCsp(writeHtml(''));
+    expect(connectSrc).toContain('https://latest.currency-api.pages.dev');
+    expect(connectSrc).toContain('https://cdn.jsdelivr.net');
+  });
+
   it('permits the image sources the app actually renders', () => {
     const { imgSrc } = buildCsp(writeHtml(''));
     // Inlined flag SVGs, and the signed-in user's Google avatar.

@@ -47,10 +47,14 @@ export function CurrencyPicker({
   value,
   onChange,
   trigger,
+  extraOption,
 }: {
-  value: string;
+  /** Null when `extraOption` is the one selected. */
+  value: string | null;
   onChange: (currency: string) => void;
   trigger: ReactNode;
+  /** One choice that isn't a currency, listed first — "whatever I used last", in Settings. */
+  extraOption?: { label: string; onSelect: () => void };
 }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -79,6 +83,20 @@ export function CurrencyPicker({
           <CommandInput placeholder={t('plugins.expenses.searchCurrency')} />
           <CommandList>
             <CommandEmpty>{t('common.noResults')}</CommandEmpty>
+            {extraOption && (
+              <CommandGroup>
+                <CommandItem
+                  value={extraOption.label}
+                  onSelect={() => {
+                    extraOption.onSelect();
+                    setOpen(false);
+                  }}
+                >
+                  <span className="flex-1 truncate">{extraOption.label}</span>
+                  {value === null && <Check className="size-3.5 text-muted-foreground" />}
+                </CommandItem>
+              </CommandGroup>
+            )}
             <CommandGroup>
               {currencies.map(({ code, name }) => (
                 <CommandItem

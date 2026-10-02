@@ -22,10 +22,10 @@ import { readAllExpenses } from './useExpenses';
  * categories against months answers that in one screen, where a thousand-row ledger answered it
  * only for a reader willing to add the rows up — and the rows are all upstairs now anyway.
  *
- * Both halves respect the export's range, and neither converts between currencies (see
- * currency.ts): a day's line states each currency separately, and the pivot is one table per
- * currency, because a rate is either fetched or invented and a total made of invented rates looks
- * exact and isn't.
+ * Both halves respect the export's range, and neither converts between currencies, though the page
+ * does: a day's line states each currency separately, and the pivot is one table per currency. An
+ * export is a record, read later and by an agent; a figure converted at whatever rate this device
+ * happened to have cached on the day it was exported would look exact and isn't.
  */
 
 /** A pipe inside a description would end its table cell early. */

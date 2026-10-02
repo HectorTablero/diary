@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { EXCHANGE_RATE_SOURCES } from '@diary/shared';
 import { config } from '../config';
 
 /**
@@ -106,6 +107,13 @@ export function buildCsp(indexHtmlPath: string): CspDirectives {
     const parentDomain = hostname.split('.').slice(1).join('.');
     // Guard against a single-label host (localhost, a mock) producing `*.` on its own.
     if (parentDomain.includes('.')) connectSrc.add(`${protocol}//*.${parentDomain}`);
+  }
+
+  /* The expense tracker's exchange rates, fetched by the browser from a public, keyless source —
+     see web/src/plugins/expenses/rates.ts. Exact origins only: both are static JSON mirrors. */
+  for (const source of EXCHANGE_RATE_SOURCES) {
+    const origin = originOf(source);
+    if (origin) connectSrc.add(origin);
   }
 
   // Escape hatch for anything else a deployment needs to reach — a self-hosted log sink, say.

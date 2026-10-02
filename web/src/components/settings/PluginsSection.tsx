@@ -1,7 +1,7 @@
 import { Compass } from 'lucide-react';
 import { useEffect, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Section, ToggleRow } from '@/components/settings/Section';
+import { Section, SectionIconContext, ToggleRow } from '@/components/settings/Section';
 import { Button } from '@/components/ui/button';
 import { countPluginRecords } from '@/db/pluginRecords';
 import { notifyError } from '@/lib/notify';
@@ -178,5 +178,10 @@ function PluginSettingsSection({ pluginId }: { pluginId: string }) {
     };
   }, [pluginId, i18n.language]);
 
-  return SettingsSection ? <SettingsSection /> : null;
+  const icon = PLUGINS.find((plugin) => plugin.id === pluginId)?.icon;
+  return SettingsSection ? (
+    <SectionIconContext.Provider value={icon}>
+      <SettingsSection />
+    </SectionIconContext.Provider>
+  ) : null;
 }

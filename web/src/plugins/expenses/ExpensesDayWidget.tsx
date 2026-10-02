@@ -41,7 +41,7 @@ export function ExpensesDayWidget({ dateKey }: { dateKey: string }) {
   const { t } = useTranslation();
   const { expenses, ready } = useExpenseDay(dateKey);
   const { categories, byId, loading: categoriesLoading } = useCategories();
-  const [defaultCurrency] = useDefaultCurrency();
+  const defaultCurrency = useDefaultCurrency();
   const today = todayKey();
   const isToday = dateKey === today;
   const isPast = dateKey < today;
@@ -251,11 +251,15 @@ export function ExpenseRow({
   expense,
   category,
   onEdit,
+  converted,
 }: {
   expense: Expense;
   category: Category | undefined;
   /** Absent while locked: the row is then plain text rather than a button that does nothing. */
   onEdit?: () => void;
+  /** The amount in the page's display currency, formatted — only for one paid in another. The
+      amount paid stays the headline; this is what it came to in the totals around it. */
+  converted?: string;
 }) {
   const { t, i18n } = useTranslation();
   const labelOf = useCategoryLabel();
@@ -278,7 +282,14 @@ export function ExpenseRow({
           <span className="block truncate text-xs text-muted-foreground">{categoryName}</span>
         )}
       </span>
-      <span className="shrink-0 text-sm tabular-nums">{amount}</span>
+      <span className="shrink-0 text-right tabular-nums">
+        <span className="block text-sm">{amount}</span>
+        {converted && (
+          <span className="block text-xs text-muted-foreground">
+            {t('plugins.expenses.approximately', { amount: converted })}
+          </span>
+        )}
+      </span>
     </>
   );
 

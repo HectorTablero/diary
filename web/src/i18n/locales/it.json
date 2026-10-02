@@ -639,7 +639,9 @@
       "hasData_one": "Disattivato — {{count}} voce salvata su questo account",
       "hasData_other": "Disattivato — {{count}} voci salvate su questo account",
       "saveFailed": "Impossibile modificare quel modulo.",
-      "tourButton": "Fai un giro rapido"
+      "tourButton": "Fai un giro rapido",
+      "disabledTitle": "{{name}} è disattivato",
+      "disabledDescription": "Attivalo per usarlo qui. Vale per tutti i dispositivi, e ciò che aveva salvato prima è ancora lì."
     }
   },
   "errors": {

@@ -58,13 +58,13 @@ to break by accident and that fail silently when broken.
 
 A plugin fills any of five **surfaces**, all optional (`web/src/plugins/types.ts`):
 
-| Surface         | What it is                                               |
-| --------------- | -------------------------------------------------------- |
-| `day`           | a card on the diary's day page, below the composer       |
-| `page`          | its own screen at `/plugins/<id>`                        |
-| `settings`      | a card in Settings                                       |
-| `notifications` | reminders contributed to the app's single reconcile pass |
-| `export`        | Markdown files added to the export archive               |
+| Surface         | What it is                                                                      |
+| --------------- | ------------------------------------------------------------------------------- |
+| `day`           | a card on the diary's day page, below the composer                              |
+| `page`          | its own screen at `/plugins/<id>` (offers to switch the plugin on if it is off) |
+| `settings`      | a card in Settings                                                              |
+| `notifications` | reminders contributed to the app's single reconcile pass                        |
+| `export`        | Markdown files added to the export archive                                      |
 
 `web/src/plugins/registry.ts` is the catalogue and the only plugin file the entry chunk may reach:
 an id, an icon, the surfaces list, and a dynamic-import thunk. The surfaces are declared **outside**
@@ -275,10 +275,15 @@ Four decisions are worth knowing before touching it:
   uses would turn two devices logging on the same day into last-write-wins losing one of them. The
   `dateKey` is still the day. Amounts are integers in the currency's minor unit (`currencyDigits`,
   via `Intl`), because every figure on the page is a sum.
-- **Currencies are never converted.** Each expense keeps its own; the default (synced, in the config
-  row's `settings`) only pre-fills the form. With more than one in use the page gets a currency
-  switcher and everything below it is that currency alone — a rate is either fetched (a network
-  dependency and a server change) or invented.
+- **Expenses are stored in the currency they were paid in; only the page converts.** The default
+  for new ones is whatever was used last (or a fixed currency, picked in Settings), synced in the
+  config row's `settings` like the page's own choices. By default the page combines everything into
+  one display currency, picked there; with more than one currency in use it can also show each one
+  separately, unconverted. Rates (`rates.ts`) are fetched by the browser from a free, keyless
+  source — only when something actually needs converting — and cached in `localStorage`; a
+  snapshot taken at build time (`web/scripts/generateRates.ts`, refreshed in CI, committed so a
+  checkout builds offline) covers an APK that is never online. Rates over a week old still convert,
+  with a warning on the page. The export never converts.
 - **The starter categories are never written.** They're built in with fixed ids, translated names
   and their own icons; a row appears only once one is renamed or retired. Seeding them as rows would
   duplicate the set when two devices enabled the plugin offline. Categories in use are retired,
@@ -293,7 +298,8 @@ Surfaces: the day card (always on today; on a past day only if something was rec
 quiet "add an expense for this day" button that opens it unlocked; never on a future day),
 `/plugins/expenses` (month total, per-day average, a cumulative line for the month, twelve months
 of columns, a per-category breakdown, the month's expenses by day), a synced Settings card for the
-default currency, a calendar view shaded by spend relative to the month on screen, `expenses.md` in
+default currency, a calendar view shaded by spend (converted into the display currency) relative to
+the month on screen, `expenses.md` in
 the export, and a tour. Deliberately **no** notifications — a nudge to log spending is a nudge to feel
 watched — and no Android widget.
 

@@ -640,7 +640,9 @@
       "hasData_one": "Desactivado — {{count}} registro guardado en esta cuenta",
       "hasData_other": "Desactivado — {{count}} registros guardados en esta cuenta",
       "saveFailed": "No se pudo cambiar ese complemento.",
-      "tourButton": "Hacer un recorrido rápido"
+      "tourButton": "Hacer un recorrido rápido",
+      "disabledTitle": "{{name}} está desactivado",
+      "disabledDescription": "Actívalo para usarlo aquí. Se aplica en todos tus dispositivos, y lo que guardó antes sigue ahí."
     }
   },
   "errors": {

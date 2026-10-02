@@ -12,7 +12,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { ExpensesDayWidget } from './ExpensesDayWidget';
 import en from './locales/en.json';
 import { expenseData, parseExpense } from './model';
-import { resetDefaultCurrencyCache } from './useExpenses';
+import { resetExpenseSettingsCache } from './useExpenses';
 
 /* The card follows the other plugins' rule — today is open, the past is locked until deliberately
    opened, the future isn't there — plus one of its own: a past day with nothing on it gets a quiet
@@ -40,7 +40,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en');
   await db.pluginRecords.clear();
   await db.outbox.clear();
-  resetDefaultCurrencyCache();
+  resetExpenseSettingsCache();
   await savePluginSettings('expenses', { currency: 'EUR' });
   vi.useFakeTimers({ toFake: ['Date'], now: new Date(`${TODAY}T12:00:00.000Z`) });
 });

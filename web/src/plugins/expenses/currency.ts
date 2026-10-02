@@ -1,10 +1,8 @@
 /**
  * Currencies, entirely through `Intl` — no table of symbols or decimal places to keep up to date.
  *
- * There is deliberately no conversion anywhere in this plugin. A rate is either fetched (a network
- * dependency in an offline-first app, and a server change in a system built so plugins are
- * client-only) or invented, and a total made of invented rates is a number that looks exact and
- * isn't. Each currency is summed on its own instead.
+ * Nothing here converts: an expense is stored, summed and exported in the currency it was paid in.
+ * Conversion is a display concern and lives in rates.ts, where the page's combined view uses it.
  */
 
 const CODE = /^[A-Z]{3}$/;

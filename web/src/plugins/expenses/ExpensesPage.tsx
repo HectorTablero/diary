@@ -2,9 +2,11 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ChevronsUpDown,
   Hash,
   Plus,
   Tags,
+  TriangleAlert,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -37,10 +39,18 @@ import { notifyError, notifySuccess } from '@/lib/notify';
 import { captureError } from '@/lib/telemetry';
 import { CategoriesDialog } from './CategoriesDialog';
 import { CategoryBars, monthLabel, MonthlyColumns, MonthProgress } from './charts';
-import { formatMinor } from './currency';
+import { currencyName, formatMinor } from './currency';
 import { ExpenseRow } from './ExpensesDayWidget';
-import { ExpenseForm, useCategoryLabel } from './ExpenseForm';
+import { CurrencyPicker, ExpenseForm, useCategoryLabel } from './ExpenseForm';
 import type { Category, Expense } from './model';
+import { RatesExplorer } from './RatesExplorer';
+import {
+  convertExpenses,
+  ratesAreStale,
+  useExchangeRates,
+  type ConvertedExpenses,
+  type ExchangeRates,
+} from './rates';
 import {
   categoryBreakdown,
   currenciesUsed,
@@ -59,7 +69,11 @@ import {
   useAllExpenses,
   useActivePeriods,
   useCategories,
-  useDefaultCurrency,
+  resolveDefaultCurrency,
+  resolveDisplayCurrency,
+  saveExpenseSettings,
+  useExpenseSettings,
+  type ExpenseSettings,
 } from './useExpenses';
 
 /**
@@ -69,9 +83,14 @@ import {
  * A month rather than a running balance or a rolling 30 days, because a month is how most people
  * are paid and billed, so it is the unit "what did that come to" is naturally asked in.
  *
- * With more than one currency in use, a switcher picks which one the page is about; everything
- * below it — the figures, both charts and the list — is that currency only. Mixing them would mean
- * either converting (see currency.ts for why not) or adding euros to yen.
+ * Everything is shown in one currency by default — the display currency, picked here and synced —
+ * with expenses paid in any other converted at the latest exchange rates this device has (see
+ * rates.ts). The page says when that's happened and how old the rates are, and warns once they're
+ * over a week old. Each row still shows what was actually paid, with the converted figure beneath.
+ *
+ * With more than one currency in use, a second switch shows them separately instead: one currency
+ * at a time, everything below the switcher in that currency only, nothing converted — the way this
+ * page worked before conversion existed, for anyone who'd rather see exact figures.
  */
 export default function ExpensesPage() {
   const { t, i18n } = useTranslation();
@@ -79,7 +98,8 @@ export default function ExpensesPage() {
   const currentMonth = monthOf(today);
   const { expenses, loading } = useAllExpenses();
   const categoriesState = useCategories();
-  const [defaultCurrency] = useDefaultCurrency();
+  const settings = useExpenseSettings();
+  const defaultCurrency = resolveDefaultCurrency(settings);
   const periods = useActivePeriods();
   const [month, setMonth] = useState(currentMonth);
   const [pickedCurrency, setPickedCurrency] = useState<string | null>(null);
@@ -101,34 +121,58 @@ export default function ExpensesPage() {
     () => currenciesUsed(expenses, defaultCurrency),
     [expenses, defaultCurrency],
   );
-  const currency =
-    pickedCurrency && currencies.includes(pickedCurrency) ? pickedCurrency : currencies[0];
+  /* With a single currency there is nothing to show separately, so a saved "separate" is moot —
+     and the display currency still applies, for someone who wants their euros shown in dollars. */
+  const combined = settings.view === 'combined' || currencies.length <= 1;
+  const displayCurrency = useMemo(
+    () => resolveDisplayCurrency(settings, expenses),
+    [settings, expenses],
+  );
+  /* Always asks (at most twice a day) rather than only when something needs converting, unlike the
+     calendar: the page also carries the rates explorer, which is worth fresh rates on its own. */
+  const rates = useExchangeRates(true);
+  const conversion = useMemo(
+    () => (combined ? convertExpenses(expenses, displayCurrency, rates) : null),
+    [combined, expenses, displayCurrency, rates],
+  );
+  /* What every figure and chart is computed from. Combined, it is every expense already in the
+     display currency, so the stats below run exactly as they do for a diary kept in one. */
+  const counted = conversion?.expenses ?? expenses;
+  const currency = combined
+    ? displayCurrency
+    : pickedCurrency && currencies.includes(pickedCurrency)
+      ? pickedCurrency
+      : currencies[0];
 
   const summary = useMemo(
-    () => monthSummary(expenses, currency, month, today, periods),
-    [expenses, currency, month, today, periods],
+    () => monthSummary(counted, currency, month, today, periods),
+    [counted, currency, month, today, periods],
   );
   /* The chart's twelve months stay put while the picked month is anywhere inside the last year, so
      clicking a column doesn't slide the chart out from under the pointer. Browsing further back
      re-centres it on the picked month instead. */
   const chartEnd = month >= shiftMonth(currentMonth, -11) ? currentMonth : shiftMonth(month, 6);
   const totals = useMemo(
-    () => monthlyTotals(expenses, currency, chartEnd),
-    [expenses, currency, chartEnd],
+    () => monthlyTotals(counted, currency, chartEnd),
+    [counted, currency, chartEnd],
   );
   const breakdown = useMemo(
-    () => categoryBreakdown(expenses, currency, month),
-    [expenses, currency, month],
+    () => categoryBreakdown(counted, currency, month),
+    [counted, currency, month],
   );
   /* Only while this month has that category, so moving to a month without it shows everything
      rather than an empty list with no bar left to click off. */
   const categoryFilter = breakdown.some((item) => item.category === pickedCategory)
     ? pickedCategory
     : undefined;
+  /* The list shows what was paid, so it is built from the originals: in combined mode every one of
+     them (including any with no rate, which the totals leave out and the notice names), and
+     separately only the currency on screen. */
   const days = useMemo(() => {
     const byDay = new Map<string, Expense[]>();
     for (const expense of expenses) {
-      if (expense.currency !== currency || monthOf(expense.dateKey) !== month) continue;
+      if (monthOf(expense.dateKey) !== month) continue;
+      if (!combined && expense.currency !== currency) continue;
       if (categoryFilter !== undefined && expense.category !== categoryFilter) continue;
       const list = byDay.get(expense.dateKey) ?? [];
       list.push(expense);
@@ -136,7 +180,12 @@ export default function ExpensesPage() {
     }
     // Most recent day first, the order a history is read in; within a day, the order they happened.
     return [...byDay].sort(([a], [b]) => b.localeCompare(a));
-  }, [expenses, currency, month, categoryFilter]);
+  }, [expenses, combined, currency, month, categoryFilter]);
+  /* Each expense's amount in the display currency, by id — for the rows and the day totals. */
+  const convertedById = useMemo(
+    () => new Map((conversion?.expenses ?? []).map((expense) => [expense.id, expense.minor])),
+    [conversion],
+  );
 
   const tell = (error: unknown) => {
     captureError(error, { scope: 'plugin.expenses.write' });
@@ -147,6 +196,8 @@ export default function ExpensesPage() {
     tell(error);
     throw error;
   };
+  const saveSettings = (patch: Partial<ExpenseSettings>) =>
+    void saveExpenseSettings(patch).catch(tell);
 
   const remove = async (expense: Expense) => {
     setEditing(null);
@@ -276,23 +327,60 @@ export default function ExpensesPage() {
                 <ChevronRight className="size-4" />
               </Button>
             </div>
-            {currencies.length > 1 && (
-              <Tabs value={currency} onValueChange={setPickedCurrency} className="ml-auto">
-                <TabsList aria-label={t('plugins.expenses.currencySwitcher')}>
-                  {currencies.map((code) => (
-                    <TabsTrigger key={code} value={code}>
-                      {code}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            )}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {currencies.length > 1 && (
+                <Tabs
+                  value={combined ? 'combined' : 'separate'}
+                  onValueChange={(view) =>
+                    saveSettings({ view: view === 'separate' ? 'separate' : 'combined' })
+                  }
+                >
+                  <TabsList aria-label={t('plugins.expenses.viewSwitcher')}>
+                    <TabsTrigger value="combined">{t('plugins.expenses.viewCombined')}</TabsTrigger>
+                    <TabsTrigger value="separate">{t('plugins.expenses.viewSeparate')}</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
+              {combined ? (
+                <CurrencyPicker
+                  value={displayCurrency}
+                  onChange={(next) => {
+                    if (next !== displayCurrency) saveSettings({ displayCurrency: next });
+                  }}
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      aria-label={t('plugins.expenses.displayCurrencyLabel', {
+                        currency: currencyName(displayCurrency, i18n.language),
+                      })}
+                    >
+                      <span className="font-mono text-xs">{displayCurrency}</span>
+                      <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  }
+                />
+              ) : (
+                <Tabs value={currency} onValueChange={setPickedCurrency}>
+                  <TabsList aria-label={t('plugins.expenses.currencySwitcher')}>
+                    {currencies.map((code) => (
+                      <TabsTrigger key={code} value={code}>
+                        {code}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
           </div>
+
+          {conversion && <RatesNotice conversion={conversion} rates={rates} today={today} />}
 
           <SummaryCard summary={summary} currency={currency} />
 
           <div className="rounded-xl border bg-card p-4 shadow-xs">
-            <MonthProgress expenses={expenses} currency={currency} month={month} today={today} />
+            <MonthProgress expenses={counted} currency={currency} month={month} today={today} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -347,9 +435,18 @@ export default function ExpensesPage() {
                   expenses={dayExpenses}
                   byId={categoriesState.byId}
                   onEdit={setEditing}
+                  display={combined ? { currency, convertedById } : undefined}
                 />
               ))}
             </ul>
+          )}
+
+          {!ratesAreStale(rates, today) && (
+            <RatesExplorer
+              rates={rates}
+              displayCurrency={displayCurrency}
+              currencies={currencies}
+            />
           )}
         </div>
       )}
@@ -417,6 +514,52 @@ function CategoryFilter({
   );
 }
 
+/**
+ * What the combined figures are built on: the date of the rates, and a warning once they're more
+ * than a week old. Only shown when something was actually converted — a diary in one currency,
+ * shown in that currency, has nothing to explain. Currencies the rates don't cover are named,
+ * since their expenses are listed but can't be in any total.
+ */
+function RatesNotice({
+  conversion,
+  rates,
+  today,
+}: {
+  conversion: ConvertedExpenses;
+  rates: ExchangeRates;
+  today: string;
+}) {
+  const { t, i18n } = useTranslation();
+  if (!conversion.converted && conversion.unconverted.length === 0) return null;
+  const date = formatDateKey(rates.date, i18n.language, 'PPP');
+  const stale = ratesAreStale(rates, today);
+
+  return (
+    <div className="space-y-1 text-xs">
+      {conversion.converted &&
+        (stale ? (
+          <p
+            role="status"
+            className="flex items-start gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300"
+          >
+            <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
+            {t('plugins.expenses.ratesStale', { date })}
+          </p>
+        ) : (
+          <p className="text-muted-foreground">{t('plugins.expenses.ratesNote', { date })}</p>
+        ))}
+      {conversion.unconverted.length > 0 && (
+        <p className="text-muted-foreground">
+          {t('plugins.expenses.ratesMissing', {
+            count: conversion.unconverted.length,
+            currencies: conversion.unconverted.join(', '),
+          })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Exported for the tour's page preview, which shows it over made-up numbers. */
 export function SummaryCard({
   summary,
@@ -477,16 +620,47 @@ function DayGroup({
   expenses,
   byId,
   onEdit,
+  display,
 }: {
   dateKey: string;
   expenses: readonly Expense[];
   byId: ReadonlyMap<string, Category>;
   onEdit: (expense: Expense) => void;
+  /** Present in combined mode: the currency the page is in, and each expense's amount in it. */
+  display?: { currency: string; convertedById: ReadonlyMap<string, number> };
 }) {
-  const { i18n } = useTranslation();
-  const totals = [...sumByCurrency(expenses)].map(([code, minor]) =>
-    formatMinor(minor, code, i18n.language),
-  );
+  const { t, i18n } = useTranslation();
+  const format = (minor: number, code: string) => formatMinor(minor, code, i18n.language);
+  const inDisplay = (expense: Expense) => display?.convertedById.get(expense.id);
+  /* Paid in another currency and converted — what gets the secondary figure and the "≈". */
+  const wasConverted = (expense: Expense) =>
+    display !== undefined &&
+    expense.currency !== display.currency &&
+    inDisplay(expense) !== undefined;
+
+  let totals: string[];
+  if (display) {
+    /* One total in the display currency — marked approximate if any of it was converted — then,
+       separately, anything with no rate, so no money spent that day goes unmentioned. */
+    const counted = expenses.filter((expense) => inDisplay(expense) !== undefined);
+    const leftOver = expenses.filter((expense) => inDisplay(expense) === undefined);
+    const total = format(
+      counted.reduce((sum, expense) => sum + inDisplay(expense)!, 0),
+      display.currency,
+    );
+    totals = [
+      ...(counted.length === 0
+        ? []
+        : [
+            counted.some(wasConverted)
+              ? t('plugins.expenses.approximately', { amount: total })
+              : total,
+          ]),
+      ...[...sumByCurrency(leftOver)].map(([code, minor]) => format(minor, code)),
+    ];
+  } else {
+    totals = [...sumByCurrency(expenses)].map(([code, minor]) => format(minor, code));
+  }
   return (
     <li className="rounded-xl border bg-card px-4 py-3 shadow-xs">
       <div className="flex items-center gap-2">
@@ -506,6 +680,9 @@ function DayGroup({
             expense={expense}
             category={expense.category ? byId.get(expense.category) : undefined}
             onEdit={() => onEdit(expense)}
+            converted={
+              wasConverted(expense) ? format(inDisplay(expense)!, display!.currency) : undefined
+            }
           />
         ))}
       </ul>

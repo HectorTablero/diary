@@ -4,7 +4,8 @@ import type { Expense } from './model';
 
 /**
  * Everything the page, the calendar and the tour compute from a list of expenses. Pure, and always
- * about *one* currency at a time — see currency.ts for why nothing here converts.
+ * about *one* currency at a time. Nothing here converts: the page's combined view hands these a list
+ * already converted into one currency (rates.ts), so they never need to know it happened.
  *
  * What is deliberately absent: budgets, "over/under", month-on-month arrows. A number compared
  * against a target, or coloured by which direction it moved, is a verdict. The stats say what

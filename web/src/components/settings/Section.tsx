@@ -1,11 +1,18 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { notifySuccess } from '@/lib/notify';
 import { cn } from '@/lib/utils';
+
+/**
+ * The icon a plugin's settings card is headed with. Provided by the Settings page around each
+ * plugin's own card (see PluginSettingsSection), so every plugin gets the icon it is known by in
+ * the Plugins list and the nav without each card having to look up its own manifest.
+ */
+export const SectionIconContext = createContext<LucideIcon | undefined>(undefined);
 
 /**
  * One titled block of settings, with an optional second tier behind an "Advanced" disclosure.
@@ -23,18 +30,26 @@ export function Section({
   description,
   children,
   advanced,
+  icon,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   advanced?: ReactNode;
+  /** Beside the title. Falls back to SectionIconContext, which is how plugin cards get theirs. */
+  icon?: LucideIcon;
 }) {
   const { t } = useTranslation();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const contextIcon = useContext(SectionIconContext);
+  const Icon = icon ?? contextIcon;
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-xs">
-      <h2 className="text-sm font-semibold">{title}</h2>
+      <h2 className="flex items-center gap-2 text-sm font-semibold">
+        {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
+        {title}
+      </h2>
       {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
       <div className="mt-3">{children}</div>
       {advanced && (

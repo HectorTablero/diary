@@ -11,8 +11,8 @@ import { expensesOnboardingSteps } from './onboarding/steps';
 
 /* The expense tracker. Six surfaces, matching the `surfaces` list in ../registry: the day card is
    "what did today cost", the page is "what did the month come to, and where did it go", the calendar
-   is the same question at a glance, the settings card holds the one synced preference (the default
-   currency), the export is a plain table, and the tour shows all of it before it's switched on.
+   is the same question at a glance, the settings card holds the default currency (a fixed one, or
+   whatever was used last), the export is a plain table, and the tour shows all of it before it's switched on.
    Deliberately no notifications — a nudge to log spending is a nudge to feel watched — and no
    Android widget. */
 

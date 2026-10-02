@@ -317,3 +317,14 @@ export function newObjectId(): string {
   crypto.getRandomValues(bytes);
   return time + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+/**
+ * Where the expense tracker fetches exchange rates from: two mirrors of the same daily file, tried
+ * in order. Here rather than in the plugin because three places must agree on it — the plugin that
+ * fetches, the build script that snapshots it into the app (web/scripts/generateRates.ts), and the
+ * server's CSP, which has to let the browser reach both hosts.
+ */
+export const EXCHANGE_RATE_SOURCES = [
+  'https://latest.currency-api.pages.dev/v1/currencies/eur.json',
+  'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json',
+] as const;

@@ -644,7 +644,9 @@
       "hasData_one": "Off — {{count}} entry saved on this account",
       "hasData_other": "Off — {{count}} entries saved on this account",
       "saveFailed": "Couldn't change that plugin.",
-      "tourButton": "Take a quick tour"
+      "tourButton": "Take a quick tour",
+      "disabledTitle": "{{name}} is turned off",
+      "disabledDescription": "Switch it on to use it here. It applies to every device, and anything it saved before is still there."
     }
   },
   "errors": {

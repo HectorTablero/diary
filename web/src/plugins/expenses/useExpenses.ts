@@ -51,56 +51,129 @@ function useReloadOnChange(reload: () => void) {
   }, [reload]);
 }
 
-/* --- Default currency --------------------------------------------------------------------------
+/* --- Settings ----------------------------------------------------------------------------------
    Synced, in the plugin's config row: which currency a diary is kept in is a fact about the diary,
    not about the phone — the laptop pre-filling dollars while the phone pre-fills euros would be the
    kind of bug that quietly splits a month's total in two. Held in a module-level store so the
-   settings card and every open form move together the moment it changes. */
+   settings card, the page and every open form move together the moment one changes.
 
-let defaultCurrency: string | null = null;
-const currencyListeners = new Set<() => void>();
+   `currency` is what new expenses start in: a code, or — absent or null — "whatever I used last",
+   which is `lastCurrency`, recorded on every save the way the composer records `lastImportance`.
+   Absent means "last used" because that is the default now; a diary that picked a currency before
+   this existed has it stored and keeps it. `lastCurrency` is synced too, so the phone remembers the
+   euros the laptop just used.
 
-function publishCurrency(next: string) {
-  if (next === defaultCurrency) return;
-  defaultCurrency = next;
-  for (const listener of currencyListeners) listener();
+   `displayCurrency` and `view` are the page's: which currency the combined figures are shown in, and
+   whether they are combined at all. Absent means automatic — see `resolveDisplayCurrency`. */
+
+export type ExpensesView = 'combined' | 'separate';
+
+export interface ExpenseSettings {
+  /** A fixed default for new expenses, or null for "whatever I used last". */
+  currency: string | null;
+  lastCurrency: string | null;
+  /** Null until picked on the page. */
+  displayCurrency: string | null;
+  view: ExpensesView;
 }
 
-async function refreshDefaultCurrency() {
-  const settings = await getPluginSettings(PLUGIN_ID);
-  const stored = typeof settings.currency === 'string' ? settings.currency : '';
-  publishCurrency(isCurrencyCode(stored) ? stored : guessCurrency());
+const code = (value: unknown): string | null =>
+  typeof value === 'string' && isCurrencyCode(value) ? value : null;
+
+export function parseExpenseSettings(raw: Record<string, unknown>): ExpenseSettings {
+  return {
+    currency: code(raw.currency),
+    lastCurrency: code(raw.lastCurrency),
+    displayCurrency: code(raw.displayCurrency),
+    view: raw.view === 'separate' ? 'separate' : 'combined',
+  };
 }
 
-const subscribeCurrency = (listener: () => void) => {
-  currencyListeners.add(listener);
+const EMPTY_SETTINGS: ExpenseSettings = parseExpenseSettings({});
+
+let settings: ExpenseSettings | null = null;
+const settingsListeners = new Set<() => void>();
+
+function publishSettings(next: ExpenseSettings) {
+  if (
+    settings &&
+    next.currency === settings.currency &&
+    next.lastCurrency === settings.lastCurrency &&
+    next.displayCurrency === settings.displayCurrency &&
+    next.view === settings.view
+  ) {
+    return;
+  }
+  settings = next;
+  for (const listener of settingsListeners) listener();
+}
+
+async function refreshSettings(): Promise<ExpenseSettings> {
+  publishSettings(parseExpenseSettings(await getPluginSettings(PLUGIN_ID)));
+  return settings!;
+}
+
+const subscribeSettings = (listener: () => void) => {
+  settingsListeners.add(listener);
   return () => {
-    currencyListeners.delete(listener);
+    settingsListeners.delete(listener);
   };
 };
 
 /** Only exported for tests, which need a fresh read per case. */
-export const resetDefaultCurrencyCache = () => {
-  defaultCurrency = null;
+export const resetExpenseSettingsCache = () => {
+  settings = null;
 };
 
-export function useDefaultCurrency(): [string, (currency: string) => Promise<void>] {
-  const current = useSyncExternalStore(subscribeCurrency, () => defaultCurrency);
+/** Write some settings, showing them here at once rather than after the round-trip. */
+export async function saveExpenseSettings(patch: Partial<ExpenseSettings>): Promise<void> {
+  publishSettings({ ...(settings ?? (await refreshSettings())), ...patch });
+  await savePluginSettings(PLUGIN_ID, patch);
+}
+
+/** What the composer's "remember last used" does for importance, for currency. Only writes when
+    it changed, which is rarely — most expenses are in the same currency as the last one. */
+async function rememberCurrency(currency: string): Promise<void> {
+  const current = settings ?? (await refreshSettings());
+  if (current.lastCurrency === currency) return;
+  await saveExpenseSettings({ lastCurrency: currency });
+}
+
+export function useExpenseSettings(): ExpenseSettings {
+  const current = useSyncExternalStore(subscribeSettings, () => settings);
 
   useEffect(() => {
-    void refreshDefaultCurrency();
-    return onSyncApplied(() => void refreshDefaultCurrency());
+    void refreshSettings();
+    return onSyncApplied(() => void refreshSettings());
   }, []);
 
-  const set = useCallback(async (currency: string) => {
-    if (!isCurrencyCode(currency)) return;
-    publishCurrency(currency);
-    await savePluginSettings(PLUGIN_ID, { currency });
-  }, []);
+  // Defaults stand in for the first frame, before the config row has been read.
+  return current ?? EMPTY_SETTINGS;
+}
 
-  // The guess stands in for the first frame, before the config row has been read — the same answer
-  // the read will give for a diary that never picked one.
-  return [current ?? guessCurrency(), set];
+/** The currency a new expense starts in: the fixed default, else the last one used, else a guess
+    from the browser's locale for a diary that has never recorded anything. */
+export const resolveDefaultCurrency = (s: ExpenseSettings): string =>
+  s.currency ?? s.lastCurrency ?? guessCurrency();
+
+export const useDefaultCurrency = (): string => resolveDefaultCurrency(useExpenseSettings());
+
+/**
+ * The currency the page combines everything into, unless one was picked there: the fixed default if
+ * there is one, otherwise whichever currency most expenses were recorded in. Deliberately *not* the
+ * last one used — one coffee bought abroad shouldn't re-denominate the whole page.
+ */
+export function resolveDisplayCurrency(s: ExpenseSettings, expenses: readonly Expense[]): string {
+  if (s.displayCurrency) return s.displayCurrency;
+  if (s.currency) return s.currency;
+  const counts = new Map<string, number>();
+  let best: string | null = null;
+  for (const expense of expenses) {
+    const count = (counts.get(expense.currency) ?? 0) + 1;
+    counts.set(expense.currency, count);
+    if (!best || count > counts.get(best)!) best = expense.currency;
+  }
+  return best ?? resolveDefaultCurrency(s);
 }
 
 /* --- Categories -------------------------------------------------------------------------------- */
@@ -229,15 +302,26 @@ export function useCategories(): CategoriesState {
 
 /* --- Writing expenses ------------------------------------------------------------------------- */
 
-export async function addExpense(dateKey: string, input: ExpenseInput): Promise<Expense> {
+/* Remembering the currency is best-effort: the expense is what was asked for, and a failure to
+   update a preference must not turn its save into an error. */
+const remember = (currency: string) => void rememberCurrency(currency).catch(() => undefined);
+
+async function createExpense(dateKey: string, input: ExpenseInput): Promise<Expense> {
   const row = await createPluginRecord(PLUGIN_ID, 'record', dateKey, expenseData(input));
   announceChange();
   return parseExpense(row)!;
 }
 
+export async function addExpense(dateKey: string, input: ExpenseInput): Promise<Expense> {
+  const expense = await createExpense(dateKey, input);
+  remember(input.currency);
+  return expense;
+}
+
 export async function updateExpense(expense: Expense, input: ExpenseInput): Promise<void> {
   await updatePluginRecord(expense.id, expenseData(input));
   announceChange();
+  if (input.currency !== expense.currency) remember(input.currency);
 }
 
 /** The caller keeps the `Expense` it passed in, which is everything `restoreExpense` needs. */
@@ -247,8 +331,9 @@ export async function removeExpense(expense: Expense): Promise<void> {
 }
 
 /** Undo for `removeExpense`: the same expense, on the same day. A new row id — nothing refers to an
-    expense by id, so nothing can tell. */
-export const restoreExpense = (expense: Expense) => addExpense(expense.dateKey, expense);
+    expense by id, so nothing can tell. Not a "use" of its currency: undoing a delete shouldn't
+   change what the next expense starts in. */
+export const restoreExpense = (expense: Expense) => createExpense(expense.dateKey, expense);
 
 /* --- Reading expenses -------------------------------------------------------------------------- */
 
