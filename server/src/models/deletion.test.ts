@@ -1,6 +1,7 @@
 import { TOMBSTONE_RETENTION_MS } from '@diary/shared';
-import { describe, expect, it } from 'vitest';
-import { isCursorStale } from './deletion';
+import { Types } from 'mongoose';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Deletion, findTombstone, isCursorStale } from './deletion';
 
 /*
  * The one decision in this file that isn't a database call: whether a client's cursor still lands
@@ -36,5 +37,60 @@ describe('isCursorStale', () => {
     // A device whose clock runs fast writes a cursor ahead of the server's now. It will miss
     // changes until the clock catches up, but that heals; a reset every sync would not.
     expect(isCursorStale(new Date(NOW.getTime() + 86_400_000), NOW)).toBe(false);
+  });
+});
+
+/*
+ * The tombstone lookup a create makes alongside its other work. It has to be exactly as effective as
+ * the unconditional delete it replaced for the one case that delete was for — undo re-creating a
+ * deleted id — while leaving every other create without a write it never needed.
+ */
+describe('findTombstone', () => {
+  const ID = '0000000000000000000000a1';
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('retracts a tombstone that is there, and only when told to', async () => {
+    vi.spyOn(Deletion, 'exists').mockResolvedValue({ _id: new Types.ObjectId() } as never);
+    const deleteMany = vi.spyOn(Deletion, 'deleteMany').mockResolvedValue({} as never);
+
+    const retract = await findTombstone('u1', 'entry', ID);
+    // Looking is not retracting: the create has not landed yet.
+    expect(deleteMany).not.toHaveBeenCalled();
+
+    await retract();
+    expect(deleteMany).toHaveBeenCalledWith({
+      userId: 'u1',
+      coll: 'entry',
+      docId: { $in: [new Types.ObjectId(ID)] },
+    });
+  });
+
+  it('writes nothing when there is no tombstone, which is almost always', async () => {
+    const exists = vi.spyOn(Deletion, 'exists').mockResolvedValue(null as never);
+    const deleteMany = vi.spyOn(Deletion, 'deleteMany').mockResolvedValue({} as never);
+
+    await (
+      await findTombstone('u1', 'person', ID)
+    )();
+
+    expect(exists).toHaveBeenCalledWith({
+      userId: 'u1',
+      coll: 'person',
+      docId: new Types.ObjectId(ID),
+    });
+    expect(deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('does not even look for a server-minted id, which has never been deleted', async () => {
+    const exists = vi.spyOn(Deletion, 'exists');
+
+    await (
+      await findTombstone('u1', 'tag', undefined)
+    )();
+
+    expect(exists).not.toHaveBeenCalled();
   });
 });

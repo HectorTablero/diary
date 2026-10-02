@@ -25,17 +25,28 @@ const Entry = modelDouble();
 const Tag = modelDouble();
 const deletions = vi.hoisted(() => ({
   record: vi.fn(async () => {}),
-  clear: vi.fn(async () => {}),
+  clear: vi.fn(async (..._args: unknown[]) => {}),
 }));
-const settings = vi.hoisted(() => ({ getSettings: vi.fn() }));
+const settings = vi.hoisted(() => {
+  const getSettings = vi.fn();
+  // The narrow read the create route uses: the same row, so it answers from the same stub.
+  return { getSettings, getWriteSettings: (userId: string) => getSettings(userId) };
+});
 
 vi.mock('../models/person', () => ({ Person }));
 vi.mock('../models/entry', () => ({ Entry }));
 vi.mock('../models/tag', () => ({ Tag }));
-vi.mock('../models/deletion', () => ({
-  recordDeletions: deletions.record,
-  clearDeletions: deletions.clear,
-}));
+vi.mock('../models/deletion', async () => {
+  const { Types } = await import('mongoose');
+  return {
+    recordDeletions: deletions.record,
+    clearDeletions: deletions.clear,
+    /* Behaves as though every client-supplied id has a tombstone, so `deletions.clear` sees exactly
+       the retraction an undo would make. Whether one is really there is deletion.test.ts's job. */
+    findTombstone: async (userId: string, coll: string, id: string | undefined) =>
+      id ? () => deletions.clear(userId, coll, [new Types.ObjectId(id)]) : async () => {},
+  };
+});
 vi.mock('../services/settingsService', () => settings);
 
 const { peopleRouter } = await import('./people');
@@ -129,7 +140,8 @@ describe('POST /people', () => {
     // user, so one belonging to somebody else cannot be attached.
     expect(Tag.find).toHaveBeenCalledWith(
       { userId: USER_ID, _id: { $in: [objectId('t1'), objectId('t2')] } },
-      '_id',
+      // Carrying what the response shows, so the tags are not read a second time to populate it.
+      'name color',
     );
     const [docs] = Person.create.mock.calls[0] as unknown as [Record<string, unknown>[]];
     expect(docs[0].tags).toEqual([objectId('t1')]);

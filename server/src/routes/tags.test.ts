@@ -26,16 +26,23 @@ const Entry = modelDouble();
 const Person = modelDouble();
 const deletions = vi.hoisted(() => ({
   record: vi.fn(async () => {}),
-  clear: vi.fn(async () => {}),
+  clear: vi.fn(async (..._args: unknown[]) => {}),
 }));
 
 vi.mock('../models/tag', () => ({ Tag }));
 vi.mock('../models/entry', () => ({ Entry }));
 vi.mock('../models/person', () => ({ Person }));
-vi.mock('../models/deletion', () => ({
-  recordDeletions: deletions.record,
-  clearDeletions: deletions.clear,
-}));
+vi.mock('../models/deletion', async () => {
+  const { Types } = await import('mongoose');
+  return {
+    recordDeletions: deletions.record,
+    clearDeletions: deletions.clear,
+    /* Behaves as though every client-supplied id has a tombstone, so `deletions.clear` sees exactly
+       the retraction an undo would make. Whether one is really there is deletion.test.ts's job. */
+    findTombstone: async (userId: string, coll: string, id: string | undefined) =>
+      id ? () => deletions.clear(userId, coll, [new Types.ObjectId(id)]) : async () => {},
+  };
+});
 
 const { tagsRouter } = await import('./tags');
 

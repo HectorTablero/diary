@@ -1,3 +1,4 @@
+import { MAX_BATCH_OPS } from '@diary/shared';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Auth } from './auth';
@@ -38,7 +39,17 @@ vi.mock('./routes/entries', async () => {
 });
 vi.mock('./routes/people', async () => {
   const { Hono: H } = await import('hono');
-  return { peopleRouter: new H<AppEnv>().post('/', (c) => c.json({ reached: 'people' })) };
+  const { z } = await import('zod');
+  const { jsonValidator } = await import('./middleware/validate');
+  return {
+    peopleRouter: new H<AppEnv>()
+      .post('/', (c) => c.json({ reached: 'people' }))
+      // The one stand-in with a real validator, so the batch tests can show a body refused alone is
+      // refused identically inside a batch.
+      .patch('/:id', jsonValidator(z.object({ name: z.string().min(1) })), (c) =>
+        c.json({ reached: 'people-patch', id: c.req.param('id'), name: c.req.valid('json').name }),
+      ),
+  };
 });
 vi.mock('./routes/tags', async () => {
   const { Hono: H } = await import('hono');
@@ -80,8 +91,9 @@ const SESSION = { user: { id: 'user_app_test' }, session: { createdAt: new Date(
 const session = vi.hoisted(() => ({ value: null as typeof SESSION | null }));
 
 /** Enough of Better Auth for the gate and the passthrough route. */
+const getSession = vi.fn(async () => session.value);
 const auth = {
-  api: { getSession: async () => session.value },
+  api: { getSession },
   handler: async () => new Response(JSON.stringify({ handled: true }), { status: 200 }),
 } as unknown as Auth;
 
@@ -96,6 +108,7 @@ const mutate = (path: string, method = 'POST') =>
 
 beforeEach(() => {
   session.value = SESSION;
+  getSession.mockClear();
   live.notifyUserChanged.mockClear();
   assetLinks.buildAssetLinks.mockReturnValue({ statements: [], malformed: [] });
 });
@@ -194,6 +207,163 @@ describe('the live-sync nudge', () => {
     await mutate('/api/tags');
 
     expect(live.notifyUserChanged).not.toHaveBeenCalled();
+  });
+});
+
+/* POST /api/batch is transport, never a second way in: each op must meet exactly what it would have
+   met alone. So these go through the real buildApp and assert on what the *routers and middleware*
+   saw, not on anything the batch route decides for itself. */
+describe('batched writes', () => {
+  const batch = (ops: unknown[], headers: Record<string, string> = {}) =>
+    app.request('/api/batch', {
+      method: 'POST',
+      headers: { Origin: ORIGIN, 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ ops }),
+    });
+
+  it('answers each op with what its own request would have got, in order', async () => {
+    const res = await batch([
+      { method: 'POST', path: '/entries', body: { content: 'hi' } },
+      { method: 'POST', path: '/tags', body: {} },
+      { method: 'PATCH', path: '/people/abc', body: { name: 'Ana' } },
+    ]);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      results: [
+        { status: 201, body: { reached: 'entries', userId: 'user_app_test' } },
+        { status: 200, body: { reached: 'tags' } },
+        { status: 200, body: { reached: 'people-patch', id: 'abc', name: 'Ana' } },
+      ],
+    });
+  });
+
+  it('looks the session up once, for the whole batch', async () => {
+    await batch([
+      { method: 'POST', path: '/tags' },
+      { method: 'POST', path: '/threads' },
+      { method: 'POST', path: '/people' },
+    ]);
+
+    // Every op is from the caller the envelope already proved; asking again is the same question.
+    expect(getSession).toHaveBeenCalledOnce();
+  });
+
+  it('hands every op the identity the envelope proved, and nothing else', async () => {
+    // Only the envelope gets a session. Were any op looked up again, it would be refused.
+    getSession.mockImplementationOnce(async () => {
+      session.value = null;
+      return SESSION;
+    });
+
+    const res = await batch([
+      { method: 'POST', path: '/entries' },
+      { method: 'POST', path: '/entries' },
+    ]);
+
+    expect(await res.json()).toEqual({
+      results: [
+        { status: 201, body: { reached: 'entries', userId: 'user_app_test' } },
+        { status: 201, body: { reached: 'entries', userId: 'user_app_test' } },
+      ],
+    });
+  });
+
+  it('vouches for its own ops only — a lone request is still checked in full', async () => {
+    await batch([{ method: 'POST', path: '/tags' }]);
+    session.value = null;
+
+    const res = await mutate('/api/tags');
+
+    expect(res.status).toBe(401);
+  });
+
+  it('validates each op body with its own route, and refuses it the same way', async () => {
+    const res = await batch([
+      { method: 'PATCH', path: '/people/abc', body: { name: '' } },
+      { method: 'PATCH', path: '/people/abc', body: { name: 'Ana' } },
+    ]);
+
+    const { results } = (await res.json()) as { results: { status: number; body: unknown }[] };
+    expect(results[0]).toEqual({ status: 400, body: { error: 'errors.validation' } });
+    expect(results[1]?.status).toBe(200);
+  });
+
+  it('keeps going past a server error, answering every op', async () => {
+    const res = await batch([
+      { method: 'POST', path: '/tags/boom' },
+      { method: 'POST', path: '/entries' },
+    ]);
+
+    expect(await res.json()).toEqual({
+      results: [
+        { status: 500, body: { error: 'errors.unknown' } },
+        { status: 201, body: { reached: 'entries', userId: 'user_app_test' } },
+      ],
+    });
+  });
+
+  it('nudges other devices per applied op, as lone requests would', async () => {
+    await batch(
+      [
+        { method: 'POST', path: '/tags' },
+        { method: 'POST', path: '/tags/boom' },
+      ],
+      { 'X-Client-Id': 'client_abc' },
+    );
+
+    // Once for the tag that landed, once for the envelope; never for the op that failed.
+    expect(live.notifyUserChanged).toHaveBeenCalledTimes(2);
+    expect(live.notifyUserChanged).toHaveBeenCalledWith('user_app_test', 'client_abc');
+  });
+
+  it('is refused whole without a session, with nothing dispatched', async () => {
+    session.value = null;
+
+    const res = await batch([{ method: 'POST', path: '/tags' }]);
+
+    expect(res.status).toBe(401);
+    expect(getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('is refused whole from an untrusted origin', async () => {
+    const res = await batch([{ method: 'POST', path: '/tags' }], {
+      Origin: 'https://evil.example',
+    });
+
+    expect(res.status).toBe(403);
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['account deletion', 'DELETE', '/account'],
+    ['the AI routes', 'POST', '/ai/suggestions'],
+    ['the auth handler', 'POST', '/auth/sign-out'],
+    ['itself', 'POST', '/batch'],
+    ['the sync pull', 'GET', '/sync'],
+    ['a dot segment', 'DELETE', '/entries/../account'],
+    ['a query string', 'POST', '/entries?x=1'],
+    ['an encoded character', 'POST', '/entries/%2e%2e'],
+    ['a path without its slash', 'POST', 'entries'],
+  ])('refuses an op aimed at %s, before running anything', async (_, method, path) => {
+    const res = await batch([
+      { method: 'POST', path: '/tags' },
+      { method, path },
+    ]);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'errors.validation' });
+    // Only the envelope's own auth ran: the valid op ahead of the bad one was never dispatched.
+    expect(getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an empty batch and an oversized one', async () => {
+    expect((await batch([])).status).toBe(400);
+    const tooMany = Array.from({ length: MAX_BATCH_OPS + 1 }, () => ({
+      method: 'POST',
+      path: '/tags',
+    }));
+    expect((await batch(tooMany)).status).toBe(400);
   });
 });
 

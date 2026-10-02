@@ -9,7 +9,7 @@ import { Types } from 'mongoose';
 import { conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { clearDeletions, recordDeletions } from '../models/deletion';
+import { findTombstone, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
@@ -37,6 +37,10 @@ export const tagsRouter = new Hono<AppEnv>()
     try {
       // timestamps off: keep updatedAt at server time (not createdAt) so replayed offline
       // creates still hit other clients' sync cursors.
+      const [color, retractTombstone] = await Promise.all([
+        input.color ?? nextColor(userId),
+        findTombstone(userId, 'tag', input.id),
+      ]);
       const [tag] = await Tag.create(
         [
           {
@@ -45,13 +49,13 @@ export const tagsRouter = new Hono<AppEnv>()
             updatedAt: new Date(),
             userId,
             name: input.name,
-            color: input.color ?? (await nextColor(userId)),
+            color,
           },
         ],
         { timestamps: false },
       );
       // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
-      if (input.id) await clearDeletions(userId, 'tag', [tag._id]);
+      await retractTombstone();
       return c.json(tagToDto(tag.toObject() as unknown as LeanTag), 201);
     } catch (err) {
       // A collision on _id means this exact tag is already there — a replayed create, which is a

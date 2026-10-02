@@ -1,6 +1,6 @@
 import type { SyncCollection } from '@diary/shared';
 import { TOMBSTONE_RETENTION_MS } from '@diary/shared';
-import { model, Schema, type Types } from 'mongoose';
+import { model, Schema, Types } from 'mongoose';
 
 /** Tombstones so offline clients learn about deletes on their next sync pull. */
 const deletionSchema = new Schema({
@@ -133,6 +133,35 @@ export async function recordDeletions(
  * single-valued, which is what makes undo converge to the same state on every device regardless of
  * when each one pulls.
  */
+/** What `findTombstone` hands back: run it once the create has landed. */
+export type TombstoneRetraction = () => Promise<void>;
+
+const nothingToRetract: TombstoneRetraction = async () => {};
+
+/**
+ * `clearDeletions` for a create, split in two: look now, retract afterwards — and only if there was
+ * anything to retract.
+ *
+ * Every create carrying a client id used to end with an unconditional `deleteMany` on this
+ * collection, a durable write that, outside of undo, matches nothing: a fresh id has never been
+ * deleted. A restore paid one per row. The lookup is a read, so it runs alongside whatever the
+ * create already reads or writes and adds no step of its own; the delete happens only for the
+ * re-created id that actually has a tombstone, which is the one case it ever did anything for.
+ *
+ * Nothing can slip in between: a tombstone for this id could only be written by deleting the
+ * document, and the document is the thing this request is still creating.
+ */
+export async function findTombstone(
+  userId: string,
+  coll: SyncCollection,
+  docId: string | undefined,
+): Promise<TombstoneRetraction> {
+  if (!docId) return nothingToRetract;
+  const id = new Types.ObjectId(docId);
+  const found = await Deletion.exists({ userId, coll, docId: id });
+  return found ? () => clearDeletions(userId, coll, [id]) : nothingToRetract;
+}
+
 export async function clearDeletions(
   userId: string,
   coll: SyncCollection,

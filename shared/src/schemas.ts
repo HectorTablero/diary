@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import {
   AI_MAX_TRANSCRIPT_LENGTH,
+  BATCH_OP_PATH_REGEX,
   BIRTHDAY_REGEX,
   DATE_KEY_REGEX,
   HEX_COLOR_REGEX,
   MAX_ALIAS_LENGTH,
   MAX_ALIASES,
+  MAX_BATCH_OPS,
   MAX_CONTENT_LENGTH,
   MAX_EMAIL_LENGTH,
   MAX_EVENT_TITLE_LENGTH,
@@ -377,6 +379,19 @@ export const syncQuerySchema = z.object({
   since: isoDateTimeSchema.optional(),
 });
 
+/* Write batching. Only the envelope is checked here: each op's own body is validated by the route
+   it is replayed into, exactly as it would have been had it been sent alone. */
+
+export const batchOpSchema = z.object({
+  method: z.enum(['POST', 'PATCH', 'PUT', 'DELETE']),
+  path: z.string().regex(BATCH_OP_PATH_REGEX),
+  body: z.unknown().optional(),
+});
+
+export const batchRequestSchema = z.object({
+  ops: z.array(batchOpSchema).min(1).max(MAX_BATCH_OPS),
+});
+
 export type EntryCreateInput = z.infer<typeof entryCreateSchema>;
 export type EntryUpdateInput = z.infer<typeof entryUpdateSchema>;
 export type PersonCreateInput = z.infer<typeof personCreateSchema>;
@@ -391,4 +406,6 @@ export type PluginRecordUpdateInput = z.infer<typeof pluginRecordUpdateSchema>;
 export type PluginDocumentCreateInput = z.infer<typeof pluginDocumentCreateSchema>;
 export type PluginDocumentUpdateInput = z.infer<typeof pluginDocumentUpdateSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
+export type BatchOpInput = z.infer<typeof batchOpSchema>;
+export type BatchRequestInput = z.infer<typeof batchRequestSchema>;
 export type AiSuggestionsRequestInput = z.infer<typeof aiSuggestionsRequestSchema>;

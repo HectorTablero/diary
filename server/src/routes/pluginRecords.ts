@@ -4,7 +4,7 @@ import { Types } from 'mongoose';
 import { badRequest, conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { clearDeletions, recordDeletions } from '../models/deletion';
+import { findTombstone, recordDeletions } from '../models/deletion';
 import { pluginCapExceeded, PluginRecord } from '../models/pluginRecord';
 import { pluginRecordToDto, type LeanPluginRecord } from '../dto';
 
@@ -26,7 +26,10 @@ export const pluginRecordsRouter = new Hono<AppEnv>()
     const userId = c.get('userId');
     const input = c.req.valid('json');
 
-    const exceeded = await pluginCapExceeded(userId, input.pluginId);
+    const [exceeded, retractTombstone] = await Promise.all([
+      pluginCapExceeded(userId, input.pluginId),
+      findTombstone(userId, 'pluginRecord', input.id),
+    ]);
     if (exceeded) throw badRequest(`pluginRecord.too_many_${exceeded}`);
 
     try {
@@ -48,7 +51,7 @@ export const pluginRecordsRouter = new Hono<AppEnv>()
         { timestamps: false },
       );
       // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
-      if (input.id) await clearDeletions(userId, 'pluginRecord', [record._id]);
+      await retractTombstone();
       return c.json(pluginRecordToDto(record.toObject() as unknown as LeanPluginRecord), 201);
     } catch (err) {
       // A collision on _id means this exact row is already there — a replayed create, which is a

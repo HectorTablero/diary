@@ -4,7 +4,7 @@ import { Types } from 'mongoose';
 import { conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { clearDeletions, recordDeletions } from '../models/deletion';
+import { findTombstone, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Thread } from '../models/thread';
 import { threadToDto, type LeanThread } from '../dto';
@@ -22,20 +22,24 @@ export const threadsRouter = new Hono<AppEnv>()
     try {
       // timestamps off: keep updatedAt at server time (not createdAt) so replayed offline
       // creates still hit other clients' sync cursors.
-      const [thread] = await Thread.create(
-        [
-          {
-            _id: input.id ? new Types.ObjectId(input.id) : new Types.ObjectId(),
-            createdAt: input.createdAt ? new Date(input.createdAt) : new Date(),
-            updatedAt: new Date(),
-            userId,
-            name: input.name,
-          },
-        ],
-        { timestamps: false },
-      );
+      // The tombstone lookup is a read, so it goes alongside the insert rather than ahead of it.
+      const [[thread], retractTombstone] = await Promise.all([
+        Thread.create(
+          [
+            {
+              _id: input.id ? new Types.ObjectId(input.id) : new Types.ObjectId(),
+              createdAt: input.createdAt ? new Date(input.createdAt) : new Date(),
+              updatedAt: new Date(),
+              userId,
+              name: input.name,
+            },
+          ],
+          { timestamps: false },
+        ),
+        findTombstone(userId, 'thread', input.id),
+      ]);
       // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
-      if (input.id) await clearDeletions(userId, 'thread', [thread._id]);
+      await retractTombstone();
       return c.json(threadToDto(thread.toObject() as unknown as LeanThread), 201);
     } catch (err) {
       // A collision on _id means this exact thread is already there — a replayed create, which is

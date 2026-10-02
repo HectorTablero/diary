@@ -8,7 +8,7 @@ import { Types } from 'mongoose';
 import { badRequest, conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { clearDeletions, recordDeletions } from '../models/deletion';
+import { findTombstone, recordDeletions } from '../models/deletion';
 import { pluginDocumentCapExceeded, PluginDocument } from '../models/pluginDocument';
 import { pluginDocumentToDto, type LeanPluginDocument } from '../dto';
 
@@ -27,7 +27,10 @@ export const pluginDocumentsRouter = new Hono<AppEnv>()
     const userId = c.get('userId');
     const input = c.req.valid('json');
 
-    const exceeded = await pluginDocumentCapExceeded(userId, input.pluginId);
+    const [exceeded, retractTombstone] = await Promise.all([
+      pluginDocumentCapExceeded(userId, input.pluginId),
+      findTombstone(userId, 'pluginDocument', input.id),
+    ]);
     if (exceeded) throw badRequest(`pluginDocument.too_many_${exceeded}`);
 
     try {
@@ -54,7 +57,7 @@ export const pluginDocumentsRouter = new Hono<AppEnv>()
         { timestamps: false },
       );
       // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
-      if (input.id) await clearDeletions(userId, 'pluginDocument', [doc._id]);
+      await retractTombstone();
       return c.json(pluginDocumentToDto(doc.toObject() as unknown as LeanPluginDocument), 201);
     } catch (err) {
       // A collision on _id is this exact row arriving twice — a replayed create, which succeeded.

@@ -26,17 +26,24 @@ const PluginDocument = modelDouble();
 const caps = vi.hoisted(() => ({ exceeded: vi.fn(async () => null as string | null) }));
 const deletions = vi.hoisted(() => ({
   record: vi.fn(async () => {}),
-  clear: vi.fn(async () => {}),
+  clear: vi.fn(async (..._args: unknown[]) => {}),
 }));
 
 vi.mock('../models/pluginDocument', () => ({
   PluginDocument,
   pluginDocumentCapExceeded: caps.exceeded,
 }));
-vi.mock('../models/deletion', () => ({
-  recordDeletions: deletions.record,
-  clearDeletions: deletions.clear,
-}));
+vi.mock('../models/deletion', async () => {
+  const { Types } = await import('mongoose');
+  return {
+    recordDeletions: deletions.record,
+    clearDeletions: deletions.clear,
+    /* Behaves as though every client-supplied id has a tombstone, so `deletions.clear` sees exactly
+       the retraction an undo would make. Whether one is really there is deletion.test.ts's job. */
+    findTombstone: async (userId: string, coll: string, id: string | undefined) =>
+      id ? () => deletions.clear(userId, coll, [new Types.ObjectId(id)]) : async () => {},
+  };
+});
 
 const { pluginDocumentsRouter } = await import('./pluginDocuments');
 

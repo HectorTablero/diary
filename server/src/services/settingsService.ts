@@ -4,13 +4,39 @@ import { Types } from 'mongoose';
 import { Thread } from '../models/thread';
 import { UserSettings } from '../models/userSettings';
 
-/** Read the user's settings, creating the defaults row on first access. */
-export async function getSettings(userId: string): Promise<SettingsDto> {
-  const doc = await UserSettings.findOneAndUpdate(
+/**
+ * The user's settings row, creating the defaults row on first access.
+ *
+ * A read first, and the upsert only when there is nothing to read. The upsert alone answered both
+ * cases, but it is a *write* every time — Mongoose's timestamps turn even a no-op `$setOnInsert`
+ * into a `$set` of `updatedAt` — and settings are consulted on the write path: every sub-entry
+ * create checks the depth limit, every person create without an interval reads the default. A
+ * restore did one of those per row, each a durable write that changed nothing anyone reads.
+ */
+async function settingsDoc(userId: string) {
+  const existing = await UserSettings.findOne({ userId }).lean();
+  if (existing) return existing;
+  return UserSettings.findOneAndUpdate(
     { userId },
     { $setOnInsert: { userId } },
     { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
   ).lean();
+}
+
+/** The settings the write routes consult — without the extra lookup `getSettings` may make. */
+export async function getWriteSettings(
+  userId: string,
+): Promise<Pick<SettingsDto, 'maxSubEntryDepth' | 'defaultCheckupIntervalDays'>> {
+  const doc = await settingsDoc(userId);
+  return {
+    maxSubEntryDepth: doc.maxSubEntryDepth ?? DEFAULT_SETTINGS.maxSubEntryDepth,
+    defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
+  };
+}
+
+/** Read the user's settings, creating the defaults row on first access. */
+export async function getSettings(userId: string): Promise<SettingsDto> {
+  const doc = await settingsDoc(userId);
   return {
     halfLifeDays: doc.halfLifeDays as SettingsDto['halfLifeDays'],
     epsilon: doc.epsilon,

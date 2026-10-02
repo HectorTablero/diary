@@ -22,6 +22,7 @@ import { requireTrustedOrigin } from './middleware/origin';
 import { requireAuth, type AppEnv } from './middleware/session';
 import { accountRouter } from './routes/account';
 import { aiRouter } from './routes/ai';
+import { batchRouter } from './routes/batch';
 import { entriesRouter } from './routes/entries';
 import { peopleRouter } from './routes/people';
 import { settingsRouter } from './routes/settings';
@@ -149,6 +150,14 @@ export const buildApp = (app: Hono<AppEnv>, auth: Auth, upgradeWebSocket?: Upgra
   api.route('/plugin-documents', pluginDocumentsRouter);
   api.route('/settings', settingsRouter);
   api.route('/sync', syncRouter);
+  /* Many outbox writes in one round trip. Each op is re-dispatched through `app` from the very top,
+     so it meets every middleware above and every check in its own router exactly as if it had been
+     sent alone — see routes/batch.ts. The caller checks alone are answered once, by the envelope:
+     its origin and session were verified on the way in, and every op carries that verdict. */
+  api.route(
+    '/batch',
+    batchRouter((request, env) => app.fetch(request, env)),
+  );
   // DELETE only: erases the diary and the account behind it. See routes/account.ts.
   api.route('/account', accountRouter);
   api.route('/ai', aiRouter);

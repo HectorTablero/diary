@@ -328,3 +328,23 @@ export const EXCHANGE_RATE_SOURCES = [
   'https://latest.currency-api.pages.dev/v1/currencies/eur.json',
   'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json',
 ] as const;
+
+/* --- Write batching ----------------------------------------------------------------------------
+
+   POST /api/batch carries several outbox ops in one request. It is transport only: the server
+   replays every op through the whole app as if it had arrived on its own, so nothing about
+   validating or applying a write depends on how it was sent (see server/src/routes/batch.ts). */
+
+/** Most ops one batch may carry. The client chunks its queue to this, the server refuses more. */
+export const MAX_BATCH_OPS = 500;
+
+/**
+ * The only paths a batched op may target: the routes the outbox writes to, and nothing else.
+ *
+ * Not the auth handler, not account deletion, not the AI routes, not /batch itself — none of those
+ * is ever queued, so none of them has any business arriving by this door. Each segment after the
+ * collection is an id or a fixed route word; a query string, a dot segment or an encoded character
+ * has no way to match.
+ */
+export const BATCH_OP_PATH_REGEX =
+  /^\/(entries|people|tags|threads|plugin-records|plugin-documents|settings)(\/[A-Za-z0-9_-]{1,64}){0,4}$/;

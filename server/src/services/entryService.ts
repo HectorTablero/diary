@@ -9,13 +9,13 @@ import {
 import { generateKeyBetween } from 'fractional-indexing';
 import { Types } from 'mongoose';
 import { badRequest, conflict, isDuplicateKey, notFound } from '../errors';
-import { clearDeletions, recordDeletions } from '../models/deletion';
+import { findTombstone, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
 import { Tag } from '../models/tag';
 import { Thread } from '../models/thread';
-import { getSettings } from './settingsService';
-import { ENTRY_POPULATE, entryToDto, type LeanEntry } from '../dto';
+import { getWriteSettings } from './settingsService';
+import { ENTRY_POPULATE, entryToDto, type LeanEntry, type LeanTag, type LeanThread } from '../dto';
 
 const toObjectIds = (ids: string[]) => ids.map((id) => new Types.ObjectId(id));
 
@@ -36,6 +36,31 @@ async function ownedPersonIds(userId: string, ids: string[]) {
   if (!ids.length) return [];
   const people = await Person.find({ userId, _id: { $in: toObjectIds(ids) } }, '_id').lean();
   return people.map((p) => p._id);
+}
+
+/* The same ownership filters, carrying the fields ENTRY_POPULATE selects — so a create can answer
+   with the DTO straight from what it already read, instead of reading the same rows a second time
+   to populate them. The arrays keep the order Mongo returned them in, which is also the order they
+   are stored in, so the DTO lists them exactly as a populate of the stored entry would. */
+
+async function ownedTags(userId: string, ids: string[]): Promise<LeanTag[]> {
+  if (!ids.length) return [];
+  return Tag.find({ userId, _id: { $in: toObjectIds(ids) } }, 'name color').lean<LeanTag[]>();
+}
+
+async function ownedThreads(userId: string, ids: string[]): Promise<LeanThread[]> {
+  if (!ids.length) return [];
+  return Thread.find({ userId, _id: { $in: toObjectIds(ids) } }, 'name createdAt updatedAt').lean<
+    LeanThread[]
+  >();
+}
+
+/** With `lastCheckupAt` too, so a create can tell which checkup clocks it would actually move. */
+async function ownedPeople(userId: string, ids: string[]) {
+  if (!ids.length) return [];
+  return Person.find({ userId, _id: { $in: toObjectIds(ids) } }, 'name lastCheckupAt').lean<
+    { _id: Types.ObjectId; name: string; lastCheckupAt?: Date }[]
+  >();
 }
 
 /** A `saidTo` entry is either a bare person id (legacy — server stamps `at` itself) or an
@@ -70,17 +95,48 @@ async function parentMap(userId: string): Promise<Map<string, string | null>> {
   );
 }
 
-/** 0-based depth of `id` itself (a root entry is depth 0). Throws if it isn't owned by userId. */
+interface AncestorChain {
+  _id: Types.ObjectId;
+  parentId: Types.ObjectId | null;
+  ancestors: { _id: Types.ObjectId; parentId: Types.ObjectId | null }[];
+}
+
+/**
+ * 0-based depth of `id` itself (a root entry is depth 0). Throws if it isn't owned by userId.
+ *
+ * One query that walks only `id`'s own ancestors. This used to load the parent link of every entry
+ * the user owns — `parentMap` — to answer a question about one chain, so each sub-entry create cost
+ * a read of the whole diary, and restoring a backup was quadratic in its size. `depthOf` only ever
+ * follows the chain from `id` upward, so a map holding exactly that chain gives it the same answer
+ * the full map did — a dangling parent and a cycle included.
+ */
 async function ancestorDepth(userId: string, id: string): Promise<number> {
-  const exists = await Entry.exists({ _id: id, userId });
-  if (!exists) throw notFound('entry.not_found');
-  return depthOf(id, await parentMap(userId));
+  const [chain] = await Entry.aggregate<AncestorChain>([
+    { $match: { _id: new Types.ObjectId(id), userId } },
+    {
+      $graphLookup: {
+        from: Entry.collection.collectionName,
+        startWith: '$parentId',
+        connectFromField: 'parentId',
+        connectToField: '_id',
+        as: 'ancestors',
+        restrictSearchWithMatch: { userId },
+      },
+    },
+    { $project: { parentId: 1, 'ancestors._id': 1, 'ancestors.parentId': 1 } },
+  ]);
+  if (!chain) throw notFound('entry.not_found');
+  const map = new Map<string, string | null>();
+  for (const row of [chain, ...chain.ancestors]) {
+    map.set(row._id.toString(), row.parentId ? row.parentId.toString() : null);
+  }
+  return depthOf(id, map);
 }
 
 /** How deep this user allows nesting. Read per call rather than cached: it is one indexed lookup
     on a row this request has usually touched already, and a stale copy would reject a legal edit. */
 async function maxDepthFor(userId: string): Promise<number> {
-  return (await getSettings(userId)).maxSubEntryDepth;
+  return (await getWriteSettings(userId)).maxSubEntryDepth;
 }
 
 async function assertDepthAllowed(userId: string, parentId: string) {
@@ -155,18 +211,27 @@ async function replayedCreate(err: unknown, userId: string, id: string | undefin
 }
 
 export async function createEntry(userId: string, input: EntryCreateInput) {
-  if (input.parentId) await assertDepthAllowed(userId, input.parentId);
-
-  const people = await ownedPersonIds(userId, input.people);
+  /* Every read a create depends on, all at once. None of them depends on another, and one after the
+     other they were most of what a create cost — up to eight sequential round trips before the
+     insert even started. The depth check is the only one that can refuse, and it refuses the same
+     way whichever of them happens to finish first. */
+  const [, people, tags, threads, saidToOwned, orderKey, retractTombstone] = await Promise.all([
+    input.parentId ? assertDepthAllowed(userId, input.parentId) : undefined,
+    ownedPeople(userId, input.people),
+    ownedTags(userId, input.tags),
+    ownedThreads(userId, input.threads),
+    input.saidTo === undefined ? null : ownedPeople(userId, saidToIdList(input.saidTo)),
+    // Defense-in-depth for a client that predates orderKey — normally the client always sends one.
+    input.orderKey ?? appendOrderKey(userId, input.parentId ?? null, input.dateKey),
+    findTombstone(userId, 'entry', input.id),
+  ]);
+  const peopleIds = people.map((person) => person._id);
   // Auto-said: a direct mention means the person heard it, unless the client says otherwise.
-  const saidToIds =
-    input.saidTo === undefined ? people : await ownedPersonIds(userId, saidToIdList(input.saidTo));
+  const saidToPeople = saidToOwned ?? people;
+  const saidToIds = saidToPeople.map((person) => person._id);
   const providedAt = saidToProvidedAt(input.saidTo);
   // Offline creates replay with their original timestamp so ordering within a day survives.
   const now = input.createdAt ? new Date(input.createdAt) : new Date();
-  // Defense-in-depth for a client that predates orderKey — normally the client always sends one.
-  const orderKey =
-    input.orderKey ?? (await appendOrderKey(userId, input.parentId ?? null, input.dateKey));
 
   // timestamps off for this save: mongoose would otherwise force updatedAt = createdAt on new
   // docs, hiding replayed offline creates from other clients' sync cursors.
@@ -182,9 +247,9 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
           content: input.content,
           dateKey: input.dateKey,
           importance: input.importance,
-          tags: await ownedTagIds(userId, input.tags),
-          threads: await ownedThreadIds(userId, input.threads),
-          people,
+          tags: tags.map((tag) => tag._id),
+          threads: threads.map((thread) => thread._id),
+          people: peopleIds,
           saidTo: saidToIds.map((person) => ({
             person,
             at: providedAt.get(person.toString()) ?? now,
@@ -200,15 +265,23 @@ export async function createEntry(userId: string, input: EntryCreateInput) {
     if (existing) return existing;
     throw err;
   }
-  // Only a client-supplied id can collide with a tombstone — a fresh ObjectId has never been
-  // deleted, so there is nothing to retract for an ordinary create.
-  if (input.id) await clearDeletions(userId, 'entry', [entry._id]);
-  await bumpLastCheckup(
-    userId,
-    saidToIds.map((id) => ({ personId: id, at: providedAt.get(id.toString()) ?? now })),
-  );
-  const populated = await entry.populate(ENTRY_POPULATE);
-  return entryToDto(populated.toObject() as unknown as LeanEntry);
+  /* Only the checkup clocks this would actually move. The update keeps its own `$lt` guard, which
+     is what makes it safe; this just stops it being sent for people it is certain to skip — a
+     clock that was already at or past `at` when it was read can only have moved further since.
+     A person with no clock at all is skipped as well, exactly as the guard would skip them. */
+  const marks = saidToPeople.flatMap(({ _id, lastCheckupAt }) => {
+    const at = providedAt.get(_id.toString()) ?? now;
+    return lastCheckupAt && lastCheckupAt < at ? [{ personId: _id, at }] : [];
+  });
+  // Different collections, neither reading the other, so together.
+  await Promise.all([retractTombstone(), bumpLastCheckup(userId, marks)]);
+  // Populated from the rows read above rather than by reading them again (see ownedTags).
+  return entryToDto({
+    ...(entry.toObject() as unknown as LeanEntry),
+    tags,
+    threads,
+    people,
+  });
 }
 
 /** Moving a parent's date must carry every descendant along with it. */

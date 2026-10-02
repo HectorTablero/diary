@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
-import type { AppEnv } from './session';
+import { isVouchedFor, type AppEnv } from './session';
 
 /**
  * Refuse a state-changing request that announces an origin this deployment doesn't trust.
@@ -37,6 +37,8 @@ export const requireTrustedOrigin = (trusted: string[]): MiddlewareHandler<AppEn
   const allowed = new Set(trusted);
   return async (c, next) => {
     if (SAFE_METHODS.has(c.req.method)) return next();
+    // An op replayed by POST /api/batch, whose envelope already passed this exact check.
+    if (isVouchedFor(c.req.raw)) return next();
     const origin = c.req.header('Origin');
     if (origin && !allowed.has(origin)) {
       return c.json({ error: 'errors.forbidden' }, 403);

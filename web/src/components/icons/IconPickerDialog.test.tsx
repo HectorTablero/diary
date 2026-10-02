@@ -1,7 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { loadIconCatalog } from './iconCatalog';
 import { IconPickerDialog } from './IconPickerDialog';
 
 /* The picker over the real catalog (served by scripts/lucideIcons.mjs through vitest.config.ts).
@@ -26,6 +27,19 @@ function open(props: Partial<Parameters<typeof IconPickerDialog>[0]> = {}) {
 const grid = () => screen.findByRole('group', { name: 'Icons' }, { timeout: 5000 });
 
 describe('IconPickerDialog', () => {
+  /* Paid once, up front, under a timeout sized for it.
+
+     The catalog is a module generated from every Lucide icon, and the first import of it in a worker
+     transforms the lot — measured at ~5.3 s on its own, longer again on a busy parallel run. That
+     used to land inside whichever test opened the picker first, against the 5 s the grid lookup
+     waits, so that test failed — and a load slow enough could outlast the next few too, which is how
+     every test in this file came to fail at once while each passed when re-run. The picker shares
+     this module-level cache, so once it is warm the tests below time the picker, not the bundler.
+     iconSearch is the picker's other lazy import, warmed for the same reason. */
+  beforeAll(async () => {
+    await Promise.all([loadIconCatalog(), import('./iconSearch')]);
+  }, 60_000);
+
   it('renders only the rows in view, not the whole set', async () => {
     open();
     const cells = within(await grid()).getAllByRole('button');

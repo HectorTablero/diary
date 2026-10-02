@@ -1426,6 +1426,29 @@ export async function importEntries(
     prepared.push({ row, finalId, isOverwrite });
   }
 
+  /* Parents before their children, in the queue as on the server. File order is not that: a
+     sub-entry can be exported ahead of its parent, and its create then reached the server first and
+     was refused — the parent did not exist yet — with a 404 the restore tolerates by design, so the
+     entry was silently never saved (and any sub-entries of its own after it). Ordered by depth within
+     this import, which only ever moves a row behind the rows it hangs from; the sort is stable, so
+     everything else keeps the order it had. */
+  const preparedByRowId = new Map(prepared.map((item) => [item.row.id, item]));
+  const importDepth = new Map<string, number>();
+  for (const { row } of prepared) {
+    let depth = 0;
+    const seen = new Set([row.id]);
+    for (
+      let parent = row.parentId;
+      parent !== null && preparedByRowId.has(parent) && !seen.has(parent);
+      parent = preparedByRowId.get(parent)!.row.parentId
+    ) {
+      seen.add(parent);
+      depth++;
+    }
+    importDepth.set(row.id, depth);
+  }
+  prepared.sort((a, b) => importDepth.get(a.row.id)! - importDepth.get(b.row.id)!);
+
   // Pass 2: rewrite every reference (tags/people/saidTo/hiddenFor/parentId) through the maps
   // built above. A parent that was never part of this import and isn't already local either
   // gets promoted to root rather than left dangling.

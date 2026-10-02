@@ -361,3 +361,20 @@ export interface SyncResponse {
   settings: SettingsDto;
   deletions: SyncDeletion[];
 }
+
+/** What one batched op would have answered had it been sent alone. */
+export interface BatchOpResult {
+  status: number;
+  /** The parsed JSON body, or `null` for an empty one (a 204). */
+  body: unknown;
+}
+
+/**
+ * The answer to POST /api/batch: one result per op, in the order they were sent.
+ *
+ * Every op is attempted, whatever the ones before it answered. Shorter than the request only if the
+ * client abandoned it partway, and then the ops past the end were never attempted.
+ */
+export interface BatchResponse {
+  results: BatchOpResult[];
+}

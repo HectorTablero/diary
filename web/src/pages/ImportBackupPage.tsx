@@ -34,7 +34,10 @@ import {
   type ThreadImportItem,
 } from '@/db/mutations';
 import { PluginImportSection } from '@/components/settings/PluginImportSection';
+import { db } from '@/db/db';
 import { forceSyncNow, waitForOutboxDrain } from '@/db/sync';
+import { useOutboxRemaining } from '@/db/useOutboxRemaining';
+import { cn } from '@/lib/utils';
 import {
   applyPluginSettingsChoices,
   usePluginSettingsConflicts,
@@ -166,6 +169,15 @@ export default function ImportBackupPage() {
    */
   const [phase, setPhase] = useState<'idle' | 'saving' | 'syncing'>('idle');
   const importing = phase !== 'idle';
+
+  /* How far the upload has got. The queue's size when the upload began is the whole job; what has
+     left the queue since is done. Anything queued before the restore rides along in both numbers,
+     which is right — the page waits for that too. */
+  const [uploadTotal, setUploadTotal] = useState(0);
+  const remaining = useOutboxRemaining(phase === 'syncing');
+  const uploaded = remaining === null ? 0 : Math.max(0, uploadTotal - remaining);
+  // Floored, so it reads 100% only once everything has actually gone.
+  const uploadPercent = uploadTotal > 0 ? Math.floor((uploaded / uploadTotal) * 100) : 100;
 
   /* Plugin settings restore like everything else, but they *replace* what this account uses on
      every device — so where the file and the account disagree, the user picks. Unconflicted
@@ -406,6 +418,7 @@ export default function ImportBackupPage() {
          this device, and that is not what someone restoring a backup means by "done". Push, and
          stay on this screen until the queue is empty. `forceSyncNow` rather than `syncNow`: this is
          an explicit action, so it goes ahead even when the user has asked to sync on Wi-Fi only. */
+      setUploadTotal(await db.outbox.count());
       setPhase('syncing');
       void forceSyncNow();
       const outcome = await waitForOutboxDrain();
@@ -668,25 +681,57 @@ export default function ImportBackupPage() {
           </div>
         )}
         <Button
-          className="w-full gap-1.5"
+          /* Not faded while it works: disabled is what stops a second press, but at half opacity a
+             button that is busy looks the same as one that is refusing. */
+          className={cn(
+            'relative w-full gap-1.5 overflow-hidden',
+            importing && 'disabled:opacity-100',
+          )}
           disabled={totalUnresolved > 0 || importing}
           onClick={() => void runImport()}
         >
-          {importing && <Spinner className="size-3.5" />}
-          {/* The label names the phase rather than staying "Restore" behind a spinner. The upload
-              is the long one and it is the one people are most likely to interrupt, so it has to
-              say what it is waiting for — a spinner alone reads as a hung button. */}
-          {phase === 'saving'
-            ? t('importBackup.saving')
-            : phase === 'syncing'
-              ? t('importBackup.syncing')
-              : t('importBackup.confirm')}
+          {/* The button is the progress bar for the slow half. Decorative only — a button's contents
+              are presentational to assistive tech, so the count below carries it for them. */}
+          {phase === 'syncing' && (
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-0 bg-primary-foreground/20 transition-[width] duration-300 ease-out"
+              style={{ width: `${uploadPercent}%` }}
+            />
+          )}
+          <span className="relative inline-flex items-center gap-1.5">
+            {importing && <Spinner className="size-3.5" />}
+            {/* The label names the phase rather than staying "Restore" behind a spinner. The upload
+                is the long one and it is the one people are most likely to interrupt, so it has to
+                say what it is waiting for — a spinner alone reads as a hung button. */}
+            {phase === 'saving'
+              ? t('importBackup.saving')
+              : phase === 'syncing'
+                ? t('importBackup.syncingProgress', { percent: uploadPercent })
+                : t('importBackup.confirm')}
+          </span>
         </Button>
         {phase === 'syncing' && (
-          // aria-live, so a screen reader is told why the button stopped responding.
-          <p className="text-center text-xs text-muted-foreground" role="status">
-            {t('importBackup.syncingHint')}
-          </p>
+          <div className="flex flex-col items-center gap-0.5 text-center text-xs text-muted-foreground">
+            {/* A progressbar rather than a live region: announcing every batch would talk over
+                everything else, while this can be asked at any time. */}
+            <p
+              className="tabular-nums"
+              role="progressbar"
+              aria-label={t('importBackup.uploadProgress')}
+              aria-valuemin={0}
+              aria-valuemax={uploadTotal}
+              aria-valuenow={uploaded}
+              aria-valuetext={t('importBackup.uploadedCount', {
+                done: uploaded,
+                total: uploadTotal,
+              })}
+            >
+              {t('importBackup.uploadedCount', { done: uploaded, total: uploadTotal })}
+            </p>
+            {/* aria-live, so a screen reader is told why the button stopped responding. */}
+            <p role="status">{t('importBackup.syncingHint')}</p>
+          </div>
         )}
       </div>
     </PageContainer>

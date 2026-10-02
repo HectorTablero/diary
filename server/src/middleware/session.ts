@@ -20,9 +20,44 @@ export interface AppEnv {
   };
 }
 
+/** Who a request is from, as requireAuth establishes it. */
+export interface Identity {
+  userId: string;
+  sessionCreatedAt: Date;
+}
+
+/**
+ * Requests whose caller has already been checked, and who that caller is.
+ *
+ * Only POST /api/batch writes here: each op it replays is a request it built itself, on behalf of an
+ * envelope that has just passed the origin guard and the session lookup. Every op in a batch comes
+ * from that same caller, so asking the database again per op would be the same question with the
+ * same answer, hundreds of times over.
+ *
+ * Keyed by the Request *object*, which is what makes it unforgeable. Nothing arriving over the wire
+ * can be one of these objects — the HTTP server makes a fresh Request for every connection — so no
+ * header, path or body can talk its way into this map. A WeakMap so an entry lives exactly as long
+ * as the request it vouches for.
+ */
+const vouched = new WeakMap<Request, Identity>();
+
+export const vouchFor = (request: Request, identity: Identity): Request => {
+  vouched.set(request, identity);
+  return request;
+};
+
+/** True for a request built by the batch endpoint after its envelope passed every caller check. */
+export const isVouchedFor = (request: Request): boolean => vouched.has(request);
+
 export const requireAuth =
   (auth: Auth): MiddlewareHandler<AppEnv> =>
   async (c, next) => {
+    const known = vouched.get(c.req.raw);
+    if (known) {
+      c.set('userId', known.userId);
+      c.set('sessionCreatedAt', known.sessionCreatedAt);
+      return next();
+    }
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'errors.unauthorized' }, 401);
     c.set('userId', session.user.id);

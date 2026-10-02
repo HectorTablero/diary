@@ -1,5 +1,7 @@
 import type { Page, Route } from '@playwright/test';
 import type {
+  BatchRequestInput,
+  BatchResponse,
   EntryDto,
   PersonDto,
   SettingsDto,
@@ -188,17 +190,15 @@ export async function installApiMock(
     await json(route, response);
   });
 
-  await page.route('**/api/{entries,people,tags,threads,settings}**', async (route) => {
-    const call = record(route);
-    if (unreachable) return route.abort('connectionfailed');
-
+  /** One write, answered the way the server would answer it — whether it came alone or batched. */
+  const write = (call: RecordedCall): { status: number; body: unknown } => {
     const index = rejections.findIndex((r) => r.method === call.method && r.path.test(call.path));
     if (index !== -1) {
       const [rejection] = rejections.splice(index, 1);
       /* `{ error: <i18n key> }` is the contract: apiClient parses it into ApiError.code, sync.ts
            stores that on the dead-letter row, and the toast renders it. Any other body shape would
            make the rejection path untestable while still looking like a failure. */
-      return json(route, { error: rejection.code }, rejection.status);
+      return { status: rejection.status, body: { error: rejection.code } };
     }
 
     // Apply creates so the next pull returns them — which is what makes "write, drain, reload"
@@ -206,7 +206,32 @@ export async function installApiMock(
     if (call.method === 'POST' && call.path === '/api/entries') {
       state.entries = [...state.entries, call.body as EntryDto];
     }
-    await json(route, {});
+    return { status: 200, body: {} };
+  };
+
+  await page.route('**/api/{entries,people,tags,threads,settings}**', async (route) => {
+    const call = record(route);
+    if (unreachable) return route.abort('connectionfailed');
+    const { status, body } = write(call);
+    await json(route, body, status);
+  });
+
+  /* The real endpoint replays each op through the app as if it had been sent alone, so the fixture
+     does too: every op is recorded and answered exactly as its own request would have been, and the
+     envelope itself is not a call any spec needs to know about. */
+  await page.route('**/api/batch', async (route) => {
+    if (unreachable) return route.abort('connectionfailed');
+    const { ops } = route.request().postDataJSON() as BatchRequestInput;
+    const results: BatchResponse['results'] = [];
+    for (const op of ops) {
+      const call: RecordedCall = { method: op.method, path: `/api${op.path}`, body: op.body };
+      calls.push(call);
+      const result = /^\/(entries|people|tags|threads|settings)\b/.test(op.path)
+        ? write(call)
+        : { status: 404, body: { error: 'errors.not_found' } };
+      results.push(result);
+    }
+    await json(route, { results } satisfies BatchResponse);
   });
 
   return {

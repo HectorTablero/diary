@@ -58,6 +58,7 @@ const {
   onDocumentsMerged,
   onRejected,
   onSyncApplied,
+  subscribeSyncStatus,
   syncNow,
   waitForOutboxDrain,
 } = await import('./sync');
@@ -888,5 +889,174 @@ describe('push: the conditional body write', () => {
     expect(rejected).not.toHaveBeenCalled();
     // The base survives, because it is what the merge on the next pull needs.
     expect(await db.pluginDocumentBases.get(DOC_ID)).toBeDefined();
+  });
+});
+
+/* An import queues hundreds of writes, and a round trip each was most of what it cost. They now go
+   up together — but each op's answer must be settled exactly as if it had come back alone, so these
+   mirror the single-op cases above rather than testing anything new about what a write means. */
+describe('push: batching', () => {
+  type Sent = { method: string; path: string; body?: unknown };
+  const batchesSent = () =>
+    apiCall.mock.calls
+      .filter(([path]) => path === '/batch')
+      .map(([, init]) => (JSON.parse((init as { body: string }).body) as { ops: Sent[] }).ops);
+  const answer = (...results: { status: number; body?: unknown }[]) =>
+    apiCall.mockResolvedValueOnce({ results: results.map((r) => ({ body: null, ...r })) });
+
+  beforeEach(() => {
+    apiGet.mockResolvedValue(syncResponse({}));
+  });
+
+  it('sends queued ops together, in order, and drains them all', async () => {
+    await db.outbox.bulkAdd([
+      { method: 'POST', path: '/tags', body: { id: 't1' } },
+      { method: 'POST', path: '/people', body: { id: 'p1' } },
+      { method: 'DELETE', path: '/entries/e1' },
+    ]);
+    answer({ status: 201 }, { status: 201 }, { status: 204 });
+
+    await syncNow();
+
+    expect(apiCall).toHaveBeenCalledOnce();
+    expect(batchesSent()).toEqual([
+      [
+        { method: 'POST', path: '/tags', body: { id: 't1' } },
+        { method: 'POST', path: '/people', body: { id: 'p1' } },
+        { method: 'DELETE', path: '/entries/e1' },
+      ],
+    ]);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('settles every answer exactly as it would settle it alone', async () => {
+    await db.people.put({ id: 'p2', name: 'Ana' } as never);
+    await db.outbox.bulkAdd([
+      { method: 'PATCH', path: '/entries/e1', body: { id: 'e1' } },
+      { method: 'PATCH', path: '/entries/e2', body: { id: 'e2' } },
+      { method: 'POST', path: '/people', body: { id: 'p2' } },
+      { method: 'POST', path: '/tags', body: { id: 't2' } },
+    ]);
+    answer(
+      { status: 422, body: { error: 'validation' } },
+      { status: 404, body: { error: 'entry.not_found' } },
+      { status: 409, body: { error: 'errors.duplicate' } },
+      { status: 200, body: {} },
+    );
+
+    await syncNow();
+
+    // 422 dead-letters, a 404 on a PATCH is already-gone, a 409 on a create drops the phantom.
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.deadLetter.toArray()).toMatchObject([
+      { method: 'PATCH', path: '/entries/e1', status: 422, code: 'validation' },
+    ]);
+    expect(await db.people.get('p2')).toBeUndefined();
+  });
+
+  it('stops at a server error, keeping it queued ahead of everything behind it', async () => {
+    await db.outbox.bulkAdd([
+      { method: 'POST', path: '/tags', body: { id: 't3' } },
+      { method: 'POST', path: '/tags', body: { id: 't4' } },
+      { method: 'POST', path: '/tags', body: { id: 't5' } },
+    ]);
+    // The server answers every op; t5 landed, but replaying it after t4 is what keeps the order.
+    answer({ status: 200 }, { status: 503, body: { error: 'errors.unknown' } }, { status: 200 });
+
+    await syncNow();
+
+    expect((await db.outbox.toArray()).map((op) => (op.body as { id: string }).id)).toEqual([
+      't4',
+      't5',
+    ]);
+    expect(getSyncStatus().blocker).toBe('unreachable');
+  });
+
+  it('drains nothing when the batch itself never arrives', async () => {
+    await db.outbox.bulkAdd([
+      { method: 'POST', path: '/tags', body: { id: 't6' } },
+      { method: 'POST', path: '/tags', body: { id: 't7' } },
+    ]);
+    apiCall.mockRejectedValueOnce(new ApiErrorMock(0, 'errors.offline'));
+
+    await syncNow();
+
+    expect(await db.outbox.count()).toBe(2);
+  });
+
+  it('falls back to one request per op against a server without /batch', async () => {
+    await db.outbox.bulkAdd([
+      { method: 'POST', path: '/tags', body: { id: 't8' } },
+      { method: 'POST', path: '/tags', body: { id: 't9' } },
+    ]);
+    apiCall.mockImplementation((path: string) =>
+      path === '/batch'
+        ? Promise.reject(new ApiErrorMock(404, 'errors.not_found'))
+        : Promise.resolve({}),
+    );
+
+    await syncNow();
+
+    expect(apiCall.mock.calls.map(([path]) => path)).toEqual(['/batch', '/tags', '/tags']);
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.deadLetter.count()).toBe(0);
+  });
+
+  it('publishes how much is left after every batch, so a long drain can show progress', async () => {
+    await db.outbox.bulkAdd(
+      Array.from({ length: 250 }, (_, i) => ({
+        method: 'POST' as const,
+        path: '/tags',
+        body: { id: `t${i}` },
+      })),
+    );
+    apiCall.mockImplementation((_path: string, init: { body: string }) => {
+      const { ops } = JSON.parse(init.body) as { ops: unknown[] };
+      return Promise.resolve({ results: ops.map(() => ({ status: 200, body: {} })) });
+    });
+    const seen: number[] = [];
+    const off = subscribeSyncStatus(() => {
+      const { pending } = getSyncStatus();
+      if (seen.at(-1) !== pending) seen.push(pending);
+    });
+
+    await syncNow();
+    off();
+
+    // Three requests of at most a hundred, and the count stepping down after each one rather than
+    // jumping from 250 to 0 when the pass ends.
+    expect(batchesSent().map((ops) => ops.length)).toEqual([100, 100, 50]);
+    expect(seen).toEqual(expect.arrayContaining([150, 50, 0]));
+    expect(seen.indexOf(150)).toBeLessThan(seen.indexOf(50));
+  });
+
+  it('never puts two body writes to one document in the same batch', async () => {
+    /* The second write's precondition is the version the first comes back stamped with, which
+       does not exist until the first has been answered. */
+    await db.pluginDocumentBases.put({ id: 'd5', text: 'Was.', version: 'v1' });
+    await db.outbox.bulkAdd([
+      { method: 'PATCH', path: '/plugin-documents/d5', body: { body: 'First.' } },
+      { method: 'POST', path: '/tags', body: { id: 't10' } },
+      { method: 'PATCH', path: '/plugin-documents/d5', body: { body: 'Second.' } },
+    ]);
+    answer({ status: 200, body: { updatedAt: 'v2' } }, { status: 200 });
+    apiCall.mockResolvedValueOnce({ updatedAt: 'v3' });
+
+    await syncNow();
+
+    expect(batchesSent()).toEqual([
+      [
+        {
+          method: 'PATCH',
+          path: '/plugin-documents/d5',
+          body: { body: 'First.', baseVersion: 'v1' },
+        },
+        { method: 'POST', path: '/tags', body: { id: 't10' } },
+      ],
+    ]);
+    const [path, init] = apiCall.mock.calls[1] as [string, { body: string }];
+    expect(path).toBe('/plugin-documents/d5');
+    expect(JSON.parse(init.body)).toEqual({ body: 'Second.', baseVersion: 'v2' });
+    expect(await db.outbox.count()).toBe(0);
   });
 });

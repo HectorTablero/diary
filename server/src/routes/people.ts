@@ -4,12 +4,12 @@ import { Types } from 'mongoose';
 import { conflict, isDuplicateKey, notFound } from '../errors';
 import type { AppEnv } from '../middleware/session';
 import { jsonValidator } from '../middleware/validate';
-import { clearDeletions, recordDeletions } from '../models/deletion';
+import { findTombstone, recordDeletions } from '../models/deletion';
 import { Entry } from '../models/entry';
 import { Person } from '../models/person';
-import { personToDto, type LeanPerson } from '../dto';
+import { personToDto, type LeanPerson, type LeanTag } from '../dto';
 import { Tag } from '../models/tag';
-import { getSettings } from '../services/settingsService';
+import { getWriteSettings } from '../services/settingsService';
 
 const oid = (value: string) => {
   if (!OBJECT_ID_REGEX.test(value)) throw notFound('person.not_found');
@@ -25,6 +25,15 @@ async function ownedTagIds(userId: string, ids: string[]) {
   return tags.map((t) => t._id);
 }
 
+/** The same filter, carrying what PERSON_POPULATE selects — see createEntry's ownedTags. */
+async function ownedTags(userId: string, ids: string[]): Promise<LeanTag[]> {
+  if (!ids.length) return [];
+  return Tag.find(
+    { userId, _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
+    'name color',
+  ).lean<LeanTag[]>();
+}
+
 const PERSON_POPULATE = { path: 'tags', select: 'name color' };
 
 /* Writes only. The people list, a single person, talking points, memories and history are all
@@ -35,10 +44,14 @@ export const peopleRouter = new Hono<AppEnv>()
     const userId = c.get('userId');
     const input = c.req.valid('json');
     try {
-      const checkupIntervalDays =
+      // Independent reads, so together rather than one after the other.
+      const [checkupIntervalDays, tags, retractTombstone] = await Promise.all([
         input.checkupIntervalDays !== undefined
           ? input.checkupIntervalDays
-          : (await getSettings(userId)).defaultCheckupIntervalDays;
+          : getWriteSettings(userId).then((settings) => settings.defaultCheckupIntervalDays),
+        ownedTags(userId, input.tags),
+        findTombstone(userId, 'person', input.id),
+      ]);
       const createdAt = input.createdAt ? new Date(input.createdAt) : new Date();
       // timestamps off: keep updatedAt at server time (not createdAt) so replayed offline
       // creates still hit other clients' sync cursors.
@@ -58,7 +71,7 @@ export const peopleRouter = new Hono<AppEnv>()
             jobTitle: input.jobTitle,
             contactId: input.contactId,
             events: input.events,
-            tags: await ownedTagIds(userId, input.tags),
+            tags: tags.map((tag) => tag._id),
             notes: input.notes,
             checkupIntervalDays,
             lastCheckupAt: createdAt,
@@ -67,9 +80,9 @@ export const peopleRouter = new Hono<AppEnv>()
         { timestamps: false },
       );
       // Re-creating a deleted id (undo) retracts its tombstone; a fresh id never had one.
-      if (input.id) await clearDeletions(userId, 'person', [person._id]);
-      const populated = await person.populate(PERSON_POPULATE);
-      return c.json(personToDto(populated.toObject() as unknown as LeanPerson), 201);
+      await retractTombstone();
+      // Populated from the tags read above rather than by reading them again.
+      return c.json(personToDto({ ...(person.toObject() as unknown as LeanPerson), tags }), 201);
     } catch (err) {
       // A collision on _id means this exact person is already there — a replayed create, which is
       // a success, not a conflict. See replayedCreate in services/entryService for the full why.

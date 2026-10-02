@@ -1,4 +1,5 @@
-import type { SyncCollection, SyncResponse } from '@diary/shared';
+import type { BatchResponse, SyncCollection, SyncResponse } from '@diary/shared';
+import { BATCH_OP_PATH_REGEX } from '@diary/shared';
 import { API_BASE, CLIENT_ID, api, ApiError, apiGet } from '@/lib/apiClient';
 import { isMeteredConnection } from '@/lib/network';
 import { getPreferences, subscribePreferences } from '@/lib/preferences';
@@ -263,128 +264,268 @@ async function dirtyIds(): Promise<Set<string>> {
 }
 
 /**
+ * How many ops one push request carries — well under the server's MAX_BATCH_OPS, on purpose.
+ *
+ * The server's cost is per op either way, so a bigger batch saves only round trips, and at a hundred
+ * ops those are a small share of the request. What a smaller one buys is a queue that visibly moves:
+ * the remaining count is published after every batch (see pushOutbox), and that is what the backup
+ * importer's progress bar reads. At 500 a typical restore went up in three jumps.
+ */
+const PUSH_BATCH_OPS = 100;
+
+/** A queued op as it will actually be sent. */
+interface PreparedOp {
+  op: OutboxOp;
+  payload: unknown;
+  bodyWrite: { id: string; body: string } | null;
+  precondition: string | undefined;
+}
+
+/** What the server answered for one op — the same either way it was sent. */
+type OpOutcome = { ok: true; response: unknown } | { ok: false; error: ApiError };
+
+async function prepare(op: OutboxOp): Promise<PreparedOp> {
+  /* The one op in the queue that is not sent exactly as it was written down: a document's body is
+     the whole text, so it goes up as a compare-and-swap against the version this device last saw.
+     The precondition is read now rather than baked in at enqueue time — see
+     documentWritePrecondition for why that distinction is the difference between the guard
+     working and the guard refusing every write after the first. */
+  const bodyWrite = documentBodyWrite(op);
+  const precondition = bodyWrite ? await documentWritePrecondition(bodyWrite.id) : undefined;
+  const payload =
+    bodyWrite && precondition ? { ...(op.body as object), baseVersion: precondition } : op.body;
+  return { op, payload, bodyWrite, precondition };
+}
+
+/**
+ * The next ops to send, oldest first: as many as one batch carries, cut short where it must be.
+ *
+ * Before a second body write to a document already in the batch, because that write's precondition
+ * is the version the first one will come back stamped with, which nobody knows until it has been
+ * sent. And before any op whose path the batch endpoint does not accept, which then goes alone —
+ * that is the only way it ever went before, so nothing it relies on changes.
+ */
+async function nextBatch(limit: number): Promise<PreparedOp[]> {
+  const queued = await db.outbox.orderBy('seq').limit(limit).toArray();
+  const batch: PreparedOp[] = [];
+  const bodyWritten = new Set<string>();
+  for (const op of queued) {
+    if (!BATCH_OP_PATH_REGEX.test(op.path)) {
+      if (!batch.length) batch.push(await prepare(op));
+      break;
+    }
+    const bodyWrite = documentBodyWrite(op);
+    if (bodyWrite) {
+      if (bodyWritten.has(bodyWrite.id)) break;
+      bodyWritten.add(bodyWrite.id);
+    }
+    batch.push(await prepare(op));
+  }
+  return batch;
+}
+
+async function sendOne({ op, payload }: PreparedOp): Promise<OpOutcome> {
+  try {
+    const response = await api<unknown>(op.path, {
+      method: op.method,
+      body: payload === undefined ? undefined : JSON.stringify(payload),
+    });
+    return { ok: true, response };
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err;
+    return { ok: false, error: err };
+  }
+}
+
+/**
+ * Send several ops in one request, and read back what each would have answered on its own.
+ *
+ * The server replays them through the whole app one at a time (server/src/routes/batch.ts), so each
+ * result is the status and body that op's own request would have got — and is turned back into the
+ * same success or `ApiError` that `api()` makes of a response, so settle() cannot tell the two
+ * paths apart. The server attempts every op whatever came before it; fewer results than ops means
+ * only that the request was abandoned partway, and the rest were never attempted.
+ *
+ * `null` when the server refused the envelope itself, with a 4xx. That says nothing about the ops
+ * inside it — it is a server that predates /batch (404), or one that will not take this envelope —
+ * and nothing in it was applied, so the caller sends them the way every server understands: alone.
+ */
+async function sendBatch(batch: PreparedOp[]): Promise<OpOutcome[] | null> {
+  let results: BatchResponse['results'];
+  try {
+    ({ results } = await api<BatchResponse>('/batch', {
+      method: 'POST',
+      body: JSON.stringify({
+        ops: batch.map(({ op, payload }) => ({ method: op.method, path: op.path, body: payload })),
+      }),
+    }));
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err;
+    // No network, no session, or a server in trouble: exactly what the first op alone would have
+    // run into, and settle() stops the drain on each of them without touching the op.
+    if (err.status === 0 || err.status === 401 || err.status >= 500) {
+      return [{ ok: false, error: err }];
+    }
+    trackEvent('sync_batch_refused', { status: err.status, code: err.code });
+    return null;
+  }
+  // Only reachable if the server gave up before the first op (it saw the request abandoned). Read
+  // as a server in trouble, so the drain stops and retries rather than spinning on the same batch.
+  if (!results.length) return [{ ok: false, error: new ApiError(503, 'errors.unknown') }];
+  return results.slice(0, batch.length).map(({ status, body }) => {
+    if (status >= 200 && status < 300) return { ok: true, response: body };
+    const code = (body as { error?: unknown } | null)?.error;
+    return {
+      ok: false,
+      error: new ApiError(status, typeof code === 'string' && code ? code : 'errors.unknown'),
+    };
+  });
+}
+
+/**
+ * Apply the server's answer to one op. Returns false when the queue is blocked and the drain must
+ * stop here — with this op, and everything after it, still queued.
+ */
+async function settle(
+  { op, bodyWrite, precondition }: PreparedOp,
+  outcome: OpOutcome,
+): Promise<boolean> {
+  if (outcome.ok) {
+    /* The server has our text now, so the ancestor moves onto it — and onto the version the
+       server just stamped, which is what the *next* write has to match.
+
+       Only when a precondition was actually sent. Without one there was no base record, and the
+       op is something else that happens to carry a string `body`: a *revision*, whose body is an
+       encoded patch and which has no ancestor to track. Writing one here would leave a base
+       behind that sent every future pull of that revision through the merge path. */
+    if (bodyWrite && precondition) {
+      const version = (outcome.response as { updatedAt?: unknown } | null)?.updatedAt;
+      if (typeof version === 'string') {
+        await documentBasePushed(bodyWrite.id, bodyWrite.body, version);
+      }
+    }
+    await db.outbox.delete(op.seq!);
+    pushedThisPass++;
+    return true;
+  }
+  const err = outcome.error;
+  if (err.status === 0) {
+    setStatus({ blocker: networkBlocker() });
+    networkFailure = true;
+    return false;
+  }
+  if (err.status === 401) {
+    setStatus({ needsAuth: true });
+    return false;
+  }
+  if (err.status >= 500) {
+    setStatus({ blocker: 'unreachable' });
+    networkFailure = true;
+    return false; // server hiccup: retry once it answers again
+  }
+  /* A conditional body write the server refused because the row moved underneath it — the
+     non-fast-forward push, and the whole point of `baseVersion` (see the shared update schema).
+     The op leaves the queue and nothing is lost: the text is still in Dexie, the merge base is
+     still recorded, and the pull that follows this drained queue will merge the two versions
+     and enqueue the result. Retrying the op as-is would only be refused again, forever, and
+     dead-lettering it would report data loss for a write the app is about to redo properly. */
+  if (err.status === 409 && bodyWrite && precondition) {
+    await db.outbox.delete(op.seq!);
+    // Sampled: a document edited on two devices produces a burst of these, and the rate is the
+    // signal. The merge that follows is counted in full, in pull().
+    if (sampled(0.1)) trackEvent('sync_stale_write', { path: routeShape(op.path) });
+    return true;
+  }
+  if (err.status === 409 && op.method === 'POST') {
+    await removeLocalDoc(op);
+    await db.outbox.delete(op.seq!);
+    /* Tolerated, so nothing else records it — but a replayed create and a *lost name race* both
+       arrive here and only the second one destroys a local document. Sampled because a flaky
+       connection replays whole batches of these at once, and one in ten is plenty to notice
+       that the rate has changed. */
+    if (sampled(0.1)) trackEvent('sync_conflict', { path: routeShape(op.path) });
+    return true;
+  }
+  /* Already gone is not a loss.
+     For everything but a create that is unconditional: a PATCH or DELETE against a document
+     the server no longer has asks for a state it is already in.
+     For a create it takes `tolerate404`, which only the backup importer sets — a restore of an
+     old file legitimately posts things whose parent has since been deleted, and reporting those
+     as unsaved changes would be reporting data loss for data that was deleted on purpose. Every
+     other POST 404 is a real loss and falls through to the dead letter below. */
+  if (err.status === 404 && (op.method !== 'POST' || op.tolerate404)) {
+    await db.outbox.delete(op.seq!);
+    // Sampled, so a restore quietly dropping *everything* — a wrong base URL, an API that moved
+    // — is still visible as a rate rather than vanishing into a tolerated branch.
+    if (op.tolerate404 && sampled(0.1)) {
+      trackEvent('sync_tolerated_404', { path: routeShape(op.path) });
+    }
+    return true;
+  }
+  /* Any other 4xx would jam the queue forever, so it has to leave the queue — but it must not
+     leave without a trace. The local copy of this change still says "saved", and only the
+     dead-letter row and the toast that follows it stop the user finding out on another device
+     months later, or not at all. */
+  console.warn('sync: rejected op moved to dead letter', op, err.code);
+  /* Never sampled. This is a write the user was told had been saved and which the server threw
+     away — the single most serious thing that happens in this app that isn't a crash. Until
+     now the only traces were a console.warn nobody reads and a toast that is gone in seconds,
+     which means a systematic rejection (a payload the API stopped accepting after a deploy,
+     say) would be silently eating every affected write on every client with nothing anywhere
+     to show for it. `code` is the server's i18n key, which is what makes these groupable into
+     "the same bug" rather than a list of incidents. */
+  trackEvent('sync_dead_letter', {
+    status: err.status,
+    code: err.code,
+    method: op.method,
+    path: routeShape(op.path),
+  });
+  await db.deadLetter.add({
+    method: op.method,
+    path: op.path,
+    body: op.body,
+    status: err.status,
+    code: err.code,
+    failedAt: new Date().toISOString(),
+  });
+  await db.outbox.delete(op.seq!);
+  rejectedThisPass++;
+  return true;
+}
+
+/**
  * Replay queued ops in order. Returns true when the queue fully drained.
  * Tolerance rules keep replays idempotent: a 404 on DELETE/PATCH/PUT means the
  * doc is already gone; a 409 on POST means the create already applied (or lost
  * a name race) — drop the op and let the pull reconcile.
+ *
+ * Ops go up in batches where they can — a backup restore or a contacts import queues hundreds, and
+ * a round trip each was most of what it cost — but every op is still answered, and settled here,
+ * one at a time and in order, exactly as it would have been sent alone. A lone op is sent alone.
+ *
+ * The server carries on past a failure, so when settling stops on one (a 5xx), the ops behind it in
+ * the same batch may already have landed. They stay queued anyway and go up again after it: the
+ * failed op keeps its place ahead of them, and replaying a write that already applied is the case
+ * the tolerance rules above exist for — it is what a response lost in flight has always produced.
  */
 async function pushOutbox(): Promise<boolean> {
+  /* Per pass, not per session: a server refusing batches costs one refused request per pass rather
+     than one per op, and a server upgraded mid-session starts getting batches on the next pass. */
+  let batching = true;
   for (;;) {
-    const op = await db.outbox.orderBy('seq').first();
-    if (!op) return true;
-    /* The one op in the queue that is not sent exactly as it was written down: a document's body is
-       the whole text, so it goes up as a compare-and-swap against the version this device last saw.
-       The precondition is read now rather than baked in at enqueue time — see
-       documentWritePrecondition for why that distinction is the difference between the guard
-       working and the guard refusing every write after the first. */
-    const bodyWrite = documentBodyWrite(op);
-    const precondition = bodyWrite ? await documentWritePrecondition(bodyWrite.id) : undefined;
-    const payload =
-      bodyWrite && precondition ? { ...(op.body as object), baseVersion: precondition } : op.body;
-    try {
-      const response = await api<unknown>(op.path, {
-        method: op.method,
-        body: payload === undefined ? undefined : JSON.stringify(payload),
-      });
-      /* The server has our text now, so the ancestor moves onto it — and onto the version the
-         server just stamped, which is what the *next* write has to match.
-
-         Only when a precondition was actually sent. Without one there was no base record, and the
-         op is something else that happens to carry a string `body`: a *revision*, whose body is an
-         encoded patch and which has no ancestor to track. Writing one here would leave a base
-         behind that sent every future pull of that revision through the merge path. */
-      if (bodyWrite && precondition) {
-        const version = (response as { updatedAt?: unknown } | null)?.updatedAt;
-        if (typeof version === 'string') {
-          await documentBasePushed(bodyWrite.id, bodyWrite.body, version);
-        }
-      }
-      await db.outbox.delete(op.seq!);
-      pushedThisPass++;
-    } catch (err) {
-      if (!(err instanceof ApiError)) throw err;
-      if (err.status === 0) {
-        setStatus({ blocker: networkBlocker() });
-        networkFailure = true;
-        return false;
-      }
-      if (err.status === 401) {
-        setStatus({ needsAuth: true });
-        return false;
-      }
-      if (err.status >= 500) {
-        setStatus({ blocker: 'unreachable' });
-        networkFailure = true;
-        return false; // server hiccup: retry once it answers again
-      }
-      /* A conditional body write the server refused because the row moved underneath it — the
-         non-fast-forward push, and the whole point of `baseVersion` (see the shared update schema).
-         The op leaves the queue and nothing is lost: the text is still in Dexie, the merge base is
-         still recorded, and the pull that follows this drained queue will merge the two versions
-         and enqueue the result. Retrying the op as-is would only be refused again, forever, and
-         dead-lettering it would report data loss for a write the app is about to redo properly. */
-      if (err.status === 409 && bodyWrite && precondition) {
-        await db.outbox.delete(op.seq!);
-        // Sampled: a document edited on two devices produces a burst of these, and the rate is the
-        // signal. The merge that follows is counted in full, in pull().
-        if (sampled(0.1)) trackEvent('sync_stale_write', { path: routeShape(op.path) });
-        continue;
-      }
-      if (err.status === 409 && op.method === 'POST') {
-        await removeLocalDoc(op);
-        await db.outbox.delete(op.seq!);
-        /* Tolerated, so nothing else records it — but a replayed create and a *lost name race* both
-           arrive here and only the second one destroys a local document. Sampled because a flaky
-           connection replays whole batches of these at once, and one in ten is plenty to notice
-           that the rate has changed. */
-        if (sampled(0.1)) trackEvent('sync_conflict', { path: routeShape(op.path) });
-        continue;
-      }
-      /* Already gone is not a loss.
-         For everything but a create that is unconditional: a PATCH or DELETE against a document
-         the server no longer has asks for a state it is already in.
-         For a create it takes `tolerate404`, which only the backup importer sets — a restore of an
-         old file legitimately posts things whose parent has since been deleted, and reporting those
-         as unsaved changes would be reporting data loss for data that was deleted on purpose. Every
-         other POST 404 is a real loss and falls through to the dead letter below. */
-      if (err.status === 404 && (op.method !== 'POST' || op.tolerate404)) {
-        await db.outbox.delete(op.seq!);
-        // Sampled, so a restore quietly dropping *everything* — a wrong base URL, an API that moved
-        // — is still visible as a rate rather than vanishing into a tolerated branch.
-        if (op.tolerate404 && sampled(0.1)) {
-          trackEvent('sync_tolerated_404', { path: routeShape(op.path) });
-        }
-        continue;
-      }
-      /* Any other 4xx would jam the queue forever, so it has to leave the queue — but it must not
-         leave without a trace. The local copy of this change still says "saved", and only the
-         dead-letter row and the toast that follows it stop the user finding out on another device
-         months later, or not at all. */
-      console.warn('sync: rejected op moved to dead letter', op, err.code);
-      /* Never sampled. This is a write the user was told had been saved and which the server threw
-         away — the single most serious thing that happens in this app that isn't a crash. Until
-         now the only traces were a console.warn nobody reads and a toast that is gone in seconds,
-         which means a systematic rejection (a payload the API stopped accepting after a deploy,
-         say) would be silently eating every affected write on every client with nothing anywhere
-         to show for it. `code` is the server's i18n key, which is what makes these groupable into
-         "the same bug" rather than a list of incidents. */
-      trackEvent('sync_dead_letter', {
-        status: err.status,
-        code: err.code,
-        method: op.method,
-        path: routeShape(op.path),
-      });
-      await db.deadLetter.add({
-        method: op.method,
-        path: op.path,
-        body: op.body,
-        status: err.status,
-        code: err.code,
-        failedAt: new Date().toISOString(),
-      });
-      await db.outbox.delete(op.seq!);
-      rejectedThisPass++;
+    const batch = await nextBatch(batching ? PUSH_BATCH_OPS : 1);
+    if (!batch.length) return true;
+    const outcomes = batch.length === 1 ? [await sendOne(batch[0]!)] : await sendBatch(batch);
+    if (!outcomes) {
+      batching = false;
+      continue;
     }
+    for (const [i, outcome] of outcomes.entries()) {
+      if (!(await settle(batch[i]!, outcome))) return false;
+    }
+    // Live, not just at the end of the pass: anything showing how far a long drain has got (the
+    // backup importer's progress bar, the sync pill's count) moves as each batch lands.
+    await refreshPending();
   }
 }
 
