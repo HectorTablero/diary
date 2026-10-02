@@ -471,6 +471,36 @@ describe('waiting for the outbox to drain', () => {
     await expect(waiting).resolves.toBe('blocked');
     expect(await db.outbox.count()).toBe(1);
   });
+
+  it('keeps waiting for as long as the queue keeps shrinking', async () => {
+    await db.outbox.bulkAdd(
+      Array.from({ length: 4 }, (_, i) => ({
+        method: 'POST' as const,
+        path: '/tags',
+        body: { id: `long${i}` },
+      })),
+    );
+    // One op at a time (a server without /batch), each taking longer than a third of the timeout:
+    // the whole upload outlasts it, but no single step does.
+    apiCall.mockImplementation(async (path: string) => {
+      if (path === '/batch') throw new ApiErrorMock(404, 'errors.not_found');
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      return {};
+    });
+    apiGet.mockResolvedValue(syncResponse({}));
+
+    const waiting = waitForOutboxDrain(100);
+    await syncNow();
+
+    await expect(waiting).resolves.toBe('drained');
+  });
+
+  it('gives up on a queue that has stopped moving', async () => {
+    await db.outbox.add({ method: 'POST', path: '/tags', body: { id: 't11' } });
+
+    // Nothing is syncing and nothing is blocked: only the timeout can end this.
+    await expect(waitForOutboxDrain(30)).resolves.toBe('blocked');
+  });
 });
 
 /* A pull runs every 60 seconds whether or not anything changed, and announcing one invalidates the
@@ -1023,11 +1053,42 @@ describe('push: batching', () => {
     await syncNow();
     off();
 
-    // Three requests of at most a hundred, and the count stepping down after each one rather than
-    // jumping from 250 to 0 when the pass ends.
-    expect(batchesSent().map((ops) => ops.length)).toEqual([100, 100, 50]);
-    expect(seen).toEqual(expect.arrayContaining([150, 50, 0]));
-    expect(seen.indexOf(150)).toBeLessThan(seen.indexOf(50));
+    /* Small first, so the first step lands quickly; growing while the server keeps up, never more
+       than doubling; and the count stepping down after each one rather than jumping from 250 to 0
+       when the pass ends. */
+    const sizes = batchesSent().map((ops) => ops.length);
+    expect(sizes.reduce((sum, n) => sum + n, 0)).toBe(250);
+    expect(sizes[0]).toBeLessThanOrEqual(25);
+    expect(sizes.length).toBeGreaterThan(2);
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThanOrEqual(sizes[i - 1]! * 2);
+    let left = 250;
+    const expected = sizes.map((n) => (left -= n));
+    expect(seen).toEqual(expect.arrayContaining(expected));
+  });
+
+  it('sends smaller batches to a server that answers slowly, so progress keeps moving', async () => {
+    await db.outbox.bulkAdd(
+      Array.from({ length: 400 }, (_, i) => ({
+        method: 'POST' as const,
+        path: '/tags',
+        body: { id: `slow${i}` },
+      })),
+    );
+    // A tenth of a second per op: a batch of 25 takes 2.5s, well past the one-second target.
+    apiCall.mockImplementation(async (_path: string, init: { body: string }) => {
+      const { ops } = JSON.parse(init.body) as { ops: unknown[] };
+      const now = performance.now();
+      vi.spyOn(performance, 'now').mockReturnValueOnce(now + ops.length * 100);
+      return { results: ops.map(() => ({ status: 200, body: {} })) };
+    });
+
+    await syncNow();
+    vi.restoreAllMocks();
+
+    const sizes = batchesSent().map((ops) => ops.length);
+    expect(sizes[1]).toBeLessThan(sizes[0]!);
+    expect(Math.max(...sizes.slice(1))).toBeLessThanOrEqual(10);
+    expect(await db.outbox.count()).toBe(0);
   });
 
   it('never puts two body writes to one document in the same batch', async () => {

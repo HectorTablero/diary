@@ -136,15 +136,21 @@ export function subscribeSyncStatus(cb: () => void): () => void {
  * will replay, so the honest report is "this will finish later", not "this failed". The timeout is
  * the third case — a queue that is neither draining nor blocked, which shouldn't happen and must
  * still not hang a button forever.
+ *
+ * The timeout measures *stillness*, not the whole wait: it restarts every time the queue shrinks.
+ * It used to cap the wait outright, and a large restore against a slow server — steadily draining,
+ * every batch answered — outlived it, so the page gave up midway, said the upload would finish
+ * "once you are back online" on a perfectly good connection, and then said nothing at all when it
+ * did finish. Only a queue that has stopped moving is a queue worth giving up on.
  */
-export async function waitForOutboxDrain(timeoutMs = 120_000): Promise<'drained' | 'blocked'> {
+export async function waitForOutboxDrain(idleTimeoutMs = 120_000): Promise<'drained' | 'blocked'> {
   /* Counted from the table, never from `status.pending`. That figure is a snapshot refreshed during
      a sync pass, so immediately after a big enqueue it still reads whatever it read before — and a
      caller that trusted it would be told a queue of several thousand writes had drained, instantly,
      before a single one had been sent. The status is right about *blockers*, which is what it is
      consulted for below; it is merely stale about the count. */
-  const drained = async () => (await db.outbox.count()) === 0;
-  if (await drained()) return 'drained';
+  let lowest = await db.outbox.count();
+  if (lowest === 0) return 'drained';
 
   return new Promise((resolve) => {
     let settled = false;
@@ -156,14 +162,34 @@ export async function waitForOutboxDrain(timeoutMs = 120_000): Promise<'drained'
       unsubscribe?.();
       resolve(result);
     };
-    const timer = setTimeout(() => finish('blocked'), timeoutMs);
+    const idle = () => setTimeout(() => finish('blocked'), idleTimeoutMs);
+    let timer = idle();
 
     const check = () => {
       void (async () => {
-        if (await drained()) finish('drained');
-        // A blocker means the queue has stopped moving for a reason the user can act on (or wait
-        // out); either way there is nothing left for this promise to wait for.
-        else if (getSyncStatus().blocker || getSyncStatus().needsAuth) finish('blocked');
+        const remaining = await db.outbox.count();
+        if (settled) return;
+        if (remaining < lowest) {
+          // Progress: the clock only runs while nothing is moving.
+          lowest = remaining;
+          clearTimeout(timer);
+          timer = idle();
+        }
+        if (remaining === 0) {
+          finish('drained');
+          return;
+        }
+        /* A blocker means the queue has stopped moving for a reason the user can act on (or wait
+           out); either way there is nothing left for this promise to wait for.
+
+           But only once no pass is running. A blocker is cleared by nothing short of a completed
+           pull, which comes after the whole queue has drained, so during a pass it is the previous
+           pass's verdict rather than this one's: an "unreachable" left by a failure an hour ago,
+           or a "paused" set by the Wi-Fi-only check of a timer kick that arrived while a forced
+           upload was going fine. Either ended this wait on the first batch, with the upload still
+           running. A pass that really is blocked ends, and its last status change lands here. */
+        const { blocker, needsAuth, syncing } = getSyncStatus();
+        if ((blocker || needsAuth) && !syncing) finish('blocked');
       })();
     };
 
@@ -264,14 +290,33 @@ async function dirtyIds(): Promise<Set<string>> {
 }
 
 /**
- * How many ops one push request carries — well under the server's MAX_BATCH_OPS, on purpose.
+ * How many ops one push request carries: sized by how long a request takes, not fixed.
  *
- * The server's cost is per op either way, so a bigger batch saves only round trips, and at a hundred
- * ops those are a small share of the request. What a smaller one buys is a queue that visibly moves:
- * the remaining count is published after every batch (see pushOutbox), and that is what the backup
- * importer's progress bar reads. At 500 a typical restore went up in three jumps.
+ * The server's cost is per op either way, so a bigger batch saves only round trips. What a smaller
+ * one buys is a queue that visibly moves: the remaining count is published after every batch (see
+ * pushOutbox), and that is what the backup importer's progress bar reads. A fixed count can only
+ * get that right for one server speed. It was a hundred, which against a server spending a few
+ * hundred milliseconds per write — a remote database, a large diary, overwrites rather than
+ * creates — meant half a minute and more between steps, and a bar that read as stuck.
+ *
+ * So each batch is sized to take about PUSH_BATCH_TARGET_MS at the per-op pace the last one
+ * actually ran at: a fast server gets big batches and few round trips, a slow one small batches
+ * and a bar that still moves every second or so. It starts small so the first step lands quickly,
+ * at most doubles per batch so one lucky answer cannot commit the next request to minutes of
+ * work, and is kept across passes — it describes the server, and the server has not changed.
  */
-const PUSH_BATCH_OPS = 100;
+const PUSH_BATCH_MIN_OPS = 10;
+const PUSH_BATCH_MAX_OPS = 200;
+const PUSH_BATCH_TARGET_MS = 1_000;
+let pushBatchOps = 25;
+
+function adaptBatchSize(sent: number, elapsedMs: number): void {
+  // Only a full batch says anything about the pace: a short one is just the end of the queue.
+  if (sent < pushBatchOps) return;
+  const perOpMs = Math.max(elapsedMs, 1) / sent;
+  const fit = Math.floor(PUSH_BATCH_TARGET_MS / perOpMs);
+  pushBatchOps = Math.min(PUSH_BATCH_MAX_OPS, pushBatchOps * 2, Math.max(PUSH_BATCH_MIN_OPS, fit));
+}
 
 /** A queued op as it will actually be sent. */
 interface PreparedOp {
@@ -513,9 +558,19 @@ async function pushOutbox(): Promise<boolean> {
      than one per op, and a server upgraded mid-session starts getting batches on the next pass. */
   let batching = true;
   for (;;) {
-    const batch = await nextBatch(batching ? PUSH_BATCH_OPS : 1);
+    const batch = await nextBatch(batching ? pushBatchOps : 1);
     if (!batch.length) return true;
-    const outcomes = batch.length === 1 ? [await sendOne(batch[0]!)] : await sendBatch(batch);
+    let outcomes: OpOutcome[] | null;
+    if (batch.length === 1) {
+      outcomes = [await sendOne(batch[0]!)];
+    } else {
+      const sentAt = performance.now();
+      outcomes = await sendBatch(batch);
+      // Only an answered batch: a refused or failed one says nothing about how fast ops apply.
+      if (outcomes && outcomes.length === batch.length) {
+        adaptBatchSize(batch.length, performance.now() - sentAt);
+      }
+    }
     if (!outcomes) {
       batching = false;
       continue;
@@ -1074,11 +1129,10 @@ function reportPass(
 async function run(): Promise<void> {
   await refreshPending();
   if (!navigator.onLine) {
-    setStatus({ blocker: 'offline' });
+    setStatus({ blocker: 'offline', syncing: false });
     startReconnectProbe();
     return;
   }
-  setStatus({ syncing: true });
   networkFailure = false;
   rejectedThisPass = 0;
   pushedThisPass = 0;
@@ -1183,6 +1237,10 @@ export function syncNow(
   // Set here rather than at the top: a coalesced call returns above without starting a pass, and
   // overwriting the trigger there would attribute the running pass to whatever arrived during it.
   triggerThisPass = options.trigger ?? 'unknown';
+  /* Before run() rather than inside it, so `syncing` is true from the very moment a pass exists —
+     run() awaits a count before it gets going, and waitForOutboxDrain reads a blocker seen while
+     `syncing` is false as the pass's verdict. In that gap it is only the last pass's. */
+  setStatus({ syncing: true });
   running = run().finally(() => {
     running = null;
     if (rerun) {

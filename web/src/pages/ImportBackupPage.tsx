@@ -37,12 +37,14 @@ import { PluginImportSection } from '@/components/settings/PluginImportSection';
 import { db } from '@/db/db';
 import { forceSyncNow, waitForOutboxDrain } from '@/db/sync';
 import { useOutboxRemaining } from '@/db/useOutboxRemaining';
+import { getCachedUser } from '@/lib/sessionCache';
 import { cn } from '@/lib/utils';
 import {
   applyPluginSettingsChoices,
   usePluginSettingsConflicts,
   type PluginSettingsResolution,
 } from '@/plugins/importConflicts';
+import { refreshPlugins } from '@/plugins/lifecycle';
 import { bulkActions, type BulkCandidate } from '@/lib/backup/bulk';
 import {
   backupMergeTargets,
@@ -413,15 +415,28 @@ export default function ImportBackupPage() {
         pluginRecords,
         pluginDocuments: envelope?.pluginDocuments ?? [],
       });
+      /* The restored `config` rows are already in Dexie, so the plugins they switch on are on — but
+         the in-memory enabled set only re-reads them when a *pull* applies, and the pull waits for
+         the whole upload below to drain. Until then the restored plugins stayed invisible, and a
+         reload (which re-reads at startup) was the only way to see them. Never throws. */
+      await refreshPlugins();
 
       /* Everything is now safely in Dexie, so nothing below can lose it — but it is still only on
          this device, and that is not what someone restoring a backup means by "done". Push, and
          stay on this screen until the queue is empty. `forceSyncNow` rather than `syncNow`: this is
-         an explicit action, so it goes ahead even when the user has asked to sync on Wi-Fi only. */
-      setUploadTotal(await db.outbox.count());
-      setPhase('syncing');
-      void forceSyncNow();
-      const outcome = await waitForOutboxDrain();
+         an explicit action, so it goes ahead even when the user has asked to sync on Wi-Fi only.
+
+         Only with an account. Without one there is no server to reach: sync never runs (see
+         syncNow), the queue never moves, and this screen sat at 0% until the drain wait timed out.
+         The restore is finished once it is saved here, and the queued writes go up by themselves
+         the day an account is linked. */
+      let outcome: 'drained' | 'blocked' = 'drained';
+      if (getCachedUser()) {
+        setUploadTotal(await db.outbox.count());
+        setPhase('syncing');
+        void forceSyncNow();
+        outcome = await waitForOutboxDrain();
+      }
 
       notifySuccess(
         t('importBackup.done', {
