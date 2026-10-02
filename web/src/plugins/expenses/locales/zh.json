@@ -50,7 +50,7 @@
   "emptyPageDescription": "在这里添加，或随时在日记的当天页面添加。",
   "previousMonth": "上个月",
   "nextMonth": "下个月",
-  "currencySwitcher": "货币",
+  "separateCurrencyLabel": "仅显示{{currency}}。更改货币",
   "viewSwitcher": "货币显示方式",
   "viewCombined": "合并",
   "viewSeparate": "分开",

@@ -50,7 +50,7 @@
   "emptyPageDescription": "ここで追加するか、日記の日付ページからその都度追加できます。",
   "previousMonth": "前の月",
   "nextMonth": "次の月",
-  "currencySwitcher": "通貨",
+  "separateCurrencyLabel": "{{currency}}のみ表示中。通貨を変更",
   "viewSwitcher": "通貨の表示方法",
   "viewCombined": "まとめて",
   "viewSeparate": "通貨ごと",

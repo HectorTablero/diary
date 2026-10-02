@@ -50,7 +50,7 @@
   "emptyPageDescription": "Aggiungine una qui, o dalla pagina del giorno del diario man mano.",
   "previousMonth": "Mese precedente",
   "nextMonth": "Mese successivo",
-  "currencySwitcher": "Valuta",
+  "separateCurrencyLabel": "Mostrati solo gli importi in {{currency}}. Cambia valuta",
   "viewSwitcher": "Come mostrare le valute",
   "viewCombined": "Insieme",
   "viewSeparate": "Separate",

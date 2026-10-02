@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Hash,
+  Info,
   Plus,
   Tags,
   TriangleAlert,
@@ -14,6 +15,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/common/EmptyState';
+import { HintTooltip } from '@/components/common/HintTooltip';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -35,6 +37,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDateKey, todayKey } from '@/lib/dates';
+import { isNative } from '@/lib/native';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { captureError } from '@/lib/telemetry';
 import { CategoriesDialog } from './CategoriesDialog';
@@ -327,6 +330,8 @@ export default function ExpensesPage() {
                 <ChevronRight className="size-4" />
               </Button>
             </div>
+            {/* The same button in either view, so switching between them doesn't shift anything:
+                combined, any currency to convert into; separately, one of those actually used. */}
             <div className="ml-auto flex flex-wrap items-center gap-2">
               {currencies.length > 1 && (
                 <Tabs
@@ -336,46 +341,67 @@ export default function ExpensesPage() {
                   }
                 >
                   <TabsList aria-label={t('plugins.expenses.viewSwitcher')}>
-                    <TabsTrigger value="combined">{t('plugins.expenses.viewCombined')}</TabsTrigger>
+                    {/* Where the rates' date lives, in either view, rather than in a line under
+                        the bar that came and went with it. Nice to know, not need to know, so a
+                        touch screen — where a tooltip never opens — gets neither icon nor tooltip.
+                        The tooltip hangs off a wrapper, not the tab: as its trigger, the tab would
+                        have its data-state overwritten with the tooltip's, losing its active style. */}
+                    <HintTooltip
+                      content={t('plugins.expenses.ratesNote', {
+                        date: formatDateKey(rates.date, i18n.language, 'PPP'),
+                      })}
+                    >
+                      <span className="flex flex-1 items-center self-stretch">
+                        <TabsTrigger value="combined">
+                          {t('plugins.expenses.viewCombined')}
+                          {!isNative && (
+                            <Info
+                              className="size-3.5 text-muted-foreground pointer-coarse:hidden"
+                              aria-hidden
+                            />
+                          )}
+                        </TabsTrigger>
+                      </span>
+                    </HintTooltip>
                     <TabsTrigger value="separate">{t('plugins.expenses.viewSeparate')}</TabsTrigger>
                   </TabsList>
                 </Tabs>
               )}
-              {combined ? (
-                <CurrencyPicker
-                  value={displayCurrency}
-                  onChange={(next) => {
-                    if (next !== displayCurrency) saveSettings({ displayCurrency: next });
-                  }}
-                  trigger={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      aria-label={t('plugins.expenses.displayCurrencyLabel', {
-                        currency: currencyName(displayCurrency, i18n.language),
-                      })}
-                    >
-                      <span className="font-mono text-xs">{displayCurrency}</span>
-                      <ChevronsUpDown className="size-3.5 text-muted-foreground" />
-                    </Button>
-                  }
-                />
-              ) : (
-                <Tabs value={currency} onValueChange={setPickedCurrency}>
-                  <TabsList aria-label={t('plugins.expenses.currencySwitcher')}>
-                    {currencies.map((code) => (
-                      <TabsTrigger key={code} value={code}>
-                        {code}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              )}
+              <CurrencyPicker
+                value={currency}
+                options={combined ? undefined : currencies}
+                onChange={(next) => {
+                  if (!combined) setPickedCurrency(next);
+                  else if (next !== displayCurrency) saveSettings({ displayCurrency: next });
+                }}
+                trigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    aria-label={t(
+                      combined
+                        ? 'plugins.expenses.displayCurrencyLabel'
+                        : 'plugins.expenses.separateCurrencyLabel',
+                      { currency: currencyName(currency, i18n.language) },
+                    )}
+                  >
+                    <span className="font-mono text-xs">{currency}</span>
+                    <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+                  </Button>
+                }
+              />
             </div>
           </div>
 
-          {conversion && <RatesNotice conversion={conversion} rates={rates} today={today} />}
+          {conversion && (
+            <RatesNotice
+              conversion={conversion}
+              rates={rates}
+              today={today}
+              showDate={currencies.length <= 1}
+            />
+          )}
 
           <SummaryCard summary={summary} currency={currency} />
 
@@ -519,20 +545,28 @@ function CategoryFilter({
  * than a week old. Only shown when something was actually converted — a diary in one currency,
  * shown in that currency, has nothing to explain. Currencies the rates don't cover are named,
  * since their expenses are listed but can't be in any total.
+ *
+ * The plain date is only spelled out here when there's no view switch to carry it in a tooltip —
+ * a single currency shown in another. The warning and the missing currencies always are: they say
+ * the totals are off, which nobody should have to hover to find out.
  */
 function RatesNotice({
   conversion,
   rates,
   today,
+  showDate,
 }: {
   conversion: ConvertedExpenses;
   rates: ExchangeRates;
   today: string;
+  showDate: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  if (!conversion.converted && conversion.unconverted.length === 0) return null;
   const date = formatDateKey(rates.date, i18n.language, 'PPP');
-  const stale = ratesAreStale(rates, today);
+  const stale = conversion.converted && ratesAreStale(rates, today);
+  if (!stale && !(conversion.converted && showDate) && conversion.unconverted.length === 0) {
+    return null;
+  }
 
   return (
     <div className="space-y-1 text-xs">
@@ -546,7 +580,9 @@ function RatesNotice({
             {t('plugins.expenses.ratesStale', { date })}
           </p>
         ) : (
-          <p className="text-muted-foreground">{t('plugins.expenses.ratesNote', { date })}</p>
+          showDate && (
+            <p className="text-muted-foreground">{t('plugins.expenses.ratesNote', { date })}</p>
+          )
         ))}
       {conversion.unconverted.length > 0 && (
         <p className="text-muted-foreground">

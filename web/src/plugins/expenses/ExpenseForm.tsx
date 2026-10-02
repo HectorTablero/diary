@@ -48,6 +48,7 @@ export function CurrencyPicker({
   onChange,
   trigger,
   extraOption,
+  options,
 }: {
   /** Null when `extraOption` is the one selected. */
   value: string | null;
@@ -55,14 +56,20 @@ export function CurrencyPicker({
   trigger: ReactNode;
   /** One choice that isn't a currency, listed first — "whatever I used last", in Settings. */
   extraOption?: { label: string; onSelect: () => void };
+  /** The only currencies offered, in this order; every currency there is when absent. */
+  options?: readonly string[];
 }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const currencies = useMemo(
-    () => allCurrencies().map((code) => ({ code, name: currencyName(code, i18n.language) })),
-    [i18n.language],
+    () =>
+      (options ?? allCurrencies()).map((code) => ({
+        code,
+        name: currencyName(code, i18n.language),
+      })),
+    [options, i18n.language],
   );
 
   return (

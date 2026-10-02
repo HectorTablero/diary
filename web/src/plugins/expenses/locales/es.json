@@ -50,7 +50,7 @@
   "emptyPageDescription": "Añade uno aquí, o desde la página del día del diario sobre la marcha.",
   "previousMonth": "Mes anterior",
   "nextMonth": "Mes siguiente",
-  "currencySwitcher": "Moneda",
+  "separateCurrencyLabel": "Mostrando solo {{currency}}. Cambiar moneda",
   "viewSwitcher": "Cómo se muestran las monedas",
   "viewCombined": "Juntas",
   "viewSeparate": "Por separado",

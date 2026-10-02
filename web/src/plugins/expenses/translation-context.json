@@ -47,7 +47,7 @@
         "emptyPageDescription": "Second line of the empty state: the two places an expense can be added.",
         "previousMonth": "Accessible name of the month switcher's back arrow.",
         "nextMonth": "Accessible name of its forward arrow.",
-        "currencySwitcher": "Accessible name of the currency tabs, shown only when more than one currency has been used and the page is set to show them separately.",
+        "separateCurrencyLabel": "Accessible name of the button showing which currency the page is limited to when currencies are shown separately (its visible text is just the code, e.g. EUR); pressing it opens a list of only the currencies that have been used. {{currency}} is the currency's full name, already localised.",
         "viewSwitcher": "Accessible name of a two-option switch on the plugin page, shown when more than one currency has been used: show everything combined in one currency, or each currency separately.",
         "viewCombined": "That switch's first option: every expense converted into one currency and added together. Short — it sits beside a currency code.",
         "viewSeparate": "Its second option: one currency at a time, nothing converted.",

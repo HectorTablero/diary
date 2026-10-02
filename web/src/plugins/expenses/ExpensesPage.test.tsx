@@ -69,11 +69,15 @@ describe('ExpensesPage', () => {
 
     // €10 + $10 at 2 USD/EUR = €15, in one figure.
     expect((await screen.findAllByText('€15.00')).length).toBeGreaterThan(0);
-    expect(
-      screen.getByText(
-        `Other currencies converted at exchange rates from ${formatDateKey(CACHED, 'en', 'PPP')}.`,
-      ),
-    ).toBeInTheDocument();
+    // The rates' date is on the switch rather than in a line that comes and goes with the view.
+    expect(screen.queryByText(/converted at exchange rates/)).not.toBeInTheDocument();
+    await user.hover(screen.getByRole('tab', { name: /Combined/ }));
+    // The tooltip mustn't take over the tab's own state, which is what styles it as the active one.
+    expect(screen.getByRole('tab', { name: /Combined/ })).toHaveAttribute('data-state', 'active');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      `Other currencies converted at exchange rates from ${formatDateKey(CACHED, 'en', 'PPP')}.`,
+    );
+    await user.unhover(screen.getByRole('tab', { name: /Combined/ }));
     // The taxi still shows what was paid, with what it came to beneath.
     const taxi = screen.getByRole('button', { name: /Taxi/ });
     expect(within(taxi).getByText('$10.00')).toBeInTheDocument();
@@ -81,8 +85,16 @@ describe('ExpensesPage', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Separately' }));
     await waitFor(async () => expect((await getPluginSettings('expenses')).view).toBe('separate'));
-    expect(await screen.findByRole('tab', { name: 'USD' })).toBeInTheDocument();
-    expect(screen.queryByText(/converted at exchange rates/)).not.toBeInTheDocument();
+    // One currency at a time, picked from only those that have been used.
+    await user.click(await screen.findByRole('button', { name: /Showing only Euro/ }));
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'EUREuro',
+      'USDUS Dollar',
+    ]);
+    await user.click(screen.getByRole('option', { name: /US Dollar/ }));
+    expect(
+      await screen.findByRole('button', { name: /Showing only US Dollar/ }),
+    ).toBeInTheDocument();
   });
 
   it('warns once the rates are more than a week old', async () => {
@@ -132,6 +144,8 @@ describe('ExpensesPage', () => {
     // A single currency, shown in another: €10 is $20.
     expect((await screen.findAllByText('$20.00')).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Totals shown in US Dollar/ })).toBeInTheDocument();
+    // With no switch to put it on, the rates' date is spelled out instead.
+    expect(screen.getByText(/converted at exchange rates from/)).toBeInTheDocument();
     // Nothing to show separately with only one currency in use.
     expect(screen.queryByRole('tab', { name: 'Separately' })).not.toBeInTheDocument();
   });

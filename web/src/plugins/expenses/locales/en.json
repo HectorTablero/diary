@@ -50,7 +50,7 @@
   "emptyPageDescription": "Add one here, or from the diary's day page as you go.",
   "previousMonth": "Previous month",
   "nextMonth": "Next month",
-  "currencySwitcher": "Currency",
+  "separateCurrencyLabel": "Showing only {{currency}}. Change currency",
   "viewSwitcher": "How currencies are shown",
   "viewCombined": "Combined",
   "viewSeparate": "Separately",
