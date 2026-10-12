@@ -2,9 +2,18 @@ import type { EntryDto } from '@diary/shared';
 import { normalize } from '@/lib/tokens';
 import { buildImportanceLegend } from './importanceLegend';
 
+/**
+ * Whether an entry's `Tags:` / `Mentions:` lines leave out what its text already names. Off: every
+ * link is listed under its entry, so a reader never has to infer one from the sentence. Flip to
+ * `true` to go back to listing only the links the text does not already say.
+ */
+export const OMIT_LINKS_NAMED_IN_TEXT = false;
+
 export interface EntriesMarkdownOptions {
   from: string | null;
   to: string | null;
+  /** Overrides `OMIT_LINKS_NAMED_IN_TEXT` for this export. */
+  omitLinksNamedInText?: boolean;
 }
 
 /**
@@ -66,12 +75,13 @@ export function buildEntriesMarkdown(
   plugins: Partial<EntriesPluginContent> = {},
 ): string {
   const { dayLines = new Map<string, readonly (readonly string[])[]>(), notes = [] } = plugins;
+  const omitNamed = options.omitLinksNamedInText ?? OMIT_LINKS_NAMED_IN_TEXT;
   const range =
     options.from || options.to ? ` (${options.from ?? '…'} – ${options.to ?? '…'})` : '';
   const lines: string[] = [
     `# Diary export${range}`,
     '',
-    buildMentionNote(),
+    buildMentionNote(omitNamed),
     buildImportanceLegend(),
     /* Beside the document's own two notes, and for the same reason they exist: everything this
        export uses a notation for explains it before using it, because the reader is an agent with
@@ -97,12 +107,16 @@ export function buildEntriesMarkdown(
     );
     for (const entry of dayEntries) {
       lines.push(`- [importance ${entry.importance}] ${entry.content}`);
-      /* Only what the entry does not already say. A tag typed as #work, or a person the sentence
-         names outright, is repeated by a line underneath it — and an export of a year of entries is
-         mostly such repetition, which buries the handful of links that genuinely add something: the
-         person an entry is about without naming, the tag chosen from the picker and never typed. */
-      const tags = entry.tags.filter((tag) => !writtenInText(tag.name, entry.content));
-      const people = entry.people.filter((person) => !writtenInText(person.name, entry.content));
+      /* With `omitNamed`, only what the entry does not already say. A tag typed as #work, or a
+         person the sentence names outright, is repeated by a line underneath it — and an export of
+         a year of entries is mostly such repetition, which buries the handful of links that
+         genuinely add something. Without it, every link is listed, so none has to be inferred. */
+      const tags = omitNamed
+        ? entry.tags.filter((tag) => !writtenInText(tag.name, entry.content))
+        : entry.tags;
+      const people = omitNamed
+        ? entry.people.filter((person) => !writtenInText(person.name, entry.content))
+        : entry.people;
       if (tags.length) lines.push(`  Tags: ${tags.map((t) => `#${t.name}`).join(', ')}`);
       if (people.length) lines.push(`  Mentions: ${people.map((p) => p.name).join(', ')}`);
     }
@@ -127,14 +141,18 @@ export function buildEntriesMarkdown(
     the sentence already", and would read the second as the first. English for the reason
     `buildImportanceLegend` is: these exports are meant for an agent, so they stay in one language
     regardless of what the app is set to. */
-function buildMentionNote(): string {
-  return [
-    '## Tags and mentions',
-    '',
-    'An entry can be linked to tags and to people. Those links are listed under it as `Tags:` and',
-    "`Mentions:` lines — but only the ones the entry's own text does not already name, whether as an",
-    '`#tag` / `@name` token or as a plain word. So a missing line means the text already says it, not',
-    'that the entry has no tags or mentions.',
-    '',
-  ].join('\n');
+function buildMentionNote(omitNamed: boolean): string {
+  const rule = omitNamed
+    ? [
+        'An entry can be linked to tags and to people. Those links are listed under it as `Tags:` and',
+        "`Mentions:` lines — but only the ones the entry's own text does not already name, whether as an",
+        '`#tag` / `@name` token or as a plain word. So a missing line means the text already says it, not',
+        'that the entry has no tags or mentions.',
+      ]
+    : [
+        'An entry can be linked to tags and to people. All of those links are listed under it as `Tags:`',
+        "and `Mentions:` lines, whether or not the entry's own text also names them. A missing line means",
+        'the entry has no tags or no mentions.',
+      ];
+  return ['## Tags and mentions', '', ...rule, ''].join('\n');
 }

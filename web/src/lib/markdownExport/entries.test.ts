@@ -31,13 +31,17 @@ const person = (name: string) => ({ id: `person-${name}`, name });
 
 /** Just the day's own block. The preamble explains the rule in the same words the lines use, so a
     document-wide `not.toContain('Tags:')` would only ever be testing the explanation. */
-const build = (over: Partial<EntryDto> & { content: string }) => {
-  const markdown = buildEntriesMarkdown([entry(over)], { from: null, to: null });
+const build = (over: Partial<EntryDto> & { content: string }, omitLinksNamedInText = true) => {
+  const markdown = buildEntriesMarkdown([entry(over)], {
+    from: null,
+    to: null,
+    omitLinksNamedInText,
+  });
   return markdown.slice(markdown.indexOf('## 2026-09-01'));
 };
 
-const whole = (over: Partial<EntryDto> & { content: string }) =>
-  buildEntriesMarkdown([entry(over)], { from: null, to: null });
+const whole = (over: Partial<EntryDto> & { content: string }, omitLinksNamedInText = true) =>
+  buildEntriesMarkdown([entry(over)], { from: null, to: null, omitLinksNamedInText });
 
 /* Plugin content is the document's second author: an enabled plugin puts a block under the day it
    is about, and a note in the preamble teaching the reader to parse it. The builder's side of that
@@ -47,7 +51,7 @@ const whole = (over: Partial<EntryDto> & { content: string }) =>
 const NO_ENTRIES: EntryDto[] = [];
 const ALL = { from: null, to: null };
 
-describe('buildEntriesMarkdown — tags and mentions', () => {
+describe('buildEntriesMarkdown — tags and mentions, omitting what the text names', () => {
   it('says nothing about a mention the entry already writes as a token', () => {
     const markdown = build({
       content: 'Coffee with @Ana about the #move.',
@@ -104,6 +108,41 @@ describe('buildEntriesMarkdown — tags and mentions', () => {
     expect(markdown.indexOf('## Tags and mentions')).toBeLessThan(
       markdown.indexOf('## Importance scale'),
     );
+  });
+});
+
+describe('buildEntriesMarkdown — tags and mentions, listing all (default)', () => {
+  it('is the default mode', () => {
+    const markdown = buildEntriesMarkdown(
+      [entry({ content: 'Coffee with @Ana.', people: [person('Ana')] })],
+      ALL,
+    );
+    expect(markdown).toContain('  Mentions: Ana');
+  });
+
+  it('lists links the text already names, as tokens or plain words', () => {
+    const markdown = build(
+      {
+        content: 'Coffee with @Ana and Bruno about the #move.',
+        tags: [tag('move')],
+        people: [person('Ana'), person('Bruno')],
+      },
+      false,
+    );
+    expect(markdown).toContain('  Tags: #move');
+    expect(markdown).toContain('  Mentions: Ana, Bruno');
+  });
+
+  it('still writes no line for an entry without links', () => {
+    const markdown = build({ content: 'Nothing much.' }, false);
+    expect(markdown).not.toContain('Tags:');
+    expect(markdown).not.toContain('Mentions:');
+  });
+
+  it('says in the preamble that every link is listed', () => {
+    const markdown = whole({ content: 'Nothing much.' }, false);
+    expect(markdown).toContain('All of those links are listed');
+    expect(markdown).not.toContain('only the ones');
   });
 });
 
