@@ -1,5 +1,6 @@
 import {
   Archive,
+  ChartColumn,
   CircleCheckBig,
   Hash,
   ListTodo,
@@ -39,6 +40,7 @@ import { useWeekStart } from '@/lib/preferences';
 import { splitColumns, useIsWideContainer } from '@/lib/useContainerWidth';
 import { cn } from '@/lib/utils';
 import { describeSchedule, habitChanges, habitSummary } from './changes';
+import { HabitChart } from './HabitChart';
 import { HiddenSection, StreakBadge } from './HabitControls';
 import {
   DEFAULT_SCALE_MAX,
@@ -311,6 +313,7 @@ function HabitCard({
   const schedule = scheduleAt(habit);
   const scheduleNoted = schedule.kind !== 'daily';
   const weekStart = useWeekStart();
+  const [charting, setCharting] = useState(false);
 
   return (
     <section
@@ -383,7 +386,28 @@ function HabitCard({
 
       <HabitChanges habit={habit} />
 
+      {/* Mounted only while open: the chart walks the habit's whole life. */}
+      <Dialog open={charting} onOpenChange={setCharting}>
+        {charting && (
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{habit.name}</DialogTitle>
+            </DialogHeader>
+            <HabitChart habit={habit} history={library.history} today={today} />
+          </DialogContent>
+        )}
+      </Dialog>
+
       <div className="mt-3 flex flex-wrap justify-end gap-1.5 border-t pt-2.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+          onClick={() => setCharting(true)}
+        >
+          <ChartColumn className="size-3" />
+          {t('plugins.habits.chart')}
+        </Button>
         <Button
           variant="ghost"
           size="sm"

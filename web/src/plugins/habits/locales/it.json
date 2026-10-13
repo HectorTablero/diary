@@ -30,7 +30,7 @@
   "exportLogHeading": "Il registro",
   "exportKeyDone": "una casella spuntata. Gli altri tipi mostrano quello che è stato registrato.",
   "exportKeyMissed": "quel giorno l'abitudine era prevista e non è stato registrato nulla.",
-  "exportKeyOverdue": "un'attività ancora in sospeso dopo il giorno in cui era prevista, e non fatta quel giorno. Il giorno previsto stesso è `·`.",
+  "exportKeyOverdue": "un'attività prevista e non fatta quel giorno: il giorno in cui era prevista e ogni giorno in cui è rimasta in sospeso dopo.",
   "exportKeyUnscheduled": "l'abitudine era ancora attiva, ma quel giorno non era prevista.",
   "exportKeyUntracked": "Una cella vuota significa che quel giorno l'abitudine non era seguita affatto: non esisteva ancora, oppure era già stata ritirata.",
   "exportKeyTask": "Un'attività non fatta continua a essere chiesta nei giorni successivi a quello previsto, quindi anche quei giorni contano come previsti.",
@@ -166,5 +166,27 @@
       "label": "Widget per la schermata Home",
       "note": "Tieni premuta la schermata Home, scegli Widget e aggiungi Abitudini."
     }
-  }
+  },
+  "chart": "Grafico",
+  "chartRange1m": "1M",
+  "chartRange3m": "3M",
+  "chartRange1y": "1A",
+  "chartRangeAll": "Tutto",
+  "chartPerDay": "Al giorno",
+  "chartPerWeek": "A settimana",
+  "chartPerMonth": "Al mese",
+  "chartHint": "Scorri o pizzica per lo zoom, trascina per spostarti. Le linee tratteggiate segnano le modifiche all'abitudine.",
+  "chartLabel": "Grafico di {{name}}, dal {{from}} al {{to}}",
+  "chartDoneDays_one": "Fatta {{met}} su {{count}} giorno",
+  "chartDoneDays_other": "Fatta {{met}} su {{count}} giorni",
+  "chartMetDays_one": "Obiettivo raggiunto {{met}} su {{count}} giorno",
+  "chartMetDays_other": "Obiettivo raggiunto {{met}} su {{count}} giorni",
+  "chartRecordedDays_one": "Registrata {{recorded}} su {{count}} giorno",
+  "chartRecordedDays_other": "Registrata {{recorded}} su {{count}} giorni",
+  "chartAverage": "Media: {{value}}",
+  "chartGoal": "Obiettivo allora: {{value}}",
+  "chartNamedThen": "Allora si chiamava «{{name}}»",
+  "chartEdited": "Modificata il {{date}}",
+  "chartOverdueDays_one": "In ritardo per {{count}} giorno",
+  "chartOverdueDays_other": "In ritardo per {{count}} giorni"
 }

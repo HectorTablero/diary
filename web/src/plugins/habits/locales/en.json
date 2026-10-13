@@ -30,7 +30,7 @@
   "exportLogHeading": "The log",
   "exportKeyDone": "a box that was ticked. Every other kind prints what was actually recorded.",
   "exportKeyMissed": "the habit was asked about on that day, and nothing was recorded.",
-  "exportKeyOverdue": "a task still owed after the day it was due on, and not done that day. The day it was due on itself is `·`.",
+  "exportKeyOverdue": "a task that was due and not done that day — the day it fell due, and every day it was still owed after.",
   "exportKeyUnscheduled": "the habit was still being kept, but its schedule does not fall on that day.",
   "exportKeyUntracked": "An empty cell means the habit was not being tracked on that day at all — it had not been created yet, or it had already been retired.",
   "exportKeyTask": "A task that is not done keeps being asked about on the days after the one it was due on, so those days count as asked too.",
@@ -166,5 +166,27 @@
       "label": "Home screen widget",
       "note": "Long-press your home screen, choose Widgets, and add Habits."
     }
-  }
+  },
+  "chart": "Chart",
+  "chartRange1m": "1M",
+  "chartRange3m": "3M",
+  "chartRange1y": "1Y",
+  "chartRangeAll": "All",
+  "chartPerDay": "Per day",
+  "chartPerWeek": "Per week",
+  "chartPerMonth": "Per month",
+  "chartHint": "Scroll or pinch to zoom, drag to move. Dotted lines mark edits to the habit.",
+  "chartLabel": "Chart of {{name}}, from {{from}} to {{to}}",
+  "chartDoneDays_one": "Done on {{met}} of {{count}} day",
+  "chartDoneDays_other": "Done on {{met}} of {{count}} days",
+  "chartMetDays_one": "Goal met on {{met}} of {{count}} day",
+  "chartMetDays_other": "Goal met on {{met}} of {{count}} days",
+  "chartRecordedDays_one": "Recorded on {{recorded}} of {{count}} day",
+  "chartRecordedDays_other": "Recorded on {{recorded}} of {{count}} days",
+  "chartAverage": "Average: {{value}}",
+  "chartGoal": "Goal then: {{value}}",
+  "chartNamedThen": "Called “{{name}}” then",
+  "chartEdited": "Edited on {{date}}",
+  "chartOverdueDays_one": "Overdue on {{count}} day",
+  "chartOverdueDays_other": "Overdue on {{count}} days"
 }

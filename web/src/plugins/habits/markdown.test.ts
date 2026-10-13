@@ -123,7 +123,7 @@ describe('exportHabitsMarkdown', () => {
     await day('2026-09-05', { [water.id]: 1, [passport.id]: 1 }); // done, late
 
     const text = await markdown();
-    expect(rowFor(text, '2026-09-01')).toBe('| 2026-09-01 | · | 1 |');
+    expect(rowFor(text, '2026-09-01')).toBe('| 2026-09-01 | ! | 1 |');
     expect(rowFor(text, '2026-09-03')).toBe('| 2026-09-03 | ! | 1 |');
     expect(rowFor(text, '2026-09-05')).toBe('| 2026-09-05 | × | 1 |');
     expect(text).toContain('Once');
@@ -256,7 +256,7 @@ describe('a date range', () => {
     // The task was finished on the 8th, which this range excludes. Judging "still pending on the
     // 3rd" off the clipped log alone would never see that, and would mark it owed forever.
     const text = await markdown({ from: '2026-09-01', to: '2026-09-05' });
-    expect(rowFor(text, '2026-09-01')).toBe('| 2026-09-01 | · | 1 |');
+    expect(rowFor(text, '2026-09-01')).toBe('| 2026-09-01 | ! | 1 |');
     expect(rowFor(text, '2026-09-03')).toBe('| 2026-09-03 | ! | 1 |');
     // Recorded nowhere inside the window, though it was owed on every day of it.
     expect(text).toContain('asked about on 5 days · 0 days recorded');

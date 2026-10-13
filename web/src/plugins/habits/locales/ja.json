@@ -27,7 +27,7 @@
   "exportLogHeading": "記録",
   "exportKeyDone": "チェックを入れた日。ほかの種類は記録した値をそのまま表示します。",
   "exportKeyMissed": "その日は対象日でしたが、何も記録されていません。",
-  "exportKeyOverdue": "予定日を過ぎてもまだ終わっておらず、その日も完了しなかったタスク。予定日そのものは `·` です。",
+  "exportKeyOverdue": "その日に予定されていて完了しなかったタスク。予定日当日と、その後まだ終わっていなかった毎日が該当します。",
   "exportKeyUnscheduled": "習慣は続けていましたが、その日は対象外でした。",
   "exportKeyUntracked": "空欄は、その日はまだ記録の対象ではなかったことを表します。作成される前か、すでに終了したあとです。",
   "exportKeyTask": "終わっていないタスクは、予定日の翌日以降も繰り返し表示されます。そのため、それらの日も対象日として数えます。",
@@ -157,5 +157,23 @@
       "label": "ホーム画面ウィジェット",
       "note": "ホーム画面を長押しして「ウィジェット」を選び、習慣を追加してください。"
     }
-  }
+  },
+  "chart": "グラフ",
+  "chartRange1m": "1か月",
+  "chartRange3m": "3か月",
+  "chartRange1y": "1年",
+  "chartRangeAll": "すべて",
+  "chartPerDay": "日別",
+  "chartPerWeek": "週別",
+  "chartPerMonth": "月別",
+  "chartHint": "スクロールまたはピンチで拡大縮小、ドラッグで移動。点線は習慣を編集した日です。",
+  "chartLabel": "{{name}}のグラフ（{{from}}〜{{to}}）",
+  "chartDoneDays": "{{count}}日中{{met}}日達成",
+  "chartMetDays": "{{count}}日中{{met}}日目標達成",
+  "chartRecordedDays": "{{count}}日中{{recorded}}日記録",
+  "chartAverage": "平均：{{value}}",
+  "chartGoal": "当時の目標：{{value}}",
+  "chartNamedThen": "当時の名前：「{{name}}」",
+  "chartEdited": "{{date}}に編集",
+  "chartOverdueDays": "{{count}}日間期限切れ"
 }

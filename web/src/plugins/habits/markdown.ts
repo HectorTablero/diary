@@ -65,7 +65,7 @@ import { doneDaysOf, pendingTask } from './tasks';
 const DONE = '×';
 /** Asked about on that day, and nothing recorded. */
 const MISSED = '·';
-/** A task still owed from an earlier day, and not done on this one — the app's "Overdue" pill. */
+/** A task owed and not done that day — the day it fell due as much as every day after it. */
 const OVERDUE = '!';
 /** Being kept, but its schedule does not fall on that day. */
 const UNSCHEDULED = '–';
@@ -238,7 +238,7 @@ export async function exportHabitsMarkdown(
          of the tracked period first: a habit that did not exist yet cannot have been asked. */
       if (!habitAppliesOn(habit, day.dateKey)) return UNTRACKED;
       const done = doneDays.get(habit.id) ?? new Set<string>();
-      if (pendingTask(habit, day.dateKey, done)?.overdue) return OVERDUE;
+      if (pendingTask(habit, day.dateKey, done)) return OVERDUE;
       return asked(habit, day.dateKey, done) ? MISSED : UNSCHEDULED;
     });
     return `| ${day.dateKey} | ${cells.join(' | ')} |`;

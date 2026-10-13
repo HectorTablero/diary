@@ -725,7 +725,7 @@ function ScaleControl({
 
 /** Five faces, worst to best. Icons rather than emoji so they inherit the palette and stroke weight
     of everything else, and render identically on every platform. */
-const MOOD_ICONS = [Angry, Frown, Meh, Smile, Laugh];
+export const MOOD_ICONS = [Angry, Frown, Meh, Smile, Laugh];
 
 /**
  * The unchosen face's colour — a blend, not a translucent one.

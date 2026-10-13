@@ -27,7 +27,7 @@
   "exportLogHeading": "记录",
   "exportKeyDone": "勾选的方框。其他类型直接显示所记录的内容。",
   "exportKeyMissed": "当天需要进行该习惯，但没有任何记录。",
-  "exportKeyOverdue": "到期日之后仍未完成、当天也没有完成的任务。到期日当天本身记为 `·`。",
+  "exportKeyOverdue": "当天应完成但未完成的任务——包括到期日当天，以及之后仍未完成的每一天。",
   "exportKeyUnscheduled": "习惯仍在坚持，但当天无需进行。",
   "exportKeyUntracked": "空白单元格表示当天并未追踪该习惯：它尚未创建，或者已经停用。",
   "exportKeyTask": "未完成的任务会在到期日之后的几天里继续出现，因此那些天也算作需要进行的日子。",
@@ -157,5 +157,23 @@
       "label": "主屏幕小组件",
       "note": "长按主屏幕，选择“小组件”，然后添加习惯。"
     }
-  }
+  },
+  "chart": "图表",
+  "chartRange1m": "1个月",
+  "chartRange3m": "3个月",
+  "chartRange1y": "1年",
+  "chartRangeAll": "全部",
+  "chartPerDay": "按天",
+  "chartPerWeek": "按周",
+  "chartPerMonth": "按月",
+  "chartHint": "滚动或双指缩放，拖动以移动。虚线标记习惯被编辑的日期。",
+  "chartLabel": "{{name}} 的图表，{{from}} 至 {{to}}",
+  "chartDoneDays": "{{count}} 天中完成 {{met}} 天",
+  "chartMetDays": "{{count}} 天中达成目标 {{met}} 天",
+  "chartRecordedDays": "{{count}} 天中记录 {{recorded}} 天",
+  "chartAverage": "平均：{{value}}",
+  "chartGoal": "当时的目标：{{value}}",
+  "chartNamedThen": "当时名为“{{name}}”",
+  "chartEdited": "编辑于 {{date}}",
+  "chartOverdueDays": "逾期 {{count}} 天"
 }
