@@ -169,7 +169,8 @@ export interface ActiveToken {
 /** The @/# token the caret is currently inside, if any. */
 export function detectActiveToken(value: string, caret: number): ActiveToken | null {
   const before = value.slice(0, caret);
-  const match = before.match(/[@#][^\s@#]*$/);
+  // Tags stop at anything but letters, digits, `-` and `_`, so "#ABC." doesn't offer "ABC.".
+  const match = before.match(/@[^\s@#]*$|#[\p{L}\p{N}_-]*$/u);
   if (!match) return null;
   const start = caret - match[0].length;
   // Don't trigger inside words (e.g. emails).

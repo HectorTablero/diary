@@ -377,6 +377,22 @@ export async function getEntriesInRange(
     if (to && e.dateKey > to) return false;
     return true;
   });
+  /* A sub-entry the tag filter kept still needs its parents to read in context, so they come along
+     even when they don't match. Same dateKey as the child, so the range never excludes them. */
+  const have = new Set(entries.map((e) => e.id));
+  let missing = [...new Set(entries.flatMap((e) => (e.parentId ? [e.parentId] : [])))].filter(
+    (id) => !have.has(id),
+  );
+  while (missing.length) {
+    const parents = (await db.entries.bulkGet(missing)).filter((e) => e !== undefined);
+    for (const parent of parents) {
+      have.add(parent.id);
+      entries.push(parent);
+    }
+    missing = [...new Set(parents.flatMap((e) => (e.parentId ? [e.parentId] : [])))].filter(
+      (id) => !have.has(id),
+    );
+  }
   const maps = await joinMaps();
   return entries
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.createdAt.localeCompare(b.createdAt))

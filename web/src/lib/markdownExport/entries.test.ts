@@ -146,6 +146,60 @@ describe('buildEntriesMarkdown — tags and mentions, listing all (default)', ()
   });
 });
 
+describe('buildEntriesMarkdown — sub-entries', () => {
+  it('nests children under their parent in sibling order, and keeps orphans at the top', () => {
+    const markdown = buildEntriesMarkdown(
+      [
+        entry({ id: 'c2', parentId: 'p', orderKey: 'a2', content: 'Second child.' }),
+        entry({ id: 'p', orderKey: 'a0', content: 'Parent.' }),
+        entry({
+          id: 'g',
+          parentId: 'c1',
+          orderKey: 'a0',
+          content: 'Grandchild.',
+          tags: [tag('x')],
+        }),
+        entry({ id: 'c1', parentId: 'p', orderKey: 'a1', content: 'First child.' }),
+        entry({ id: 'o', parentId: 'gone', orderKey: 'a1', content: 'Orphan.' }),
+      ],
+      ALL,
+    );
+    expect(markdown).toContain(
+      [
+        '- [importance 3] Parent.',
+        '  - [importance 3] First child.',
+        '    - [importance 3] Grandchild.',
+        '      Tags: #x',
+        '  - [importance 3] Second child.',
+        '- [importance 3] Orphan.',
+      ].join('\n'),
+    );
+  });
+});
+
+describe('buildEntriesMarkdown — parents kept for context', () => {
+  it('marks a parent that missed the tag filter, and only that one', () => {
+    const markdown = buildEntriesMarkdown(
+      [
+        entry({ id: 'p', content: 'Parent.' }),
+        entry({ id: 'c', parentId: 'p', content: 'Child.', tags: [tag('x')] }),
+      ],
+      { ...ALL, tagIds: ['tag-x'] },
+    );
+    expect(markdown).toContain(
+      ['- [context only] [importance 3] Parent.', '  - [importance 3] Child.'].join('\n'),
+    );
+    expect(markdown).toContain('`[context only]`');
+  });
+
+  it('without a tag filter, explains nesting but never mentions the marker', () => {
+    const markdown = buildEntriesMarkdown([entry({ content: 'Parent.' })], ALL);
+    expect(markdown).toContain('- [importance 3] Parent.');
+    expect(markdown.indexOf('## Sub-entries')).toBeLessThan(markdown.indexOf('## 2026-09-01'));
+    expect(markdown).not.toContain('[context only]');
+  });
+});
+
 describe('buildEntriesMarkdown — plugin blocks', () => {
   it("puts a day's block under that day's entries, blank-line separated", () => {
     const markdown = buildEntriesMarkdown([entry({ content: 'Long day.' })], ALL, {

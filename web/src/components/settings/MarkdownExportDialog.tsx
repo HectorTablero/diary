@@ -274,7 +274,7 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
           getEntriesInRange(range.from, range.to, tagIds),
           collectPluginMarkdown(enabledPlugins, range, entryPluginSelection),
         ]);
-        const markdown = buildEntriesMarkdown(entries, range, contributed);
+        const markdown = buildEntriesMarkdown(entries, { ...range, tagIds }, contributed);
         const full = [markdown, ...contributed.sections.map((section) => section.markdown)].join(
           '\n\n',
         );

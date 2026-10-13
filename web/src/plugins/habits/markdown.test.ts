@@ -124,12 +124,12 @@ describe('exportHabitsMarkdown', () => {
 
     const text = await markdown();
     expect(rowFor(text, '2026-09-01')).toBe('| 2026-09-01 | · | 1 |');
-    expect(rowFor(text, '2026-09-03')).toBe('| 2026-09-03 | · | 1 |');
+    expect(rowFor(text, '2026-09-03')).toBe('| 2026-09-03 | ! | 1 |');
     expect(rowFor(text, '2026-09-05')).toBe('| 2026-09-05 | × | 1 |');
-    // Its schedule falls on one day however long it went unanswered: a backlog of missed
-    // occurrences is exactly what `pendingTask` refuses to invent.
     expect(text).toContain('Once');
-    expect(text).toContain('asked about on 1 day · 1 day recorded');
+    // The 1st to the 5th: due, then owed every day until done — the days the table marks, not
+    // just the one its schedule fell on.
+    expect(text).toContain('asked about on 5 days · 1 day recorded');
   });
 
   it('describes each habit by its kind and schedule, and dates the edits inside its period', async () => {
@@ -257,8 +257,8 @@ describe('a date range', () => {
     // 3rd" off the clipped log alone would never see that, and would mark it owed forever.
     const text = await markdown({ from: '2026-09-01', to: '2026-09-05' });
     expect(rowFor(text, '2026-09-01')).toBe('| 2026-09-01 | · | 1 |');
-    expect(rowFor(text, '2026-09-03')).toBe('| 2026-09-03 | · | 1 |');
-    // Recorded nowhere inside the window, though it was asked about there.
-    expect(text).toContain('asked about on 1 day · 0 days recorded');
+    expect(rowFor(text, '2026-09-03')).toBe('| 2026-09-03 | ! | 1 |');
+    // Recorded nowhere inside the window, though it was owed on every day of it.
+    expect(text).toContain('asked about on 5 days · 0 days recorded');
   });
 });

@@ -30,6 +30,7 @@
   "exportLogHeading": "Il registro",
   "exportKeyDone": "una casella spuntata. Gli altri tipi mostrano quello che è stato registrato.",
   "exportKeyMissed": "quel giorno l'abitudine era prevista e non è stato registrato nulla.",
+  "exportKeyOverdue": "un'attività ancora in sospeso dopo il giorno in cui era prevista, e non fatta quel giorno. Il giorno previsto stesso è `·`.",
   "exportKeyUnscheduled": "l'abitudine era ancora attiva, ma quel giorno non era prevista.",
   "exportKeyUntracked": "Una cella vuota significa che quel giorno l'abitudine non era seguita affatto: non esisteva ancora, oppure era già stata ritirata.",
   "exportKeyTask": "Un'attività non fatta continua a essere chiesta nei giorni successivi a quello previsto, quindi anche quei giorni contano come previsti.",

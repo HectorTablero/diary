@@ -65,6 +65,8 @@ import { doneDaysOf, pendingTask } from './tasks';
 const DONE = '×';
 /** Asked about on that day, and nothing recorded. */
 const MISSED = '·';
+/** A task still owed from an earlier day, and not done on this one — the app's "Overdue" pill. */
+const OVERDUE = '!';
 /** Being kept, but its schedule does not fall on that day. */
 const UNSCHEDULED = '–';
 /** Not being tracked then at all — before it existed, or after it was retired. */
@@ -147,6 +149,7 @@ export async function exportHabitsMarkdown(
     '',
     `- \`${DONE}\` — ${i18n.t('plugins.habits.exportKeyDone')}`,
     `- \`${MISSED}\` — ${i18n.t('plugins.habits.exportKeyMissed')}`,
+    `- \`${OVERDUE}\` — ${i18n.t('plugins.habits.exportKeyOverdue')}`,
     `- \`${UNSCHEDULED}\` — ${i18n.t('plugins.habits.exportKeyUnscheduled')}`,
     `- ${i18n.t('plugins.habits.exportKeyUntracked')}`,
     `- ${i18n.t('plugins.habits.exportKeyTask')}`,
@@ -167,11 +170,13 @@ export async function exportHabitsMarkdown(
     const retiredOn = habit.archivedAt?.slice(0, 10) ?? null;
     const from = range.from && range.from > origin ? range.from : origin;
     const to = range.to && range.to < horizon ? range.to : horizon;
-    /* Counted by asking `habitOccursOn` day by day rather than from the shape of the schedule, so a
-       habit that spent March on weekdays and April on Mondays is counted as each of them in turn,
-       and so the count stops of its own accord on the day the habit was retired — which is also
-       what keeps a habit retired before the range began out of the table below. */
-    const occurrences = dateRange(from, to).filter((day) => habitOccursOn(habit, day)).length;
+    /* Counted by asking `asked` day by day rather than from the shape of the schedule, so a habit
+       that spent March on weekdays and April on Mondays is counted as each of them in turn, so the
+       count stops of its own accord on the day the habit was retired — which is also what keeps a
+       habit retired before the range began out of the table below — and so a task's overdue days
+       are counted, as the legend says and the table marks them. */
+    const habitDone = doneDays.get(habit.id) ?? new Set<string>();
+    const occurrences = dateRange(from, to).filter((day) => asked(habit, day, habitDone)).length;
     const recorded = [...(doneDays.get(habit.id) ?? [])].filter((day) =>
       inExportRange(day, range),
     ).length;
@@ -232,7 +237,9 @@ export async function exportHabitsMarkdown(
       /* Nothing recorded, so which of the three silences this is decides what the cell says. Out
          of the tracked period first: a habit that did not exist yet cannot have been asked. */
       if (!habitAppliesOn(habit, day.dateKey)) return UNTRACKED;
-      return asked(habit, day.dateKey, doneDays.get(habit.id) ?? new Set()) ? MISSED : UNSCHEDULED;
+      const done = doneDays.get(habit.id) ?? new Set<string>();
+      if (pendingTask(habit, day.dateKey, done)?.overdue) return OVERDUE;
+      return asked(habit, day.dateKey, done) ? MISSED : UNSCHEDULED;
     });
     return `| ${day.dateKey} | ${cells.join(' | ')} |`;
   });

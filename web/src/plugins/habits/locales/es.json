@@ -30,6 +30,7 @@
   "exportLogHeading": "El registro",
   "exportKeyDone": "una casilla marcada. Los demás tipos muestran lo que se registró.",
   "exportKeyMissed": "ese día tocaba el hábito y no se registró nada.",
+  "exportKeyOverdue": "una tarea que seguía pendiente después del día en que tocaba, y que ese día no se hizo. El propio día en que tocaba es `·`.",
   "exportKeyUnscheduled": "el hábito se seguía manteniendo, pero ese día no tocaba.",
   "exportKeyUntracked": "Una celda vacía significa que ese día el hábito no se seguía en absoluto: aún no existía, o ya estaba retirado.",
   "exportKeyTask": "Una tarea sin hacer se sigue preguntando los días siguientes al que tocaba, así que esos días también cuentan como días en los que tocaba.",

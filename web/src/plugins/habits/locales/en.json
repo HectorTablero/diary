@@ -30,6 +30,7 @@
   "exportLogHeading": "The log",
   "exportKeyDone": "a box that was ticked. Every other kind prints what was actually recorded.",
   "exportKeyMissed": "the habit was asked about on that day, and nothing was recorded.",
+  "exportKeyOverdue": "a task still owed after the day it was due on, and not done that day. The day it was due on itself is `·`.",
   "exportKeyUnscheduled": "the habit was still being kept, but its schedule does not fall on that day.",
   "exportKeyUntracked": "An empty cell means the habit was not being tracked on that day at all — it had not been created yet, or it had already been retired.",
   "exportKeyTask": "A task that is not done keeps being asked about on the days after the one it was due on, so those days count as asked too.",

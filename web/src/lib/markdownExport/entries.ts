@@ -14,7 +14,13 @@ export interface EntriesMarkdownOptions {
   to: string | null;
   /** Overrides `OMIT_LINKS_NAMED_IN_TEXT` for this export. */
   omitLinksNamedInText?: boolean;
+  /** The tag filter the entries were picked by. An entry matching none of them is a parent brought
+      along so its sub-entries read in context, and is marked as such. */
+  tagIds?: readonly string[];
 }
+
+/** Prefix on an entry that is only in the export as the parent of one that matched the filter. */
+const CONTEXT_MARKER = '[context only]';
 
 /**
  * What enabled plugins want added to the document (see `collectPluginMarkdown`), already filtered
@@ -61,8 +67,10 @@ function writtenInText(name: string, content: string): boolean {
   return false;
 }
 
-/* Flat per-entry blocks, grouped by date — not a tree reconstruction. A date-range slice can
-   legitimately include a child without its out-of-range parent, so tree fidelity isn't attempted.
+/* Per-entry blocks grouped by date, with sub-entries nested under their parent as an indented list.
+   The caller passes a filtered child's parents along with it (see `getEntriesInRange`); those are
+   marked with `CONTEXT_MARKER` rather than dropped, so a sub-entry is never read without the entry
+   it belongs to. A child whose parent is missing anyway is listed at the top level of its day.
    Mentioned people appear as names only (EntryDto.people is already {id, name}), so no contact
    info about them can leak into the export by construction.
 
@@ -78,10 +86,14 @@ export function buildEntriesMarkdown(
   const omitNamed = options.omitLinksNamedInText ?? OMIT_LINKS_NAMED_IN_TEXT;
   const range =
     options.from || options.to ? ` (${options.from ?? '…'} – ${options.to ?? '…'})` : '';
+  const tagFilter = new Set(options.tagIds ?? []);
+  const isContext = (entry: EntryDto) =>
+    tagFilter.size > 0 && !entry.tags.some((tag) => tagFilter.has(tag.id));
   const lines: string[] = [
     `# Diary export${range}`,
     '',
     buildMentionNote(omitNamed),
+    buildNestingNote(tagFilter.size > 0),
     buildImportanceLegend(),
     /* Beside the document's own two notes, and for the same reason they exist: everything this
        export uses a notation for explains it before using it, because the reader is an agent with
@@ -102,11 +114,35 @@ export function buildEntriesMarkdown(
   const dates = [...new Set([...byDate.keys(), ...dayLines.keys()])].sort();
   for (const date of dates) {
     lines.push(`## ${date}`, '');
-    const dayEntries = (byDate.get(date) ?? []).sort((a, b) =>
-      a.createdAt.localeCompare(b.createdAt),
-    );
+    const dayEntries = byDate.get(date) ?? [];
+    const ids = new Set(dayEntries.map((e) => e.id));
+    const children = new Map<string | null, EntryDto[]>();
     for (const entry of dayEntries) {
-      lines.push(`- [importance ${entry.importance}] ${entry.content}`);
+      // An entry whose parent didn't make it into the export is shown at the top level.
+      const parent = entry.parentId && ids.has(entry.parentId) ? entry.parentId : null;
+      children.set(parent, [...(children.get(parent) ?? []), entry]);
+    }
+    // Sibling order as in the app: orderKey (plain code-unit compare, as fractional keys need),
+    // then createdAt for rows that don't have one yet.
+    const ordered: { entry: EntryDto; depth: number }[] = [];
+    const walk = (parent: string | null, depth: number) => {
+      const siblings = (children.get(parent) ?? []).sort((a, b) =>
+        a.orderKey !== b.orderKey
+          ? a.orderKey < b.orderKey
+            ? -1
+            : 1
+          : a.createdAt.localeCompare(b.createdAt),
+      );
+      for (const entry of siblings) {
+        ordered.push({ entry, depth });
+        walk(entry.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    for (const { entry, depth } of ordered) {
+      const indent = '  '.repeat(depth);
+      const marker = isContext(entry) ? `${CONTEXT_MARKER} ` : '';
+      lines.push(`${indent}- ${marker}[importance ${entry.importance}] ${entry.content}`);
       /* With `omitNamed`, only what the entry does not already say. A tag typed as #work, or a
          person the sentence names outright, is repeated by a line underneath it — and an export of
          a year of entries is mostly such repetition, which buries the handful of links that
@@ -117,8 +153,8 @@ export function buildEntriesMarkdown(
       const people = omitNamed
         ? entry.people.filter((person) => !writtenInText(person.name, entry.content))
         : entry.people;
-      if (tags.length) lines.push(`  Tags: ${tags.map((t) => `#${t.name}`).join(', ')}`);
-      if (people.length) lines.push(`  Mentions: ${people.map((p) => p.name).join(', ')}`);
+      if (tags.length) lines.push(`${indent}  Tags: ${tags.map((t) => `#${t.name}`).join(', ')}`);
+      if (people.length) lines.push(`${indent}  Mentions: ${people.map((p) => p.name).join(', ')}`);
     }
     /* Each plugin's block set off by a blank line, from the entries and from each other — they are
        separate lists that would otherwise run together into one, with the second plugin's heading
@@ -134,6 +170,26 @@ export function buildEntriesMarkdown(
   }
 
   return `${lines.join('\n').trimEnd()}\n`;
+}
+
+/** How sub-entries are written. The nesting is in every export; the marker paragraph only when a
+    tag filter is set, since that is the only time a parent can be brought along without matching. */
+function buildNestingNote(tagFiltered: boolean): string {
+  return [
+    '## Sub-entries',
+    '',
+    'An entry can have sub-entries, which add detail to it. They are listed under their parent as an',
+    'indented list, nested as deep as they go, in the order the diary shows them.',
+    '',
+    ...(tagFiltered
+      ? [
+          'This export is filtered by tag. A sub-entry that matched keeps its parents, even when those',
+          `did not match. Such a parent starts with \`${CONTEXT_MARKER}\`: it is there so the sub-entry`,
+          'can be read in context, not because it matched the filter.',
+          '',
+        ]
+      : []),
+  ].join('\n');
 }
 
 /** What the absence of a `Tags:` or `Mentions:` line means, said once at the top rather than left

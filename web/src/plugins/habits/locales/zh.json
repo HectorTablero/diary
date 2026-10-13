@@ -27,6 +27,7 @@
   "exportLogHeading": "记录",
   "exportKeyDone": "勾选的方框。其他类型直接显示所记录的内容。",
   "exportKeyMissed": "当天需要进行该习惯，但没有任何记录。",
+  "exportKeyOverdue": "到期日之后仍未完成、当天也没有完成的任务。到期日当天本身记为 `·`。",
   "exportKeyUnscheduled": "习惯仍在坚持，但当天无需进行。",
   "exportKeyUntracked": "空白单元格表示当天并未追踪该习惯：它尚未创建，或者已经停用。",
   "exportKeyTask": "未完成的任务会在到期日之后的几天里继续出现，因此那些天也算作需要进行的日子。",
