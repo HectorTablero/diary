@@ -823,10 +823,13 @@ export function HabitProgress({
   habit,
   live,
   dateKey,
+  stacked = false,
 }: {
   habit: Habit;
   live: LiveValue;
   dateKey: string;
+  /** The row fell back to its narrow layout on a wide container — keep the narrow full-width bar. */
+  stacked?: boolean;
 }) {
   const target = configAt(habit, dateKey).target;
   // Only the two kinds that can fall short of something. A rating or a mood *is* its value, and a
@@ -847,7 +850,10 @@ export function HabitProgress({
        had to squint at. Above `sm` it goes back to a fixed gauge on the controls' line, free to
        shrink to `min-w-16` before anything overflows. */
     <div
-      className="relative h-1.5 w-full min-w-16 overflow-hidden rounded-full bg-muted @[480px]:w-40"
+      className={cn(
+        'relative h-1.5 w-full min-w-16 overflow-hidden rounded-full bg-muted',
+        !stacked && '@[480px]:w-40',
+      )}
       aria-hidden
     >
       {/* Underneath, and the full extent of what has been counted. It eases in step with the bar

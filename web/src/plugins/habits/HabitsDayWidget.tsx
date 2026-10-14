@@ -1,5 +1,5 @@
 import { CircleCheckBig, ListPlus, Lock, LockOpen, PowerOff, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { HintTooltip } from '@/components/common/HintTooltip';
@@ -240,6 +240,10 @@ function DayLockButton({
   );
 }
 
+/** Below this, a truncated name beside its controls is too little of the name to recognise. The
+    same width as the progress gauge: a name should never get less of the line than its bar. */
+const MIN_TITLE_WIDTH = 160;
+
 /**
  * Exported for `plugins/habits/onboarding/TypesStep.tsx`, which previews every kind of habit
  * control through this exact component rather than a redrawing of it — see that file's own note
@@ -296,20 +300,55 @@ export function HabitRow({
      it lands here too, which is also what leaves room for its overdue pill beside the name. */
   const inline = isCheckbox(habit.type);
 
+  /* A wide container is a verdict on the slot, not on this row: a stopwatch's three buttons, its
+     duration and its bar can still leave the name a few letters beside them. So a row whose name
+     is truncated to under MIN_TITLE_WIDTH falls back to the narrow layout — name on one line,
+     controls on the next — whatever the container says. Measured once in the wide shape, then held
+     until the row's width changes; re-measuring from the stacked shape would read a name that has
+     the whole line to itself and flip straight back. */
+  const [stacked, setStacked] = useState(false);
+  const rowRef = useRef<HTMLLIElement>(null);
+  const titleRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    if (inline) return;
+    if (stacked) {
+      const row = rowRef.current;
+      if (!row) return;
+      const width = row.clientWidth;
+      const observer = new ResizeObserver(() => {
+        if (row.clientWidth !== width) setStacked(false);
+      });
+      observer.observe(row);
+      return () => observer.disconnect();
+    }
+    const title = titleRef.current;
+    if (!title) return;
+    const check = () => {
+      if (title.clientWidth < Math.min(title.scrollWidth, MIN_TITLE_WIDTH)) setStacked(true);
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(title);
+    return () => observer.disconnect();
+  }, [inline, stacked]);
+
   return (
-    <li className="group flex items-center gap-2 py-2">
+    <li ref={rowRef} className="group flex items-center gap-2 py-2">
       <div
         className={cn(
           'flex min-w-0 flex-1 gap-x-2 gap-y-1',
           inline
             ? 'items-center'
-            : 'flex-col items-stretch @[480px]:flex-row @[480px]:flex-wrap @[480px]:items-center',
+            : stacked
+              ? 'flex-col items-stretch'
+              : 'flex-col items-stretch @[480px]:flex-row @[480px]:flex-wrap @[480px]:items-center',
         )}
       >
         <span
+          ref={titleRef}
           className={cn(
             'min-w-0 truncate text-sm transition-colors',
-            inline ? 'flex-1' : '@[480px]:flex-1',
+            inline ? 'flex-1' : !stacked && '@[480px]:flex-1',
             done ? 'text-foreground' : 'text-muted-foreground',
           )}
         >
@@ -337,10 +376,13 @@ export function HabitRow({
              controls and the bar they fill belong beside each other, not stacked. */
           <div
             className={cn(
-              'flex flex-wrap items-center gap-x-2 gap-y-1.5 @[480px]:flex-nowrap',
+              'flex flex-wrap items-center gap-x-2 gap-y-1.5',
               /* Given the room on a wide container, these take it. A stepper and a 40-unit bar in the
                  corner of a full-width card looked like an afterthought bolted to the name. */
-              habit.type === 'scale' ? '@[480px]:flex-[2]' : '@[480px]:flex-1 @[480px]:justify-end',
+              !stacked &&
+                (habit.type === 'scale'
+                  ? '@[480px]:flex-nowrap @[480px]:flex-[2]'
+                  : '@[480px]:flex-nowrap @[480px]:flex-1 @[480px]:justify-end'),
             )}
           >
             <HabitControl
@@ -350,7 +392,7 @@ export function HabitRow({
               onChange={onChange}
               readOnly={readOnly}
             />
-            <HabitProgress habit={habit} live={live} dateKey={dateKey} />
+            <HabitProgress habit={habit} live={live} dateKey={dateKey} stacked={stacked} />
           </div>
         )}
       </div>
