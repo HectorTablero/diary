@@ -1,7 +1,8 @@
 import type { EntryNode } from '@diary/shared';
-import { DEFAULT_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { DEFAULT_SUB_ENTRY_DEPTH, IMPORTANCE_LEVELS } from '@diary/shared';
 import {
   ChevronRight,
+  Copy,
   CornerDownRight,
   GitBranch,
   GripVertical,
@@ -12,27 +13,34 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDeleteEntry, useSettings, useThreadsEnabled } from '@/api/hooks';
+import { useDeleteEntry, useSettings, useThreadsEnabled, useUpdateEntry } from '@/api/hooks';
 import { VoiceSubEntryDialog } from '@/components/ai/VoiceSubEntryDialog';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
 import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
-import { EntryComposer } from '@/components/entry/EntryComposer';
+import { EditEntryDialog, EntryComposer } from '@/components/entry/EntryComposer';
 import { EntryContent } from '@/components/entry/EntryContent';
-import { ImportanceDot } from '@/components/entry/ImportanceDot';
+import { ImportanceDot, useImportanceMarkerClass } from '@/components/entry/ImportanceDot';
 import { useSortableTreeRow } from '@/components/tree/SortableTreeProvider';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { useEntityLinks } from '@/lib/entityLinks';
 import { entrySummary } from '@/lib/entryLabel';
-import { notifyError } from '@/lib/notify';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { notifyDeleted } from '@/lib/undo';
 import { usePreferences } from '@/lib/preferences';
 import { fuzzyEquals } from '@/lib/tokens';
@@ -79,6 +87,8 @@ export function EntryItem({
   const [threading, setThreading] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteEntry = useDeleteEntry();
+  const updateEntry = useUpdateEntry();
+  const markerClass = useImportanceMarkerClass();
   const row = useSortableTreeRow(entry.id);
 
   // Chips only for linked entities that are not already visible as tokens in the text.
@@ -103,6 +113,96 @@ export function EntryItem({
   const canAddSub = depth < maxDepth;
   const chipThreads = threadsOn ? entry.threads : [];
 
+  // Shared by the ⋯ button and the right-click menu, so the two can never drift apart. The
+  // right-click menu adds quick tweaks on top (`contextItems`) that would only clutter the ⋯ one.
+  const menuItems = (
+    <>
+      <DropdownMenuItem onClick={() => setEditing(true)}>
+        <Pencil className="size-3.5" /> {t('common.edit')}
+      </DropdownMenuItem>
+      {canAddSub && (
+        // Split row: typing and dictating produce the same thing, so the mic sits beside
+        // "Add sub-entry" rather than repeating the label on a line of its own. Both halves
+        // stay real menu items, so arrow-key navigation and close-on-select still work.
+        <div className="flex items-center">
+          {/* `grow`, not `flex-1`: flex-1 zeroes the basis, which makes this row's
+              max-content width — the thing the shrink-to-fit menu is measured against —
+              depend on scaled flex contributions rather than on the label itself. */}
+          <DropdownMenuItem className="min-w-0 grow" onClick={() => setAddingSub(true)}>
+            <CornerDownRight className="size-3.5" />
+            <span className="truncate">{t('diary.addSubEntry')}</span>
+          </DropdownMenuItem>
+          {voiceEnabled && (
+            <>
+              {/* The centring has to be written with the same `data-vertical:` variant the
+                  Separator sets `self-stretch` with. A bare `self-center` survives
+                  tailwind-merge as a *second* rule and then loses on specificity to the
+                  attribute selector — leaving align-self: stretch, which a definite `h-5`
+                  turns into flex-start, pinning the bar to the top of the row. */}
+              <Separator orientation="vertical" className="mx-1 h-5 data-vertical:self-center" />
+              <DropdownMenuItem
+                className="justify-center px-2 py-1.5"
+                onClick={() => setRecordingSub(true)}
+                aria-label={t('ai.recordSubEntries')}
+              >
+                <Mic className="size-3.5" />
+              </DropdownMenuItem>
+            </>
+          )}
+        </div>
+      )}
+      {threadsOn && (
+        <DropdownMenuItem onClick={() => setThreading(true)}>
+          <GitBranch className="size-3.5" /> {t('threads.addToThread')}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+        <Trash2 className="size-3.5" /> {t('common.delete')}
+      </DropdownMenuItem>
+    </>
+  );
+
+  const contextItems = (
+    <>
+      {menuItems}
+      <DropdownMenuSeparator />
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>
+          <span className={cn('size-2.5', markerClass(entry.importance))} />
+          {t('importance.label')}
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>
+          <DropdownMenuRadioGroup
+            value={String(entry.importance)}
+            onValueChange={(value) =>
+              updateEntry.mutate(
+                { id: entry.id, input: { importance: Number(value) } },
+                { onError: () => notifyError(t('errors.unknown')) },
+              )
+            }
+          >
+            {IMPORTANCE_LEVELS.map((level) => (
+              <DropdownMenuRadioItem key={level} value={String(level)}>
+                <span className={cn('size-2.5', markerClass(level))} />
+                {t(`importance.levels.${level}`)}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+      <DropdownMenuItem
+        onClick={() =>
+          void navigator.clipboard.writeText(entry.content).then(
+            () => notifySuccess(t('common.copied')),
+            () => notifyError(t('errors.unknown')),
+          )
+        }
+      >
+        <Copy className="size-3.5" /> {t('common.copyText')}
+      </DropdownMenuItem>
+    </>
+  );
+
   return (
     <div
       ref={row.setNodeRef}
@@ -113,138 +213,96 @@ export function EntryItem({
       // ever triggering on it, since pointer-events: none suppresses hover state entirely).
       className={flat ? 'pointer-events-none' : undefined}
     >
-      <div
-        className={cn(
-          'group flex items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/40',
-          // Indentation alone can't say *which* row at that depth the shadow would nest under
-          // when there are several — so highlight the actual projected parent directly.
-          row.isProjectedParent &&
-            (row.isProjectedParentInvalid
-              ? 'ring-2 ring-destructive/50 bg-destructive/5'
-              : 'ring-2 ring-primary/50 bg-primary/5'),
-        )}
-      >
-        <button
-          type="button"
-          {...row.dragHandleProps}
-          aria-label={t('diary.dragHandle')}
-          className="mt-1.5 flex size-4 shrink-0 touch-none items-center justify-center text-muted-foreground/60 hover:text-muted-foreground"
-        >
-          <GripVertical className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setExpanded((e) => !e)}
-          aria-label={t('diary.subEntries', { count: entry.children.length })}
+      <ContextMenu menu={contextItems}>
+        <div
           className={cn(
-            'mt-1.75 flex size-3.5 shrink-0 items-center justify-center text-muted-foreground transition-transform',
-            entry.children.length === 0 && 'invisible',
-            expanded && 'rotate-90',
+            'group flex items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/40',
+            // Indentation alone can't say *which* row at that depth the shadow would nest under
+            // when there are several — so highlight the actual projected parent directly.
+            row.isProjectedParent &&
+              (row.isProjectedParentInvalid
+                ? 'ring-2 ring-destructive/50 bg-destructive/5'
+                : 'ring-2 ring-primary/50 bg-primary/5'),
           )}
         >
-          <ChevronRight className="size-3.5" />
-        </button>
-        <ImportanceDot importance={entry.importance} className="mt-2" />
-        <div className="min-w-0 flex-1">
-          <EntryContent entry={entry} />
-          {(chipTags.length > 0 || chipPeople.length > 0 || chipThreads.length > 0) && (
-            <div className="mt-1 flex flex-wrap items-center gap-1">
-              {chipTags.map((tag) => (
-                <TagChip key={tag.id} tag={tag} to={tagTo(tag.id)} />
-              ))}
-              {/* Always shown, unlike tags and people: a thread is never a token in the text, so
+          <button
+            type="button"
+            {...row.dragHandleProps}
+            aria-label={t('diary.dragHandle')}
+            className="mt-1.5 flex size-4 shrink-0 touch-none items-center justify-center text-muted-foreground/60 hover:text-muted-foreground"
+          >
+            <GripVertical className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-label={t('diary.subEntries', { count: entry.children.length })}
+            className={cn(
+              'mt-1.75 flex size-3.5 shrink-0 items-center justify-center text-muted-foreground transition-transform',
+              entry.children.length === 0 && 'invisible',
+              expanded && 'rotate-90',
+            )}
+          >
+            <ChevronRight className="size-3.5" />
+          </button>
+          <ImportanceDot importance={entry.importance} className="mt-2" />
+          <div className="min-w-0 flex-1">
+            <EntryContent entry={entry} />
+            {(chipTags.length > 0 || chipPeople.length > 0 || chipThreads.length > 0) && (
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                {chipTags.map((tag) => (
+                  <TagChip key={tag.id} tag={tag} to={tagTo(tag.id)} />
+                ))}
+                {/* Always shown, unlike tags and people: a thread is never a token in the text, so
                   there's no inline copy for a chip to duplicate. */}
-              {chipThreads.map((thread) => (
-                <ThreadChip key={thread.id} thread={thread} />
-              ))}
-              {chipPeople.map((person) => (
-                <PersonChip key={person.id} person={person} to={personTo(person.id)} />
-              ))}
-            </div>
-          )}
-        </div>
-        {/* `has-[:focus-visible]` rather than `focus-within`: the grip handle is keyboard-focusable
+                {chipThreads.map((thread) => (
+                  <ThreadChip key={thread.id} thread={thread} />
+                ))}
+                {chipPeople.map((person) => (
+                  <PersonChip key={person.id} person={person} to={personTo(person.id)} />
+                ))}
+              </div>
+            )}
+          </div>
+          {/* `has-[:focus-visible]` rather than `focus-within`: the grip handle is keyboard-focusable
             now (it has to be, to start a move), and a plain mouse click focuses a button too — so
             focus-within would leave these buttons stuck open after every drag. :focus-visible is
             exactly the distinction wanted, keyboard focus and not pointer focus. */}
-        <div className="flex shrink-0 items-center gap-0.5 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-has-[:focus-visible]:opacity-100">
-          {canAddSub && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground"
-              onClick={() => setAddingSub(true)}
-              aria-label={t('diary.addSubEntry')}
-            >
-              <CornerDownRight className="size-3.5" />
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <div className="flex shrink-0 items-center gap-0.5 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-has-[:focus-visible]:opacity-100">
+            {canAddSub && (
               <Button
                 variant="ghost"
                 size="icon"
                 className="size-7 text-muted-foreground"
-                aria-label={t('diary.entryActions', { text: entrySummary(entry.content) })}
+                onClick={() => setAddingSub(true)}
+                aria-label={t('diary.addSubEntry')}
               >
-                <MoreHorizontal className="size-4" />
+                <CornerDownRight className="size-3.5" />
               </Button>
-            </DropdownMenuTrigger>
-            {/* `w-auto` rather than a fixed width: DropdownMenuContent otherwise sizes itself to
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground"
+                  aria-label={t('diary.entryActions', { text: entrySummary(entry.content) })}
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              {/* `w-auto` rather than a fixed width: DropdownMenuContent otherwise sizes itself to
                 the trigger, and a size-7 ⋯ button leaves only the 128px min-width — too tight for
                 the sub-entry label plus the mic beside it. Pinning a width instead would leave
                 dead space on the right whenever the mic isn't there to fill it, so let the menu
                 shrink-to-fit and be exactly as wide as whatever it's actually showing. */}
-            <DropdownMenuContent align="end" className="w-auto">
-              <DropdownMenuItem onClick={() => setEditing(true)}>
-                <Pencil className="size-3.5" /> {t('common.edit')}
-              </DropdownMenuItem>
-              {canAddSub && (
-                // Split row: typing and dictating produce the same thing, so the mic sits beside
-                // "Add sub-entry" rather than repeating the label on a line of its own. Both halves
-                // stay real menu items, so arrow-key navigation and close-on-select still work.
-                <div className="flex items-center">
-                  {/* `grow`, not `flex-1`: flex-1 zeroes the basis, which makes this row's
-                      max-content width — the thing the shrink-to-fit menu is measured against —
-                      depend on scaled flex contributions rather than on the label itself. */}
-                  <DropdownMenuItem className="min-w-0 grow" onClick={() => setAddingSub(true)}>
-                    <CornerDownRight className="size-3.5" />
-                    <span className="truncate">{t('diary.addSubEntry')}</span>
-                  </DropdownMenuItem>
-                  {voiceEnabled && (
-                    <>
-                      {/* The centring has to be written with the same `data-vertical:` variant the
-                          Separator sets `self-stretch` with. A bare `self-center` survives
-                          tailwind-merge as a *second* rule and then loses on specificity to the
-                          attribute selector — leaving align-self: stretch, which a definite `h-5`
-                          turns into flex-start, pinning the bar to the top of the row. */}
-                      <Separator
-                        orientation="vertical"
-                        className="mx-1 h-5 data-vertical:self-center"
-                      />
-                      <DropdownMenuItem
-                        className="justify-center px-2 py-1.5"
-                        onClick={() => setRecordingSub(true)}
-                        aria-label={t('ai.recordSubEntries')}
-                      >
-                        <Mic className="size-3.5" />
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </div>
-              )}
-              {threadsOn && (
-                <DropdownMenuItem onClick={() => setThreading(true)}>
-                  <GitBranch className="size-3.5" /> {t('threads.addToThread')}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-                <Trash2 className="size-3.5" /> {t('common.delete')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <DropdownMenuContent align="end" className="w-auto">
+                {menuItems}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
+      </ContextMenu>
 
       {!flat && expanded && entry.children.length > 0 && (
         <div className="ml-5 border-l border-border/70 pl-1.5">
@@ -272,22 +330,7 @@ export function EntryItem({
         />
       )}
 
-      <Dialog open={editing} onOpenChange={setEditing}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t('diary.editEntry')}</DialogTitle>
-          </DialogHeader>
-          {editing && (
-            <EntryComposer
-              dateKey={entry.dateKey}
-              entry={entry}
-              showDateInput={entry.parentId === null}
-              autoFocus
-              onDone={() => setEditing(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <EditEntryDialog entry={entry} open={editing} onOpenChange={setEditing} />
 
       <Dialog open={addingSub} onOpenChange={setAddingSub}>
         <DialogContent className="sm:max-w-lg">

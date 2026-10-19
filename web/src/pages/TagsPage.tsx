@@ -1,7 +1,8 @@
 import type { TagWithStats } from '@diary/shared';
-import { Pencil, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Search, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -9,12 +10,15 @@ import { Spinner } from '@/components/common/Spinner';
 import { BOTTOM_NAV_ONLY, SIDEBAR_ONLY, SIDEBAR_ONLY_SR } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { notifyDeleted } from '@/lib/undo';
+import { tagHref } from '@/lib/entityLinks';
 import { ApiError } from '@/lib/apiClient';
 import { LIST_TWO_COLUMN_MIN, splitColumns, useIsWideContainer } from '@/lib/useContainerWidth';
 import { cn } from '@/lib/utils';
@@ -125,37 +129,56 @@ function TagRow({
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   return (
-    <li className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
-      <span className="size-4 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">
-          <span className="text-muted-foreground">#</span>
-          {tag.name}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {t('tags.usage', { entries: tag.entryCount, people: tag.personCount })}
-        </p>
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-8 text-muted-foreground"
-        aria-label={t('tags.editTag')}
-        onClick={onEdit}
-      >
-        <Pencil className="size-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-8 text-muted-foreground hover:text-destructive"
-        aria-label={t('tags.deleteTag')}
-        onClick={onDelete}
-      >
-        <Trash2 className="size-4" />
-      </Button>
-    </li>
+    <ContextMenu
+      menu={
+        <>
+          {tag.entryCount > 0 && (
+            <DropdownMenuItem onClick={() => void navigate(tagHref(tag.id))}>
+              <Search className="size-3.5" /> {t('tags.showEntries')}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="size-3.5" /> {t('tags.editTag')}
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <Trash2 className="size-3.5" /> {t('tags.deleteTag')}
+          </DropdownMenuItem>
+        </>
+      }
+    >
+      <li className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
+        <span className="size-4 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">
+            <span className="text-muted-foreground">#</span>
+            {tag.name}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t('tags.usage', { entries: tag.entryCount, people: tag.personCount })}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground"
+          aria-label={t('tags.editTag')}
+          onClick={onEdit}
+        >
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground hover:text-destructive"
+          aria-label={t('tags.deleteTag')}
+          onClick={onDelete}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </li>
+    </ContextMenu>
   );
 }
 

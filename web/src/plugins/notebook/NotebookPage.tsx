@@ -22,6 +22,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { IconPickerDialog } from '@/components/icons/IconPickerDialog';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,10 +75,16 @@ export default function NotebookPage() {
      should land in the same mode, not snap back to source every time. Focus mode is the opposite:
      a screen-size affordance for the document just left, not a preference carried to the next one. */
   const [preview, setPreview] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [iconOpen, setIconOpen] = useState(false);
+  /* Which dialog is open, and the document it acts on: the open one from its header, or a child
+     row from its right-click menu. Kept apart so closing (`dialog` → null) leaves `target` in place
+     for the exit animation. */
+  const [dialog, setDialog] = useState<'history' | 'move' | 'icon' | 'delete' | null>(null);
+  const [target, setTarget] = useState<PluginDocumentDto | null>(null);
+  const openDialog = (kind: NonNullable<typeof dialog>, doc: PluginDocumentDto) => {
+    setTarget(doc);
+    setDialog(kind);
+  };
+  const closeDialog = (open: boolean) => !open && setDialog(null);
   const icons = useDocumentIcons();
   const currentIcon = current ? (icons.get(current.id) ?? null) : null;
   /** The document `onNew` just created, so its `TitleField` can mount already in edit mode. Cleared
@@ -112,18 +119,21 @@ export default function NotebookPage() {
     setNewDocId(created.id);
   }, [documentId, go, reload]);
 
-  const onDelete = useCallback(async () => {
-    if (!current) return;
-    const parentId = current.parentId;
-    const { deletion, count } = await deleteDocument(current.id);
-    /* An undo on the toast, like every other delete in this app — and this is the one that most
+  const onDelete = useCallback(
+    async (doc: PluginDocumentDto) => {
+      const { deletion, count } = await deleteDocument(doc.id);
+      /* An undo on the toast, like every other delete in this app — and this is the one that most
        needs it. An entry can be typed again from memory; a document is prose that existed nowhere
        else, and deleting a container takes everything under it in one press. */
-    notifyDeleted(t('plugins.notebook.deleted', { count }), deletion);
-    go(parentId);
-  }, [current, go, t]);
+      notifyDeleted(t('plugins.notebook.deleted', { count }), deletion);
+      if (doc.id === current?.id) go(doc.parentId);
+      else await reload();
+    },
+    [current, go, reload, t],
+  );
 
   const label = current ? documentLabel(current, t('plugins.notebook.untitled')) : '';
+  const targetLabel = target ? documentLabel(target, t('plugins.notebook.untitled')) : '';
 
   /* One lookup for every `[[id]]` in every row's preview, rather than one per row. */
   const referencedIds = useMemo(
@@ -157,7 +167,7 @@ export default function NotebookPage() {
                       somewhere to click to add one. */}
                   <button
                     type="button"
-                    onClick={() => setIconOpen(true)}
+                    onClick={() => openDialog('icon', current)}
                     aria-label={t('plugins.notebook.changeIcon')}
                     className={cn(
                       'shrink-0 rounded-md p-1 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',
@@ -210,9 +220,9 @@ export default function NotebookPage() {
                 {current && (
                   <DocumentMenu
                     onFocus={() => setFocus(true)}
-                    onHistory={() => setHistoryOpen(true)}
-                    onMove={() => setMoveOpen(true)}
-                    onDelete={() => setDeleteOpen(true)}
+                    onHistory={() => openDialog('history', current)}
+                    onMove={() => openDialog('move', current)}
+                    onDelete={() => openDialog('delete', current)}
                   />
                 )}
               </>
@@ -269,29 +279,53 @@ export default function NotebookPage() {
                 const preview = documentPreview(child.body, childLabel, documentLabels);
                 const childIcon = icons.get(child.id);
                 return (
-                  <li key={child.id}>
-                    <button
-                      type="button"
-                      onClick={() => go(child.id)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
-                    >
-                      {childIcon && (
-                        <DocumentIcon
-                          icon={childIcon}
+                  <ContextMenu
+                    key={child.id}
+                    menu={
+                      <>
+                        <DropdownMenuItem onSelect={() => go(child.id)}>
+                          <ChevronRight className="size-4" aria-hidden />
+                          {t('plugins.notebook.open')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openDialog('icon', child)}>
+                          <SmilePlus className="size-4" aria-hidden />
+                          {t('plugins.notebook.changeIcon')}
+                        </DropdownMenuItem>
+                        <DocumentActions
+                          onHistory={() => openDialog('history', child)}
+                          onMove={() => openDialog('move', child)}
+                          onDelete={() => openDialog('delete', child)}
+                        />
+                      </>
+                    }
+                  >
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => go(child.id)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
+                      >
+                        {childIcon && (
+                          <DocumentIcon
+                            icon={childIcon}
+                            className="size-4 shrink-0 text-muted-foreground"
+                          />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{childLabel}</span>
+                          {preview && (
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              {preview}
+                            </span>
+                          )}
+                        </span>
+                        <ChevronRight
+                          aria-hidden
                           className="size-4 shrink-0 text-muted-foreground"
                         />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{childLabel}</span>
-                        {preview && (
-                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                            {preview}
-                          </span>
-                        )}
-                      </span>
-                      <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                    </button>
-                  </li>
+                      </button>
+                    </li>
+                  </ContextMenu>
                 );
               })}
             </ul>
@@ -299,39 +333,34 @@ export default function NotebookPage() {
         </section>
       )}
 
-      {current && historyOpen && (
-        <HistoryDialog
-          documentId={current.id}
-          title={label}
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-        />
+      {target && dialog === 'history' && (
+        <HistoryDialog documentId={target.id} title={targetLabel} open onOpenChange={closeDialog} />
       )}
-      {current && moveOpen && (
+      {target && dialog === 'move' && (
         <MoveDialog
-          document={current}
-          open={moveOpen}
-          onOpenChange={setMoveOpen}
+          document={target}
+          open
+          onOpenChange={closeDialog}
           onMoved={() => void reload()}
         />
       )}
-      {current && (
+      {target && (
         <IconPickerDialog
-          open={iconOpen}
-          onOpenChange={setIconOpen}
-          title={t('plugins.notebook.iconFor', { name: label })}
-          value={currentIcon}
+          open={dialog === 'icon'}
+          onOpenChange={closeDialog}
+          title={t('plugins.notebook.iconFor', { name: targetLabel })}
+          value={icons.get(target.id) ?? null}
           emptyOption={{ label: t('iconPicker.none') }}
-          onChange={(icon) => void setDocumentIcon(current.id, icon)}
+          onChange={(icon) => void setDocumentIcon(target.id, icon)}
         />
       )}
-      {current && (
+      {target && (
         <ConfirmDialog
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
+          open={dialog === 'delete'}
+          onOpenChange={closeDialog}
           title={t('plugins.notebook.deleteTitle')}
-          description={t('plugins.notebook.deleteDescription', { name: label })}
-          onConfirm={() => void onDelete()}
+          description={t('plugins.notebook.deleteDescription', { name: targetLabel })}
+          onConfirm={() => void onDelete(target)}
         />
       )}
     </PageContainer>
@@ -411,20 +440,39 @@ function DocumentMenu({
           <Maximize2 className="size-4" aria-hidden />
           {t('plugins.notebook.focus')}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onHistory}>
-          <Clock className="size-4" aria-hidden />
-          {t('plugins.notebook.history')}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onMove}>
-          <FolderInput className="size-4" aria-hidden />
-          {t('plugins.notebook.move')}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-          <Trash2 className="size-4" aria-hidden />
-          {t('plugins.notebook.delete')}
-        </DropdownMenuItem>
+        <DocumentActions onHistory={onHistory} onMove={onMove} onDelete={onDelete} />
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** What can be done to any document, open or not: the header's ⋯ menu and a child row's
+    right-click menu both end with these. */
+function DocumentActions({
+  onHistory,
+  onMove,
+  onDelete,
+}: {
+  onHistory: () => void;
+  onMove: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <DropdownMenuItem onSelect={onHistory}>
+        <Clock className="size-4" aria-hidden />
+        {t('plugins.notebook.history')}
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={onMove}>
+        <FolderInput className="size-4" aria-hidden />
+        {t('plugins.notebook.move')}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+        <Trash2 className="size-4" aria-hidden />
+        {t('plugins.notebook.delete')}
+      </DropdownMenuItem>
+    </>
   );
 }

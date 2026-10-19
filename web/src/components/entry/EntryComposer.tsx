@@ -21,6 +21,7 @@ import { TokenTextarea } from '@/components/entry/TokenTextarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Spinner } from '@/components/common/Spinner';
 import { useSyncStatus } from '@/db/useSyncStatus';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -343,5 +344,36 @@ export function EntryComposer({
         </div>
       </div>
     </div>
+  );
+}
+
+/** The composer in a dialog, on an existing entry — wherever an entry is shown, not just its day. */
+export function EditEntryDialog({
+  entry,
+  open,
+  onOpenChange,
+}: {
+  entry: EntryDto;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t('diary.editEntry')}</DialogTitle>
+        </DialogHeader>
+        {open && (
+          <EntryComposer
+            dateKey={entry.dateKey}
+            entry={entry}
+            showDateInput={entry.parentId === null}
+            autoFocus
+            onDone={() => onOpenChange(false)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

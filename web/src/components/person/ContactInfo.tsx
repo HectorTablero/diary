@@ -3,6 +3,7 @@ import { Briefcase, Cake, Mail, MessageCircle, Phone, TriangleAlert } from 'luci
 import { useTranslation } from 'react-i18next';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { ageOn, daysUntilBirthday, formatBirthday } from '@/lib/birthday';
 import { isIncompletePhone, mailtoLink, telLink, whatsappLink } from '@/lib/phone';
 
@@ -107,5 +108,39 @@ export function ContactInfo({ person, onEdit }: { person: PersonDto; onEdit: () 
         </div>
       )}
     </div>
+  );
+}
+
+/** The same contact actions as menu items, for a person's right-click menu. Renders nothing when
+    there is no phone or email to act on. */
+export function ContactMenuItems({ person }: { person: Pick<PersonDto, 'phone' | 'email'> }) {
+  const { t } = useTranslation();
+  const whatsapp = whatsappLink(person.phone);
+  if (!person.phone && !person.email) return null;
+  return (
+    <>
+      {whatsapp && (
+        <DropdownMenuItem asChild>
+          <a href={whatsapp} target="_blank" rel="noreferrer">
+            <MessageCircle className="size-3.5" /> {t('people.whatsapp')}
+          </a>
+        </DropdownMenuItem>
+      )}
+      {person.phone && (
+        <DropdownMenuItem asChild>
+          <a href={telLink(person.phone)} target="_blank" rel="noreferrer">
+            <Phone className="size-3.5" /> {t('people.call')}
+          </a>
+        </DropdownMenuItem>
+      )}
+      {person.email && (
+        <DropdownMenuItem asChild>
+          <a href={mailtoLink(person.email)} target="_blank" rel="noreferrer">
+            <Mail className="size-3.5" /> {t('people.email')}
+          </a>
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuSeparator />
+    </>
   );
 }

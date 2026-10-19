@@ -3,6 +3,8 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import { FLOW_ICON, OFF_ICON } from './flowIcons';
@@ -101,22 +103,36 @@ export function PeriodDayWidget({ dateKey }: { dateKey: string }) {
       : 'off';
 
   return (
-    <Card
-      action={
-        isToday ? undefined : (
-          <DayLockButton locked={locked} onToggle={() => setUnlockedFor(locked ? dateKey : null)} />
-        )
+    <ContextMenu
+      disabled={!locked}
+      menu={
+        <DropdownMenuItem onClick={() => setUnlockedFor(dateKey)}>
+          <LockOpen className="size-3.5" /> {t('plugins.period-tracker.unlock')}
+        </DropdownMenuItem>
       }
     >
-      <div className="space-y-3">
-        {!day && outlook.kind !== 'none' && <OutlookText outlook={outlook} />}
-        <PeriodControl
-          value={selected}
-          onSelect={(choice) => void setFlow(choice === 'off' ? null : choice)}
-          disabled={locked}
-        />
+      <div>
+        <Card
+          action={
+            isToday ? undefined : (
+              <DayLockButton
+                locked={locked}
+                onToggle={() => setUnlockedFor(locked ? dateKey : null)}
+              />
+            )
+          }
+        >
+          <div className="space-y-3">
+            {!day && outlook.kind !== 'none' && <OutlookText outlook={outlook} />}
+            <PeriodControl
+              value={selected}
+              onSelect={(choice) => void setFlow(choice === 'off' ? null : choice)}
+              disabled={locked}
+            />
+          </div>
+        </Card>
       </div>
-    </Card>
+    </ContextMenu>
   );
 }
 

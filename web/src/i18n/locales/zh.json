@@ -88,7 +88,9 @@
     "selectDate": "选择日期",
     "hour": "小时",
     "minute": "分钟",
-    "skipToContent": "跳到主要内容"
+    "skipToContent": "跳到主要内容",
+    "copyText": "复制文本",
+    "copied": "已复制"
   },
   "importance": {
     "label": "重要程度",
@@ -321,6 +323,7 @@
     "addTag": "添加标签",
     "editTag": "编辑标签",
     "deleteTag": "删除标签",
+    "showEntries": "显示记录",
     "name": "名称",
     "namePlaceholder": "标签名称",
     "color": "颜色",
@@ -347,12 +350,14 @@
     "noThreadsDescription": "一个话题把同一件正在进行的事 — 一个项目、一次搬家、你的研究 — 的记录归在一起，这样就能一次性跟别人讲完。",
     "entriesCount": "{{count}} 条记录",
     "showEntries": "显示记录",
+    "hideEntries": "隐藏记录",
     "noEntries": "这个话题里还什么都没有。",
     "deleteConfirmTitle": "删除话题「{{name}}」？",
     "deleteConfirmDescription": "记录本身会保留，已经标记为说过的也不受影响 — 只是不再归在一起。",
     "threadSaved": "话题已保存",
     "threadDeleted": "话题已删除",
     "addToThread": "添加到话题",
+    "removeFromThread": "从话题中移除",
     "createThread": "新建话题「{{name}}」",
     "limitReached": "一条记录最多只能属于 {{count}} 个话题。",
     "toTell": "{{count}} 条待说",

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { todayKey } from '@/lib/dates';
@@ -103,99 +105,112 @@ export function HabitsDayWidget({ dateKey }: { dateKey: string }) {
   }
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-xs" aria-labelledby="habits-day-title">
-      <div className="flex items-center gap-2">
-        <CircleCheckBig className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <h2 id="habits-day-title" className="flex-1 text-sm font-medium">
-          {t('plugins.habits.title')}
-        </h2>
-        {!loading && active.length > 0 && (
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            {/* Goals reached, not habits touched — the same bar the streak is held to, and for the
+    // A locked day's only right-click answer is the way in. Rows defer to this while locked.
+    <ContextMenu
+      disabled={!locked || active.length === 0}
+      menu={
+        <DropdownMenuItem onClick={() => setUnlocked(true)}>
+          <LockOpen className="size-3.5" /> {t('plugins.habits.unlock')}
+        </DropdownMenuItem>
+      }
+    >
+      <section
+        className="rounded-xl border bg-card p-4 shadow-xs"
+        aria-labelledby="habits-day-title"
+      >
+        <div className="flex items-center gap-2">
+          <CircleCheckBig className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <h2 id="habits-day-title" className="flex-1 text-sm font-medium">
+            {t('plugins.habits.title')}
+          </h2>
+          {!loading && active.length > 0 && (
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+              {/* Goals reached, not habits touched — the same bar the streak is held to, and for the
                 same reason: 12 of 100 push-ups counted here would make 5/5 mean "I opened the app
                 five times". `metTarget` judges each against the goal in force on this day. */}
-            {t('plugins.habits.doneOf', {
-              done: active.filter((habit) => metTarget(habit, values[habit.id] ?? 0, dateKey))
-                .length,
-              total: active.length,
-            })}
-          </span>
-        )}
-        {!loading && !isToday && active.length > 0 && (
-          <DayLockButton
-            locked={locked}
-            past={dateKey < today}
-            onToggle={() => setUnlocked((current) => !current)}
-          />
-        )}
-      </div>
-
-      {loading ? (
-        <div className="mt-3 space-y-2">
-          <Skeleton className="h-7 w-full" />
-          <Skeleton className="h-7 w-2/3" />
-        </div>
-      ) : !hasAnyHabit ? (
-        <NoHabitsYet />
-      ) : (
-        <>
-          {active.length > 0 && (
-            /* A hairline between habits. The rows carry controls of very different heights — a row
-               of faces beside a checkbox — and without a rule they read as one drifting block. */
-            <ul className="mt-1 divide-y divide-border/60">
-              {active.map((habit) => (
-                <HabitRow
-                  key={habit.id}
-                  habit={habit}
-                  value={values[habit.id] ?? 0}
-                  dateKey={dateKey}
-                  streak={streakOf(habit)}
-                  reserveStreak={anyStreak}
-                  task={taskStates.get(habit.id)}
-                  onChange={(next) => setValue(habit.id, next)}
-                  readOnly={locked}
-                />
-              ))}
-            </ul>
+              {t('plugins.habits.doneOf', {
+                done: active.filter((habit) => metTarget(habit, values[habit.id] ?? 0, dateKey))
+                  .length,
+                total: active.length,
+              })}
+            </span>
           )}
+          {!loading && !isToday && active.length > 0 && (
+            <DayLockButton
+              locked={locked}
+              past={dateKey < today}
+              onToggle={() => setUnlocked((current) => !current)}
+            />
+          )}
+        </div>
 
-          {/* An empty list, explained. Two things it can mean, and they are not the same news:
+        {loading ? (
+          <div className="mt-3 space-y-2">
+            <Skeleton className="h-7 w-full" />
+            <Skeleton className="h-7 w-2/3" />
+          </div>
+        ) : !hasAnyHabit ? (
+          <NoHabitsYet />
+        ) : (
+          <>
+            {active.length > 0 && (
+              /* A hairline between habits. The rows carry controls of very different heights — a row
+               of faces beside a checkbox — and without a rule they read as one drifting block. */
+              <ul className="mt-1 divide-y divide-border/60">
+                {active.map((habit) => (
+                  <HabitRow
+                    key={habit.id}
+                    habit={habit}
+                    value={values[habit.id] ?? 0}
+                    dateKey={dateKey}
+                    streak={streakOf(habit)}
+                    reserveStreak={anyStreak}
+                    task={taskStates.get(habit.id)}
+                    onChange={(next) => setValue(habit.id, next)}
+                    readOnly={locked}
+                  />
+                ))}
+              </ul>
+            )}
+
+            {/* An empty list, explained. Two things it can mean, and they are not the same news:
               every habit is retired, or the habits are alive and none of them is asked on this
               particular day — a Sunday, for someone who only tracks weekdays. Saying "every habit
               is retired" there would be a plain falsehood about a diary that is working fine. The
               third way a list can be empty — a day before any habit existed — never reaches this
               render at all; see the early return above. */}
-          {active.length === 0 && archivedWithProgress.length === 0 && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {anyLiveHabitThatDay
-                ? t('plugins.habits.nothingScheduled')
-                : t('plugins.habits.allRetired')}
-            </p>
-          )}
+            {active.length === 0 && archivedWithProgress.length === 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {anyLiveHabitThatDay
+                  ? t('plugins.habits.nothingScheduled')
+                  : t('plugins.habits.allRetired')}
+              </p>
+            )}
 
-          {/* Archived habits that *were* recorded on this day. Read-only: the day is a record, and
+            {/* Archived habits that *were* recorded on this day. Read-only: the day is a record, and
               an archived habit is not being asked about any more. In the same disclosure the diary
               uses for hidden sub-entries, because it is the same kind of thing — context. */}
-          <HiddenSection
-            count={archivedWithProgress.length}
-            showLabel={t('plugins.habits.retiredOnDay', { count: archivedWithProgress.length })}
-            hideLabel={t('plugins.habits.hideRetired')}
-          >
-            <ul className="divide-y divide-border/60">
-              {archivedWithProgress.map((habit) => (
-                <HabitRow
-                  key={habit.id}
-                  habit={habit}
-                  value={values[habit.id] ?? 0}
-                  dateKey={dateKey}
-                  readOnly
-                />
-              ))}
-            </ul>
-          </HiddenSection>
-        </>
-      )}
-    </section>
+            <HiddenSection
+              count={archivedWithProgress.length}
+              showLabel={t('plugins.habits.retiredOnDay', { count: archivedWithProgress.length })}
+              hideLabel={t('plugins.habits.hideRetired')}
+            >
+              <ul className="divide-y divide-border/60">
+                {archivedWithProgress.map((habit) => (
+                  <HabitRow
+                    key={habit.id}
+                    habit={habit}
+                    value={values[habit.id] ?? 0}
+                    dateKey={dateKey}
+                    readOnly
+                  />
+                ))}
+              </ul>
+            </HiddenSection>
+          </>
+        )}
+      </section>
+    </ContextMenu>
   );
 }
 
@@ -333,58 +348,47 @@ export function HabitRow({
   }, [inline, stacked]);
 
   return (
-    <li ref={rowRef} className="group flex items-center gap-2 py-2">
-      <div
-        className={cn(
-          'flex min-w-0 flex-1 gap-x-2 gap-y-1',
-          inline
-            ? 'items-center'
-            : stacked
-              ? 'flex-col items-stretch'
-              : 'flex-col items-stretch @[480px]:flex-row @[480px]:flex-wrap @[480px]:items-center',
-        )}
-      >
-        <span
-          ref={titleRef}
+    // Right-click only, and only once something is logged: the ✕ beside the row, without the aiming.
+    <ContextMenu
+      disabled={readOnly || !onChange || !done}
+      menu={
+        <>
+          {done && (
+            <DropdownMenuItem onClick={clear}>
+              <X className="size-3.5" /> {t('common.clear')}
+            </DropdownMenuItem>
+          )}
+        </>
+      }
+    >
+      <li ref={rowRef} className="group flex items-center gap-2 py-2">
+        <div
           className={cn(
-            'min-w-0 truncate text-sm transition-colors',
-            inline ? 'flex-1' : !stacked && '@[480px]:flex-1',
-            done ? 'text-foreground' : 'text-muted-foreground',
+            'flex min-w-0 flex-1 gap-x-2 gap-y-1',
+            inline
+              ? 'items-center'
+              : stacked
+                ? 'flex-col items-stretch'
+                : 'flex-col items-stretch @[480px]:flex-row @[480px]:flex-wrap @[480px]:items-center',
           )}
         >
-          {habit.name}
-        </span>
-
-        {/* Kept even once the task has been ticked today: `task` is derived from settled history
-            and does not move while the row is being used, so the pill does not blink out from
-            under the finger that just pressed the button beside it. */}
-        {task?.overdue && <OverdueBadge since={task.dueOn} />}
-
-        {inline ? (
-          <HabitControl
-            habit={habit}
-            live={live}
-            dateKey={dateKey}
-            onChange={onChange}
-            readOnly={readOnly}
-          />
-        ) : (
-          /* Wraps rather than squeezes. A stopwatch is three buttons and a duration, and on a narrow
-             screen or sidebar container it and the bar simply do not share a line — so the bar drops to a row of its own
-             (and takes the whole width of it) instead of both being compressed into illegibility.
-             `@[480px]:flex-nowrap` retires that concession the moment there is room: on a wide container the
-             controls and the bar they fill belong beside each other, not stacked. */
-          <div
+          <span
+            ref={titleRef}
             className={cn(
-              'flex flex-wrap items-center gap-x-2 gap-y-1.5',
-              /* Given the room on a wide container, these take it. A stepper and a 40-unit bar in the
-                 corner of a full-width card looked like an afterthought bolted to the name. */
-              !stacked &&
-                (habit.type === 'scale'
-                  ? '@[480px]:flex-nowrap @[480px]:flex-[2]'
-                  : '@[480px]:flex-nowrap @[480px]:flex-1 @[480px]:justify-end'),
+              'min-w-0 truncate text-sm transition-colors',
+              inline ? 'flex-1' : !stacked && '@[480px]:flex-1',
+              done ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
+            {habit.name}
+          </span>
+
+          {/* Kept even once the task has been ticked today: `task` is derived from settled history
+            and does not move while the row is being used, so the pill does not blink out from
+            under the finger that just pressed the button beside it. */}
+          {task?.overdue && <OverdueBadge since={task.dueOn} />}
+
+          {inline ? (
             <HabitControl
               habit={habit}
               live={live}
@@ -392,40 +396,65 @@ export function HabitRow({
               onChange={onChange}
               readOnly={readOnly}
             />
-            <HabitProgress habit={habit} live={live} dateKey={dateKey} stacked={stacked} />
-          </div>
-        )}
-      </div>
+          ) : (
+            /* Wraps rather than squeezes. A stopwatch is three buttons and a duration, and on a narrow
+             screen or sidebar container it and the bar simply do not share a line — so the bar drops to a row of its own
+             (and takes the whole width of it) instead of both being compressed into illegibility.
+             `@[480px]:flex-nowrap` retires that concession the moment there is room: on a wide container the
+             controls and the bar they fill belong beside each other, not stacked. */
+            <div
+              className={cn(
+                'flex flex-wrap items-center gap-x-2 gap-y-1.5',
+                /* Given the room on a wide container, these take it. A stepper and a 40-unit bar in the
+                 corner of a full-width card looked like an afterthought bolted to the name. */
+                !stacked &&
+                  (habit.type === 'scale'
+                    ? '@[480px]:flex-nowrap @[480px]:flex-[2]'
+                    : '@[480px]:flex-nowrap @[480px]:flex-1 @[480px]:justify-end'),
+              )}
+            >
+              <HabitControl
+                habit={habit}
+                live={live}
+                dateKey={dateKey}
+                onChange={onChange}
+                readOnly={readOnly}
+              />
+              <HabitProgress habit={habit} live={live} dateKey={dateKey} stacked={stacked} />
+            </div>
+          )}
+        </div>
 
-      {/* The right rail: fixed width, pinned to the edge and centred against however tall the rest
+        {/* The right rail: fixed width, pinned to the edge and centred against however tall the rest
           of the row has become. It is the same two slots on every row, so the eye can run down it. */}
-      <div className="flex shrink-0 items-center gap-0.5 self-center">
-        {reserveStreak && (
-          <span className="flex w-10 justify-end">
-            <StreakBadge
-              streak={streak}
-              completed={completed}
-              everyDay={scheduleAt(habit, dateKey).kind === 'daily'}
-            />
-          </span>
-        )}
-        {!readOnly && done ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            /* Hidden until hover on a pointer device, always reachable by keyboard. On touch there
+        <div className="flex shrink-0 items-center gap-0.5 self-center">
+          {reserveStreak && (
+            <span className="flex w-10 justify-end">
+              <StreakBadge
+                streak={streak}
+                completed={completed}
+                everyDay={scheduleAt(habit, dateKey).kind === 'daily'}
+              />
+            </span>
+          )}
+          {!readOnly && done ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              /* Hidden until hover on a pointer device, always reachable by keyboard. On touch there
                is no hover, so it stays visible there. */
-            className="size-7 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100"
-            aria-label={t('plugins.habits.clear', { name: habit.name })}
-            onClick={clear}
-          >
-            <X className="size-3.5" />
-          </Button>
-        ) : (
-          <span className="size-7" aria-hidden />
-        )}
-      </div>
-    </li>
+              className="size-7 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+              aria-label={t('plugins.habits.clear', { name: habit.name })}
+              onClick={clear}
+            >
+              <X className="size-3.5" />
+            </Button>
+          ) : (
+            <span className="size-7" aria-hidden />
+          )}
+        </div>
+      </li>
+    </ContextMenu>
   );
 }
 

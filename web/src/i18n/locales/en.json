@@ -97,7 +97,9 @@
     "selectDate": "Select a date",
     "hour": "Hour",
     "minute": "Minute",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "copyText": "Copy text",
+    "copied": "Copied"
   },
   "importance": {
     "label": "Importance",
@@ -349,6 +351,7 @@
     "addTag": "Add tag",
     "editTag": "Edit tag",
     "deleteTag": "Delete tag",
+    "showEntries": "Show entries",
     "name": "Name",
     "namePlaceholder": "Tag name",
     "color": "Color",
@@ -377,12 +380,14 @@
     "entriesCount": "{{count}} entry",
     "entriesCount_other": "{{count}} entries",
     "showEntries": "Show entries",
+    "hideEntries": "Hide entries",
     "noEntries": "Nothing in this thread yet.",
     "deleteConfirmTitle": "Delete thread \"{{name}}\"?",
     "deleteConfirmDescription": "The entries themselves are kept, along with everything already marked as said — they just stop being grouped.",
     "threadSaved": "Thread saved",
     "threadDeleted": "Thread deleted",
     "addToThread": "Add to thread",
+    "removeFromThread": "Remove from thread",
     "createThread": "Create thread \"{{name}}\"",
     "limitReached": "An entry can belong to at most {{count}} threads.",
     "toTell": "{{count}} to tell",

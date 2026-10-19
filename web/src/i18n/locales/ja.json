@@ -90,7 +90,9 @@
     "selectDate": "日付を選択",
     "hour": "時",
     "minute": "分",
-    "skipToContent": "本文へスキップ"
+    "skipToContent": "本文へスキップ",
+    "copyText": "テキストをコピー",
+    "copied": "コピーしました"
   },
   "importance": {
     "label": "重要度",
@@ -327,6 +329,7 @@
     "addTag": "タグを追加",
     "editTag": "タグを編集",
     "deleteTag": "タグを削除",
+    "showEntries": "記録を表示",
     "name": "名前",
     "namePlaceholder": "タグの名前",
     "color": "色",
@@ -353,12 +356,14 @@
     "noThreadsDescription": "スレッドは、進行中のひとつの話題 — 仕事のプロジェクト、引っ越し、研究など — についての記録をまとめます。相手にまとめて一度で伝えられます。",
     "entriesCount": "記録{{count}}件",
     "showEntries": "記録を表示",
+    "hideEntries": "記録を隠す",
     "noEntries": "このスレッドにはまだ何もありません。",
     "deleteConfirmTitle": "スレッド「{{name}}」を削除しますか？",
     "deleteConfirmDescription": "記録そのものは残り、「話した」の記録もそのままです。まとまりがなくなるだけです。",
     "threadSaved": "スレッドを保存しました",
     "threadDeleted": "スレッドを削除しました",
     "addToThread": "スレッドに追加",
+    "removeFromThread": "スレッドから外す",
     "createThread": "スレッド「{{name}}」を作成",
     "limitReached": "ひとつの記録が入れるスレッドは最大{{count}}件です。",
     "toTell": "未報告{{count}}件",

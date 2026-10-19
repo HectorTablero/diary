@@ -91,7 +91,9 @@
     "selectDate": "Scegli una data",
     "hour": "Ora",
     "minute": "Minuto",
-    "skipToContent": "Vai al contenuto"
+    "skipToContent": "Vai al contenuto",
+    "copyText": "Copia testo",
+    "copied": "Copiato"
   },
   "importance": {
     "label": "Importanza",
@@ -343,6 +345,7 @@
     "addTag": "Aggiungi etichetta",
     "editTag": "Modifica etichetta",
     "deleteTag": "Elimina etichetta",
+    "showEntries": "Mostra le voci",
     "name": "Nome",
     "namePlaceholder": "Nome dell'etichetta",
     "color": "Colore",
@@ -371,12 +374,14 @@
     "entriesCount": "{{count}} voce",
     "entriesCount_other": "{{count}} voci",
     "showEntries": "Mostra le voci",
+    "hideEntries": "Nascondi le voci",
     "noEntries": "In questo filone non c'è ancora niente.",
     "deleteConfirmTitle": "Eliminare il filone «{{name}}»?",
     "deleteConfirmDescription": "Le voci restano, e resta anche tutto ciò che è già segnato come detto — semplicemente non saranno più raggruppate.",
     "threadSaved": "Filone salvato",
     "threadDeleted": "Filone eliminato",
     "addToThread": "Aggiungi a un filone",
+    "removeFromThread": "Rimuovi dal filone",
     "createThread": "Crea il filone «{{name}}»",
     "limitReached": "Una voce può appartenere al massimo a {{count}} filoni.",
     "toTell": "{{count}} da raccontare",

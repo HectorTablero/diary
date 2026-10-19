@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/common/EmptyState';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -316,140 +318,166 @@ function HabitCard({
   const [charting, setCharting] = useState(false);
 
   return (
-    <section
-      className={cn('rounded-xl border bg-card p-4 shadow-xs', archived && 'border-dashed')}
-      aria-labelledby={`habit-${habit.id}-name`}
+    <ContextMenu
+      menu={
+        <>
+          <DropdownMenuItem onClick={() => setCharting(true)}>
+            <ChartColumn className="size-3.5" /> {t('plugins.habits.chart')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="size-3.5" /> {t('common.edit')}
+          </DropdownMenuItem>
+          {archived ? (
+            <DropdownMenuItem onClick={() => void library.setArchived(habit, false)}>
+              <RotateCcw className="size-3.5" /> {t('plugins.habits.restore')}
+            </DropdownMenuItem>
+          ) : deletable ? (
+            <DropdownMenuItem variant="destructive" onClick={() => void library.deleteHabit(habit)}>
+              <Trash2 className="size-3.5" /> {t('common.delete')}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={() => void library.setArchived(habit, true)}>
+              <Archive className="size-3.5" /> {t('plugins.habits.retire')}
+            </DropdownMenuItem>
+          )}
+        </>
+      }
     >
-      <div className="flex items-start gap-2">
-        <span
-          className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-          aria-hidden
-        >
-          <KindIcon kind={habit.type} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 id={`habit-${habit.id}-name`} className="truncate text-sm font-medium">
-            {habit.name}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            {habitSummary(habit, t)}
-            {scheduleNoted && ` · ${describeSchedule(schedule, t, i18n.language, weekStart)}`}
-            {' · '}
-            {t('plugins.habits.recordedDays', { count: recorded })}
-          </p>
-        </div>
-        <StreakBadge
-          streak={library.streaks.get(habit.id) ?? 0}
-          completed={todayCompleted}
-          everyDay={!scheduleNoted}
-        />
-      </div>
-
-      {/* Oldest on the left. Each cell carries its own label, because a row of coloured squares
-          says nothing at all to a screen reader. */}
-      <ol
-        className="mt-3 flex gap-1"
-        aria-label={t('plugins.habits.lastDays', { count: GRID_DAYS })}
+      <section
+        className={cn('rounded-xl border bg-card p-4 shadow-xs', archived && 'border-dashed')}
+        aria-labelledby={`habit-${habit.id}-name`}
       >
-        {days.map((day) => {
-          const value = library.history.get(day)?.[habit.id] ?? 0;
-          const filled = value > 0;
-          const met = metTarget(habit, value, day);
-          /* A day the habit was never asked on is drawn fainter than an empty one, and read out as
+        <div className="flex items-start gap-2">
+          <span
+            className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+            aria-hidden
+          >
+            <KindIcon kind={habit.type} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id={`habit-${habit.id}-name`} className="truncate text-sm font-medium">
+              {habit.name}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {habitSummary(habit, t)}
+              {scheduleNoted && ` · ${describeSchedule(schedule, t, i18n.language, weekStart)}`}
+              {' · '}
+              {t('plugins.habits.recordedDays', { count: recorded })}
+            </p>
+          </div>
+          <StreakBadge
+            streak={library.streaks.get(habit.id) ?? 0}
+            completed={todayCompleted}
+            everyDay={!scheduleNoted}
+          />
+        </div>
+
+        {/* Oldest on the left. Each cell carries its own label, because a row of coloured squares
+          says nothing at all to a screen reader. */}
+        <ol
+          className="mt-3 flex gap-1"
+          aria-label={t('plugins.habits.lastDays', { count: GRID_DAYS })}
+        >
+          {days.map((day) => {
+            const value = library.history.get(day)?.[habit.id] ?? 0;
+            const filled = value > 0;
+            const met = metTarget(habit, value, day);
+            /* A day the habit was never asked on is drawn fainter than an empty one, and read out as
              such. Without the distinction a Mon/Wed/Fri habit looks like a habit failed four days
              a week — the grid would be showing the calendar's shape rather than the person's. */
-          const asked = habitOccursOn(habit, day);
-          return (
-            <li
-              key={day}
-              className={cn(
-                'h-7 flex-1 rounded-sm transition-colors',
-                !filled && (asked ? 'bg-muted' : 'bg-muted/40'),
-                filled && met && 'bg-primary',
-                filled && !met && 'bg-primary/40',
-              )}
-            >
-              <span className="sr-only">
-                {formatDateKey(day, i18n.language)} —{' '}
-                {filled
-                  ? isCheckbox(habit.type)
-                    ? t('plugins.habits.done')
-                    : formatHabitValue(habit, value, day)
-                  : asked
-                    ? t('plugins.habits.notDone')
-                    : t('plugins.habits.notScheduled')}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+            const asked = habitOccursOn(habit, day);
+            return (
+              <li
+                key={day}
+                className={cn(
+                  'h-7 flex-1 rounded-sm transition-colors',
+                  !filled && (asked ? 'bg-muted' : 'bg-muted/40'),
+                  filled && met && 'bg-primary',
+                  filled && !met && 'bg-primary/40',
+                )}
+              >
+                <span className="sr-only">
+                  {formatDateKey(day, i18n.language)} —{' '}
+                  {filled
+                    ? isCheckbox(habit.type)
+                      ? t('plugins.habits.done')
+                      : formatHabitValue(habit, value, day)
+                    : asked
+                      ? t('plugins.habits.notDone')
+                      : t('plugins.habits.notScheduled')}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
 
-      <HabitChanges habit={habit} />
+        <HabitChanges habit={habit} />
 
-      {/* Mounted only while open: the chart walks the habit's whole life. */}
-      <Dialog open={charting} onOpenChange={setCharting}>
-        {charting && (
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{habit.name}</DialogTitle>
-            </DialogHeader>
-            <HabitChart habit={habit} history={library.history} today={today} />
-          </DialogContent>
-        )}
-      </Dialog>
+        {/* Mounted only while open: the chart walks the habit's whole life. */}
+        <Dialog open={charting} onOpenChange={setCharting}>
+          {charting && (
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{habit.name}</DialogTitle>
+              </DialogHeader>
+              <HabitChart habit={habit} history={library.history} today={today} />
+            </DialogContent>
+          )}
+        </Dialog>
 
-      <div className="mt-3 flex flex-wrap justify-end gap-1.5 border-t pt-2.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
-          onClick={() => setCharting(true)}
-        >
-          <ChartColumn className="size-3" />
-          {t('plugins.habits.chart')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
-          onClick={onEdit}
-        >
-          <Pencil className="size-3" />
-          {t('common.edit')}
-        </Button>
-        {archived ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs"
-            onClick={() => void library.setArchived(habit, false)}
-          >
-            <RotateCcw className="size-3" />
-            {t('plugins.habits.restore')}
-          </Button>
-        ) : deletable ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs text-destructive"
-            onClick={() => void library.deleteHabit(habit)}
-          >
-            <Trash2 className="size-3" />
-            {t('common.delete')}
-          </Button>
-        ) : (
+        <div className="mt-3 flex flex-wrap justify-end gap-1.5 border-t pt-2.5">
           <Button
             variant="ghost"
             size="sm"
             className="h-7 gap-1 px-2 text-xs text-muted-foreground"
-            onClick={() => void library.setArchived(habit, true)}
+            onClick={() => setCharting(true)}
           >
-            <Archive className="size-3" />
-            {t('plugins.habits.retire')}
+            <ChartColumn className="size-3" />
+            {t('plugins.habits.chart')}
           </Button>
-        )}
-      </div>
-    </section>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+            onClick={onEdit}
+          >
+            <Pencil className="size-3" />
+            {t('common.edit')}
+          </Button>
+          {archived ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => void library.setArchived(habit, false)}
+            >
+              <RotateCcw className="size-3" />
+              {t('plugins.habits.restore')}
+            </Button>
+          ) : deletable ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs text-destructive"
+              onClick={() => void library.deleteHabit(habit)}
+            >
+              <Trash2 className="size-3" />
+              {t('common.delete')}
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+              onClick={() => void library.setArchived(habit, true)}
+            >
+              <Archive className="size-3" />
+              {t('plugins.habits.retire')}
+            </Button>
+          )}
+        </div>
+      </section>
+    </ContextMenu>
   );
 }
 

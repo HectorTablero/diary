@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto';
 import { UNDATED_KEY } from '@diary/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { loadIconCatalog } from '@/components/icons/iconCatalog';
 import { db } from '@/db/db';
 import { createPluginRecord, getUndatedRecords } from '@/db/pluginRecords';
 import i18n from '@/i18n';
@@ -39,6 +40,12 @@ beforeEach(async () => {
 });
 
 describe('CategoriesDialog', () => {
+  /* The icon catalog's first import in a worker costs ~5 s (see IconPickerDialog.test.tsx), which
+     used to land inside the icon test's lookup and fail it whenever the run was busy. Paid up front. */
+  beforeAll(async () => {
+    await Promise.all([loadIconCatalog(), import('@/components/icons/iconSearch')]);
+  }, 60_000);
+
   it('deletes an unused custom category, with an undo', async () => {
     const user = userEvent.setup();
     await custom('Pets');

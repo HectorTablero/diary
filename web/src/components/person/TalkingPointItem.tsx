@@ -18,6 +18,7 @@ import { EntryRow } from '@/components/person/EntryRow';
 import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,79 +98,98 @@ export function TalkingPointItem({
     );
   };
 
+  const menuItems = (
+    <>
+      {/* Right where you notice this is one of several entries about the same topic. */}
+      {threadsOn && (
+        <DropdownMenuItem onClick={() => setThreading(true)}>
+          <GitBranch className="size-3.5" />
+          {t('threads.addToThread')}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem onClick={hide}>
+        <EyeOff className="size-3.5" />
+        {t('people.hideForPerson', { name: personName })}
+      </DropdownMenuItem>
+    </>
+  );
+
   return (
     <li>
-      {/* `pr-2` is not decoration: this card had no right padding at all, which was survivable
+      {/* The right-click menu also carries "Mark as said", which the ⋯ menu leaves to the button
+          beside it. */}
+      <ContextMenu
+        disabled={!isMatch}
+        menu={
+          <>
+            <DropdownMenuItem onClick={markSaid}>
+              <Check className="size-3.5" />
+              {t('people.markSaid')}
+            </DropdownMenuItem>
+            {menuItems}
+          </>
+        }
+      >
+        {/* `pr-2` is not decoration: this card had no right padding at all, which was survivable
           while the actions were a flex sibling but leaves the floated cluster sitting flush on the
           rounded border. Less than the `pl-3` on the other side because the trailing ⋯ button is a
           ghost icon that already carries its own optical padding. */}
-      <div
-        className={cn(
-          'rounded-xl py-1.5 pr-2 pl-3',
-          isMatch ? 'border bg-card shadow-xs' : 'opacity-70',
-        )}
-      >
-        <EntryRow entry={node} showChips={false} showDate={depth === 0}>
-          {isMatch && (
-            // No wrapper of its own — EntryRow floats these and already lays them out in a row.
-            <>
-              <Badge
-                variant="outline"
-                className="hidden gap-1 text-[11px] text-muted-foreground sm:inline-flex"
-              >
-                {node.matchType === 'mention' ? (
-                  <AtSign className="size-3" />
-                ) : node.matchType === 'tag' ? (
-                  <TagIcon className="size-3" />
-                ) : (
-                  <Megaphone className="size-3" />
-                )}
-                {t(
-                  node.matchType === 'mention'
-                    ? 'people.matchMention'
-                    : node.matchType === 'tag'
-                      ? 'people.matchTag'
-                      : 'people.matchBroadcast',
-                )}
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1 px-2 text-xs mt-1.5"
-                onClick={markSaid}
-              >
-                <Check className="size-3.5" />
-                {t('people.markSaid')}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 text-muted-foreground mt-1.5"
-                    aria-label={t('diary.entryActions', { text: entrySummary(node.content) })}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {/* Right where you notice this is one of several entries about the same topic. */}
-                  {threadsOn && (
-                    <DropdownMenuItem onClick={() => setThreading(true)}>
-                      <GitBranch className="size-3.5" />
-                      {t('threads.addToThread')}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={hide}>
-                    <EyeOff className="size-3.5" />
-                    {t('people.hideForPerson', { name: personName })}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
+        <div
+          className={cn(
+            'rounded-xl py-1.5 pr-2 pl-3',
+            isMatch ? 'border bg-card shadow-xs' : 'opacity-70',
           )}
-        </EntryRow>
-      </div>
+        >
+          <EntryRow entry={node} showChips={false} showDate={depth === 0}>
+            {isMatch && (
+              // No wrapper of its own — EntryRow floats these and already lays them out in a row.
+              <>
+                <Badge
+                  variant="outline"
+                  className="hidden gap-1 text-[11px] text-muted-foreground sm:inline-flex"
+                >
+                  {node.matchType === 'mention' ? (
+                    <AtSign className="size-3" />
+                  ) : node.matchType === 'tag' ? (
+                    <TagIcon className="size-3" />
+                  ) : (
+                    <Megaphone className="size-3" />
+                  )}
+                  {t(
+                    node.matchType === 'mention'
+                      ? 'people.matchMention'
+                      : node.matchType === 'tag'
+                        ? 'people.matchTag'
+                        : 'people.matchBroadcast',
+                  )}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs mt-1.5"
+                  onClick={markSaid}
+                >
+                  <Check className="size-3.5" />
+                  {t('people.markSaid')}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-foreground mt-1.5"
+                      aria-label={t('diary.entryActions', { text: entrySummary(node.content) })}
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+          </EntryRow>
+        </div>
+      </ContextMenu>
 
       <AddToThreadDialog entry={node} open={threading} onOpenChange={setThreading} />
 

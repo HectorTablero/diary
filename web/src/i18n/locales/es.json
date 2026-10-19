@@ -95,7 +95,9 @@
     "selectDate": "Elegir fecha",
     "hour": "Hora",
     "minute": "Minuto",
-    "skipToContent": "Saltar al contenido"
+    "skipToContent": "Saltar al contenido",
+    "copyText": "Copiar texto",
+    "copied": "Copiado"
   },
   "importance": {
     "label": "Importancia",
@@ -344,6 +346,7 @@
     "addTag": "Añadir etiqueta",
     "editTag": "Editar etiqueta",
     "deleteTag": "Eliminar etiqueta",
+    "showEntries": "Ver entradas",
     "name": "Nombre",
     "namePlaceholder": "Nombre de la etiqueta",
     "color": "Color",
@@ -372,12 +375,14 @@
     "entriesCount": "{{count}} entrada",
     "entriesCount_other": "{{count}} entradas",
     "showEntries": "Ver entradas",
+    "hideEntries": "Ocultar entradas",
     "noEntries": "Todavía no hay nada en este hilo.",
     "deleteConfirmTitle": "¿Eliminar el hilo «{{name}}»?",
     "deleteConfirmDescription": "Las entradas se conservan, y también todo lo que ya esté marcado como contado — solo dejan de estar agrupadas.",
     "threadSaved": "Hilo guardado",
     "threadDeleted": "Hilo eliminado",
     "addToThread": "Añadir a un hilo",
+    "removeFromThread": "Quitar del hilo",
     "createThread": "Crear hilo «{{name}}»",
     "limitReached": "Una entrada puede pertenecer como máximo a {{count}} hilos.",
     "toTell": "{{count}} por contar",

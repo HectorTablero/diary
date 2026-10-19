@@ -11,6 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { DocumentIcon } from './DocumentIcon';
+import { useDocumentIcons } from './icons';
 import { canMoveUnder, documentLabel, ROOT_ID, sortDocuments } from './model';
 import { moveDocument, useAllDocuments } from './useNotebook';
 
@@ -40,6 +42,7 @@ export function MoveDialog({
 }) {
   const { t } = useTranslation();
   const documents = useAllDocuments();
+  const icons = useDocumentIcons();
   const [target, setTarget] = useState<string>(document.parentId);
 
   const byId = useMemo(() => new Map(documents.map((doc) => [doc.id, doc])), [documents]);
@@ -95,6 +98,7 @@ export function MoveDialog({
             <Option
               key={doc.id}
               label={documentLabel(doc, t('plugins.notebook.untitled'))}
+              icon={icons.get(doc.id)}
               depth={depth + 1}
               selected={target === doc.id}
               disabled={!canMoveUnder(document.id, doc.id, documents, byId)}
@@ -118,12 +122,14 @@ export function MoveDialog({
 
 function Option({
   label,
+  icon,
   depth,
   selected,
   disabled,
   onSelect,
 }: {
   label: string;
+  icon?: string;
   depth: number;
   selected: boolean;
   disabled: boolean;
@@ -139,12 +145,13 @@ function Option({
         onClick={onSelect}
         style={{ paddingInlineStart: `${0.75 + depth * 1}rem` }}
         className={cn(
-          'w-full truncate rounded-md py-2 pe-3 text-start text-sm transition-colors',
+          'flex w-full items-center gap-2 rounded-md py-2 pe-3 text-start text-sm transition-colors',
           selected && 'bg-accent text-accent-foreground',
           disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-muted',
         )}
       >
-        {label}
+        {icon && <DocumentIcon icon={icon} className="size-4 shrink-0 text-muted-foreground" />}
+        <span className="min-w-0 truncate">{label}</span>
       </button>
     </li>
   );

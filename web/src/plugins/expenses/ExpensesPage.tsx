@@ -461,6 +461,7 @@ export default function ExpensesPage() {
                   expenses={dayExpenses}
                   byId={categoriesState.byId}
                   onEdit={setEditing}
+                  onDelete={(expense) => void remove(expense)}
                   display={combined ? { currency, convertedById } : undefined}
                 />
               ))}
@@ -656,12 +657,14 @@ function DayGroup({
   expenses,
   byId,
   onEdit,
+  onDelete,
   display,
 }: {
   dateKey: string;
   expenses: readonly Expense[];
   byId: ReadonlyMap<string, Category>;
   onEdit: (expense: Expense) => void;
+  onDelete: (expense: Expense) => void;
   /** Present in combined mode: the currency the page is in, and each expense's amount in it. */
   display?: { currency: string; convertedById: ReadonlyMap<string, number> };
 }) {
@@ -716,6 +719,7 @@ function DayGroup({
             expense={expense}
             category={expense.category ? byId.get(expense.category) : undefined}
             onEdit={() => onEdit(expense)}
+            onDelete={() => onDelete(expense)}
             converted={
               wasConverted(expense) ? format(inDisplay(expense)!, display!.currency) : undefined
             }

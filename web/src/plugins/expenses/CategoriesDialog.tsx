@@ -5,6 +5,7 @@ import { HintTooltip } from '@/components/common/HintTooltip';
 import { iconOrDefault } from '@/components/icons/iconCatalog';
 import { IconPickerDialog } from '@/components/icons/IconPickerDialog';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { notifyError } from '@/lib/notify';
 import { captureError } from '@/lib/telemetry';
@@ -280,49 +282,63 @@ function CategoryRow({
     onRename(next);
   };
 
+  const ToggleIcon = category.retired ? ArchiveRestore : deletable ? Trash2 : Archive;
+  const CategoryIcon = category.icon;
+
   return (
-    <li className="flex items-center gap-2">
-      <IconButton
-        icon={category.icon}
-        label={t('plugins.expenses.changeIcon', { name: category.name ?? builtinName ?? '' })}
-        onClick={onPickIcon}
-        muted={category.retired}
-      />
-      <Input
-        value={draft}
-        maxLength={CATEGORY_NAME_MAX}
-        placeholder={builtinName ?? undefined}
-        aria-label={t('plugins.expenses.renameCategory', {
-          name: category.name ?? builtinName ?? '',
-        })}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            commit();
-          }
-        }}
-        className={category.retired ? 'text-muted-foreground' : undefined}
-      />
-      <HintTooltip content={toggleLabel}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0 text-muted-foreground"
-          aria-label={toggleLabel}
-          onClick={onToggleRetired}
-        >
-          {category.retired ? (
-            <ArchiveRestore className="size-3.5" />
-          ) : deletable ? (
-            <Trash2 className="size-3.5" />
-          ) : (
-            <Archive className="size-3.5" />
-          )}
-        </Button>
-      </HintTooltip>
-    </li>
+    <ContextMenu
+      menu={
+        <>
+          <DropdownMenuItem onClick={onPickIcon}>
+            <CategoryIcon className="size-3.5" />
+            {t('plugins.expenses.changeIcon', { name: category.name ?? builtinName ?? '' })}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant={deletable && !category.retired ? 'destructive' : 'default'}
+            onClick={onToggleRetired}
+          >
+            <ToggleIcon className="size-3.5" /> {toggleLabel}
+          </DropdownMenuItem>
+        </>
+      }
+    >
+      <li className="flex items-center gap-2">
+        <IconButton
+          icon={category.icon}
+          label={t('plugins.expenses.changeIcon', { name: category.name ?? builtinName ?? '' })}
+          onClick={onPickIcon}
+          muted={category.retired}
+        />
+        <Input
+          value={draft}
+          maxLength={CATEGORY_NAME_MAX}
+          placeholder={builtinName ?? undefined}
+          aria-label={t('plugins.expenses.renameCategory', {
+            name: category.name ?? builtinName ?? '',
+          })}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commit();
+            }
+          }}
+          className={category.retired ? 'text-muted-foreground' : undefined}
+        />
+        <HintTooltip content={toggleLabel}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0 text-muted-foreground"
+            aria-label={toggleLabel}
+            onClick={onToggleRetired}
+          >
+            <ToggleIcon className="size-3.5" />
+          </Button>
+        </HintTooltip>
+      </li>
+    </ContextMenu>
   );
 }

@@ -1,13 +1,15 @@
-import type { ThreadWithStats } from '@diary/shared';
-import { ChevronDown, GitBranch, Pencil, Plus, Trash2 } from 'lucide-react';
+import type { EntryDto, ThreadWithStats } from '@diary/shared';
+import { ChevronDown, GitBranch, Pencil, Plus, Trash2, Unlink } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useCreateThread,
+  useDeleteEntry,
   useDeleteThread,
   useSettings,
   useThreadEntries,
   useThreads,
+  useUpdateEntry,
   useUpdateThread,
 } from '@/api/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -15,11 +17,14 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { BOTTOM_NAV_ONLY, SIDEBAR_ONLY, SIDEBAR_ONLY_SR } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { EditEntryDialog } from '@/components/entry/EntryComposer';
 import { EntryRow } from '@/components/person/EntryRow';
 import { ThreadsToggleCard } from '@/components/thread/ThreadsToggleCard';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ContextMenu } from '@/components/ui/context-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -110,11 +115,68 @@ function ThreadMembers({ threadId }: { threadId: string }) {
   return (
     <ul className="mt-2 flex flex-col gap-1.5 border-l pl-3">
       {entries.map((entry) => (
-        <li key={entry.id}>
-          <EntryRow entry={entry} showChips={false} />
-        </li>
+        <ThreadMember key={entry.id} entry={entry} threadId={threadId} />
       ))}
     </ul>
+  );
+}
+
+/** A member entry, editable from right here — finding it again on its own day is the long way round. */
+function ThreadMember({ entry, threadId }: { entry: EntryDto; threadId: string }) {
+  const { t } = useTranslation();
+  const updateEntry = useUpdateEntry();
+  const deleteEntry = useDeleteEntry();
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  return (
+    <>
+      <ContextMenu
+        menu={
+          <>
+            <DropdownMenuItem onClick={() => setEditing(true)}>
+              <Pencil className="size-3.5" /> {t('diary.editEntry')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                updateEntry.mutate(
+                  {
+                    id: entry.id,
+                    input: {
+                      threads: entry.threads.filter((x) => x.id !== threadId).map((x) => x.id),
+                    },
+                  },
+                  { onError: () => notifyError(t('errors.unknown')) },
+                )
+              }
+            >
+              <Unlink className="size-3.5" /> {t('threads.removeFromThread')}
+            </DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+              <Trash2 className="size-3.5" /> {t('common.delete')}
+            </DropdownMenuItem>
+          </>
+        }
+      >
+        <li>
+          <EntryRow entry={entry} showChips={false} />
+        </li>
+      </ContextMenu>
+      <EditEntryDialog entry={entry} open={editing} onOpenChange={setEditing} />
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={t('diary.deleteConfirmTitle')}
+        description={t('diary.deleteConfirmDescription')}
+        confirmLabel={t('common.delete')}
+        onConfirm={() =>
+          deleteEntry.mutate(entry.id, {
+            onSuccess: (deletion) => notifyDeleted(t('diary.entryDeleted'), deletion),
+            onError: () => notifyError(t('errors.unknown')),
+          })
+        }
+      />
+    </>
   );
 }
 
@@ -133,47 +195,69 @@ function ThreadRow({
   return (
     <li className="rounded-xl border bg-card px-4 py-3 shadow-xs">
       <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="flex items-center gap-3">
-          {/* Where the tags page shows a colour swatch, a thread shows its icon — same anchor role,
+        {/* The header only: the expanded entries below are rows of their own. */}
+        <ContextMenu
+          menu={
+            <>
+              {thread.entryCount > 0 && (
+                <DropdownMenuItem onClick={() => setOpen(!open)}>
+                  <ChevronDown className={cn('size-3.5', open && 'rotate-180')} />
+                  {t(open ? 'threads.hideEntries' : 'threads.showEntries')}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="size-3.5" /> {t('threads.editThread')}
+              </DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onClick={onDelete}>
+                <Trash2 className="size-3.5" /> {t('threads.deleteThread')}
+              </DropdownMenuItem>
+            </>
+          }
+        >
+          <div className="flex items-center gap-3">
+            {/* Where the tags page shows a colour swatch, a thread shows its icon — same anchor role,
               and `foreground` keeps it legible on the card in both themes. */}
-          <GitBranch className="size-4 shrink-0 text-foreground" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-foreground">{thread.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {t('threads.entriesCount', { count: thread.entryCount })}
-            </p>
+            <GitBranch className="size-4 shrink-0 text-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium text-foreground">{thread.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {t('threads.entriesCount', { count: thread.entryCount })}
+              </p>
+            </div>
+            {thread.entryCount > 0 && (
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground"
+                  aria-label={t('threads.showEntries')}
+                >
+                  <ChevronDown
+                    className={cn('size-4 transition-transform', open && 'rotate-180')}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground"
+              aria-label={t('threads.editThread')}
+              onClick={onEdit}
+            >
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-destructive"
+              aria-label={t('threads.deleteThread')}
+              onClick={onDelete}
+            >
+              <Trash2 className="size-4" />
+            </Button>
           </div>
-          {thread.entryCount > 0 && (
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 text-muted-foreground"
-                aria-label={t('threads.showEntries')}
-              >
-                <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
-              </Button>
-            </CollapsibleTrigger>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 text-muted-foreground"
-            aria-label={t('threads.editThread')}
-            onClick={onEdit}
-          >
-            <Pencil className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 text-muted-foreground hover:text-destructive"
-            aria-label={t('threads.deleteThread')}
-            onClick={onDelete}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
+        </ContextMenu>
         <CollapsibleContent>
           {/* Mounted only while open, so the entry query doesn't run for collapsed rows. */}
           {open && <ThreadMembers threadId={thread.id} />}

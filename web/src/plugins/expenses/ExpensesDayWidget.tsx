@@ -1,8 +1,10 @@
-import { Lock, LockOpen, Wallet } from 'lucide-react';
+import { Lock, LockOpen, Pencil, Trash2, Wallet } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { todayKey } from '@/lib/dates';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -86,23 +88,38 @@ export function ExpensesDayWidget({ dateKey }: { dateKey: string }) {
   const locked = !isToday && unlockedFor !== dateKey;
 
   return (
-    <ExpenseDayCard
-      dateKey={dateKey}
-      expenses={expenses}
-      categories={categories}
-      byId={byId}
-      defaultCurrency={defaultCurrency}
-      locked={locked}
-      action={
-        isToday ? undefined : (
-          <DayLockButton locked={locked} onToggle={() => setUnlockedFor(locked ? dateKey : null)} />
-        )
+    // The wrapper only carries the locked day's right-click "Unlock"; rows defer to it while locked.
+    <ContextMenu
+      disabled={!locked}
+      menu={
+        <DropdownMenuItem onClick={() => setUnlockedFor(dateKey)}>
+          <LockOpen className="size-3.5" /> {t('plugins.expenses.unlock')}
+        </DropdownMenuItem>
       }
-      onAdd={(input) => addExpense(dateKey, input).then(() => undefined)}
-      onUpdate={updateExpense}
-      onDelete={removeExpense}
-      onRestore={(expense) => restoreExpense(expense).then(() => undefined)}
-    />
+    >
+      <div>
+        <ExpenseDayCard
+          dateKey={dateKey}
+          expenses={expenses}
+          categories={categories}
+          byId={byId}
+          defaultCurrency={defaultCurrency}
+          locked={locked}
+          action={
+            isToday ? undefined : (
+              <DayLockButton
+                locked={locked}
+                onToggle={() => setUnlockedFor(locked ? dateKey : null)}
+              />
+            )
+          }
+          onAdd={(input) => addExpense(dateKey, input).then(() => undefined)}
+          onUpdate={updateExpense}
+          onDelete={removeExpense}
+          onRestore={(expense) => restoreExpense(expense).then(() => undefined)}
+        />
+      </div>
+    </ContextMenu>
   );
 }
 
@@ -222,6 +239,7 @@ export function ExpenseDayCard({
                 expense={expense}
                 category={expense.category ? byId.get(expense.category) : undefined}
                 onEdit={locked ? undefined : () => setEditing(expense.id)}
+                onDelete={() => void remove(expense)}
               />
             ),
           )}
@@ -251,12 +269,14 @@ export function ExpenseRow({
   expense,
   category,
   onEdit,
+  onDelete,
   converted,
 }: {
   expense: Expense;
   category: Category | undefined;
   /** Absent while locked: the row is then plain text rather than a button that does nothing. */
   onEdit?: () => void;
+  onDelete?: () => void;
   /** The amount in the page's display currency, formatted — only for one paid in another. The
       amount paid stays the headline; this is what it came to in the totals around it. */
   converted?: string;
@@ -294,20 +314,36 @@ export function ExpenseRow({
   );
 
   return (
-    <li>
-      {onEdit ? (
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label={t('plugins.expenses.editExpense', { name: title, amount })}
-          className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/60"
-        >
-          {body}
-        </button>
-      ) : (
-        <div className="flex items-center gap-3 py-2">{body}</div>
-      )}
-    </li>
+    <ContextMenu
+      disabled={!onEdit}
+      menu={
+        <>
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="size-3.5" /> {t('common.edit')}
+          </DropdownMenuItem>
+          {onDelete && (
+            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+              <Trash2 className="size-3.5" /> {t('common.delete')}
+            </DropdownMenuItem>
+          )}
+        </>
+      }
+    >
+      <li>
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={t('plugins.expenses.editExpense', { name: title, amount })}
+            className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/60"
+          >
+            {body}
+          </button>
+        ) : (
+          <div className="flex items-center gap-3 py-2">{body}</div>
+        )}
+      </li>
+    </ContextMenu>
   );
 }
 

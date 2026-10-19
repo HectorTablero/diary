@@ -50,7 +50,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { TagChip } from '@/components/entry/chips';
 import { PageContainer } from '@/components/layout/PageHeader';
-import { ContactInfo } from '@/components/person/ContactInfo';
+import { ContactInfo, ContactMenuItems } from '@/components/person/ContactInfo';
 import { EntryRow } from '@/components/person/EntryRow';
 import { EventForm } from '@/components/person/EventForm';
 import { PersonForm } from '@/components/person/PersonForm';
@@ -58,6 +58,7 @@ import { TalkingPointGroup } from '@/components/person/TalkingPointGroup';
 import { TalkingPointItem } from '@/components/person/TalkingPointItem';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ContextMenu } from '@/components/ui/context-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -442,94 +443,112 @@ function EventRow({
     parseDateKey(eventEndKey(event)),
   );
 
+  const menuItems = (
+    <>
+      <DropdownMenuItem onClick={() => onEdit(event)}>
+        <Pencil className="size-3.5" /> {t('common.edit')}
+      </DropdownMenuItem>
+      <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+        <Trash2 className="size-3.5" /> {t('common.delete')}
+      </DropdownMenuItem>
+    </>
+  );
+
+  const markAskedNow = () =>
+    markAsked.mutate(
+      { personId: person.id, eventId: event.id },
+      {
+        onSuccess: () => notifySuccess(t('people.eventMarkedAsked')),
+        onError: () => notifyError(t('errors.unknown')),
+      },
+    );
+
   return (
-    <li className="rounded-xl border bg-card shadow-xs">
-      <div className="flex items-start gap-2 p-3">
-        <div className="min-w-0 flex-1">
-          {/* flex-wrap, not a fixed two-row stack: the dates sit beside the title when they fit
+    <ContextMenu
+      menu={
+        <>
+          {followUpDue && (
+            <DropdownMenuItem onClick={markAskedNow}>
+              <Check className="size-3.5" /> {t('people.markEventAsked')}
+            </DropdownMenuItem>
+          )}
+          {menuItems}
+        </>
+      }
+    >
+      <li className="rounded-xl border bg-card shadow-xs">
+        <div className="flex items-start gap-2 p-3">
+          <div className="min-w-0 flex-1">
+            {/* flex-wrap, not a fixed two-row stack: the dates sit beside the title when they fit
               and drop to their own line only when the title needs the room. */}
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="max-w-full truncate text-sm font-medium">{event.title}</span>
-            <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-              {dates}
-            </span>
-            {event.askedAt && (
-              <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="max-w-full truncate text-sm font-medium">{event.title}</span>
+              <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
+                {dates}
+              </span>
+              {event.askedAt && (
+                <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              )}
+            </div>
+            {event.notes && (
+              <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                {event.notes}
+              </p>
             )}
           </div>
-          {event.notes && (
-            <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              {event.notes}
-            </p>
-          )}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0 text-muted-foreground"
+                aria-label={t('people.editEvent')}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        {/* Footer only appears when you owe them something, and says *why* it's here. */}
+        {followUpDue && (
+          <div className="flex flex-col items-stretch gap-2 border-t border-amber-500/15 bg-amber-500/[0.035] dark:border-amber-400/10 dark:bg-amber-400/[0.02] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0 text-xs text-muted-foreground">
+              {t('people.eventEndedDaysAgo', { count: daysSinceEnd })}
+            </span>
             <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0 text-muted-foreground"
-              aria-label={t('people.editEvent')}
+              variant="outline"
+              size="sm"
+              className="h-7 w-full shrink-0 gap-1.5 text-xs sm:w-auto"
+              onClick={markAskedNow}
             >
-              <MoreHorizontal className="size-4" />
+              <Check className="size-3.5" />
+              {t('people.markEventAsked')}
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(event)}>
-              <Pencil className="size-3.5" /> {t('common.edit')}
-            </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-              <Trash2 className="size-3.5" /> {t('common.delete')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          </div>
+        )}
 
-      {/* Footer only appears when you owe them something, and says *why* it's here. */}
-      {followUpDue && (
-        <div className="flex flex-col items-stretch gap-2 border-t border-amber-500/15 bg-amber-500/[0.035] dark:border-amber-400/10 dark:bg-amber-400/[0.02] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="min-w-0 text-xs text-muted-foreground">
-            {t('people.eventEndedDaysAgo', { count: daysSinceEnd })}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 w-full shrink-0 gap-1.5 text-xs sm:w-auto"
-            onClick={() =>
-              markAsked.mutate(
-                { personId: person.id, eventId: event.id },
-                {
-                  onSuccess: () => notifySuccess(t('people.eventMarkedAsked')),
-                  onError: () => notifyError(t('errors.unknown')),
-                },
-              )
-            }
-          >
-            <Check className="size-3.5" />
-            {t('people.markEventAsked')}
-          </Button>
-        </div>
-      )}
-
-      <ConfirmDialog
-        open={confirmingDelete}
-        onOpenChange={setConfirmingDelete}
-        title={t('people.eventDeleteConfirmTitle', { title: event.title })}
-        description={t('people.eventDeleteConfirmDescription')}
-        confirmLabel={t('common.delete')}
-        onConfirm={() => {
-          setConfirmingDelete(false);
-          deleteEvent.mutate(
-            { personId: person.id, eventId: event.id },
-            {
-              onSuccess: (deletion) => notifyDeleted(t('people.eventDeleted'), deletion),
-              onError: () => notifyError(t('errors.unknown')),
-            },
-          );
-        }}
-      />
-    </li>
+        <ConfirmDialog
+          open={confirmingDelete}
+          onOpenChange={setConfirmingDelete}
+          title={t('people.eventDeleteConfirmTitle', { title: event.title })}
+          description={t('people.eventDeleteConfirmDescription')}
+          confirmLabel={t('common.delete')}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            deleteEvent.mutate(
+              { personId: person.id, eventId: event.id },
+              {
+                onSuccess: (deletion) => notifyDeleted(t('people.eventDeleted'), deletion),
+                onError: () => notifyError(t('errors.unknown')),
+              },
+            );
+          }}
+        />
+      </li>
+    </ContextMenu>
   );
 }
 
@@ -725,6 +744,29 @@ export default function PersonProfilePage() {
     </div>
   );
 
+  const personMenuItems = (
+    <>
+      <DropdownMenuItem onClick={() => setEditing(true)}>
+        <Pencil className="size-3.5" /> {t('people.editPerson')}
+      </DropdownMenuItem>
+      {person.checkupIntervalDays != null && (
+        <DropdownMenuItem
+          onClick={() =>
+            markCheckup.mutate(person.id, {
+              onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+              onError: () => notifyError(t('errors.unknown')),
+            })
+          }
+        >
+          <Check className="size-3.5" /> {t('people.markCheckupNow')}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+        <Trash2 className="size-3.5" /> {t('people.deletePerson')}
+      </DropdownMenuItem>
+    </>
+  );
+
   return (
     // Unlike the list pages, this one is allowed to grow: the payoff of two columns here is real
     // (events always visible instead of a tab away) rather than a cramped attempt to fit two card
@@ -747,51 +789,43 @@ export default function PersonProfilePage() {
           style={mainColumnStyle}
           className={cn(useTwoColumns && 'col-span-7')}
         >
-          <PersonIdentity
-            name={person.name}
-            tags={person.tags}
-            actions={
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground"
-                    aria-label={t('people.personActions', { name: person.name })}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setEditing(true)}>
-                    <Pencil className="size-3.5" /> {t('people.editPerson')}
-                  </DropdownMenuItem>
-                  {person.checkupIntervalDays != null && (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        markCheckup.mutate(person.id, {
-                          onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
-                          onError: () => notifyError(t('errors.unknown')),
-                        })
-                      }
-                    >
-                      <Check className="size-3.5" /> {t('people.markCheckupNow')}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-                    <Trash2 className="size-3.5" /> {t('people.deletePerson')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+          <ContextMenu
+            menu={
+              <>
+                <ContactMenuItems person={person} />
+                {personMenuItems}
+              </>
             }
           >
-            {person.notes && (
-              <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">
-                {person.notes}
-              </p>
-            )}
-            <ContactInfo person={person} onEdit={() => setEditing(true)} />
-          </PersonIdentity>
+            <div>
+              <PersonIdentity
+                name={person.name}
+                tags={person.tags}
+                actions={
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground"
+                        aria-label={t('people.personActions', { name: person.name })}
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">{personMenuItems}</DropdownMenuContent>
+                  </DropdownMenu>
+                }
+              >
+                {person.notes && (
+                  <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">
+                    {person.notes}
+                  </p>
+                )}
+                <ContactInfo person={person} onEdit={() => setEditing(true)} />
+              </PersonIdentity>
+            </div>
+          </ContextMenu>
 
           {!useTwoColumns && checkupBanner}
 

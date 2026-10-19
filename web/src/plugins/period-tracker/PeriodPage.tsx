@@ -15,7 +15,9 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import { DatePicker } from '@/components/ui/date-picker';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -347,73 +349,87 @@ export function CycleCard({
     : undefined;
 
   return (
-    <li className="rounded-xl border bg-card p-4 shadow-xs">
-      <div className="flex items-start gap-2">
-        <span
-          className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-          aria-hidden
-        >
-          <Droplet className="size-3.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">
-            {formatDateKey(cycle.start, i18n.language, 'PP')}
-            {cycle.end !== cycle.start && ` – ${formatDateKey(cycle.end, i18n.language, 'PP')}`}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {t('plugins.period-tracker.daysCount', { count: duration })}
-            {cycleLength !== undefined &&
-              ` · ${t('plugins.period-tracker.cycleLength', { count: cycleLength })}`}
-          </p>
+    <ContextMenu
+      disabled={disableActions}
+      menu={
+        <>
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="size-3.5" /> {t('common.edit')}
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <Trash2 className="size-3.5" /> {t('common.delete')}
+          </DropdownMenuItem>
+        </>
+      }
+    >
+      <li className="rounded-xl border bg-card p-4 shadow-xs">
+        <div className="flex items-start gap-2">
+          <span
+            className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+            aria-hidden
+          >
+            <Droplet className="size-3.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">
+              {formatDateKey(cycle.start, i18n.language, 'PP')}
+              {cycle.end !== cycle.start && ` – ${formatDateKey(cycle.end, i18n.language, 'PP')}`}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t('plugins.period-tracker.daysCount', { count: duration })}
+              {cycleLength !== undefined &&
+                ` · ${t('plugins.period-tracker.cycleLength', { count: cycleLength })}`}
+            </p>
+          </div>
         </div>
-      </div>
 
-      <Disclosure
-        label={t('plugins.period-tracker.perDayToggle')}
-        hideLabel={t('plugins.period-tracker.perDayToggleHide')}
-        defaultOpen={disclosureDefaultOpen}
-      >
-        <ul className="space-y-1">
-          {dateKeysBetween(cycle.start, cycle.end).map((day) => (
-            <li
-              key={day}
-              className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
-            >
-              <span className="text-xs text-muted-foreground">
-                {formatDateKey(day, i18n.language, 'PP')}
-              </span>
-              <IntensityPill
-                value={byDate.get(day)?.flow ?? DEFAULT_FLOW}
-                onSelect={(level) => onSetDayFlow(day, level)}
-              />
-            </li>
-          ))}
-        </ul>
-      </Disclosure>
+        <Disclosure
+          label={t('plugins.period-tracker.perDayToggle')}
+          hideLabel={t('plugins.period-tracker.perDayToggleHide')}
+          defaultOpen={disclosureDefaultOpen}
+        >
+          <ul className="space-y-1">
+            {dateKeysBetween(cycle.start, cycle.end).map((day) => (
+              <li
+                key={day}
+                className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
+              >
+                <span className="text-xs text-muted-foreground">
+                  {formatDateKey(day, i18n.language, 'PP')}
+                </span>
+                <IntensityPill
+                  value={byDate.get(day)?.flow ?? DEFAULT_FLOW}
+                  onSelect={(level) => onSetDayFlow(day, level)}
+                />
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
 
-      <div className="mt-3 flex flex-wrap justify-end gap-1.5 border-t pt-2.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
-          disabled={disableActions}
-          onClick={onEdit}
-        >
-          <Pencil className="size-3" />
-          {t('common.edit')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 px-2 text-xs text-destructive"
-          disabled={disableActions}
-          onClick={onDelete}
-        >
-          <Trash2 className="size-3" />
-          {t('common.delete')}
-        </Button>
-      </div>
-    </li>
+        <div className="mt-3 flex flex-wrap justify-end gap-1.5 border-t pt-2.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+            disabled={disableActions}
+            onClick={onEdit}
+          >
+            <Pencil className="size-3" />
+            {t('common.edit')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs text-destructive"
+            disabled={disableActions}
+            onClick={onDelete}
+          >
+            <Trash2 className="size-3" />
+            {t('common.delete')}
+          </Button>
+        </div>
+      </li>
+    </ContextMenu>
   );
 }
 

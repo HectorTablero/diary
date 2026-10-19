@@ -14,20 +14,30 @@ import {
   Plus,
   Search,
   StickyNote,
+  Trash2,
   Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { useMarkCheckup, usePeople, useTags, useTalkingPointCounts } from '@/api/hooks';
+import {
+  useDeletePerson,
+  useMarkCheckup,
+  usePeople,
+  useTags,
+  useTalkingPointCounts,
+} from '@/api/hooks';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
+import { ContactMenuItems } from '@/components/person/ContactInfo';
 import { PersonForm } from '@/components/person/PersonForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ContextMenu } from '@/components/ui/context-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -45,6 +55,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { notifyDeleted } from '@/lib/undo';
 import { isCheckupDue } from '@/lib/checkup';
 import { canImportContacts } from '@/lib/contacts';
 import { todayKey } from '@/lib/dates';
@@ -131,11 +142,36 @@ function PersonRow({
 }) {
   const { t } = useTranslation();
   const markCheckup = useMarkCheckup();
+  const deletePerson = useDeletePerson();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ongoing = ongoingEvents(person.events, today);
   const pending = pendingEventCount(person, today);
   // Under a tag filter the matching tags claim the visible slots, so a person can't be shown
   // without the tag that put them there. See lib/tags.ts.
   const { shown: shownTags, hidden: hiddenTagCount } = visibleTags(person.tags, tagFilter);
+  const menuItems = (
+    <>
+      <DropdownMenuItem onClick={() => onEdit(person)}>
+        <Pencil className="size-3.5" /> {t('people.editPerson')}
+      </DropdownMenuItem>
+      {person.checkupIntervalDays != null && (
+        <DropdownMenuItem
+          onClick={() =>
+            markCheckup.mutate(person.id, {
+              onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
+              onError: () => notifyError(t('errors.unknown')),
+            })
+          }
+        >
+          <Check className="size-3.5" /> {t('people.markCheckupNow')}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+        <Trash2 className="size-3.5" /> {t('people.deletePerson')}
+      </DropdownMenuItem>
+    </>
+  );
+
   return (
     /* The row's link and its ⋯ menu are siblings, not nested. The menu trigger used to sit inside
        the <Link>, which is invalid HTML — interactive content inside an anchor — and left screen
@@ -143,177 +179,191 @@ function PersonRow({
        the mouse behaviour only, never the semantics. Now the anchor stretches over the row via
        `before:absolute inset-0` and the menu sits above it on the z-axis, so the whole row is
        still one click target while the button is a genuine sibling with its own accessible name. */
-    <li className="group/row relative flex items-center gap-3 rounded-xl border bg-card p-4 shadow-xs transition-colors hover:bg-accent/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
-      <Link
-        to={`/people/${person.id}`}
-        className="flex min-w-0 flex-1 items-center gap-3 outline-none before:absolute before:inset-0 before:rounded-xl before:content-['']"
+    <>
+      <ContextMenu
+        menu={
+          <>
+            <ContactMenuItems person={person} />
+            {menuItems}
+          </>
+        }
       >
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase">
-          {person.name.slice(0, 2)}
-        </div>
-        <div className="min-w-0 flex-1">
-          {/* flex-wrap so the matched nickname sits beside the name when it fits, and only drops
+        <li className="group/row relative flex items-center gap-3 rounded-xl border bg-card p-4 shadow-xs transition-colors hover:bg-accent/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
+          <Link
+            to={`/people/${person.id}`}
+            data-row-link
+            className="flex min-w-0 flex-1 items-center gap-3 outline-none before:absolute before:inset-0 before:rounded-xl before:content-['']"
+          >
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase">
+              {person.name.slice(0, 2)}
+            </div>
+            <div className="min-w-0 flex-1">
+              {/* flex-wrap so the matched nickname sits beside the name when it fits, and only drops
               to its own line — still above the tags — when it doesn't. */}
-          <div className="flex flex-wrap items-baseline gap-x-1.5">
-            <span className="max-w-full truncate font-medium">{person.name}</span>
-            {match && match.aliases.length > 0 && (
-              <span className="max-w-full truncate text-xs text-muted-foreground">
-                {t('people.alsoKnownAs')}{' '}
-                <span className="font-medium text-foreground">{match.aliases.join(', ')}</span>
-              </span>
-            )}
-            {match?.job && (
-              <span className="flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground">
-                <Briefcase className="size-3 shrink-0" />
-                <span className="truncate font-medium text-foreground">{match.job}</span>
-              </span>
-            )}
-          </div>
-          {ongoing.length > 0 && (
-            /* A bare "3 ongoing events" says nothing useful. On the web the names are a hover
+              <div className="flex flex-wrap items-baseline gap-x-1.5">
+                <span className="max-w-full truncate font-medium">{person.name}</span>
+                {match && match.aliases.length > 0 && (
+                  <span className="max-w-full truncate text-xs text-muted-foreground">
+                    {t('people.alsoKnownAs')}{' '}
+                    <span className="font-medium text-foreground">{match.aliases.join(', ')}</span>
+                  </span>
+                )}
+                {match?.job && (
+                  <span className="flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground">
+                    <Briefcase className="size-3 shrink-0" />
+                    <span className="truncate font-medium text-foreground">{match.job}</span>
+                  </span>
+                )}
+              </div>
+              {ongoing.length > 0 && (
+                /* A bare "3 ongoing events" says nothing useful. On the web the names are a hover
                away; on the phone there's no hover to be had, so list them inline instead — the
                count alone would be information the user could never reach. */
-            <HintTooltip
-              content={
-                <ul>
-                  {ongoing.map((event) => (
-                    <li key={event.id}>{event.title}</li>
-                  ))}
-                </ul>
-              }
-            >
-              <p
-                className={cn(
-                  'mt-0.5 flex w-fit max-w-full items-center gap-1 text-xs text-muted-foreground',
-                  ongoing.length > 1 &&
-                    !isNative &&
-                    'underline decoration-dotted underline-offset-2',
-                )}
-              >
-                <CalendarClock className="size-3 shrink-0" />
-                <span className="truncate">
-                  {ongoing.length === 1 || isNative
-                    ? ongoing.map((event) => event.title).join(' · ')
-                    : t('people.eventsOngoing', { count: ongoing.length })}
-                </span>
-              </p>
-            </HintTooltip>
-          )}
-          {person.tags.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {shownTags.map((tag) => (
-                <TagChip
-                  key={tag.id}
-                  tag={tag}
-                  // Fade the tags that aren't what you filtered on, so the ones that are jump out.
-                  className={
-                    tagFilter.length > 0 && !tagFilter.includes(tag.id) ? 'opacity-30' : undefined
+                <HintTooltip
+                  content={
+                    <ul>
+                      {ongoing.map((event) => (
+                        <li key={event.id}>{event.title}</li>
+                      ))}
+                    </ul>
                   }
-                />
-              ))}
-              {hiddenTagCount > 0 && (
-                <span className="text-xs text-muted-foreground">+{hiddenTagCount}</span>
+                >
+                  <p
+                    className={cn(
+                      'mt-0.5 flex w-fit max-w-full items-center gap-1 text-xs text-muted-foreground',
+                      ongoing.length > 1 &&
+                        !isNative &&
+                        'underline decoration-dotted underline-offset-2',
+                    )}
+                  >
+                    <CalendarClock className="size-3 shrink-0" />
+                    <span className="truncate">
+                      {ongoing.length === 1 || isNative
+                        ? ongoing.map((event) => event.title).join(' · ')
+                        : t('people.eventsOngoing', { count: ongoing.length })}
+                    </span>
+                  </p>
+                </HintTooltip>
+              )}
+              {person.tags.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {shownTags.map((tag) => (
+                    <TagChip
+                      key={tag.id}
+                      tag={tag}
+                      // Fade the tags that aren't what you filtered on, so the ones that are jump out.
+                      className={
+                        tagFilter.length > 0 && !tagFilter.includes(tag.id)
+                          ? 'opacity-30'
+                          : undefined
+                      }
+                    />
+                  ))}
+                  {hiddenTagCount > 0 && (
+                    <span className="text-xs text-muted-foreground">+{hiddenTagCount}</span>
+                  )}
+                </div>
+              )}
+              {match?.notes && match.notes.length > 0 && (
+                <div className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
+                  <StickyNote className="mt-0.5 size-3 shrink-0" />
+                  <p className="min-w-0 flex-1">
+                    {match.notes.slice(0, MAX_NOTE_SNIPPETS).map((window, i) => (
+                      <span key={i}>
+                        {i > 0 && ' '}
+                        {window.segments.map((segment, j) =>
+                          segment.matched ? (
+                            <span key={j} className="font-medium text-foreground">
+                              {segment.text}
+                            </span>
+                          ) : (
+                            <span key={j}>{segment.text}</span>
+                          ),
+                        )}
+                      </span>
+                    ))}
+                    {match.notes.length > MAX_NOTE_SNIPPETS && (
+                      <span> +{match.notes.length - MAX_NOTE_SNIPPETS}</span>
+                    )}
+                  </p>
+                </div>
               )}
             </div>
-          )}
-          {match?.notes && match.notes.length > 0 && (
-            <div className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
-              <StickyNote className="mt-0.5 size-3 shrink-0" />
-              <p className="min-w-0 flex-1">
-                {match.notes.slice(0, MAX_NOTE_SNIPPETS).map((window, i) => (
-                  <span key={i}>
-                    {i > 0 && ' '}
-                    {window.segments.map((segment, j) =>
-                      segment.matched ? (
-                        <span key={j} className="font-medium text-foreground">
-                          {segment.text}
-                        </span>
-                      ) : (
-                        <span key={j}>{segment.text}</span>
-                      ),
-                    )}
-                  </span>
-                ))}
-                {match.notes.length > MAX_NOTE_SNIPPETS && (
-                  <span> +{match.notes.length - MAX_NOTE_SNIPPETS}</span>
-                )}
-              </p>
-            </div>
-          )}
-        </div>
-      </Link>
+          </Link>
 
-      {/* Outside the link, so they read as part of the row. The two count badges are lifted above
+          {/* Outside the link, so they read as part of the row. The two count badges are lifted above
           the link's stretched ::before so they can be hovered for their tooltip — the two speech
           bubbles are otherwise hard to tell apart — and are links to the profile themselves, so
           clicking one still opens it like the rest of the row does. */}
-      {/* Same destructive tint the row already uses for an overdue checkup — an unanswered
+          {/* Same destructive tint the row already uses for an overdue checkup — an unanswered
           "how did it go?" is the same kind of debt. */}
-      {pending > 0 && (
-        <HintTooltip content={t('people.pendingFollowUpsHint', { count: pending })}>
-          <Link to={`/people/${person.id}`} tabIndex={-1} className="relative z-10 shrink-0">
-            <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
-              <MessageCircleQuestion className="size-3" />
-              {pending}
-            </Badge>
-          </Link>
-        </HintTooltip>
-      )}
-      {person.checkupIntervalDays != null && (
-        <span
-          className={
-            'hidden shrink-0 items-center gap-1 text-xs sm:flex' +
-            (checkupPending ? ' text-destructive' : ' text-muted-foreground')
-          }
-        >
-          <BellRing className="size-3" />
-          {t('people.checkupEvery')} {person.checkupIntervalDays} {t('settings.memories.days')}
-        </span>
-      )}
-      {person.talkingPointCount > 0 && (
-        <HintTooltip content={t('people.talkingPointsHint', { count: person.talkingPointCount })}>
-          <Link to={`/people/${person.id}`} tabIndex={-1} className="relative z-10 shrink-0">
-            <Badge variant="secondary" className="gap-1">
-              <MessageCircle className="size-3" />
-              {person.talkingPointCount}
-            </Badge>
-          </Link>
-        </HintTooltip>
-      )}
-
-      {/* `relative z-10` lifts the menu above the link's overlay — without it the anchor would
-          swallow the click and navigate instead of opening the menu. No preventDefault anywhere
-          now: nothing is inside the anchor to bubble to. */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative z-10 size-8 shrink-0 text-muted-foreground"
-            aria-label={t('people.personActions', { name: person.name })}
-          >
-            <MoreHorizontal className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onEdit(person)}>
-            <Pencil className="size-3.5" /> {t('people.editPerson')}
-          </DropdownMenuItem>
+          {pending > 0 && (
+            <HintTooltip content={t('people.pendingFollowUpsHint', { count: pending })}>
+              <Link to={`/people/${person.id}`} tabIndex={-1} className="relative z-10 shrink-0">
+                <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+                  <MessageCircleQuestion className="size-3" />
+                  {pending}
+                </Badge>
+              </Link>
+            </HintTooltip>
+          )}
           {person.checkupIntervalDays != null && (
-            <DropdownMenuItem
-              onClick={() =>
-                markCheckup.mutate(person.id, {
-                  onSuccess: () => notifySuccess(t('people.checkupMarkedDone')),
-                  onError: () => notifyError(t('errors.unknown')),
-                })
+            <span
+              className={
+                'hidden shrink-0 items-center gap-1 text-xs sm:flex' +
+                (checkupPending ? ' text-destructive' : ' text-muted-foreground')
               }
             >
-              <Check className="size-3.5" /> {t('people.markCheckupNow')}
-            </DropdownMenuItem>
+              <BellRing className="size-3" />
+              {t('people.checkupEvery')} {person.checkupIntervalDays} {t('settings.memories.days')}
+            </span>
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </li>
+          {person.talkingPointCount > 0 && (
+            <HintTooltip
+              content={t('people.talkingPointsHint', { count: person.talkingPointCount })}
+            >
+              <Link to={`/people/${person.id}`} tabIndex={-1} className="relative z-10 shrink-0">
+                <Badge variant="secondary" className="gap-1">
+                  <MessageCircle className="size-3" />
+                  {person.talkingPointCount}
+                </Badge>
+              </Link>
+            </HintTooltip>
+          )}
+
+          {/* `relative z-10` lifts the menu above the link's overlay — without it the anchor would
+          swallow the click and navigate instead of opening the menu. No preventDefault anywhere
+          now: nothing is inside the anchor to bubble to. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative z-10 size-8 shrink-0 text-muted-foreground"
+                aria-label={t('people.personActions', { name: person.name })}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
+          </DropdownMenu>
+        </li>
+      </ContextMenu>
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={t('people.deleteConfirmTitle', { name: person.name })}
+        description={t('people.deleteConfirmDescription')}
+        confirmLabel={t('common.delete')}
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          deletePerson.mutate(person.id, {
+            onSuccess: (deletion) => notifyDeleted(t('people.personDeleted'), deletion),
+            onError: () => notifyError(t('errors.unknown')),
+          });
+        }}
+      />
+    </>
   );
 }
 
