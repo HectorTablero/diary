@@ -9,6 +9,7 @@ import { EntityPicker } from '@/components/entry/EntityPicker';
 import { useImportanceMarkerClass } from '@/components/entry/ImportanceDot';
 import { SIDEBAR_ONLY } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { EntryMenu } from '@/components/entry/EntryMenu';
 import { EntryRow } from '@/components/person/EntryRow';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -237,9 +238,11 @@ export default function SearchPage() {
           </p>
           <ul className="flex flex-col gap-3">
             {data.results.map((entry) => (
-              <li key={entry.id}>
-                <EntryRow entry={entry} />
-              </li>
+              <EntryMenu key={entry.id} entry={entry}>
+                <li>
+                  <EntryRow entry={entry} />
+                </li>
+              </EntryMenu>
             ))}
           </ul>
           {totalPages > 1 && (

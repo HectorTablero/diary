@@ -14,11 +14,11 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useSetHidden, useSetSaid, useThreadsEnabled } from '@/api/hooks';
+import { EntryMenu } from '@/components/entry/EntryMenu';
 import { EntryRow } from '@/components/person/EntryRow';
 import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ContextMenu } from '@/components/ui/context-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -116,18 +116,24 @@ export function TalkingPointItem({
 
   return (
     <li>
-      {/* The right-click menu also carries "Mark as said", which the ⋯ menu leaves to the button
-          beside it. */}
-      <ContextMenu
-        disabled={!isMatch}
-        menu={
-          <>
-            <DropdownMenuItem onClick={markSaid}>
-              <Check className="size-3.5" />
-              {t('people.markSaid')}
-            </DropdownMenuItem>
-            {menuItems}
-          </>
+      {/* The right-click menu is the full entry menu (edit, delete, importance…) with this tab's
+          own actions on top — including "Mark as said", which the ⋯ menu leaves to the button
+          beside it. Context-only rows get the entry menu alone. */}
+      <EntryMenu
+        entry={node}
+        extra={
+          isMatch && (
+            <>
+              <DropdownMenuItem onClick={markSaid}>
+                <Check className="size-3.5" />
+                {t('people.markSaid')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={hide}>
+                <EyeOff className="size-3.5" />
+                {t('people.hideForPerson', { name: personName })}
+              </DropdownMenuItem>
+            </>
+          )
         }
       >
         {/* `pr-2` is not decoration: this card had no right padding at all, which was survivable
@@ -189,7 +195,7 @@ export function TalkingPointItem({
             )}
           </EntryRow>
         </div>
-      </ContextMenu>
+      </EntryMenu>
 
       <AddToThreadDialog entry={node} open={threading} onOpenChange={setThreading} />
 

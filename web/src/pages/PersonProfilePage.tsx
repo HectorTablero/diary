@@ -51,6 +51,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { TagChip } from '@/components/entry/chips';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { ContactInfo, ContactMenuItems } from '@/components/person/ContactInfo';
+import { EntryMenu } from '@/components/entry/EntryMenu';
 import { EntryRow } from '@/components/person/EntryRow';
 import { EventForm } from '@/components/person/EventForm';
 import { PersonForm } from '@/components/person/PersonForm';
@@ -286,19 +287,32 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
           <CollapsibleContent>
             <ul className="mt-2 flex flex-col gap-2">
               {data.said.map((entry) => (
-                <li key={entry.id} className="rounded-xl border border-dashed p-3">
-                  <EntryRow entry={entry} crossedOut showChips={false}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                <EntryMenu
+                  key={entry.id}
+                  entry={entry}
+                  extra={
+                    <DropdownMenuItem
                       onClick={() => setSaid.mutate({ entryId: entry.id, personId, said: false })}
                     >
                       <Undo2 className="size-3.5" />
                       {t('people.unmarkSaid')}
-                    </Button>
-                  </EntryRow>
-                </li>
+                    </DropdownMenuItem>
+                  }
+                >
+                  <li className="rounded-xl border border-dashed p-3">
+                    <EntryRow entry={entry} crossedOut showChips={false}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                        onClick={() => setSaid.mutate({ entryId: entry.id, personId, said: false })}
+                      >
+                        <Undo2 className="size-3.5" />
+                        {t('people.unmarkSaid')}
+                      </Button>
+                    </EntryRow>
+                  </li>
+                </EntryMenu>
               ))}
             </ul>
           </CollapsibleContent>
@@ -343,9 +357,11 @@ function MemoriesTab({ personId, personName }: { personId: string; personName: s
           <h2 className="mb-2 text-sm font-semibold text-muted-foreground">{year}</h2>
           <ul className="flex flex-col gap-3 border-l-2 border-border/70 pl-4">
             {entries.map((entry) => (
-              <li key={entry.id}>
-                <EntryRow entry={entry} />
-              </li>
+              <EntryMenu key={entry.id} entry={entry}>
+                <li>
+                  <EntryRow entry={entry} />
+                </li>
+              </EntryMenu>
             ))}
           </ul>
         </div>
@@ -370,9 +386,11 @@ function HistoryTab({ personId, personName }: { personId: string; personName: st
     <div className="flex flex-col gap-3">
       <ul className="flex flex-col gap-3">
         {data.results.map((entry) => (
-          <li key={entry.id}>
-            <EntryRow entry={entry} />
-          </li>
+          <EntryMenu key={entry.id} entry={entry}>
+            <li>
+              <EntryRow entry={entry} />
+            </li>
+          </EntryMenu>
         ))}
       </ul>
       {totalPages > 1 && (

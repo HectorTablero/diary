@@ -1,8 +1,7 @@
 import type { EntryNode } from '@diary/shared';
-import { DEFAULT_SUB_ENTRY_DEPTH, IMPORTANCE_LEVELS } from '@diary/shared';
+import { DEFAULT_SUB_ENTRY_DEPTH } from '@diary/shared';
 import {
   ChevronRight,
-  Copy,
   CornerDownRight,
   GitBranch,
   GripVertical,
@@ -13,14 +12,15 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDeleteEntry, useSettings, useThreadsEnabled, useUpdateEntry } from '@/api/hooks';
+import { useDeleteEntry, useSettings, useThreadsEnabled } from '@/api/hooks';
 import { VoiceSubEntryDialog } from '@/components/ai/VoiceSubEntryDialog';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PersonChip, TagChip, ThreadChip } from '@/components/entry/chips';
 import { AddToThreadDialog } from '@/components/thread/AddToThreadDialog';
 import { EditEntryDialog, EntryComposer } from '@/components/entry/EntryComposer';
 import { EntryContent } from '@/components/entry/EntryContent';
-import { ImportanceDot, useImportanceMarkerClass } from '@/components/entry/ImportanceDot';
+import { EntryQuickItems } from '@/components/entry/EntryMenu';
+import { ImportanceDot } from '@/components/entry/ImportanceDot';
 import { useSortableTreeRow } from '@/components/tree/SortableTreeProvider';
 import { Button } from '@/components/ui/button';
 import { ContextMenu } from '@/components/ui/context-menu';
@@ -29,18 +29,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { useEntityLinks } from '@/lib/entityLinks';
 import { entrySummary } from '@/lib/entryLabel';
-import { notifyError, notifySuccess } from '@/lib/notify';
+import { notifyError } from '@/lib/notify';
 import { notifyDeleted } from '@/lib/undo';
 import { usePreferences } from '@/lib/preferences';
 import { fuzzyEquals } from '@/lib/tokens';
@@ -87,8 +82,6 @@ export function EntryItem({
   const [threading, setThreading] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteEntry = useDeleteEntry();
-  const updateEntry = useUpdateEntry();
-  const markerClass = useImportanceMarkerClass();
   const row = useSortableTreeRow(entry.id);
 
   // Chips only for linked entities that are not already visible as tokens in the text.
@@ -166,40 +159,7 @@ export function EntryItem({
     <>
       {menuItems}
       <DropdownMenuSeparator />
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
-          <span className={cn('size-2.5', markerClass(entry.importance))} />
-          {t('importance.label')}
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup
-            value={String(entry.importance)}
-            onValueChange={(value) =>
-              updateEntry.mutate(
-                { id: entry.id, input: { importance: Number(value) } },
-                { onError: () => notifyError(t('errors.unknown')) },
-              )
-            }
-          >
-            {IMPORTANCE_LEVELS.map((level) => (
-              <DropdownMenuRadioItem key={level} value={String(level)}>
-                <span className={cn('size-2.5', markerClass(level))} />
-                {t(`importance.levels.${level}`)}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
-      <DropdownMenuItem
-        onClick={() =>
-          void navigator.clipboard.writeText(entry.content).then(
-            () => notifySuccess(t('common.copied')),
-            () => notifyError(t('errors.unknown')),
-          )
-        }
-      >
-        <Copy className="size-3.5" /> {t('common.copyText')}
-      </DropdownMenuItem>
+      <EntryQuickItems entry={entry} />
     </>
   );
 

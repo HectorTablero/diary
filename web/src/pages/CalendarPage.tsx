@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router';
 import { useCalendarMonth, useOnThisDay, usePeople } from '@/api/hooks';
 import { useImportanceMarkerClass } from '@/components/entry/ImportanceDot';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
+import { EntryMenu } from '@/components/entry/EntryMenu';
 import { EntryRow } from '@/components/person/EntryRow';
 import { HintTooltip } from '@/components/common/HintTooltip';
 import { Button } from '@/components/ui/button';
@@ -406,9 +407,11 @@ export default function CalendarPage() {
           </h2>
           <ul className="flex flex-col gap-2">
             {onThisDay.map((entry) => (
-              <li key={entry.id} className="rounded-xl border bg-card p-3 shadow-xs">
-                <EntryRow entry={entry} />
-              </li>
+              <EntryMenu key={entry.id} entry={entry}>
+                <li className="rounded-xl border bg-card p-3 shadow-xs">
+                  <EntryRow entry={entry} />
+                </li>
+              </EntryMenu>
             ))}
           </ul>
         </div>

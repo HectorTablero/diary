@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useCreateThread,
-  useDeleteEntry,
   useDeleteThread,
   useSettings,
   useThreadEntries,
@@ -17,7 +16,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { Spinner } from '@/components/common/Spinner';
 import { BOTTOM_NAV_ONLY, SIDEBAR_ONLY, SIDEBAR_ONLY_SR } from '@/components/layout/ExploreLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EditEntryDialog } from '@/components/entry/EntryComposer';
+import { EntryMenu } from '@/components/entry/EntryMenu';
 import { EntryRow } from '@/components/person/EntryRow';
 import { ThreadsToggleCard } from '@/components/thread/ThreadsToggleCard';
 import { Button } from '@/components/ui/button';
@@ -125,61 +124,34 @@ function ThreadMembers({ threadId }: { threadId: string }) {
 function ThreadMember({ entry, threadId }: { entry: EntryDto; threadId: string }) {
   const { t } = useTranslation();
   const updateEntry = useUpdateEntry();
-  const deleteEntry = useDeleteEntry();
-  const [editing, setEditing] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   return (
-    <>
-      <ContextMenu
-        menu={
-          <>
-            <DropdownMenuItem onClick={() => setEditing(true)}>
-              <Pencil className="size-3.5" /> {t('diary.editEntry')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                updateEntry.mutate(
-                  {
-                    id: entry.id,
-                    input: {
-                      threads: entry.threads.filter((x) => x.id !== threadId).map((x) => x.id),
-                    },
-                  },
-                  { onError: () => notifyError(t('errors.unknown')) },
-                )
-              }
-            >
-              <Unlink className="size-3.5" /> {t('threads.removeFromThread')}
-            </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-              <Trash2 className="size-3.5" /> {t('common.delete')}
-            </DropdownMenuItem>
-          </>
-        }
-      >
-        <li>
-          <EntryRow entry={entry} showChips={false} />
-        </li>
-      </ContextMenu>
-      <EditEntryDialog entry={entry} open={editing} onOpenChange={setEditing} />
-      <ConfirmDialog
-        open={confirmingDelete}
-        onOpenChange={setConfirmingDelete}
-        title={t('diary.deleteConfirmTitle')}
-        description={t('diary.deleteConfirmDescription')}
-        confirmLabel={t('common.delete')}
-        onConfirm={() =>
-          deleteEntry.mutate(entry.id, {
-            onSuccess: (deletion) => notifyDeleted(t('diary.entryDeleted'), deletion),
-            onError: () => notifyError(t('errors.unknown')),
-          })
-        }
-      />
-    </>
+    <EntryMenu
+      entry={entry}
+      extra={
+        <DropdownMenuItem
+          onClick={() =>
+            updateEntry.mutate(
+              {
+                id: entry.id,
+                input: {
+                  threads: entry.threads.filter((x) => x.id !== threadId).map((x) => x.id),
+                },
+              },
+              { onError: () => notifyError(t('errors.unknown')) },
+            )
+          }
+        >
+          <Unlink className="size-3.5" /> {t('threads.removeFromThread')}
+        </DropdownMenuItem>
+      }
+    >
+      <li>
+        <EntryRow entry={entry} showChips={false} />
+      </li>
+    </EntryMenu>
   );
 }
-
 function ThreadRow({
   thread,
   onEdit,
