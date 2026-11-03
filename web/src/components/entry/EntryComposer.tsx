@@ -6,7 +6,7 @@ import {
   useCreateEntry,
   useCreateTag,
   useCreateThread,
-  usePeople,
+  usePeopleByAffinity,
   useSettings,
   useTags,
   useThreads,
@@ -52,7 +52,7 @@ export function EntryComposer({
 }: EntryComposerProps) {
   const { t } = useTranslation();
   const { data: allTags = [] } = useTags();
-  const { data: allPeople = [] } = usePeople();
+  const allPeople = usePeopleByAffinity();
   const { data: allThreads = [] } = useThreads();
   const { data: settings } = useSettings();
   const threadsOn = useThreadsEnabled();

@@ -3,7 +3,7 @@ import { newObjectId } from '@diary/shared';
 import { AtSign, GripVertical, Hash, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCreateEntry, usePeople, useTags } from '@/api/hooks';
+import { useCreateEntry, usePeopleByAffinity, useTags } from '@/api/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import { PersonChip, TagChip } from '@/components/entry/chips';
 import { EntityPicker } from '@/components/entry/EntityPicker';
@@ -295,7 +295,7 @@ export function SuggestionReviewDialog({
 }: SuggestionReviewDialogProps) {
   const { t } = useTranslation();
   const { data: allTags = [] } = useTags();
-  const { data: allPeople = [] } = usePeople();
+  const allPeople = usePeopleByAffinity();
   const createEntry = useCreateEntry();
   const [draft, setDraft] = useState<DraftNode[]>([]);
   const [accepting, setAccepting] = useState(false);

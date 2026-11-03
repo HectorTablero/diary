@@ -575,18 +575,17 @@ describe('dead letter: bounded', () => {
   });
 
   it('keeps only the newest once past the count cap', async () => {
-    // Timestamps ascending, so "the newest 200" is a fact the assertion can name.
-    await db.deadLetter.bulkAdd(
-      Array.from({ length: 250 }, (_, i) =>
-        deadLetterRow(new Date(Date.UTC(2026, 7, 1, 0, i)).toISOString()),
-      ),
-    );
+    // Timestamps ascending, so "the newest 200" is a fact the assertion can name. Relative to now,
+    // so none of them ever falls past the age cap and gets trimmed for the wrong reason.
+    const start = Date.now() - 86_400_000;
+    const minute = (i: number) => new Date(start + i * 60_000).toISOString();
+    await db.deadLetter.bulkAdd(Array.from({ length: 250 }, (_, i) => deadLetterRow(minute(i))));
 
     await rejectOnce();
 
     expect(await db.deadLetter.count()).toBe(200);
     const oldest = await db.deadLetter.orderBy('failedAt').first();
-    expect(oldest!.failedAt).toBe(new Date(Date.UTC(2026, 7, 1, 0, 51)).toISOString());
+    expect(oldest!.failedAt).toBe(minute(51));
   });
 
   it('drops rows older than the age cap', async () => {

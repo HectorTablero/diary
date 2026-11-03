@@ -1,7 +1,7 @@
 import { MAX_PLUGIN_DOCUMENT_BYTES } from '@diary/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePeople } from '@/api/hooks';
+import { usePeopleByAffinity } from '@/api/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAllPluginDocuments } from '@/db/pluginDocuments';
 import { cn } from '@/lib/utils';
@@ -52,7 +52,7 @@ export function DocumentEditorPanel({
   onDiscarded?: () => void;
 }) {
   const { t } = useTranslation();
-  const { data: people = [] } = usePeople();
+  const people = usePeopleByAffinity();
   const { document, body, loading, tooLong, setBody, flush } = useDocumentEditor(
     documentId,
     onDiscarded,

@@ -14,7 +14,9 @@ import type {
   ThreadUpdateInput,
 } from '@diary/shared';
 import type { ExistingEntryIndex } from '@/lib/backup/conflicts';
+import { useMemo } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getAffinity } from '@/db/affinity';
 import * as mutations from '@/db/mutations';
 import * as repo from '@/db/repo';
 import { apiPost } from '@/lib/apiClient';
@@ -111,6 +113,20 @@ export const usePeople = () =>
     queryKey: ['people'],
     queryFn: () => repo.getPeople(),
   });
+
+/** The people list, most likely to be mentioned first (see db/affinity.ts) — for every
+    @-autocomplete and person picker. Name order until the scores load, and among people with no score yet. */
+export function usePeopleByAffinity(): PersonDto[] {
+  const { data: people } = usePeople();
+  const { data: affinity } = useQuery({
+    queryKey: ['people', 'affinity'],
+    queryFn: () => getAffinity(),
+  });
+  return useMemo(() => {
+    if (!people || !affinity) return people ?? [];
+    return [...people].sort((a, b) => (affinity[b.id] ?? 0) - (affinity[a.id] ?? 0));
+  }, [people, affinity]);
+}
 
 /**
  * The talking-point badge numbers, split out of `usePeople` — only the people list shows them.

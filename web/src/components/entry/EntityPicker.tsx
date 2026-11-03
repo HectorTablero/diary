@@ -10,7 +10,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { fuzzyIncludes } from '@/lib/tokens';
+import { matchNamed } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
 export interface PickerItem {
@@ -53,12 +53,14 @@ export function EntityPicker({
   const selected = new Set(selectedIds);
   /* Filtered here rather than by cmdk, with the same accent-insensitive, alias-aware match the
      composer's @ and # autocomplete use (TokenTextarea.tsx), so both ways of adding a person find
-     the same people. An item found only by an alias names it, as the autocomplete does. */
-  const matches = items.flatMap((item) => {
-    if (fuzzyIncludes(item.label, query)) return [{ item, label: item.label }];
-    const alias = item.aliases?.find((a) => fuzzyIncludes(a, query));
-    return alias ? [{ item, label: `${item.label} (aka. ${alias})` }] : [];
-  });
+     the same people in the same order. An item found by an alias names it, as the autocomplete does. */
+  const matches = matchNamed(
+    items.map((item) => ({ item, name: item.label, aliases: item.aliases })),
+    query,
+  ).map(({ match: { item }, alias }) => ({
+    item,
+    label: alias ? `${item.label} (aka. ${alias})` : item.label,
+  }));
   const canCreate =
     onCreate &&
     query.trim().length > 0 &&

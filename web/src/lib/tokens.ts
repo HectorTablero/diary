@@ -19,6 +19,23 @@ export const fuzzyIncludes = (haystack: string, needle: string) =>
 
 export const fuzzyEquals = (a: string, b: string) => normalize(a) === normalize(b);
 
+/**
+ * Autocomplete matching for anything with a name and nicknames: everything whose name or an alias
+ * contains `query`, in the order given (callers pass people most-likely-first).
+ *
+ * `alias` is set when only a nickname matched, so the row can say why "Carmen" answered "@Mum".
+ */
+export function matchNamed<T extends { name: string; aliases?: string[] }>(
+  items: T[],
+  query: string,
+): { match: T; alias?: string }[] {
+  return items.flatMap((item) => {
+    if (fuzzyIncludes(item.name, query)) return [{ match: item }];
+    const alias = item.aliases?.find((a) => fuzzyIncludes(a, query));
+    return alias === undefined ? [] : [{ match: item, alias }];
+  });
+}
+
 export interface MatchSegment {
   text: string;
   matched: boolean;

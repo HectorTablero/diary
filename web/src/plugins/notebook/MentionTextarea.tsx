@@ -2,7 +2,7 @@ import type { PersonDto } from '@diary/shared';
 import { FileText, User } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { detectActiveToken, fuzzyIncludes } from '@/lib/tokens';
+import { detectActiveToken, fuzzyIncludes, matchNamed } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 import { caretPosition } from './caret';
 import { FormulaPreview, useFormulaHover, useInvalidFormulas } from './FormulaPreview';
@@ -269,16 +269,10 @@ export function MentionTextarea({
         .slice(0, 6)
         .map((doc) => ({ id: doc.id, inserted: `[[${doc.id}]]`, label: doc.label }));
     }
-    const matchedAlias = (person: PersonDto) =>
-      person.aliases.find((alias) => fuzzyIncludes(alias, token.query));
-    return people
-      .filter(
-        (p) => !token.query || fuzzyIncludes(p.name, token.query) || matchedAlias(p) !== undefined,
-      )
+    return matchNamed(people, token.query)
       .slice(0, 6)
-      .map((p) => {
+      .map(({ match: p, alias }) => {
         // Show the nickname that matched, so picking "Carmen" after typing "@Mum" isn't a surprise.
-        const alias = fuzzyIncludes(p.name, token.query) ? undefined : matchedAlias(p);
         return {
           id: p.id,
           inserted: `@${p.name}`,

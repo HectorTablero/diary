@@ -6,6 +6,7 @@ import {
   detectActiveToken,
   fuzzyEquals,
   fuzzyIncludes,
+  matchNamed,
   segmentContent,
   type ActiveToken,
 } from '@/lib/tokens';
@@ -98,17 +99,10 @@ export function TokenTextarea({
   const suggestions = useMemo<Suggestion[]>(() => {
     if (!token) return [];
     if (token.type === '@') {
-      const matchedAlias = (person: MentionablePerson) =>
-        person.aliases?.find((alias) => fuzzyIncludes(alias, token.query));
-      return people
-        .filter(
-          (p) =>
-            !token.query || fuzzyIncludes(p.name, token.query) || matchedAlias(p) !== undefined,
-        )
+      return matchNamed(people, token.query)
         .slice(0, 6)
-        .map((p) => {
+        .map(({ match: p, alias }) => {
           // Show the nickname that matched, so picking "Carmen" after typing "@Mum" isn't a surprise.
-          const alias = fuzzyIncludes(p.name, token.query) ? undefined : matchedAlias(p);
           return {
             key: p.id,
             label: alias ? `${p.name} (aka. ${alias})` : p.name,

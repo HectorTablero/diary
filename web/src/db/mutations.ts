@@ -28,6 +28,7 @@ import {
 import { generateKeyBetween } from 'fractional-indexing';
 import { ApiError } from '@/lib/apiClient';
 import type { BackupResolution } from '@/lib/backup/conflicts';
+import { AFFINITY_POINTS, addAffinity } from './affinity';
 import type {
   EntryBackupRow,
   PersonBackupRow,
@@ -120,6 +121,7 @@ async function bumpLastCheckup(personIds: string[], at: string): Promise<void> {
     .modify((p) => {
       if (p.lastCheckupAt < at) p.lastCheckupAt = at;
     });
+  await addAffinity(personIds, AFFINITY_POINTS.interaction);
 }
 
 async function entryDto(entryId: string, dateKey: string): Promise<EntryDto> {
@@ -181,6 +183,7 @@ export async function createEntry(input: EntryCreateInput): Promise<EntryDto> {
     updatedAt: createdAt,
   };
   await db.entries.add(entry);
+  await addAffinity(input.people, AFFINITY_POINTS.mention);
   await bumpLastCheckup(saidToIds, createdAt);
   await enqueue('POST', '/entries', { ...input, id, createdAt, orderKey });
   return entryDto(id, input.dateKey);
@@ -238,6 +241,10 @@ export async function updateEntry(entryId: string, input: EntryUpdateInput): Pro
   if (dateChanging) {
     await cascadeDateKey(entryId, input.dateKey!, now);
   }
+  await addAffinity(
+    (input.people ?? []).filter((id) => !entry.peopleIds.includes(id)),
+    AFFINITY_POINTS.mention,
+  );
   await bumpLastCheckup(newlySaid, now);
   await enqueue('PATCH', `/entries/${entryId}`, dateChanging ? { ...input, orderKey } : input);
   return entryDto(entryId, updated.dateKey);
@@ -414,6 +421,7 @@ export async function createPerson(input: PersonCreateInput): Promise<PersonDto>
     lastCheckupAt: createdAt,
     createdAt,
   });
+  await addAffinity([id], AFFINITY_POINTS.created);
   await enqueue('POST', '/people', { ...input, id, createdAt, checkupIntervalDays });
   return getPerson(id);
 }
@@ -761,6 +769,7 @@ export async function markCheckup(personId: string): Promise<PersonDto> {
       p.lastCheckupAt = nowIso();
     });
   if (!count) throw new ApiError(404, 'person.not_found');
+  await addAffinity([personId], AFFINITY_POINTS.interaction);
   await enqueue('PUT', `/people/${personId}/checkup`);
   return getPerson(personId);
 }
