@@ -11,8 +11,9 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { webcrypto } from 'node:crypto';
 import { toast } from 'sonner';
-import { afterEach, beforeEach } from 'vitest';
+import { afterAll, afterEach, beforeEach } from 'vitest';
 import i18n, { seedCoreLanguage } from '../i18n';
+import { authClient } from '../lib/authClient';
 import en from '../i18n/locales/en.json';
 import { queryClient } from '../lib/queryClient';
 import { resetDb } from './seed';
@@ -154,4 +155,17 @@ afterEach(() => {
   /* The harness renders against the app's singleton QueryClient on purpose (see
      renderWithProviders), which means cached queries outlive a test unless they are cleared here. */
   queryClient.clear();
+});
+
+/* better-auth's session is a nanostore, and nanostores runs a store's unmount cleanup on a 1s
+   `setTimeout` after its last subscriber leaves. That cleanup touches `window`. When the last test
+   in a file unmounts a `useSession` caller (EntryTree, EntryComposer), the file can finish and
+   jsdom be torn down inside that second — the timer then fires into a bare Node global and throws
+   `window is not defined`, failing the run as an unhandled error. Wait it out while jsdom is still
+   here, but only when the store is actually mounted, so files that never render it pay nothing.
+   (`active` is nanostores' lifecycle flag; files that vi.mock authClient leave it unset.) */
+afterAll(async () => {
+  if ((authClient.$store.atoms.session as { active?: boolean }).active) {
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+  }
 });
