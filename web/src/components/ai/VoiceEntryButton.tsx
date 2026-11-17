@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useVoiceToSuggestions } from '@/hooks/useVoiceToSuggestions';
 import { cn } from '@/lib/utils';
 import { SuggestionReviewDialog } from './SuggestionReviewDialog';
+import { TranscriptFailureDialog } from './TranscriptFailureDialog';
 
 /** Mic button in the entry composer: records a take and hands the resulting suggestions to the
     review dialog (see useVoiceToSuggestions for the pipeline itself). Always top-level — the
@@ -20,9 +21,10 @@ export function VoiceEntryButton({
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const { phase, recorder, start, suggestions, clearSuggestions } = useVoiceToSuggestions({
-    dateKey,
-  });
+  const { phase, recorder, start, suggestions, clearSuggestions, failure, clearFailure } =
+    useVoiceToSuggestions({
+      dateKey,
+    });
 
   const startRecording = () => {
     if (disabled) {
@@ -93,6 +95,7 @@ export function VoiceEntryButton({
           if (!open) clearSuggestions();
         }}
       />
+      <TranscriptFailureDialog failure={failure} onClose={clearFailure} />
     </>
   );
 }

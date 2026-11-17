@@ -190,13 +190,15 @@ export interface SettingsDto {
      server, so they are not in the settings response, not in the IndexedDB mirror, and not in a
      backup file. */
 
-  /** A Groq key is stored. Groq powers transcription, and text generation when neither of the
-      others is set. Without one the voice assistant is off. */
+  /** A Groq key is stored. Groq powers transcription, and text generation when no custom
+      endpoint is configured. Without one the voice assistant is off. */
   hasGroqKey: boolean;
-  /** An OpenRouter key is stored; when so, it handles text/tool-calling instead of Groq. */
-  hasOpenRouterKey: boolean;
-  /** A Cerebras key is stored; takes precedence over both of the above for text/tool-calling. */
-  hasCerebrasKey: boolean;
+  /** A custom OpenAI-compatible endpoint, e.g. `https://openrouter.ai/api/v1`. "" = none. When
+      it, `aiModel` and a key are all set, it handles text/tool-calling ahead of Groq. */
+  aiBaseUrl: string;
+  aiModel: string;
+  /** A key for the custom endpoint is stored. */
+  hasAiKey: boolean;
 }
 
 // --- AI voice assistant ---

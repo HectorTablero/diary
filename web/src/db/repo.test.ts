@@ -373,8 +373,7 @@ describe('getSettings · threadsEnabled', () => {
   it('keeps it derived when another setting is saved', async () => {
     const { saveSettings } = await import('./mutations');
     await setMeta('settings', unchosen);
-    const { hasGroqKey, hasOpenRouterKey, hasCerebrasKey, threadsEnabled, ...input } =
-      await repo.getSettings();
+    const { hasGroqKey, hasAiKey, threadsEnabled, ...input } = await repo.getSettings();
 
     await saveSettings({ ...input, epsilon: 0.02 });
     await db.threads.add(aThread);

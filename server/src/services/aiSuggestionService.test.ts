@@ -1,4 +1,4 @@
-import { CEREBRAS_API_BASE, GROQ_API_BASE, OPENROUTER_API_BASE } from '@diary/shared';
+import { GROQ_API_BASE } from '@diary/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError } from '../errors';
 import type { ChatMessage } from '../lib/aiChatClient';
@@ -6,12 +6,14 @@ import { modelDouble, resetModels } from '../test/mongooseDouble';
 
 /* Provider failover.
  *
- * A user's keys are free or near-free tiers, so "has a Cerebras key" and "Cerebras will answer
- * right now" are different statements: the account runs dry and the provider answers 402. Adding a
- * second provider key is exactly what a user does about that, so a request that dies on the first
- * key while a second one sits configured and unused is the failure worth pinning here — it looks
- * like a plain upstream 502 from the outside and nothing else in the system notices.
+ * A user's keys are often free or near-free tiers, so "has a custom endpoint" and "it will answer
+ * right now" are different statements: the account runs dry and the provider answers 402. Groq is
+ * configured anyway for transcription, so a request that dies on the custom endpoint while the Groq
+ * key sits unused is the failure worth pinning here — it looks like a plain upstream 502 from the
+ * outside and nothing else in the system notices.
  */
+
+const CUSTOM_BASE = 'https://llm.example.com/v1';
 
 const chat = vi.hoisted(() => vi.fn());
 vi.mock('../lib/aiChatClient', async (importOriginal) => ({
@@ -91,17 +93,18 @@ beforeEach(() => {
   resetModels(Person.value as ReturnType<typeof modelDouble>);
   settings.getSettings.mockResolvedValue({ forceEnglishAIEvents: false, maxSubEntryDepth: 2 });
   settings.getProviderKeys.mockResolvedValue({
-    cerebrasApiKey: 'cere-key',
-    openRouterApiKey: 'or-key',
-    groqApiKey: '',
+    aiBaseUrl: `${CUSTOM_BASE}/`,
+    aiModel: 'custom-model',
+    aiApiKey: 'custom-key',
+    groqApiKey: 'groq-key',
   });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 describe('provider failover', () => {
   it('falls back to the next key when the first account is out of credit', async () => {
-    // Cerebras' 402 — the account is empty, the key is fine. Nothing about it says anything about
-    // the OpenRouter key sitting right behind it.
+    // A 402 — the account is empty, the key is fine. Nothing about it says anything about the
+    // Groq key sitting right behind it.
     chat.mockRejectedValueOnce(new HttpError(402, 'ai.quota_exhausted'));
     chat.mockResolvedValueOnce(submits('Bought milk'));
 
@@ -110,7 +113,7 @@ describe('provider failover', () => {
     expect(entries).toEqual([
       { content: 'Bought milk', importance: 3, tags: [], people: [], children: [] },
     ]);
-    expect(calledBaseUrls()).toEqual([CEREBRAS_API_BASE, OPENROUTER_API_BASE]);
+    expect(calledBaseUrls()).toEqual([CUSTOM_BASE, GROQ_API_BASE]);
   });
 
   it.each([
@@ -124,7 +127,7 @@ describe('provider failover', () => {
     chat.mockResolvedValueOnce(submits('Bought milk'));
 
     await expect(run()).resolves.toHaveLength(1);
-    expect(calledBaseUrls()).toEqual([CEREBRAS_API_BASE, OPENROUTER_API_BASE]);
+    expect(calledBaseUrls()).toEqual([CUSTOM_BASE, GROQ_API_BASE]);
   });
 
   it('carries the conversation over when a provider dies mid-loop', async () => {
@@ -139,7 +142,7 @@ describe('provider failover', () => {
     ]);
     /* The messages are provider-neutral, so the second provider resumes the same conversation
        rather than starting over — the tool call the first provider made, and the result we fed
-       back to it, are both still in the transcript OpenRouter is handed. */
+       back to it, are both still in the transcript Groq is handed. */
     const resumed = chat.mock.calls[2][2] as { messages: ChatMessage[] };
     expect(resumed.messages.map((m) => m.role)).toContain('tool');
     expect(resumed.messages[2]?.tool_calls?.[0]?.function.name).toBe('query_people');
@@ -156,10 +159,10 @@ describe('provider failover', () => {
     /* Whatever emptied the account is still true a second later. Retrying it once per tool
        iteration would pay the round trip — and the 429 backoff inside chatCompletion — every time,
        for a call that cannot succeed. */
-    expect(calledBaseUrls()).toEqual([CEREBRAS_API_BASE, OPENROUTER_API_BASE, OPENROUTER_API_BASE]);
+    expect(calledBaseUrls()).toEqual([CUSTOM_BASE, GROQ_API_BASE, GROQ_API_BASE]);
   });
 
-  it('hands each provider its own key, model and headers', async () => {
+  it('hands each provider its own key and model', async () => {
     chat.mockRejectedValueOnce(new HttpError(402, 'ai.quota_exhausted'));
     chat.mockResolvedValueOnce(submits('Bought milk'));
 
@@ -167,46 +170,50 @@ describe('provider failover', () => {
 
     // The model name is per provider, not per request: falling back with the previous provider's
     // model id would just turn one failure into a different one.
-    const [, cerebrasKey, cerebrasBody] = chat.mock.calls[0] as [string, string, { model: string }];
-    const [, openRouterKey, openRouterBody, openRouterHeaders] = chat.mock.calls[1] as [
-      string,
-      string,
-      { model: string },
-      Record<string, string>,
-    ];
-    expect(cerebrasKey).toBe('cere-key');
-    expect(openRouterKey).toBe('or-key');
-    expect(openRouterBody.model).not.toBe(cerebrasBody.model);
-    expect(openRouterHeaders).toMatchObject({ 'X-Title': 'Diary' });
+    const [, customKey, customBody] = chat.mock.calls[0] as [string, string, { model: string }];
+    const [, groqKey, groqBody] = chat.mock.calls[1] as [string, string, { model: string }];
+    expect(customKey).toBe('custom-key');
+    expect(customBody.model).toBe('custom-model');
+    expect(groqKey).toBe('groq-key');
+    expect(groqBody.model).not.toBe('custom-model');
+  });
+
+  it('skips a custom endpoint that is missing its model', async () => {
+    settings.getProviderKeys.mockResolvedValue({
+      aiBaseUrl: CUSTOM_BASE,
+      aiModel: '',
+      aiApiKey: 'custom-key',
+      groqApiKey: 'groq-key',
+    });
+    chat.mockResolvedValueOnce(submits('Bought milk'));
+
+    await run();
+
+    expect(calledBaseUrls()).toEqual([GROQ_API_BASE]);
   });
 
   it("reports the last provider's failure when every key is spent", async () => {
-    settings.getProviderKeys.mockResolvedValue({
-      cerebrasApiKey: 'cere-key',
-      openRouterApiKey: 'or-key',
-      groqApiKey: 'groq-key',
-    });
     chat.mockRejectedValueOnce(new HttpError(402, 'ai.quota_exhausted'));
-    chat.mockRejectedValueOnce(new HttpError(429, 'ai.rate_limited'));
     chat.mockRejectedValueOnce(new HttpError(400, 'ai.invalid_key'));
 
     // The real reason the request could not be served, not a generic upstream error — the first
     // provider's 402 is no longer the interesting one once a later key turned out to be invalid.
     await expect(run()).rejects.toMatchObject({ status: 400, code: 'ai.invalid_key' });
-    expect(calledBaseUrls()).toEqual([CEREBRAS_API_BASE, OPENROUTER_API_BASE, GROQ_API_BASE]);
+    expect(calledBaseUrls()).toEqual([CUSTOM_BASE, GROQ_API_BASE]);
   });
 
   it('does not burn a second key on a bug in our own code', async () => {
     chat.mockRejectedValueOnce(new TypeError('messages is not iterable'));
 
     await expect(run()).rejects.toBeInstanceOf(TypeError);
-    expect(calledBaseUrls()).toEqual([CEREBRAS_API_BASE]);
+    expect(calledBaseUrls()).toEqual([CUSTOM_BASE]);
   });
 
   it('refuses without a single key rather than calling anything', async () => {
     settings.getProviderKeys.mockResolvedValue({
-      cerebrasApiKey: '',
-      openRouterApiKey: '',
+      aiBaseUrl: '',
+      aiModel: '',
+      aiApiKey: '',
       groqApiKey: '',
     });
 

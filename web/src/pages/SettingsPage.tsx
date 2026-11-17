@@ -33,8 +33,9 @@ import {
   LanguageSetting,
   WeekStartSetting,
 } from '@/components/settings/deviceSettings';
-import { buildPayload, LEVELS } from '@/components/settings/payload';
+import { buildPayload, isValidAiBaseUrl, LEVELS } from '@/components/settings/payload';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberInput } from '@/components/ui/number-input';
 import {
@@ -169,10 +170,7 @@ export default function SettingsPage() {
    * because PUT /settings replaces the document — sending only the key would blank everything
    * else. The optimistic local mirror keeps just the has*Key flag (see mutations.saveSettings).
    */
-  const saveApiKey = (
-    field: 'groqApiKey' | 'openRouterApiKey' | 'cerebrasApiKey',
-    value: string,
-  ) => {
+  const saveApiKey = (field: 'groqApiKey' | 'aiApiKey', value: string) => {
     if (!draft) return;
     const payload = buildPayload(draft, checkupsEnabled, checkupIntervalDays);
     if (!payload) return;
@@ -753,50 +751,56 @@ export default function SettingsPage() {
                   </>
                 }
               />
+              {/* Any OpenAI-compatible endpoint. The url and model are plain settings that autosave
+                  on blur like the rest of the page; only the key goes through ApiKeyField. */}
+              <div className="flex flex-col gap-1.5 border-t pt-4">
+                <Label htmlFor="ai-base-url">{t('settings.ai.baseUrl')}</Label>
+                <Input
+                  id="ai-base-url"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={aiDisabled}
+                  value={draft.aiBaseUrl}
+                  placeholder="https://openrouter.ai/api/v1"
+                  aria-invalid={!isValidAiBaseUrl(draft.aiBaseUrl) || undefined}
+                  aria-describedby="ai-base-url-hint"
+                  onChange={(e) => setDraft({ ...draft, aiBaseUrl: e.target.value })}
+                  onBlur={requestCommit}
+                  className="max-w-sm"
+                />
+                <p id="ai-base-url-hint" className="text-xs text-muted-foreground">
+                  {isValidAiBaseUrl(draft.aiBaseUrl)
+                    ? t('settings.ai.baseUrlHint')
+                    : t('settings.ai.baseUrlInvalid')}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="ai-model">{t('settings.ai.model')}</Label>
+                <Input
+                  id="ai-model"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={aiDisabled}
+                  value={draft.aiModel}
+                  placeholder="openai/gpt-oss-120b"
+                  onChange={(e) => setDraft({ ...draft, aiModel: e.target.value })}
+                  onBlur={requestCommit}
+                  className="max-w-sm"
+                />
+              </div>
               <ApiKeyField
-                id="cerebras-api-key"
-                label={t('settings.ai.cerebrasApiKey')}
-                placeholder={t('settings.ai.cerebrasApiKeyPlaceholder')}
-                hasKey={settings.hasCerebrasKey}
+                id="ai-api-key"
+                label={t('settings.ai.customApiKey')}
+                placeholder={t('settings.ai.customApiKeyPlaceholder')}
+                hasKey={settings.hasAiKey}
                 disabled={aiDisabled}
-                onSave={(value) => saveApiKey('cerebrasApiKey', value)}
-                hint={
-                  <>
-                    {t('settings.ai.cerebrasApiKeyHint')}{' '}
-                    <a
-                      href="https://cloud.cerebras.ai/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline"
-                    >
-                      cloud.cerebras.ai
-                    </a>
-                  </>
-                }
-              />
-              <ApiKeyField
-                id="openrouter-api-key"
-                label={t('settings.ai.openRouterApiKey')}
-                placeholder={t('settings.ai.openRouterApiKeyPlaceholder')}
-                hasKey={settings.hasOpenRouterKey}
-                disabled={aiDisabled}
-                onSave={(value) => saveApiKey('openRouterApiKey', value)}
-                hint={
-                  <>
-                    {t('settings.ai.openRouterApiKeyHint')}{' '}
-                    <a
-                      href="https://openrouter.ai/keys"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline"
-                    >
-                      openrouter.ai/keys
-                    </a>
-                  </>
-                }
+                onSave={(value) => saveApiKey('aiApiKey', value)}
+                hint={t('settings.ai.customApiKeyHint')}
               />
               {/* Below the keys rather than wedged between them: it is about what the AI writes,
-                  not about which provider writes it, and it was splitting the three in two. */}
+                  not about which provider writes it. */}
               <div className="flex items-center justify-between gap-2 border-t pt-4">
                 <div className="flex flex-col gap-0.5">
                   <Label htmlFor="force-english-ai-events">

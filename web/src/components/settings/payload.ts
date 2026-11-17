@@ -1,7 +1,11 @@
 import type { SettingsDto, SettingsInput } from '@diary/shared';
-import { MAX_SUB_ENTRY_DEPTH } from '@diary/shared';
+import { MAX_SUB_ENTRY_DEPTH, settingsSchema } from '@diary/shared';
 
 export const LEVELS = ['1', '2', '3', '4', '5'] as const;
+
+/** Whether the custom endpoint field holds something the server will accept ("" clears it). */
+export const isValidAiBaseUrl = (value: string) =>
+  settingsSchema.shape.aiBaseUrl.safeParse(value).success;
 
 export const clampDays = (value: number, min: number) =>
   Math.min(3650, Math.max(min, Math.round(value)));
@@ -53,6 +57,10 @@ export function buildPayload(
       Math.max(1, Math.round(draft.maxSubEntryDepth)),
     ),
     defaultCheckupIntervalDays: checkupsEnabled ? clampDays(checkupIntervalDays, 1) : null,
+    /* Left out while it isn't a url yet rather than failing the whole save: the field shows the
+       problem, and everything else on the page keeps autosaving meanwhile. */
+    ...(isValidAiBaseUrl(draft.aiBaseUrl) ? { aiBaseUrl: draft.aiBaseUrl.trim() } : {}),
+    aiModel: draft.aiModel.trim(),
     /* No provider keys here on purpose. They are write-only and are not part of the draft at
        all, so the autosave below has nothing to send — and, more to the point, cannot resend a
        stale one. Setting a key is its own explicit save; see `saveApiKey`. */

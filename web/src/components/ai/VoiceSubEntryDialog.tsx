@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { useVoiceToSuggestions } from '@/hooks/useVoiceToSuggestions';
 import { SuggestionReviewDialog } from './SuggestionReviewDialog';
+import { TranscriptFailureDialog } from './TranscriptFailureDialog';
 
 interface VoiceSubEntryDialogProps {
   open: boolean;
@@ -44,13 +45,15 @@ export function VoiceSubEntryDialog({
 }: VoiceSubEntryDialogProps) {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
-  const { phase, recorder, start, suggestions, clearSuggestions } = useVoiceToSuggestions({
-    dateKey,
-    parentPath,
-    // A take that yields nothing (silence, a denied mic, an upstream error) has already toasted;
-    // closing here means the user is never left staring at a dialog with nothing left to do.
-    onSettled: () => onOpenChange(false),
-  });
+  const { phase, recorder, start, suggestions, clearSuggestions, failure, clearFailure } =
+    useVoiceToSuggestions({
+      dateKey,
+      parentPath,
+      // A take that yields nothing (silence, a denied mic) has already toasted, and one that was
+      // transcribed but yielded no entries has had its dialog dismissed; closing here means the
+      // user is never left staring at a dialog with nothing left to do.
+      onSettled: () => onOpenChange(false),
+    });
 
   // Guarded so React 19 StrictMode's double-effect doesn't open the mic twice.
   const startedRef = useRef(false);
@@ -83,7 +86,7 @@ export function VoiceSubEntryDialog({
       {/* Not dismissable once the take is being transcribed/interpreted: the recording is already
           spent, and closing here would throw away a result that is seconds from arriving. */}
       <Dialog
-        open={open && suggestions === null}
+        open={open && suggestions === null && failure === null}
         onOpenChange={(next) => !next && phase === 'idle' && close()}
       >
         {/* The recorder has its own cancel/stop pair, and during processing there is nothing to
@@ -146,6 +149,7 @@ export function VoiceSubEntryDialog({
           onOpenChange(false);
         }}
       />
+      <TranscriptFailureDialog failure={failure} onClose={clearFailure} />
     </>
   );
 }

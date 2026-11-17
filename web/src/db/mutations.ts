@@ -1111,13 +1111,12 @@ export async function saveSettings(input: SettingsInput): Promise<SettingsDto> {
      the local mirror, or making a key "server-only" would have achieved nothing — it would just
      be stored in IndexedDB by a different route. Only the has*Key flags are mirrored, derived
      from whatever was sent, so the UI reflects the change without waiting for a sync. */
-  const { groqApiKey, openRouterApiKey, cerebrasApiKey, ...rest } = input;
+  const { groqApiKey, aiApiKey, ...rest } = input;
   const settings: SettingsDto = {
     ...current,
     ...rest,
     ...(groqApiKey !== undefined ? { hasGroqKey: groqApiKey !== '' } : {}),
-    ...(openRouterApiKey !== undefined ? { hasOpenRouterKey: openRouterApiKey !== '' } : {}),
-    ...(cerebrasApiKey !== undefined ? { hasCerebrasKey: cerebrasApiKey !== '' } : {}),
+    ...(aiApiKey !== undefined ? { hasAiKey: aiApiKey !== '' } : {}),
   };
   // A threadsEnabled that getSettings derived stays derived: writing it back here would turn "never
   // chosen" into a choice the moment any other setting is saved.
@@ -1132,7 +1131,7 @@ export async function saveSettings(input: SettingsInput): Promise<SettingsDto> {
 /** One field changed from outside the Settings page. PUT /settings takes the whole payload, so this
     resends the current settings; the has*Key flags are dropped because they aren't input fields. */
 export async function setThreadsEnabled(threadsEnabled: boolean): Promise<SettingsDto> {
-  const { hasGroqKey, hasOpenRouterKey, hasCerebrasKey, ...current } = await getSettings();
+  const { hasGroqKey, hasAiKey, ...current } = await getSettings();
   return saveSettings({ ...current, threadsEnabled });
 }
 

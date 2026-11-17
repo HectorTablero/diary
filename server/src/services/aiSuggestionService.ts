@@ -3,17 +3,12 @@ import {
   AI_MAX_SUBMIT_REMINDERS,
   AI_MAX_SUGGESTION_NODES,
   AI_MAX_TOOL_ITERATIONS,
-  CEREBRAS_API_BASE,
-  CEREBRAS_CHAT_MODEL,
   GROQ_API_BASE,
   GROQ_CHAT_MODEL,
   MAX_CONTENT_LENGTH,
-  OPENROUTER_API_BASE,
-  OPENROUTER_CHAT_MODEL,
 } from '@diary/shared';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { config } from '../config';
 import { badRequest, HttpError } from '../errors';
 import {
   chatCompletion,
@@ -288,32 +283,22 @@ interface Provider {
   baseUrl: string;
   apiKey: string;
   model: string;
-  headers?: Record<string, string>;
 }
 
-/** Cerebras and OpenRouter are used for text/tool-calling; Groq is always required for
-    transcription but also works as the text fallback so the assistant still functions with just
-    a Groq key.
+/** The user's custom OpenAI-compatible endpoint is used for text/tool-calling; Groq is always
+    required for transcription but also works as the text fallback so the assistant still
+    functions with just a Groq key.
 
-    Every key the user has, in preference order — not just the first one. These are free or
-    near-free tiers that run dry, so "has a Cerebras key" is not the same as "Cerebras will answer
-    right now", and a user who configured a second provider did so precisely for that case. */
+    Both, in preference order — not just the first one. These are often free or near-free tiers
+    that run dry, so "has a custom endpoint" is not the same as "it will answer right now". */
 function buildProviders(keys: ProviderKeys): Provider[] {
   const providers: Provider[] = [];
-  if (keys.cerebrasApiKey) {
+  if (keys.aiBaseUrl && keys.aiModel && keys.aiApiKey) {
     providers.push({
-      baseUrl: CEREBRAS_API_BASE,
-      apiKey: keys.cerebrasApiKey,
-      model: CEREBRAS_CHAT_MODEL,
-    });
-  }
-  if (keys.openRouterApiKey) {
-    providers.push({
-      baseUrl: OPENROUTER_API_BASE,
-      apiKey: keys.openRouterApiKey,
-      model: OPENROUTER_CHAT_MODEL,
-      // Optional but recommended by OpenRouter for inclusion in their public rankings.
-      headers: { 'HTTP-Referer': config.betterAuthUrl, 'X-Title': 'Diary' },
+      // Users paste both `…/v1` and `…/v1/`; chatCompletion appends `/chat/completions`.
+      baseUrl: keys.aiBaseUrl.replace(/\/+$/, ''),
+      apiKey: keys.aiApiKey,
+      model: keys.aiModel,
     });
   }
   if (keys.groqApiKey) {
@@ -343,12 +328,10 @@ function createCompleter(providers: Provider[]) {
     for (; index < providers.length; index++) {
       const provider = providers[index];
       try {
-        return await chatCompletion(
-          provider.baseUrl,
-          provider.apiKey,
-          { ...body, model: provider.model },
-          provider.headers,
-        );
+        return await chatCompletion(provider.baseUrl, provider.apiKey, {
+          ...body,
+          model: provider.model,
+        });
       } catch (err) {
         const next = providers[index + 1];
         if (!next || !isProviderFailure(err)) throw err;

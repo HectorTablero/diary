@@ -7,7 +7,7 @@ import type { AppEnv } from './session';
  *
  * Per *user*, not per IP: everything this guards sits behind requireAuth, and the app is used from
  * phones on carrier NAT where an IP is a whole neighbourhood. The user id is also the thing the
- * cost is attached to — these routes spend the caller's own Groq and OpenRouter quota.
+ * cost is attached to — these routes spend the caller's own Groq and custom-endpoint quota.
  *
  * In-memory, and therefore per-process. That is the right size for how this deploys (one
  * container, per the README) and would need moving to a shared store the moment there are two.

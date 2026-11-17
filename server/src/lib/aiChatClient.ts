@@ -1,7 +1,7 @@
 import { HttpError } from '../errors';
 
-/* Generic OpenAI-compatible chat-completions client — both Groq and OpenRouter speak this
-   same shape, so the tool-calling loop in aiSuggestionService.ts can point at either. */
+/* Generic OpenAI-compatible chat-completions client — Groq and the user's custom endpoint both
+   speak this same shape, so the tool-calling loop in aiSuggestionService.ts can point at either. */
 
 export interface ToolCall {
   id: string;
@@ -31,8 +31,8 @@ export interface ChatCompletionResponse {
 
 function mapErrorResponse(res: Response): HttpError {
   if (res.status === 401 || res.status === 403) return new HttpError(400, 'ai.invalid_key');
-  // The key is fine, the account isn't: Cerebras and OpenRouter both answer 402 once the free
-  // allowance or the prepaid balance is gone. Unlike a 429 this does not clear on its own.
+  // The key is fine, the account isn't: OpenRouter, Cerebras and others answer 402 once the
+  // free allowance or the prepaid balance is gone. Unlike a 429 this does not clear on its own.
   if (res.status === 402) return new HttpError(402, 'ai.quota_exhausted');
   if (res.status === 429) return new HttpError(429, 'ai.rate_limited');
   return new HttpError(502, 'ai.upstream_error');
@@ -86,7 +86,6 @@ export async function chatCompletion(
   baseUrl: string,
   apiKey: string,
   body: ChatCompletionRequest,
-  extraHeaders?: Record<string, string>,
 ): Promise<ChatCompletionResponse> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let res: Response;
@@ -96,7 +95,6 @@ export async function chatCompletion(
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
-          ...extraHeaders,
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(60_000),

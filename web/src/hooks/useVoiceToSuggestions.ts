@@ -19,11 +19,19 @@ import { transcribeAudio } from '@/lib/transcribe';
 
 export type VoicePhase = 'idle' | 'transcribing' | 'thinking';
 
+/** A take that was transcribed but produced no entries — kept so the words aren't lost. */
+export interface TranscriptFailure {
+  transcript: string;
+  /** Translated reason when the suggestions call failed; absent when it found nothing. */
+  error?: string;
+}
+
 interface UseVoiceToSuggestionsOptions {
   dateKey: string;
   /** Contents of the entries these suggestions will be nested under; empty = top-level. */
   parentPath?: string[];
-  /** Called once a take is fully resolved (success, failure or empty) and the UI is idle again. */
+  /** Called once a take is fully resolved (success, failure or empty) and the UI is idle again —
+      for a transcript that yielded no entries, once its dialog has been dismissed. */
   onSettled?: () => void;
 }
 
@@ -37,6 +45,7 @@ export function useVoiceToSuggestions({
   const aiSuggestions = useAiSuggestions();
   const [phase, setPhase] = useState<VoicePhase>('idle');
   const [suggestions, setSuggestions] = useState<SuggestedEntryNode[] | null>(null);
+  const [failure, setFailure] = useState<TranscriptFailure | null>(null);
 
   const handleStop = async (blob: Blob | null) => {
     if (!blob || !settings?.hasGroqKey) {
@@ -45,8 +54,9 @@ export function useVoiceToSuggestions({
       return;
     }
     setPhase('transcribing');
+    let transcript = '';
     try {
-      const transcript = await transcribeAudio(blob);
+      transcript = await transcribeAudio(blob);
       if (!transcript) {
         notifyError(t('ai.empty'));
         setPhase('idle');
@@ -62,17 +72,18 @@ export function useVoiceToSuggestions({
         language: i18n.language.split('-')[0],
         parentPath,
       });
-      if (!entries.length) {
-        notifyError(t('ai.empty'));
-        setPhase('idle');
-        onSettled?.();
-        return;
-      }
-      setSuggestions(entries);
+      if (entries.length) setSuggestions(entries);
+      else setFailure({ transcript });
       setPhase('idle');
     } catch (err) {
-      notifyError(t(err instanceof ApiError ? err.code : 'errors.unknown'));
+      const error = t(err instanceof ApiError ? err.code : 'errors.unknown');
       setPhase('idle');
+      // Transcribed but not interpreted: show the words rather than dropping them with a toast.
+      if (transcript) {
+        setFailure({ transcript, error });
+        return;
+      }
+      notifyError(error);
       onSettled?.();
     }
   };
@@ -91,6 +102,10 @@ export function useVoiceToSuggestions({
   }, [recorder, t]);
 
   const clearSuggestions = useCallback(() => setSuggestions(null), []);
+  const clearFailure = () => {
+    setFailure(null);
+    onSettled?.();
+  };
 
-  return { phase, recorder, start, suggestions, clearSuggestions };
+  return { phase, recorder, start, suggestions, clearSuggestions, failure, clearFailure };
 }

@@ -118,8 +118,19 @@ describe('PUT /settings', () => {
        outbox, with nothing on screen to explain it. */
     const set = updateSet();
     expect('groqApiKey' in set).toBe(false);
-    expect('openRouterApiKey' in set).toBe(false);
-    expect('cerebrasApiKey' in set).toBe(false);
+    expect('aiApiKey' in set).toBe(false);
+  });
+
+  it('rejects a custom endpoint that is not an http(s) url', async () => {
+    const res = await postJson(
+      app,
+      '/settings',
+      validBody({ aiBaseUrl: 'api.example.com' }),
+      'PUT',
+    );
+
+    expect(res.status).toBe(400);
+    expect(UserSettings.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it('stores a provider key that is present', async () => {

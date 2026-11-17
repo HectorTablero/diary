@@ -56,16 +56,18 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
     defaultCheckupIntervalDays: doc.defaultCheckupIntervalDays,
     // Presence only. The keys stay here; see getProviderKeys.
     hasGroqKey: !!doc.groqApiKey?.trim(),
-    hasOpenRouterKey: !!doc.openRouterApiKey?.trim(),
-    hasCerebrasKey: !!doc.cerebrasApiKey?.trim(),
+    aiBaseUrl: doc.aiBaseUrl ?? '',
+    aiModel: doc.aiModel ?? '',
+    hasAiKey: !!doc.aiApiKey?.trim(),
   };
 }
 
-/** The stored provider keys, in the clear. */
+/** The stored provider keys, in the clear, plus the custom endpoint they go with. */
 export interface ProviderKeys {
   groqApiKey: string;
-  openRouterApiKey: string;
-  cerebrasApiKey: string;
+  aiApiKey: string;
+  aiBaseUrl: string;
+  aiModel: string;
 }
 
 /**
@@ -79,11 +81,12 @@ export interface ProviderKeys {
 export async function getProviderKeys(userId: string): Promise<ProviderKeys> {
   const doc = await UserSettings.findOne(
     { userId },
-    'groqApiKey openRouterApiKey cerebrasApiKey',
+    'groqApiKey aiApiKey aiBaseUrl aiModel',
   ).lean();
   return {
     groqApiKey: doc?.groqApiKey?.trim() ?? '',
-    openRouterApiKey: doc?.openRouterApiKey?.trim() ?? '',
-    cerebrasApiKey: doc?.cerebrasApiKey?.trim() ?? '',
+    aiApiKey: doc?.aiApiKey?.trim() ?? '',
+    aiBaseUrl: doc?.aiBaseUrl?.trim() ?? '',
+    aiModel: doc?.aiModel?.trim() ?? '',
   };
 }

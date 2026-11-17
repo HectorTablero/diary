@@ -73,13 +73,13 @@ export const DEFAULT_SETTINGS = {
   defaultCheckupIntervalDays: null as number | null,
   /* Whether each provider key is stored — never the keys themselves. See SettingsDto. */
 
-  /** Groq powers transcription, and text generation when neither of the others is set. */
+  /** Groq powers transcription, and text generation when no custom endpoint is configured. */
   hasGroqKey: false,
-  /** When set, handles text/tool-calling instead of Groq (OpenRouter has no speech-to-text, so
-      transcription still goes through Groq either way). */
-  hasOpenRouterKey: false,
-  /** Same as above, and takes precedence over OpenRouter. */
-  hasCerebrasKey: false,
+  /** Any OpenAI-compatible endpoint (base url + model + key). When all three are set it handles
+      text/tool-calling ahead of Groq; transcription still goes through Groq either way. */
+  aiBaseUrl: '',
+  aiModel: '',
+  hasAiKey: false,
 };
 
 // --- AI voice assistant ---
@@ -89,13 +89,6 @@ export const GROQ_WHISPER_MODEL = 'whisper-large-v3-turbo';
 export const GROQ_WHISPER_FALLBACK_MODEL = 'whisper-large-v3';
 /** Single point of change if this model id ever moves or is renamed on Groq. */
 export const GROQ_CHAT_MODEL = 'openai/gpt-oss-120b';
-export const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
-/** Single point of change if this model id ever moves or is renamed on OpenRouter. */
-export const OPENROUTER_CHAT_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
-export const CEREBRAS_API_BASE = 'https://api.cerebras.ai/v1';
-/** Single point of change if this model id ever moves or is renamed on Cerebras. */
-export const CEREBRAS_CHAT_MODEL = 'gemma-4-31b';
-// export const CEREBRAS_CHAT_MODEL = 'gpt-oss-120b';
 export const AI_MAX_TOOL_ITERATIONS = 8;
 export const AI_MAX_SUBMIT_REMINDERS = 2;
 export const AI_MAX_TRANSCRIPT_LENGTH = 20_000;

@@ -349,8 +349,16 @@ export const settingsSchema = z.object({
      any save that didn't touch the AI section) must not wipe the stored keys on replay. An
      explicit "" is how one gets cleared. */
   groqApiKey: z.string().trim().max(200).optional(),
-  openRouterApiKey: z.string().trim().max(200).optional(),
-  cerebrasApiKey: z.string().trim().max(200).optional(),
+  aiApiKey: z.string().trim().max(500).optional(),
+  /* The custom endpoint itself is not secret, so unlike its key it round-trips through
+     SettingsDto. "" clears it; anything else must be an http(s) url. */
+  aiBaseUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .regex(/^(https?:\/\/\S+)?$/i)
+    .optional(),
+  aiModel: z.string().trim().max(200).optional(),
 });
 
 // --- AI voice assistant ---

@@ -15,7 +15,7 @@
     "interpolation": "{{name}}, {{count}}, {{days}}, {{age}}, {{months}}, {{version}} etc. are substituted verbatim. Keep every one the reference uses; word order may move freely around them. checkI18n compares the set per key, treating variables English omits from one plural variant as optional.",
     "markup": "diary.birthdayLine and birthdayLineWithAge contain a <mention> element rendered as a styled @mention chip. Keep the tag and its contents intact; move it within the sentence as the grammar needs.",
     "sigils": "@ marks a person and # marks a tag; both are typed literally into entry text and parsed by lib/tokens.ts. Never localise or space them away — \"@人物\" is correct, \"@ 人物\" is not.",
-    "brandNames": "Google, WhatsApp, Groq, OpenRouter, Cerebras, Markdown, Android, Tamagotchi and API key placeholders (gsk_…, sk-or-…, csk-…) stay as they are.",
+    "brandNames": "Google, WhatsApp, Groq, OpenRouter, Cerebras, Markdown, Android, Tamagotchi and Together, API key placeholders (gsk_…, sk-…) and example URLs/model ids stay as they are.",
     "examplePlaceholders": "Example phone numbers are localised to a plausible number for the language's main market, keeping the international format the hint is teaching. Email placeholders stay at example.com (an RFC-reserved domain).",
     "ellipsis": "Placeholders and in-progress labels use the single character … , not three dots.",
     "length": "These strings sit in chips, buttons and table cells. Aim at or below the English length; a chip truncates with an ellipsis rather than wrapping."

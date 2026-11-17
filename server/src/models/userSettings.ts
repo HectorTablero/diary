@@ -31,8 +31,10 @@ const userSettingsSchema = new Schema(
        design — `getSettings` reports has*Key booleans instead — so these fields are readable
        only through `getProviderKeys`, and no response can carry one by accident. */
     groqApiKey: { type: String, default: '' },
-    openRouterApiKey: { type: String, default: '' },
-    cerebrasApiKey: { type: String, default: '' },
+    aiApiKey: { type: String, default: '' },
+    // Not secret: these two are reported back through SettingsDto as they are.
+    aiBaseUrl: { type: String, default: '' },
+    aiModel: { type: String, default: '' },
     forceEnglishAIEvents: { type: Boolean, default: DEFAULT_SETTINGS.forceEnglishAIEvents },
     quietNotifications: { type: Boolean, default: DEFAULT_SETTINGS.quietNotifications },
     // `null` is meaningful ("reuse the last one"), so this must be nullable rather than merely
