@@ -68,8 +68,11 @@ test('an entry written offline survives a reload and reaches the server on recon
 
   api.setUnreachable(false);
 
-  const post = await api.waitForCall('POST', /^\/api\/entries$/, 30_000);
-  expect((post.body as { content: string }).content).toBe('Bought milk');
+  // What the server holds again, not `api.waitForCall`: that would return the POST aborted while
+  // unreachable, and the real retry waits on the ten-second reconnect probe.
+  await expect
+    .poll(() => api.state.entries.map((e) => e.content), { timeout: 30_000 })
+    .toEqual(['Bought milk']);
   // The message goes once the queue has drained — the user's signal that nothing is outstanding.
   await expect(syncMessage(page, /change to sync/)).toBeHidden();
 });
@@ -102,5 +105,6 @@ test('the pill distinguishes an unreachable server from a device with no network
      would notice, because the browser never thought it was offline — which is the entire reason
      the probe exists. */
   await expect(page.getByText('Connection restored — syncing…')).toBeVisible({ timeout: 30_000 });
-  await api.waitForCall('POST', /^\/api\/entries$/, 20_000);
+  // Not `waitForCall`, which would return the aborted attempt from before the reconnect.
+  await expect.poll(() => api.state.entries.length, { timeout: 20_000 }).toBe(1);
 });
