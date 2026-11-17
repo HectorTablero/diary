@@ -110,8 +110,26 @@ jobs:
       # Catches a dependency advisory before it ships rather than at the next manual audit.
       # Production dependencies only: a devDependency finding does not reach users, and failing
       # the build on one would make this check something people learn to skip.
+      # Ignored advisories (npm audit has no ignore flag, so the JSON is filtered here). Each needs a
+      # reason and is dropped once a patched release exists:
+      #   GHSA-fc5q-39xc-vjpf picomatch ReDoS. No fix released (<=4.0.7, latest). Only reachable from
+      #     build/test tooling (vite, vitest via better-auth's optional peer) compiling globs from our
+      #     own config; no user input ever becomes a glob pattern.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node -e '
+            const ignored = ["GHSA-fc5q-39xc-vjpf"];
+            const report = require("./audit.json");
+            if (!report.vulnerabilities) { console.error("npm audit failed:", JSON.stringify(report.error ?? report)); process.exit(1); }
+            const { vulnerabilities } = report;
+            const hits = Object.values(vulnerabilities)
+              .flatMap((v) => v.via.filter((a) => typeof a === "object"))
+              .filter((a) => ["high", "critical"].includes(a.severity) && !ignored.some((id) => a.url.endsWith(id)));
+            const uniq = [...new Map(hits.map((a) => [a.url, a])).values()];
+            uniq.forEach((a) => console.error(`${a.severity}: ${a.name} ${a.title} ${a.url}`));
+            process.exit(uniq.length ? 1 : 0);
+          '
 
       - name: Decide whether the app needs rebuilding
         id: scope

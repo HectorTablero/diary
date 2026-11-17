@@ -210,6 +210,11 @@ export function ShortcutsSection() {
                     const isRecording = recordingId === action.id;
                     const conflict = conflicts.get(action.id);
                     const overridden = Object.hasOwn(shortcutOverrides, action.id);
+                    const shown = isRecording
+                      ? t('settings.shortcuts.recording')
+                      : binding
+                        ? formatBinding(binding)
+                        : t('settings.shortcuts.none');
                     return (
                       <li key={action.id} className="flex items-center gap-3 py-1.5">
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -229,7 +234,9 @@ export function ShortcutsSection() {
                           variant="outline"
                           size="sm"
                           aria-pressed={isRecording}
-                          aria-label={t('settings.shortcuts.record', { action: action.label })}
+                          // Starts with the visible text (WCAG 2.5.3 Label in Name), so a voice
+                          // user saying "click Ctrl K" reaches the button that shows Ctrl K.
+                          aria-label={`${shown}, ${t('settings.shortcuts.record', { action: action.label })}`}
                           onClick={() => startRecording(action.id)}
                           onBlur={() => isRecording && setRecordingId(null)}
                           className={cn(
@@ -238,11 +245,7 @@ export function ShortcutsSection() {
                             !isRecording && !binding && 'text-muted-foreground',
                           )}
                         >
-                          {isRecording
-                            ? t('settings.shortcuts.recording')
-                            : binding
-                              ? formatBinding(binding)
-                              : t('settings.shortcuts.none')}
+                          {shown}
                         </Button>
                         {/* Fixed-width slots, so the record buttons stay a column whichever of
                             these a row happens to have. */}

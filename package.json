@@ -1,6 +1,6 @@
 {
   "name": "diary",
-  "version": "9.14.1",
+  "version": "9.14.2",
   "private": true,
   "author": "Héctor Tablero Díaz",
   "license": "ISC",
@@ -57,6 +57,12 @@
     },
     "@hono/node-ws": {
       "@hono/node-server": "$@hono/node-server"
+    },
+    "workbox-build": {
+      "glob": "^14.0.2"
+    },
+    "@ts-morph/common": {
+      "minimatch": "^11.0.1"
     }
   },
   "dependencies": {

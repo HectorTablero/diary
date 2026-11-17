@@ -19,7 +19,7 @@
     "dotenv": "^17.4.2",
     "fractional-indexing": "^4.0.0",
     "hono": "^4.7.0",
-    "mongodb": "^7.5.0",
+    "mongodb": "~7.8.0",
     "mongoose": "^9.9.1",
     "zod": "^4.0.0"
   },
