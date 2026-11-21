@@ -234,6 +234,7 @@
     "unmarkSaid": "Not said yet",
     "hideForPerson": "Never suggest for {{name}}",
     "alreadyTold": "Already told",
+    "decayed": "Faded, never told",
     "noTalkingPoints": "Nothing new to tell",
     "noTalkingPointsDescription": "New entries that mention {{name}} or share their tags will appear here.",
     "noMemories": "No shared memories yet",

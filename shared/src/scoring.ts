@@ -118,6 +118,8 @@ export function buildTalkingPointForest(
   settings: SettingsDto,
   broadcastTagIds: ReadonlySet<string>,
   now: number,
+  /** Flip the epsilon line: match only what has decayed below it (the profile's "faded" fold). */
+  decayed = false,
 ): TalkingPointNode[] {
   const nodes = new Map<string, TalkingPointNode>();
   for (const entry of entries) {
@@ -137,7 +139,7 @@ export function buildTalkingPointForest(
       !entry.saidTo.some((s) => s.personId === personId) &&
       !entry.hiddenFor.includes(personId);
     const score = eligible ? scoreEntry(entry, matchType!, settings, now) : 0;
-    const matched = eligible && score >= settings.epsilon;
+    const matched = eligible && score >= settings.epsilon !== decayed;
     nodes.set(entry.id, {
       ...entry,
       matchType: matched ? matchType : null,

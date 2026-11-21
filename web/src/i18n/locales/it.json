@@ -228,6 +228,7 @@
     "unmarkSaid": "Non ancora detto",
     "hideForPerson": "Non suggerire mai per {{name}}",
     "alreadyTold": "Già raccontato",
+    "decayed": "Svaniti, mai detti",
     "noTalkingPoints": "Niente di nuovo da raccontare",
     "noTalkingPointsDescription": "Le nuove voci che menzionano {{name}} o che condividono le sue etichette appariranno qui.",
     "noMemories": "Ancora nessun ricordo condiviso",

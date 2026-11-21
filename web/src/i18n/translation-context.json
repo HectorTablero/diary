@@ -119,6 +119,7 @@
         "talkingPoints": "The core concept: things from the diary worth telling this person, ranked and decaying over time. Needs a term that reads as \"things worth mentioning\", not \"agenda items\" — Italian uses Spunti, Japanese 話のネタ, Chinese 谈资. It must not collide with the word chosen for threads.",
         "markSaid": "Records that this entry has now been told to this person. The single most-pressed button in the app; keep it short enough for a small outline button.",
         "unmarkSaid": "Reverses a said-mark, in the \"Already told\" list. Reads as a state (\"not said yet\"), not a command.",
+        "decayed": "Fold above \"Already told\" listing entries that matched this person but decayed out of the talking points without ever being said. Short, like alreadyTold.",
         "hideForPerson": "Suppresses one entry for one person forever. {{name}} is the person.",
         "matchMention": "Badge explaining *why* an entry was suggested: it names the person directly. Sits beside matchTag and matchBroadcast in a narrow badge.",
         "matchTag": "Badge: the entry and the person share a tag.",

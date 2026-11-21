@@ -216,6 +216,49 @@ describe('PersonProfilePage · talking points', () => {
     expect(screen.getByRole('button', { name: 'Not said yet' })).toBeInTheDocument();
   });
 
+  it('keeps what decayed without being told behind its own fold, best score first', async () => {
+    await seed({
+      people: [aPerson({ id: PERSON, name: 'Ana' })],
+      entries: [
+        mention('e1', 'Older and faded', { dateKey: '2024-01-01' }),
+        mention('e2', 'Faded more recently', { dateKey: '2025-06-01' }),
+        anEntry({ id: 'e2a', content: 'A detail under it', dateKey: '2025-06-01', parentId: 'e2' }),
+        mention('e3', 'Told long ago', {
+          dateKey: '2025-06-01',
+          saidTo: [{ personId: PERSON, at: '2025-06-02T10:00:00.000Z' }],
+        }),
+      ],
+    });
+    const { user } = renderProfile();
+
+    expect(await screen.findByText('Nothing new to tell')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Faded, never told \(2\)/ }));
+
+    const rows = await screen.findAllByText(/^(Older and faded|Faded more recently)$/);
+    expect(rows.map((r) => r.textContent)).toEqual(['Faded more recently', 'Older and faded']);
+    expect(screen.queryByText('Told long ago')).not.toBeInTheDocument();
+
+    // Sub-entries nest and expand the same way they do in the main list.
+    await user.click(screen.getByRole('button', { name: '+1 hidden sub-entry' }));
+    expect(await screen.findByText('A detail under it')).toBeInTheDocument();
+  });
+
+  it('pages a long "already told" list instead of cutting it off', async () => {
+    const told = { saidTo: [{ personId: PERSON, at: `${TODAY}T10:00:00.000Z` }] };
+    await seed({
+      people: [aPerson({ id: PERSON, name: 'Ana' })],
+      entries: Array.from({ length: 51 }, (_, i) => mention(`e${i}`, `Told ${i}`, told)),
+    });
+    const { user } = renderProfile();
+
+    await user.click(await screen.findByRole('button', { name: /Already told \(51\)/ }));
+    expect(await screen.findAllByText(/^Told \d+$/)).toHaveLength(50);
+
+    await user.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(await screen.findAllByText(/^Told \d+$/)).toHaveLength(51);
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
+  });
+
   it('puts a mistakenly marked entry back into the suggestions', async () => {
     await seed({
       people: [aPerson({ id: PERSON, name: 'Ana' })],

@@ -125,6 +125,8 @@ export interface TalkingPointNode extends EntryDto {
 export interface TalkingPointsResponse {
   active: TalkingPointNode[];
   said: EntryDto[];
+  /** Same forest as `active`, but matching only what decayed below epsilon unsaid. */
+  decayed: TalkingPointNode[];
 }
 
 /**

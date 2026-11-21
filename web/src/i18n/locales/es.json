@@ -232,6 +232,7 @@
     "unmarkSaid": "Aún no contado",
     "hideForPerson": "No sugerir nunca para {{name}}",
     "alreadyTold": "Ya contado",
+    "decayed": "Caducado sin contar",
     "noTalkingPoints": "Nada nuevo que contar",
     "noTalkingPointsDescription": "Las entradas nuevas que mencionen a {{name}} o compartan sus etiquetas aparecerán aquí.",
     "noMemories": "Aún no hay recuerdos compartidos",

@@ -222,6 +222,7 @@
     "unmarkSaid": "还没说过",
     "hideForPerson": "不再为{{name}}推荐",
     "alreadyTold": "已经说过",
+    "decayed": "过时未说",
     "noTalkingPoints": "暂时没有新的可聊",
     "noTalkingPointsDescription": "提到{{name}}或与其共享标签的新记录会出现在这里。",
     "noMemories": "还没有共同的回忆",

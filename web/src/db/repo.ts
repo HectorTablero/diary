@@ -504,10 +504,21 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
   const said = all
     .filter((e) => e.saidTo.some((s) => s.personId === personId))
     .sort(byDateDesc)
-    .slice(0, 50)
     .map((e) => entryToDto(e, maps));
 
-  return { active, said };
+  // The other side of the epsilon line, as a forest so sub-entries nest like the main list. Over
+  // `all`, not `inWindow`: everything past the cutoff has decayed, and it's needed as context too.
+  const decayed = buildTalkingPointForest(
+    all.map((e) => entryToDto(e, maps)),
+    personId,
+    personTagIds,
+    settings,
+    broadcastTagIds,
+    now,
+    true,
+  );
+
+  return { active, said, decayed };
 }
 
 /** Full index for backup-import conflict detection: every id plus a content fingerprint map so

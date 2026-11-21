@@ -216,11 +216,33 @@ function ProfileFallback({
   );
 }
 
+/** Render a long local list a page at a time; `more` is null once everything is on screen. */
+function usePaged<T>(items: T[] = [], page = 50) {
+  const [shown, setShown] = useState(page);
+  return {
+    visible: items.slice(0, shown),
+    more: items.length > shown ? () => setShown((n) => n + page) : null,
+  };
+}
+
+function ShowMoreButton({ onClick }: { onClick: (() => void) | null }) {
+  const { t } = useTranslation();
+  if (!onClick) return null;
+  return (
+    <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={onClick}>
+      {t('common.showMore')}
+    </Button>
+  );
+}
+
 function TalkingPointsTab({ personId, personName }: { personId: string; personName: string }) {
   const { t } = useTranslation();
   const { data, isLoading } = useTalkingPoints(personId);
   const setSaid = useSetSaid();
   const [alreadyToldOpen, setAlreadyToldOpen] = useState(false);
+  const [decayedOpen, setDecayedOpen] = useState(false);
+  const decayed = usePaged(data?.decayed);
+  const said = usePaged(data?.said);
 
   const threadsOn = useThreadsEnabled();
 
@@ -274,6 +296,32 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
         />
       )}
 
+      {data && data.decayed.length > 0 && (
+        <Collapsible open={decayedOpen} onOpenChange={setDecayedOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+              <ChevronDown
+                className={cn('size-4 transition-transform', decayedOpen && 'rotate-180')}
+              />
+              {t('people.decayed')} ({data.decayed.length})
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="mt-2 flex flex-col gap-2">
+              {decayed.visible.map((node) => (
+                <TalkingPointItem
+                  key={node.id}
+                  node={node}
+                  personId={personId}
+                  personName={personName}
+                />
+              ))}
+            </ul>
+            <ShowMoreButton onClick={decayed.more} />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {data && data.said.length > 0 && (
         <Collapsible open={alreadyToldOpen} onOpenChange={setAlreadyToldOpen}>
           <CollapsibleTrigger asChild>
@@ -286,7 +334,7 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
           </CollapsibleTrigger>
           <CollapsibleContent>
             <ul className="mt-2 flex flex-col gap-2">
-              {data.said.map((entry) => (
+              {said.visible.map((entry) => (
                 <EntryMenu
                   key={entry.id}
                   entry={entry}
@@ -315,6 +363,7 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
                 </EntryMenu>
               ))}
             </ul>
+            <ShowMoreButton onClick={said.more} />
           </CollapsibleContent>
         </Collapsible>
       )}

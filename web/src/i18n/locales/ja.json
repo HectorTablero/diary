@@ -224,6 +224,7 @@
     "unmarkSaid": "まだ話していない",
     "hideForPerson": "{{name}}さんには提案しない",
     "alreadyTold": "すでに話したこと",
+    "decayed": "話さないまま古くなったこと",
     "noTalkingPoints": "新しく話すことはありません",
     "noTalkingPointsDescription": "{{name}}さんに言及した記録や、タグが共通する記録がここに出てきます。",
     "noMemories": "共有できる思い出はまだありません",
