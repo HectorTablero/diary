@@ -25,14 +25,16 @@ export interface PluginNavItem {
   label: string;
 }
 
-export function usePluginNav(): PluginNavItem[] {
+/** `surface` picks which door: `page` for the sidebar, `peoplePage` for the People list's header.
+    Both lead to the same `/plugins/<id>` route. */
+export function usePluginNav(surface: 'page' | 'peoplePage' = 'page'): PluginNavItem[] {
   const { t, i18n } = useTranslation();
   const [ready, setReady] = useState<ReadonlySet<string>>(new Set());
   const enabled = useEnabledPlugins();
 
   const pages = useMemo(
-    () => PLUGINS.filter((plugin) => enabled.has(plugin.id) && plugin.surfaces.includes('page')),
-    [enabled],
+    () => PLUGINS.filter((plugin) => enabled.has(plugin.id) && plugin.surfaces.includes(surface)),
+    [enabled, surface],
   );
 
   useEffect(() => {

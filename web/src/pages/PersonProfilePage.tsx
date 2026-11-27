@@ -50,6 +50,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { TagChip } from '@/components/entry/chips';
 import { PageContainer } from '@/components/layout/PageHeader';
+import { PluginPersonSlot } from '@/plugins/PluginPersonSlot';
 import { ContactInfo, ContactMenuItems } from '@/components/person/ContactInfo';
 import { EntryMenu } from '@/components/entry/EntryMenu';
 import { EntryRow } from '@/components/person/EntryRow';
@@ -890,6 +891,7 @@ export default function PersonProfilePage() {
                   </p>
                 )}
                 <ContactInfo person={person} onEdit={() => setEditing(true)} />
+                <PluginPersonSlot personId={person.id} />
               </PersonIdentity>
             </div>
           </ContextMenu>

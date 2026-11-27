@@ -60,6 +60,7 @@ import { isCheckupDue } from '@/lib/checkup';
 import { canImportContacts } from '@/lib/contacts';
 import { todayKey } from '@/lib/dates';
 import { isNative } from '@/lib/native';
+import { usePluginNav } from '@/plugins/usePluginNav';
 import { visibleTags } from '@/lib/tags';
 import { fuzzyIncludes, matchWindows, type MatchWindow } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
@@ -392,6 +393,8 @@ export default function PeopleListPage() {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<PersonDto | null>(null);
+  // Tools enabled plugins hang off this page instead of the sidebar (the `peoplePage` surface).
+  const pluginTools = usePluginNav('peoplePage');
 
   /* What each person matched the query on, beyond their plain name: aliases, job title/company,
      and notes all feed into one map in a single pass. This also doubles as the search rule
@@ -446,10 +449,20 @@ export default function PeopleListPage() {
           </span>
         }
         actions={
-          <Button size="sm" className="gap-1.5" onClick={() => setAdding(true)}>
-            <Plus className="size-4" />
-            {t('people.addPerson')}
-          </Button>
+          <>
+            {pluginTools.map((tool) => (
+              <Button key={tool.id} asChild variant="outline" size="sm" className="gap-1.5">
+                <Link to={tool.to}>
+                  <tool.icon className="size-4" />
+                  <span className="sr-only sm:not-sr-only">{tool.label}</span>
+                </Link>
+              </Button>
+            ))}
+            <Button size="sm" className="gap-1.5" onClick={() => setAdding(true)}>
+              <Plus className="size-4" />
+              {t('people.addPerson')}
+            </Button>
+          </>
         }
       />
 

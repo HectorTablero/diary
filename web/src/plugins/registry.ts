@@ -1,4 +1,11 @@
-import { CircleCheckBig, Droplet, NotebookPen, Wallet, type LucideIcon } from 'lucide-react';
+import {
+  CircleCheckBig,
+  Droplet,
+  NotebookPen,
+  Wallet,
+  Waypoints,
+  type LucideIcon,
+} from 'lucide-react';
 import type { PluginModule, PluginSurface } from './types';
 
 /**
@@ -183,6 +190,16 @@ export const PLUGINS: readonly PluginManifest[] = [
        read on its own page against its own charts rather than beside an entry. */
     entriesExportDefault: false,
     load: () => import('./expenses'),
+  },
+  {
+    id: 'social-graph',
+    icon: Waypoints,
+    /* `peoplePage`, not `page`: this is a view *of* the People list — who knows whom, who belongs
+       together — so it is a button on that page rather than a sidebar entry beside it. No `day`
+       surface either: nothing about it is about a day. `person` puts each profile's groups and
+       closest connections under their contact details. */
+    surfaces: ['peoplePage', 'person', 'onboarding'],
+    load: () => import('./social-graph'),
   },
 ];
 

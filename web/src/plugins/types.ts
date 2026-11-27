@@ -14,7 +14,9 @@ export type PluginSurface =
   | 'ownExport'
   | 'calendar'
   | 'widget'
-  | 'onboarding';
+  | 'onboarding'
+  | 'peoplePage'
+  | 'person';
 
 /**
  * The extra checkboxes an `ownExport` plugin asked for, as `{ <key>: <ticked> }`.
@@ -103,6 +105,16 @@ export interface PluginModule {
   DayWidget?: ComponentType<{ dateKey: string }>;
   /** The plugin's own screen, at /plugins/<id>. Split again inside the plugin if it is large. */
   Page?: ComponentType;
+  /**
+   * The same kind of screen as `Page`, at the same route, but reached from a button on the People
+   * list instead of from the nav — for a plugin that is *about* the people in the diary and would
+   * otherwise be a sidebar entry competing with People itself. Never both: a plugin is a place in
+   * the nav or a tool on the People page, not two doors into one room.
+   */
+  PeoplePage?: ComponentType;
+  /** Rendered on a person's profile, under their contact details. Draws nothing when it has nothing
+      to say about this person — a profile is not where a plugin advertises itself. */
+  PersonWidget?: ComponentType<{ personId: string }>;
   /** A card in Settings, built from the app's Section/ToggleRow primitives. */
   SettingsSection?: ComponentType;
   /**

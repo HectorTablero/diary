@@ -28,6 +28,8 @@ const MEMBERS_FOR: Record<PluginSurface, readonly (keyof PluginModule)[]> = {
   calendar: ['CalendarView'],
   widget: ['syncNativeWidget'],
   onboarding: ['onboardingSteps'],
+  peoplePage: ['PeoplePage'],
+  person: ['PersonWidget'],
 };
 
 describe('declared surfaces match what each plugin exports', () => {

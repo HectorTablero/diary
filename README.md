@@ -58,13 +58,15 @@ to break by accident and that fail silently when broken.
 
 A plugin fills any of five **surfaces**, all optional (`web/src/plugins/types.ts`):
 
-| Surface         | What it is                                                                      |
-| --------------- | ------------------------------------------------------------------------------- |
-| `day`           | a card on the diary's day page, below the composer                              |
-| `page`          | its own screen at `/plugins/<id>` (offers to switch the plugin on if it is off) |
-| `settings`      | a card in Settings                                                              |
-| `notifications` | reminders contributed to the app's single reconcile pass                        |
-| `export`        | Markdown files added to the export archive                                      |
+| Surface         | What it is                                                                        |
+| --------------- | --------------------------------------------------------------------------------- |
+| `day`           | a card on the diary's day page, below the composer                                |
+| `page`          | its own screen at `/plugins/<id>` (offers to switch the plugin on if it is off)   |
+| `settings`      | a card in Settings                                                                |
+| `notifications` | reminders contributed to the app's single reconcile pass                          |
+| `export`        | Markdown files added to the export archive                                        |
+| `peoplePage`    | its own screen at `/plugins/<id>`, opened from the People list instead of the nav |
+| `person`        | a line on a person's profile, under their contact details                         |
 
 `web/src/plugins/registry.ts` is the catalogue and the only plugin file the entry chunk may reach:
 an id, an icon, the surfaces list, and a dynamic-import thunk. The surfaces are declared **outside**

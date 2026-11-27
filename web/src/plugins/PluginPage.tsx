@@ -39,7 +39,9 @@ export default function PluginPage() {
   const enabled = useEnabledPlugins();
   const manifest = findPlugin(pluginId);
 
-  if (!manifest?.surfaces.includes('page')) return <Navigate to="/diary" replace />;
+  if (!manifest?.surfaces.some((surface) => surface === 'page' || surface === 'peoplePage')) {
+    return <Navigate to="/diary" replace />;
+  }
   if (!enabled.has(pluginId)) return <DisabledPluginPage key={pluginId} manifest={manifest} />;
   // Keyed so switching between two plugin pages remounts rather than reusing the loaded module.
   return <LoadedPluginPage key={pluginId} pluginId={pluginId} />;
@@ -60,7 +62,8 @@ function LoadedPluginPage({ pluginId }: { pluginId: string }) {
       try {
         const [module] = await Promise.all([manifest.load(), ensurePluginLocales(pluginId)]);
         if (cancelled) return;
-        setState({ Page: (module.default as PluginModule).Page ?? null, failed: false });
+        const { Page, PeoplePage } = module.default as PluginModule;
+        setState({ Page: Page ?? PeoplePage ?? null, failed: false });
       } catch (err) {
         captureError(err, { scope: 'plugin.page', plugin: pluginId });
         if (!cancelled) setState({ Page: null, failed: true });
