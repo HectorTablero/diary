@@ -4,7 +4,6 @@
   "title": "Social graph",
   "needPeople": "Add a couple of people first",
   "needPeopleDescription": "The graph connects people from your People list, so it needs at least two.",
-  "selectPeople": "Select people",
   "onlyConnected": "Only connected",
   "graphLabel": "Graph of your people and how they're connected",
   "groups": "Groups",
@@ -63,5 +62,11 @@
       "lede": "Select two people and pick a bar. Add a note if it helps you remember how they met.",
       "previewNote": "Just a preview — nothing here is saved."
     }
-  }
+  },
+  "searchSelect": "Select people, groups or tags…",
+  "deselect": "Deselect {{name}}",
+  "connectAllStrength": "How close should they start?",
+  "disconnectGroup": "Disconnect everyone in this group",
+  "disconnectGroupTitle": "Remove every connection inside {{name}}?",
+  "disconnectGroupDescription": "Every connection between two members of this group is removed, notes included. The group itself stays."
 }

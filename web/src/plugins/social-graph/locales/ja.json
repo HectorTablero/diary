@@ -4,7 +4,6 @@
   "title": "ソーシャルグラフ",
   "needPeople": "まず2人以上追加してください",
   "needPeopleDescription": "グラフは人物リストの人同士をつなぐため、少なくとも2人必要です。",
-  "selectPeople": "人を選択",
   "onlyConnected": "つながりのある人のみ",
   "graphLabel": "人物とそのつながりのグラフ",
   "groups": "グループ",
@@ -60,5 +59,11 @@
       "lede": "2人を選んでバーを1つ選ぶだけ。出会いのきっかけを覚えておきたいときはメモを追加できます。",
       "previewNote": "プレビューです。ここでは何も保存されません。"
     }
-  }
+  },
+  "searchSelect": "人・グループ・タグを選択…",
+  "deselect": "{{name}}の選択を解除",
+  "connectAllStrength": "最初の親しさ",
+  "disconnectGroup": "グループ内のつながりをすべて解除",
+  "disconnectGroupTitle": "{{name}}内のつながりをすべて削除しますか？",
+  "disconnectGroupDescription": "このグループのメンバー同士のつながりがメモごとすべて削除されます。グループ自体は残ります。"
 }

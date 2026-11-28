@@ -4,7 +4,6 @@
   "title": "社交图谱",
   "needPeople": "请先添加几个人",
   "needPeopleDescription": "图谱连接的是你人物列表里的人，所以至少需要两个人。",
-  "selectPeople": "选择人物",
   "onlyConnected": "仅显示有关联的人",
   "graphLabel": "你的人物及其关联的图谱",
   "groups": "群组",
@@ -60,5 +59,11 @@
       "lede": "选择两个人，再点一根柱子。如果有助于记住他们是怎么认识的，可以加一条备注。",
       "previewNote": "这只是预览，这里不会保存任何内容。"
     }
-  }
+  },
+  "searchSelect": "选择人物、分组或标签…",
+  "deselect": "取消选择{{name}}",
+  "connectAllStrength": "初始亲近程度",
+  "disconnectGroup": "断开组内所有连接",
+  "disconnectGroupTitle": "删除{{name}}内的所有连接？",
+  "disconnectGroupDescription": "该分组成员之间的所有连接都会被删除，包括备注。分组本身保留。"
 }

@@ -99,6 +99,33 @@ export async function createPluginRecord(
   return record;
 }
 
+/** createPluginRecord for many rows: one bulk write and one outbox batch, so connecting thousands
+    of pairs doesn't kick sync and reconcile notifications thousands of times. */
+export async function createPluginRecords(
+  pluginId: string,
+  scope: PluginScope,
+  dateKey: string,
+  datas: readonly PluginData[],
+): Promise<void> {
+  if (!datas.length) return;
+  const records = datas.map((data) => newRecord(pluginId, scope, dateKey, data));
+  await db.pluginRecords.bulkAdd(records);
+  await enqueueBatch(
+    records.map((record) => ({
+      method: 'POST' as const,
+      path: PATH,
+      body: {
+        id: record.id,
+        createdAt: record.createdAt,
+        pluginId,
+        scope,
+        dateKey,
+        data: record.data,
+      },
+    })),
+  );
+}
+
 /** Replace one known row's payload. */
 export async function updatePluginRecord(id: string, data: PluginData): Promise<void> {
   const existing = await db.pluginRecords.get(id);

@@ -4,7 +4,6 @@
   "title": "Grafo social",
   "needPeople": "Primero añade un par de personas",
   "needPeopleDescription": "El grafo conecta personas de tu lista de Personas, así que necesita al menos dos.",
-  "selectPeople": "Seleccionar personas",
   "onlyConnected": "Solo conectadas",
   "graphLabel": "Grafo de tus personas y cómo se conectan",
   "groups": "Grupos",
@@ -63,5 +62,11 @@
       "lede": "Selecciona a dos personas y elige una barra. Añade una nota si te ayuda a recordar cómo se conocieron.",
       "previewNote": "Solo es una vista previa: aquí no se guarda nada."
     }
-  }
+  },
+  "searchSelect": "Selecciona personas, grupos o etiquetas…",
+  "deselect": "Quitar a {{name}} de la selección",
+  "connectAllStrength": "¿Con qué cercanía empiezan?",
+  "disconnectGroup": "Desconectar a todo el grupo",
+  "disconnectGroupTitle": "¿Quitar todas las conexiones dentro de {{name}}?",
+  "disconnectGroupDescription": "Se quitan todas las conexiones entre miembros de este grupo, notas incluidas. El grupo se mantiene."
 }

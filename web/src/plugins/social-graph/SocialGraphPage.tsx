@@ -1,3 +1,4 @@
+import { HEX_COLOR_REGEX } from '@diary/shared';
 import { Check, ChevronLeft, Minus, Pencil, Plus, Unlink, Users, Waypoints, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -5,6 +6,13 @@ import { Link, useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { EntityPicker } from '@/components/entry/EntityPicker';
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { PageContainer, PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,15 +28,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { notifyError } from '@/lib/notify';
+import { matchNamed } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 import { GraphCanvas } from './GraphCanvas';
 import {
+  DEFAULT_STRENGTH,
   GROUP_COLORS,
   MAX_GROUP_MEMBERS,
   MAX_GROUP_NAME_LENGTH,
   MAX_NOTE_LENGTH,
   ME_ID,
   type Group,
+  type Strength,
 } from './model';
 import { StrengthBars, StrengthPicker } from './StrengthPicker';
 import { useSocialGraph, type SocialGraph } from './useSocialGraph';
@@ -112,27 +123,8 @@ export default function SocialGraphPage() {
       ) : (
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
           <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <EntityPicker
-                trigger={
-                  <Button variant="outline" size="sm" className="h-7 gap-1">
-                    <Users className="size-3.5" />
-                    {t('plugins.social-graph.selectPeople')}
-                    {selected.length > 0 && (
-                      <span className="text-primary">({selected.length})</span>
-                    )}
-                  </Button>
-                }
-                items={graph.everyone.map((person) => ({
-                  id: person.id,
-                  label: person.name,
-                  aliases: person.aliases,
-                }))}
-                selectedIds={selected}
-                onToggle={toggle}
-                placeholder={t('common.search')}
-              />
-              <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 {t('plugins.social-graph.showMe')}
                 <Switch
                   size="sm"
@@ -159,25 +151,26 @@ export default function SocialGraphPage() {
                 onClear={() => setSelected([])}
                 ariaLabel={t('plugins.social-graph.graphLabel')}
               />
-              {legend.length > 0 && (
-                <ul
-                  aria-label={t('plugins.social-graph.groups')}
-                  className="pointer-events-none absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-x-3 gap-y-1 rounded-lg bg-card/85 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-sm"
-                >
-                  {legend.map((group) => (
-                    <li key={group.id} className="flex items-center gap-1.5">
-                      <span
-                        className="size-2 rounded-full"
-                        style={{ backgroundColor: group.color }}
-                      />
-                      {group.name}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
+            {legend.length > 0 && (
+              <ul
+                aria-label={t('plugins.social-graph.groups')}
+                className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs text-muted-foreground"
+              >
+                {legend.map((group) => (
+                  <li key={group.id} className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: group.color }}
+                    />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{group.name}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <aside className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs lg:sticky lg:top-4">
+            <SelectionSearch graph={graph} selected={selected} setSelected={setSelected} />
             <SelectionPanel graph={graph} selected={selected} setSelected={setSelected} />
           </aside>
         </div>
@@ -189,6 +182,143 @@ export default function SocialGraphPage() {
 function useRun() {
   const { t } = useTranslation();
   return (work: Promise<unknown>) => void work.catch(() => notifyError(t('errors.unknown')));
+}
+
+interface Bunch {
+  id: string;
+  name: string;
+  color: string;
+  members: string[];
+}
+
+/**
+ * One search for the three ways to select: a person toggles them, and a group or tag adds everyone
+ * in it to the selection (or, once they're all in, takes them back out). Only ever the selection —
+ * group membership is changed from the panel's group pills, never from here.
+ */
+function SelectionSearch({
+  graph,
+  selected,
+  setSelected,
+}: {
+  graph: SocialGraph;
+  selected: string[];
+  setSelected: (ids: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState('');
+  const tags = useMemo(() => {
+    const byId = new Map<string, Bunch>();
+    for (const person of graph.people) {
+      for (const tag of person.tags) {
+        const entry = byId.get(tag.id) ?? { ...tag, members: [] };
+        entry.members.push(person.id);
+        byId.set(tag.id, entry);
+      }
+    }
+    return [...byId.values()].sort((x, y) => x.name.localeCompare(y.name));
+  }, [graph.people]);
+
+  const q = query.trim();
+  const chosen = new Set(selected);
+  const sets = (kind: string, items: Bunch[]) =>
+    matchNamed(items, q)
+      .map(({ match }) => {
+        const members = match.members.filter(graph.visible);
+        return {
+          ...match,
+          key: `${kind}:${match.id}`,
+          members,
+          all: members.every((id) => chosen.has(id)),
+        };
+      })
+      .filter((set) => set.members.length > 0);
+  const results = q
+    ? [
+        { heading: t('plugins.social-graph.groups'), items: sets('group', graph.groups) },
+        { heading: t('nav.tags'), items: sets('tag', tags) },
+      ]
+    : [];
+  const people = q ? matchNamed(graph.everyone, q) : [];
+
+  const pickSet = (members: string[], all: boolean) => {
+    const out = new Set(members);
+    setSelected(
+      all ? selected.filter((id) => !out.has(id)) : [...new Set([...selected, ...members])],
+    );
+    setQuery('');
+  };
+  const pickPerson = (id: string) => {
+    setSelected(chosen.has(id) ? selected.filter((v) => v !== id) : [...selected, id]);
+    setQuery('');
+  };
+
+  return (
+    <Command
+      shouldFilter={false}
+      // CommandInput already draws its own field; drop the frame and padding around it.
+      className="h-auto overflow-visible bg-transparent p-0 text-foreground **:data-[slot=command-input-wrapper]:p-0"
+    >
+      <CommandInput
+        value={query}
+        onValueChange={setQuery}
+        onKeyDown={(event) => event.key === 'Escape' && setQuery('')}
+        placeholder={t('plugins.social-graph.searchSelect')}
+      />
+      {q && (
+        <CommandList className="mt-1 max-h-64 rounded-lg border">
+          {results.map(
+            ({ heading, items }) =>
+              items.length > 0 && (
+                <CommandGroup key={heading} heading={heading}>
+                  {items.map((set) => (
+                    <CommandItem
+                      key={set.key}
+                      value={set.key}
+                      onSelect={() => pickSet(set.members, set.all)}
+                    >
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: set.color }}
+                      />
+                      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{set.name}</span>
+                      {set.all ? (
+                        <Check className="size-3" aria-hidden />
+                      ) : (
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {set.members.length}
+                        </span>
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ),
+          )}
+          {people.length > 0 && (
+            <CommandGroup heading={t('nav.people')}>
+              {people.map(({ match: person, alias }) => (
+                <CommandItem
+                  key={person.id}
+                  value={`person:${person.id}`}
+                  onSelect={() => pickPerson(person.id)}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {alias ? `${person.name} (${alias})` : person.name}
+                  </span>
+                  {chosen.has(person.id) && <Check className="size-3" aria-hidden />}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {people.length === 0 && results.every(({ items }) => items.length === 0) && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              {t('common.noResults')}
+            </p>
+          )}
+        </CommandList>
+      )}
+    </Command>
+  );
 }
 
 function SelectionPanel({
@@ -218,21 +348,18 @@ function SelectionPanel({
             <ul className="-mx-2 flex flex-col">
               {graph.groups.map((group) => (
                 <li key={group.id} className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setSelected(group.members.filter(graph.visible))}
-                    disabled={group.members.length === 0}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/60 disabled:opacity-60"
-                  >
+                  {/* Not a button: selecting a whole group lives in the search above, where it
+                      reads as selecting rather than as toggling membership. */}
+                  <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-sm">
                     <span
                       className="size-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: group.color }}
                     />
-                    <span className="truncate">{group.name}</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{group.name}</span>
                     <span className="ml-auto text-xs text-muted-foreground tabular-nums">
                       {group.members.length}
                     </span>
-                  </button>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -270,11 +397,6 @@ function SelectionPanel({
               t('plugins.social-graph.selectedCount', { count: people.length })
             )}
           </h2>
-          {people.length > 2 && (
-            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-              {people.map((person) => person.name).join(', ')}
-            </p>
-          )}
         </div>
         <Button
           variant="ghost"
@@ -286,6 +408,26 @@ function SelectionPanel({
           <X className="size-4" />
         </Button>
       </div>
+      {people.length > 2 && (
+        <ul className="-mt-2 flex max-h-40 flex-wrap gap-1 overflow-y-auto">
+          {people.map((person) => (
+            <li
+              key={person.id}
+              className="flex min-h-6 max-w-full items-center gap-0.5 rounded-xl bg-muted py-0.5 pr-0.5 pl-2 text-xs"
+            >
+              <span className="min-w-0 [overflow-wrap:anywhere]">{person.name}</span>
+              <button
+                type="button"
+                aria-label={t('plugins.social-graph.deselect', { name: person.name })}
+                onClick={() => setSelected(selected.filter((id) => id !== person.id))}
+                className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-background hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {people.length === 1 && (
         <Connections graph={graph} personId={ids[0]} setSelected={setSelected} />
@@ -448,23 +590,40 @@ function PairEditor({ graph, a, b }: { graph: SocialGraph; a: string; b: string 
 function ConnectAll({ graph, ids }: { graph: SocialGraph; ids: string[] }) {
   const { t } = useTranslation();
   const run = useRun();
+  const [strength, setStrength] = useState<Strength>(DEFAULT_STRENGTH);
+  const [busy, setBusy] = useState(false);
   let missing = 0;
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) if (!graph.linkBetween(ids[i], ids[j])) missing++;
   }
+  if (missing === 0) {
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Waypoints className="size-3.5" />
+        {t('plugins.social-graph.allConnected')}
+      </p>
+    );
+  }
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="w-fit gap-1.5"
-      disabled={missing === 0}
-      onClick={() => run(graph.connectAll(ids))}
-    >
-      <Waypoints className="size-3.5" />
-      {missing === 0
-        ? t('plugins.social-graph.allConnected')
-        : t('plugins.social-graph.connectAll', { count: missing })}
-    </Button>
+    <section className="flex flex-col gap-1.5">
+      <h3 className="text-xs font-medium text-muted-foreground">
+        {t('plugins.social-graph.connectAllStrength')}
+      </h3>
+      <StrengthPicker value={strength} onChange={setStrength} />
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-1 w-fit gap-1.5"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          run(graph.connectAll(ids, strength).finally(() => setBusy(false)));
+        }}
+      >
+        <Waypoints className="size-3.5" />
+        {t('plugins.social-graph.connectAll', { count: missing })}
+      </Button>
+    </section>
   );
 }
 
@@ -513,16 +672,19 @@ function GroupToggles({ graph, ids }: { graph: SocialGraph; ids: string[] }) {
                 run(graph.updateGroup(group, { members }));
               }}
               className={cn(
-                'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors',
+                'flex min-h-7 max-w-full items-center gap-1.5 rounded-2xl border px-2.5 py-1 text-left text-xs transition-colors',
                 all
                   ? 'border-transparent bg-accent font-medium text-foreground'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <span className="size-2 rounded-full" style={{ backgroundColor: group.color }} />
-              {group.name}
-              {all && <Check className="size-3" aria-hidden />}
-              {some && <Minus className="size-3" aria-hidden />}
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: group.color }}
+              />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{group.name}</span>
+              {all && <Check className="size-3 shrink-0" aria-hidden />}
+              {some && <Minus className="size-3 shrink-0" aria-hidden />}
             </button>
           );
         })}
@@ -571,6 +733,8 @@ function GroupDialog({
   const [name, setName] = useState(group.name);
   const [color, setColor] = useState(group.color);
   const [confirming, setConfirming] = useState(false);
+  // TEMPORARY: remove one release after it ships, with graph.disconnectAll and its strings.
+  const [unlinking, setUnlinking] = useState(false);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -583,7 +747,7 @@ function GroupDialog({
           className="flex flex-col gap-4"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!name.trim()) return;
+            if (!name.trim() || !HEX_COLOR_REGEX.test(color)) return;
             run(graph.updateGroup(group, { name, color }));
             onClose();
           }}
@@ -619,8 +783,48 @@ function GroupDialog({
                 />
               ))}
             </div>
+            {/* Any colour, the way tags take one: the native picker plus its hex. */}
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={HEX_COLOR_REGEX.test(color) ? color : '#000000'}
+                onChange={(event) => setColor(event.target.value)}
+                aria-label={t('plugins.social-graph.groupColor')}
+                className="size-9 cursor-pointer rounded-md border bg-transparent p-1"
+              />
+              <Input
+                value={color}
+                onChange={(event) => {
+                  if (/^#[0-9A-Fa-f]{0,6}$/.test(event.target.value)) setColor(event.target.value);
+                }}
+                aria-label={t('plugins.social-graph.groupColor')}
+                className="w-28 font-mono text-sm"
+              />
+            </div>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit gap-1.5 text-muted-foreground hover:text-destructive"
+            onClick={() => setUnlinking(true)}
+          >
+            <Unlink className="size-3.5" />
+            {t('plugins.social-graph.disconnectGroup')}
+          </Button>
         </form>
+        <ConfirmDialog
+          open={unlinking}
+          onOpenChange={setUnlinking}
+          title={t('plugins.social-graph.disconnectGroupTitle', { name: group.name })}
+          description={t('plugins.social-graph.disconnectGroupDescription')}
+          confirmLabel={t('plugins.social-graph.disconnect')}
+          destructive
+          onConfirm={() => {
+            setUnlinking(false);
+            run(graph.disconnectAll(group.members));
+          }}
+        />
         <DialogFooter className="sm:justify-between">
           <Button
             variant="ghost"
@@ -629,7 +833,11 @@ function GroupDialog({
           >
             {t('plugins.social-graph.deleteGroup')}
           </Button>
-          <Button type="submit" form="social-graph-group" disabled={!name.trim()}>
+          <Button
+            type="submit"
+            form="social-graph-group"
+            disabled={!name.trim() || !HEX_COLOR_REGEX.test(color)}
+          >
             {t('common.save')}
           </Button>
         </DialogFooter>

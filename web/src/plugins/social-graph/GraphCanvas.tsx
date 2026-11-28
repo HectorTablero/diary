@@ -1,4 +1,4 @@
-import { Maximize, Minus, Plus, User } from 'lucide-react';
+import { House, Minus, Plus, User } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -524,7 +524,7 @@ export function GraphCanvas({
             disabled={userView === null}
             onClick={() => setUserView(null)}
           >
-            <Maximize className="size-3.5" />
+            <House className="size-3.5" />
           </Button>
         </div>
       )}

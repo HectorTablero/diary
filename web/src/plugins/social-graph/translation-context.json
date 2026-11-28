@@ -11,7 +11,6 @@
         "title": "Heading of the plugin's own page. Usually identical to `name`.",
         "needPeople": "Empty-state title on the page when the People list has fewer than two people.",
         "needPeopleDescription": "Under that title: why two are needed. A button to the People list sits below it.",
-        "selectPeople": "Toolbar button above the graph that opens a searchable list to select people without tapping the graph. A selected count may follow it in brackets.",
         "onlyConnected": "Label of a small switch above the graph that hides people with no connections and no groups. Short — it sits on one line beside the button above.",
         "graphLabel": "Accessible name of the whole graph drawing, read by screen readers. Describes what the picture is.",
         "groups": "Small heading above the list of groups in the side panel, and accessible name of the color legend on the graph.",
@@ -61,7 +60,13 @@
         "showMe": "Label of a small switch above the graph that shows or hides the owner's own node. Short.",
         "zoomIn": "Accessible name of the + button in the graph's corner.",
         "zoomOut": "Accessible name of the − button in the graph's corner.",
-        "fitView": "Accessible name of the button that resets zoom and pan so every node fits the canvas again."
+        "fitView": "Accessible name of the button that resets zoom and pan so every node fits the canvas again.",
+        "searchSelect": "Placeholder of the search box at the top of the side panel. Typing lists matching people, groups and tags; picking a group or tag selects everyone in it.",
+        "deselect": "Accessible name of the small × on one selected person's chip, removing just them from the selection. {{name}} is their name.",
+        "connectAllStrength": "Question above a five-step closeness picker, shown when three or more people are selected: which closeness the missing connections are created with.",
+        "disconnectGroup": "Temporary button in the edit-group dialog that removes every connection between two members of the group.",
+        "disconnectGroupTitle": "Title of the confirmation for that button. {{name}} is the group's name.",
+        "disconnectGroupDescription": "Body of that confirmation: what is removed and that the group stays."
       }
     }
   },

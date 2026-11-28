@@ -34,10 +34,13 @@ export function PersonWidget({ personId }: { personId: string }) {
           {groups.map((group) => (
             <span
               key={group.id}
-              className="flex h-6 items-center gap-1.5 rounded-full border px-2 text-foreground"
+              className="flex min-h-6 max-w-full items-center gap-1.5 rounded-xl border px-2 py-0.5 text-foreground"
             >
-              <span className="size-2 rounded-full" style={{ backgroundColor: group.color }} />
-              {group.name}
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: group.color }}
+              />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{group.name}</span>
             </span>
           ))}
         </div>

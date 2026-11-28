@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { usePeople } from '@/api/hooks';
 import {
   createPluginRecord,
+  createPluginRecords,
   deletePluginRecord,
   deletePluginRecords,
   getUndatedRecords,
@@ -12,7 +13,6 @@ import {
 import { onSyncApplied } from '@/db/sync';
 import { getPluginSettings, savePluginSettings } from '../enabled';
 import {
-  DEFAULT_STRENGTH,
   groupData,
   linkData,
   ME_ID,
@@ -48,8 +48,10 @@ export interface SocialGraph {
   setLink: (x: string, y: string, strength: Strength, note?: string) => Promise<void>;
   setLinkNote: (link: Link, note: string) => Promise<void>;
   removeLink: (link: Link) => Promise<void>;
-  /** Links every pair among `ids` that isn't linked yet, at the default strength. */
-  connectAll: (ids: readonly string[]) => Promise<void>;
+  /** Links every pair among `ids` that isn't linked yet, at `strength`. */
+  connectAll: (ids: readonly string[], strength: Strength) => Promise<void>;
+  /** Removes every link among `ids`. Temporary: drop next release. */
+  disconnectAll: (ids: readonly string[]) => Promise<void>;
   createGroup: (name: string, members: readonly string[]) => Promise<void>;
   updateGroup: (group: Group, patch: Partial<Omit<Group, 'id'>>) => Promise<void>;
   removeGroup: (group: Group) => Promise<void>;
@@ -162,23 +164,31 @@ export function useSocialGraph(): SocialGraph {
   );
 
   const connectAll = useCallback(
-    async (ids: readonly string[]) => {
-      // ponytail: one outbox entry per new pair; batch via putPluginRecords-style enqueueBatch if
-      // anyone connects groups of 20+ at once.
+    async (ids: readonly string[], strength: Strength) => {
+      const datas: ReturnType<typeof linkData>[] = [];
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
-          if (byPair.has(pairKey(ids[i], ids[j]))) continue;
-          await createPluginRecord(
-            PLUGIN_ID,
-            'record',
-            '',
-            linkData(ids[i], ids[j], DEFAULT_STRENGTH, ''),
-          );
+          if (!byPair.has(pairKey(ids[i], ids[j]))) {
+            datas.push(linkData(ids[i], ids[j], strength, ''));
+          }
         }
       }
+      await createPluginRecords(PLUGIN_ID, 'record', '', datas);
       await load();
     },
     [byPair, load],
+  );
+
+  // TEMPORARY: remove one release after it ships.
+  const disconnectAll = useCallback(
+    async (ids: readonly string[]) => {
+      const inside = new Set(ids);
+      await deletePluginRecords(
+        links.filter((link) => inside.has(link.a) && inside.has(link.b)).map((link) => link.id),
+      );
+      await load();
+    },
+    [links, load],
   );
 
   const createGroup = useCallback(
@@ -228,6 +238,7 @@ export function useSocialGraph(): SocialGraph {
     setLinkNote,
     removeLink,
     connectAll,
+    disconnectAll,
     createGroup,
     updateGroup,
     removeGroup,

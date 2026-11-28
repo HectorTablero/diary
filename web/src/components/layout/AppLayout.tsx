@@ -42,6 +42,7 @@ import { getUpdateState, subscribeToUpdateState, type UpdateState } from '@/lib/
 import { dismissUpdate, isDismissed } from '@/lib/updateCheck';
 import { cn } from '@/lib/utils';
 import { pageLoaders } from '@/pages/lazyPages';
+import { findPlugin } from '@/plugins/registry';
 import { usePluginNav } from '@/plugins/usePluginNav';
 import { ariaKeyShortcuts, type Binding } from '@/shortcuts/bindings';
 import { ShortcutHintsProvider, ShortcutIcon } from '@/shortcuts/ShortcutHints';
@@ -97,6 +98,14 @@ const TAB_NAV: NavItem[] = [
 
 /** `label` overrides `item.labelKey` — plugin names come from the plugin's own locale bundle, which
     is fetched with the plugin, so they arrive as a string rather than as a key. */
+/** A plugin page opened from the People list (the `peoplePage` surface) is a view of People, so
+    People stays the active nav item there, and tapping it goes back to the list. */
+function isActiveNav(to: string, isActive: boolean, pathname: string): boolean {
+  if (isActive || to !== '/people') return isActive;
+  const pluginId = /^\/plugins\/([^/]+)/.exec(pathname)?.[1];
+  return !!pluginId && !!findPlugin(pluginId)?.surfaces.includes('peoplePage');
+}
+
 function SidebarLink({
   item,
   badge = 0,
@@ -109,6 +118,7 @@ function SidebarLink({
   shortcut?: Binding;
 }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   return (
     <NavLink
       to={item.to}
@@ -116,7 +126,7 @@ function SidebarLink({
       className={({ isActive }) =>
         cn(
           'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-          isActive
+          isActiveNav(item.to, isActive, pathname)
             ? 'bg-accent text-accent-foreground'
             : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
         )
@@ -252,7 +262,9 @@ function MoreTabSlot() {
   const pluginNav = usePluginNav();
   const segments = useExploreSegments();
   const shown = pluginNav.slice(0, MAX_PLUGIN_MENU_ITEMS);
-  const active = isExplorePath(pathname) || pathname.startsWith('/plugins/');
+  const active =
+    isExplorePath(pathname) ||
+    (pathname.startsWith('/plugins/') && !isActiveNav('/people', false, pathname));
 
   return (
     <DropdownMenu>
@@ -290,6 +302,7 @@ function MoreTabSlot() {
 
 function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   return (
     <nav
       /* Marks the bottom obstruction for anything that needs to know how much screen is actually
@@ -312,14 +325,19 @@ function TabBar({ pendingCheckups }: { pendingCheckups: number }) {
             <NavLink
               to={item.to}
               className={({ isActive }) =>
-                cn(TAB_SLOT, isActive ? 'text-primary' : 'text-muted-foreground')
+                cn(
+                  TAB_SLOT,
+                  isActiveNav(item.to, isActive, pathname)
+                    ? 'text-primary'
+                    : 'text-muted-foreground',
+                )
               }
             >
               {({ isActive }) => (
                 <TabSlotBody
                   icon={item.icon}
                   label={t(item.labelKey)}
-                  active={isActive}
+                  active={isActiveNav(item.to, isActive, pathname)}
                   badge={item.to === '/people' ? pendingCheckups : 0}
                 />
               )}
