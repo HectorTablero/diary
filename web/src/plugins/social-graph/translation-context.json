@@ -66,7 +66,10 @@
         "connectAllStrength": "Question above a five-step closeness picker, shown when three or more people are selected: which closeness the missing connections are created with.",
         "disconnectGroup": "Temporary button in the edit-group dialog that removes every connection between two members of the group.",
         "disconnectGroupTitle": "Title of the confirmation for that button. {{name}} is the group's name.",
-        "disconnectGroupDescription": "Body of that confirmation: what is removed and that the group stays."
+        "disconnectGroupDescription": "Body of that confirmation: what is removed and that the group stays.",
+        "talkingPointsToggle": "Checkbox at the top of a person's Talking Points tab. Ticked, entries mentioning the people they're connected to in the graph also show up, ranked below direct mentions. Short — one line beside a checkbox.",
+        "exportHint": "Under the output picker in Settings → Export when the social graph is the chosen export type. nodes.csv and edges.csv are file names and Gephi is a product name: keep all three as they are.",
+        "exportOption": "Checkboxes in that export. `me` includes the diary owner (shown as \"You\") with their connections and groups; `notes` includes the free-text note on each connection; `skipIsolated` leaves out people with no connections and no groups."
       }
     }
   },

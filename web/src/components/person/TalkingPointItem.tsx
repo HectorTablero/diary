@@ -9,6 +9,7 @@ import {
   Megaphone,
   MoreHorizontal,
   Tag as TagIcon,
+  Users,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -158,6 +159,8 @@ export function TalkingPointItem({
                     <AtSign className="size-3" />
                   ) : node.matchType === 'tag' ? (
                     <TagIcon className="size-3" />
+                  ) : node.matchType === 'connection' ? (
+                    <Users className="size-3" />
                   ) : (
                     <Megaphone className="size-3" />
                   )}
@@ -166,7 +169,9 @@ export function TalkingPointItem({
                       ? 'people.matchMention'
                       : node.matchType === 'tag'
                         ? 'people.matchTag'
-                        : 'people.matchBroadcast',
+                        : node.matchType === 'connection'
+                          ? 'people.matchConnection'
+                          : 'people.matchBroadcast',
                   )}
                 </Badge>
                 <Button

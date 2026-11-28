@@ -357,3 +357,32 @@ describe('countTalkingPointGroups', () => {
     expect(countFor(entries)).toBe(groupsFor(entries).length);
   });
 });
+
+describe('buildTalkingPointForest with connections', () => {
+  const LUIS = 'luis';
+  const aboutLuis = entry({ id: 'luis', people: [{ id: LUIS, name: 'Luis' }] });
+  const forestWith = (entries: EntryDto[], connections: Map<string, number>) =>
+    buildTalkingPointForest(entries, ANA, new Set(), settings, new Set(), NOW, false, connections);
+
+  it('matches a mention of a connection, scaled by its weight', () => {
+    const [direct] = forestFor([entry({ id: 'ana' })]);
+    const [node] = forestWith([aboutLuis], new Map([[LUIS, 0.25]]));
+    expect(node.matchType).toBe('connection');
+    expect(node.score).toBeCloseTo(direct.score * 0.25);
+  });
+
+  it('ignores mentions of people who are not connections', () => {
+    expect(forestWith([aboutLuis], new Map())).toEqual([]);
+  });
+
+  it('keeps a direct mention over a connection', () => {
+    const both = entry({
+      id: 'both',
+      people: [
+        { id: ANA, name: 'Ana' },
+        { id: LUIS, name: 'Luis' },
+      ],
+    });
+    expect(forestWith([both], new Map([[LUIS, 0.5]]))[0].matchType).toBe('mention');
+  });
+});

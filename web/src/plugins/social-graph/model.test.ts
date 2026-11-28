@@ -1,7 +1,15 @@
 import type { PluginRecordDto } from '@diary/shared';
 import { describe, expect, it } from 'vitest';
 import { seedPosition, tick, type SimNode } from './layout';
-import { GROUP_COLORS, groupData, linkData, nextGroupColor, parseGraph } from './model';
+import {
+  connectionWeights,
+  GROUP_COLORS,
+  groupData,
+  linkData,
+  ME_ID,
+  nextGroupColor,
+  parseGraph,
+} from './model';
 
 const A = 'a'.repeat(24);
 const B = 'b'.repeat(24);
@@ -67,5 +75,22 @@ describe('layout', () => {
     expect(dist(a, b)).toBeLessThan(dist(a, c));
     expect(dist(a, b)).toBeLessThan(dist(b, c));
     for (const node of nodes) expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
+  });
+});
+
+describe('connectionWeights', () => {
+  it('weights each link by penalty × strength/5, and leaves "you" out', () => {
+    const { links } = parseGraph([
+      row('1', linkData(A, B, 5, '')),
+      row('2', linkData(C, A, 2, '')),
+      row('3', linkData(A, ME_ID, 4, '')),
+      row('4', linkData(B, C, 3, '')),
+    ]);
+    expect(connectionWeights(links, A)).toEqual(
+      new Map([
+        [B, 0.5],
+        [C, 0.2],
+      ]),
+    );
   });
 });

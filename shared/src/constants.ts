@@ -33,8 +33,10 @@ export const EVENT_REMEMBER_MULTIPLIER = 7;
 /** Weight applied per importance level in the talking-points score: 1 → 1.0 … 5 → 0.2 */
 export const importanceWeight = (importance: number): number => (6 - importance) / 5;
 
-/** Match strength multipliers: a direct mention beats a shared tag beats a broadcast. */
-export const MATCH_STRENGTH = { mention: 1.0, tag: 0.6, broadcast: 0.4 } as const;
+/** Match strength multipliers: a direct mention beats a shared tag beats a broadcast.
+    `connection` — a mention of someone this person knows — is a mention of someone else, so it
+    starts at full strength and the caller's per-connection weight (always < 1) scales it down. */
+export const MATCH_STRENGTH = { mention: 1.0, tag: 0.6, broadcast: 0.4, connection: 1.0 } as const;
 export type MatchType = keyof typeof MATCH_STRENGTH;
 
 /** Default half-lives (days) per importance level for talking-point decay. */

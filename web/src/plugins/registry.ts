@@ -197,8 +197,12 @@ export const PLUGINS: readonly PluginManifest[] = [
     /* `peoplePage`, not `page`: this is a view *of* the People list — who knows whom, who belongs
        together — so it is a button on that page rather than a sidebar entry beside it. No `day`
        surface either: nothing about it is about a day. `person` puts each profile's groups and
-       closest connections under their contact details. */
-    surfaces: ['peoplePage', 'person', 'onboarding'],
+       closest connections under their contact details. `talkingPoints` lets a profile's
+       Talking Points also pick up entries about the people they know. `ownExport`: a graph is
+       not day-scoped, so it is its own export type (Markdown, plus CSVs for graph tools). */
+    surfaces: ['peoplePage', 'person', 'talkingPoints', 'ownExport', 'onboarding'],
+    // `me` starts as the plugin's data says (exportOwn.defaultOptions); off until that answers.
+    exportOptions: { me: false, notes: false, skipIsolated: true },
     load: () => import('./social-graph'),
   },
 ];

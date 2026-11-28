@@ -68,5 +68,12 @@
   "connectAllStrength": "¿Con qué cercanía empiezan?",
   "disconnectGroup": "Desconectar a todo el grupo",
   "disconnectGroupTitle": "¿Quitar todas las conexiones dentro de {{name}}?",
-  "disconnectGroupDescription": "Se quitan todas las conexiones entre miembros de este grupo, notas incluidas. El grupo se mantiene."
+  "disconnectGroupDescription": "Se quitan todas las conexiones entre miembros de este grupo, notas incluidas. El grupo se mantiene.",
+  "talkingPointsToggle": "Incluir a la gente que conoce",
+  "exportHint": "Grupos y conexiones en un único documento Markdown. El ZIP añade nodes.csv y edges.csv, que herramientas de grafos como Gephi abren directamente.",
+  "exportOption": {
+    "me": "Incluirte a ti, con tus conexiones y grupos",
+    "notes": "Incluir las notas de las conexiones",
+    "skipIsolated": "Omitir a quien no tenga conexiones ni grupos"
+  }
 }

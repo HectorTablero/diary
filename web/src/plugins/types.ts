@@ -16,7 +16,8 @@ export type PluginSurface =
   | 'widget'
   | 'onboarding'
   | 'peoplePage'
-  | 'person';
+  | 'person'
+  | 'talkingPoints';
 
 /**
  * The extra checkboxes an `ownExport` plugin asked for, as `{ <key>: <ticked> }`.
@@ -115,6 +116,15 @@ export interface PluginModule {
   /** Rendered on a person's profile, under their contact details. Draws nothing when it has nothing
       to say about this person — a profile is not where a plugin advertises itself. */
   PersonWidget?: ComponentType<{ personId: string }>;
+  /**
+   * The people someone knows, for their Talking Points tab: person id → weight in (0, 1). An entry
+   * mentioning one of them becomes a talking point scored like a mention times that weight.
+   *
+   * The tab offers it behind a checkbox labelled `plugins.<id>.talkingPointsToggle`, and only calls
+   * this once it is ticked. Whether it is ticked is kept in the plugin's synced settings under
+   * `talkingPoints` — the app's key, like `enabled` is, not the plugin's to use.
+   */
+  talkingPointConnections?: (personId: string) => Promise<ReadonlyMap<string, number>>;
   /** A card in Settings, built from the app's Section/ToggleRow primitives. */
   SettingsSection?: ComponentType;
   /**
@@ -187,6 +197,9 @@ export interface PluginModule {
     /** Extra controls drawn under the option checkboxes — e.g. which items to include. Owns and
         persists its own state; `buildMerged`/`buildZip` are expected to read it themselves. */
     Picker?: ComponentType;
+    /** Starting values that depend on the plugin's data, laid over the manifest's static
+        `exportOptions` once the chunk has loaded — "include you" only for someone in the graph. */
+    defaultOptions?: () => Promise<PluginExportOptions>;
   };
   /**
    * A view in the calendar page's switcher: replaces the diary's own entry heatmap with this

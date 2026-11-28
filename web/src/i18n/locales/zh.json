@@ -232,6 +232,7 @@
     "matchMention": "直接提到",
     "matchTag": "共享标签",
     "matchBroadcast": "对所有人共享",
+    "matchConnection": "认识的人",
     "hiddenSubEntries": "+{{count}} 条隐藏的子记录",
     "hideSubEntries": "收起子记录",
     "deleteConfirmTitle": "删除{{name}}？",

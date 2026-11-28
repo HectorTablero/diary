@@ -65,5 +65,12 @@
   "connectAllStrength": "最初の親しさ",
   "disconnectGroup": "グループ内のつながりをすべて解除",
   "disconnectGroupTitle": "{{name}}内のつながりをすべて削除しますか？",
-  "disconnectGroupDescription": "このグループのメンバー同士のつながりがメモごとすべて削除されます。グループ自体は残ります。"
+  "disconnectGroupDescription": "このグループのメンバー同士のつながりがメモごとすべて削除されます。グループ自体は残ります。",
+  "talkingPointsToggle": "知り合いの話題も含める",
+  "exportHint": "グループとつながりを1つのMarkdown文書にします。ZIPにはGephiなどのグラフツールでそのまま開けるnodes.csvとedges.csvも入ります。",
+  "exportOption": {
+    "me": "自分自身（つながりとグループ）を含める",
+    "notes": "つながりのメモを含める",
+    "skipIsolated": "つながりもグループもない人を除く"
+  }
 }

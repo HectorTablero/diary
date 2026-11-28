@@ -124,6 +124,7 @@
         "matchMention": "Badge explaining *why* an entry was suggested: it names the person directly. Sits beside matchTag and matchBroadcast in a narrow badge.",
         "matchTag": "Badge: the entry and the person share a tag.",
         "matchBroadcast": "Badge: the entry is broadcast to everyone regardless of match.",
+        "matchConnection": "Badge: the entry mentions someone this person knows (from the social graph plugin), so it may interest them too. Same narrow badge as matchMention.",
         "checkupReminders": "\"Checkup\" here means getting back in touch with someone after a while, not a medical check. Choose a word for reaching out, not for inspecting.",
         "checkupDueTitle": "Notification title when someone is overdue. {{name}} is the person.",
         "checkupDigestTitle": "Counted. Stands in for the whole set when more than three people are overdue at once — importing an address book otherwise means one buzz per person, all in the same second. Only ever seen with a count of four or more, so the singular form exists purely for i18next's lookup.",

@@ -234,6 +234,7 @@
     "matchMention": "直接の言及",
     "matchTag": "共通のタグ",
     "matchBroadcast": "全員に共有",
+    "matchConnection": "知り合いのこと",
     "hiddenSubEntries": "+ 非表示のサブ記録{{count}}件",
     "hideSubEntries": "サブ記録を隠す",
     "deleteConfirmTitle": "{{name}}さんを削除しますか？",

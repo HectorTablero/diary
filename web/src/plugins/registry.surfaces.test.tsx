@@ -30,6 +30,7 @@ const MEMBERS_FOR: Record<PluginSurface, readonly (keyof PluginModule)[]> = {
   onboarding: ['onboardingSteps'],
   peoplePage: ['PeoplePage'],
   person: ['PersonWidget'],
+  talkingPoints: ['talkingPointConnections'],
 };
 
 describe('declared surfaces match what each plugin exports', () => {

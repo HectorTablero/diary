@@ -238,6 +238,7 @@
     "matchMention": "Menzione diretta",
     "matchTag": "Etichetta in comune",
     "matchBroadcast": "Condiviso con tutti",
+    "matchConnection": "Qualcuno che conosce",
     "hiddenSubEntries": "+{{count}} sotto-voce nascosta",
     "hiddenSubEntries_other": "+{{count}} sotto-voci nascoste",
     "hideSubEntries": "Nascondi le sotto-voci",

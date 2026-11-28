@@ -468,7 +468,12 @@ export async function getPerson(personId: string): Promise<PersonDto> {
   return personToDto(person, maps.tags);
 }
 
-export async function getTalkingPoints(personId: string): Promise<TalkingPointsResponse> {
+/** `connections`: people this person knows, weighted in (0, 1) — see buildTalkingPointForest.
+    Supplied by a plugin (the social graph), so the core only ever sees ids and numbers. */
+export async function getTalkingPoints(
+  personId: string,
+  connections?: ReadonlyMap<string, number>,
+): Promise<TalkingPointsResponse> {
   const [person, settings, maps] = await Promise.all([
     requirePerson(personId),
     getSettings(),
@@ -499,6 +504,8 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
     settings,
     broadcastTagIds,
     now,
+    false,
+    connections,
   ).slice(0, settings.talkingPointsLimit);
 
   const said = all
@@ -516,6 +523,7 @@ export async function getTalkingPoints(personId: string): Promise<TalkingPointsR
     broadcastTagIds,
     now,
     true,
+    connections,
   );
 
   return { active, said, decayed };

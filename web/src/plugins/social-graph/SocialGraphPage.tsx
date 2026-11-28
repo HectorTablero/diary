@@ -719,6 +719,10 @@ function GroupToggles({ graph, ids }: { graph: SocialGraph; ids: string[] }) {
   );
 }
 
+/** The temporary "disconnect everyone in this group" button, hidden; the code behind it stays.
+    TEMPORARY: remove with graph.disconnectAll and its strings one release after it ships. */
+const SHOW_DISCONNECT_GROUP = false as boolean;
+
 function GroupDialog({
   graph,
   group,
@@ -802,16 +806,18 @@ function GroupDialog({
               />
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-fit gap-1.5 text-muted-foreground hover:text-destructive"
-            onClick={() => setUnlinking(true)}
-          >
-            <Unlink className="size-3.5" />
-            {t('plugins.social-graph.disconnectGroup')}
-          </Button>
+          {SHOW_DISCONNECT_GROUP && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit gap-1.5 text-muted-foreground hover:text-destructive"
+              onClick={() => setUnlinking(true)}
+            >
+              <Unlink className="size-3.5" />
+              {t('plugins.social-graph.disconnectGroup')}
+            </Button>
+          )}
         </form>
         <ConfirmDialog
           open={unlinking}

@@ -120,10 +120,14 @@ export function buildTalkingPointForest(
   now: number,
   /** Flip the epsilon line: match only what has decayed below it (the profile's "faded" fold). */
   decayed = false,
+  /** People this person knows, each with a weight in (0, 1): an entry mentioning one of them
+      matches as `connection`, scored like a mention times that weight, when that beats its own
+      match. Empty by default, which is exactly the forest without connections. */
+  connections: ReadonlyMap<string, number> = new Map(),
 ): TalkingPointNode[] {
   const nodes = new Map<string, TalkingPointNode>();
   for (const entry of entries) {
-    const matchType = matchTypeFor(
+    let matchType = matchTypeFor(
       {
         importance: entry.importance,
         tagIds: entry.tags.map((tag) => tag.id),
@@ -134,11 +138,20 @@ export function buildTalkingPointForest(
       settings,
       broadcastTagIds,
     );
+    let score = matchType ? scoreEntry(entry, matchType, settings, now) : 0;
+    const weight = entry.people.reduce((max, p) => Math.max(max, connections.get(p.id) ?? 0), 0);
+    if (weight > 0) {
+      const viaConnection = scoreEntry(entry, 'connection', settings, now) * weight;
+      if (viaConnection > score) {
+        matchType = 'connection';
+        score = viaConnection;
+      }
+    }
     const eligible =
       matchType !== null &&
       !entry.saidTo.some((s) => s.personId === personId) &&
       !entry.hiddenFor.includes(personId);
-    const score = eligible ? scoreEntry(entry, matchType!, settings, now) : 0;
+    if (!eligible) score = 0;
     const matched = eligible && score >= settings.epsilon !== decayed;
     nodes.set(entry.id, {
       ...entry,

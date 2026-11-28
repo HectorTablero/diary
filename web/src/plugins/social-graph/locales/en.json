@@ -68,5 +68,12 @@
   "connectAllStrength": "How close should they start?",
   "disconnectGroup": "Disconnect everyone in this group",
   "disconnectGroupTitle": "Remove every connection inside {{name}}?",
-  "disconnectGroupDescription": "Every connection between two members of this group is removed, notes included. The group itself stays."
+  "disconnectGroupDescription": "Every connection between two members of this group is removed, notes included. The group itself stays.",
+  "talkingPointsToggle": "Include people they know",
+  "exportHint": "Groups and connections as one Markdown document. The ZIP adds nodes.csv and edges.csv, which graph tools such as Gephi open directly.",
+  "exportOption": {
+    "me": "Include yourself, with your connections and groups",
+    "notes": "Include connection notes",
+    "skipIsolated": "Leave out people with no connections or groups"
+  }
 }

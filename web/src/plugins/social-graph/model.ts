@@ -130,6 +130,23 @@ export function parseGraph(rows: readonly PluginRecordDto[]) {
   return { links: [...byPair.values()], groups, duplicateLinkIds };
 }
 
+/**
+ * How much less an entry about someone a person knows is worth telling them than one about them:
+ * a talking point via a connection scores CONNECTION_PENALTY × strength/5 of a direct mention, so
+ * even a very close friend's news (0.5) sits below a shared tag (0.6).
+ */
+export const CONNECTION_PENALTY = 0.5;
+
+/** Everyone `personId` is linked to, weighted for talking points. "You" never appear in entries. */
+export function connectionWeights(links: readonly Link[], personId: string): Map<string, number> {
+  const weights = new Map<string, number>();
+  for (const link of links) {
+    const other = link.a === personId ? link.b : link.b === personId ? link.a : null;
+    if (other && other !== ME_ID) weights.set(other, (CONNECTION_PENALTY * link.strength) / 5);
+  }
+  return weights;
+}
+
 /** The first palette colour no group uses yet, so a new group is distinguishable without asking. */
 export function nextGroupColor(groups: readonly Group[]): string {
   const used = new Set(groups.map((group) => group.color.toLowerCase()));

@@ -34,6 +34,26 @@ export interface GraphGroup {
 
 const PAD = 56;
 const MIN_SPAN = 320;
+
+/** The view that fits every node, padded, never smaller than MIN_SPAN. */
+function fitView(nodes: Iterable<SimNode>): View {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const node of nodes) {
+    minX = Math.min(minX, node.x);
+    minY = Math.min(minY, node.y);
+    maxX = Math.max(maxX, node.x);
+    maxY = Math.max(maxY, node.y);
+  }
+  if (minX === Infinity) minX = minY = maxX = maxY = 0;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const w = Math.max(maxX - minX + PAD * 2, MIN_SPAN);
+  const h = Math.max(maxY - minY + PAD * 2, MIN_SPAN);
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
 const DRAG_THRESHOLD = 4;
 const ALPHA_DECAY = 0.985;
 const ALPHA_MIN = 0.004;
@@ -92,6 +112,8 @@ export function GraphCanvas({
   const frozenView = useRef<View | null>(null);
   /** Set once the person moves the view themselves; `null` means "fit to the nodes". */
   const [userView, setUserView] = useState<View | null>(null);
+  const userViewRef = useRef(userView);
+  userViewRef.current = userView;
   const viewRef = useRef<View>({ x: 0, y: 0, w: MIN_SPAN, h: MIN_SPAN });
   /** Background pointers currently down, for panning (one) and pinching (two). */
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -175,6 +197,37 @@ export function GraphCanvas({
     // simLinks/groupMembers deliberately not deps: they only seed newcomers and the pre-settle.
   }, [people]);
 
+  /* Each animation frame writes positions straight onto the elements instead of re-rendering.
+     A re-render per frame is an urgent update every 16ms, and React Router navigates in a
+     transition, which those kept interrupting: leaving the page waited for the graph to settle.
+     Reads only refs, so the loop can hold on to any render's copy. */
+  const paint = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const at = positions.current;
+    for (const el of svg.querySelectorAll<SVGGElement>('[data-node]')) {
+      const node = at.get(el.dataset.node!);
+      if (node) el.setAttribute('transform', `translate(${node.x} ${node.y})`);
+    }
+    for (const el of svg.querySelectorAll<SVGGElement>('[data-link]')) {
+      const [a, b] = el.dataset.link!.split(':');
+      const p = at.get(a);
+      const q = at.get(b);
+      if (!p || !q) continue;
+      for (const line of el.children) {
+        line.setAttribute('x1', String(p.x));
+        line.setAttribute('y1', String(p.y));
+        line.setAttribute('x2', String(q.x));
+        line.setAttribute('y2', String(q.y));
+      }
+    }
+    if (!userViewRef.current && !frozenView.current) {
+      const v = fitView(at.values());
+      viewRef.current = v;
+      svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
+    }
+  };
+
   useEffect(() => {
     alpha.current = Math.max(alpha.current, 0.5);
     if (reduced) {
@@ -191,7 +244,7 @@ export function GraphCanvas({
     const loop = () => {
       tick(nodes, simLinks, groupMembers, alpha.current);
       alpha.current *= ALPHA_DECAY;
-      setFrame((f) => f + 1);
+      paint();
       raf = alpha.current > ALPHA_MIN || drag.current ? requestAnimationFrame(loop) : 0;
     };
     raf = requestAnimationFrame(loop);
@@ -222,25 +275,7 @@ export function GraphCanvas({
     }
   }
 
-  let view = userView ?? frozenView.current;
-  if (!view) {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const node of nodes) {
-      minX = Math.min(minX, node.x);
-      minY = Math.min(minY, node.y);
-      maxX = Math.max(maxX, node.x);
-      maxY = Math.max(maxY, node.y);
-    }
-    if (!nodes.length) minX = minY = maxX = maxY = 0;
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const w = Math.max(maxX - minX + PAD * 2, MIN_SPAN);
-    const h = Math.max(maxY - minY + PAD * 2, MIN_SPAN);
-    view = { x: cx - w / 2, y: cy - h / 2, w, h };
-  }
+  const view = userView ?? frozenView.current ?? fitView(nodes);
   viewRef.current = view;
 
   const onBackgroundPointerDown = (event: PointerEvent<SVGSVGElement>) => {
@@ -310,7 +345,7 @@ export function GraphCanvas({
       if (Math.hypot(event.clientX - current.x, event.clientY - current.y) < DRAG_THRESHOLD) return;
       current.moved = true;
       // Hold the frame still while dragging, or the view refits under the pointer.
-      frozenView.current = view;
+      frozenView.current = viewRef.current;
     }
     const node = byId.get(current.id);
     const point = toSvg(event);
@@ -358,7 +393,7 @@ export function GraphCanvas({
             const lit = selected.has(link.a) || selected.has(link.b);
             const faded = selected.size > 0 && !lit;
             return (
-              <g key={`${link.a}:${link.b}`}>
+              <g key={`${link.a}:${link.b}`} data-link={`${link.a}:${link.b}`}>
                 <line
                   x1={p.x}
                   y1={p.y}
@@ -407,6 +442,7 @@ export function GraphCanvas({
             return (
               <g
                 key={person.id}
+                data-node={person.id}
                 transform={`translate(${node.x} ${node.y})`}
                 opacity={dimmed ? 0.3 : 1}
                 className={cn(

@@ -51,6 +51,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { TagChip } from '@/components/entry/chips';
 import { PageContainer } from '@/components/layout/PageHeader';
 import { PluginPersonSlot } from '@/plugins/PluginPersonSlot';
+import { usePluginTalkingPoints } from '@/plugins/usePluginTalkingPoints';
 import { ContactInfo, ContactMenuItems } from '@/components/person/ContactInfo';
 import { EntryMenu } from '@/components/entry/EntryMenu';
 import { EntryRow } from '@/components/person/EntryRow';
@@ -59,6 +60,7 @@ import { PersonForm } from '@/components/person/PersonForm';
 import { TalkingPointGroup } from '@/components/person/TalkingPointGroup';
 import { TalkingPointItem } from '@/components/person/TalkingPointItem';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ContextMenu } from '@/components/ui/context-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -238,7 +240,8 @@ function ShowMoreButton({ onClick }: { onClick: (() => void) | null }) {
 
 function TalkingPointsTab({ personId, personName }: { personId: string; personName: string }) {
   const { t } = useTranslation();
-  const { data, isLoading } = useTalkingPoints(personId);
+  const connections = usePluginTalkingPoints(personId);
+  const { data, isPending } = useTalkingPoints(personId, connections.weights, !connections.pending);
   const setSaid = useSetSaid();
   const [alreadyToldOpen, setAlreadyToldOpen] = useState(false);
   const [decayedOpen, setDecayedOpen] = useState(false);
@@ -256,9 +259,20 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
     return data.active.map((cluster) => ({ thread: null, clusters: [cluster] }));
   }, [data, threadsOn]);
 
-  if (isLoading) {
+  const connectionsToggle = connections.label && (
+    <label className="flex w-fit items-center gap-2 text-sm text-muted-foreground">
+      <Checkbox
+        checked={connections.on}
+        onCheckedChange={(value) => connections.setOn(value === true)}
+      />
+      {connections.label}
+    </label>
+  );
+
+  if (isPending) {
     return (
       <div className="flex flex-col gap-3">
+        {connectionsToggle}
         <Skeleton className="h-14" />
         <Skeleton className="h-14" />
       </div>
@@ -267,6 +281,7 @@ function TalkingPointsTab({ personId, personName }: { personId: string; personNa
 
   return (
     <div className="flex flex-col gap-4">
+      {connectionsToggle}
       {groups.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {groups.map((group) =>

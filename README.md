@@ -67,6 +67,7 @@ A plugin fills any of five **surfaces**, all optional (`web/src/plugins/types.ts
 | `export`        | Markdown files added to the export archive                                        |
 | `peoplePage`    | its own screen at `/plugins/<id>`, opened from the People list instead of the nav |
 | `person`        | a line on a person's profile, under their contact details                         |
+| `talkingPoints` | people someone knows, offered as a checkbox to widen their Talking Points         |
 
 `web/src/plugins/registry.ts` is the catalogue and the only plugin file the entry chunk may reach:
 an id, an icon, the surfaces list, and a dynamic-import thunk. The surfaces are declared **outside**

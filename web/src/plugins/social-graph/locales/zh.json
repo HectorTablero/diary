@@ -65,5 +65,12 @@
   "connectAllStrength": "初始亲近程度",
   "disconnectGroup": "断开组内所有连接",
   "disconnectGroupTitle": "删除{{name}}内的所有连接？",
-  "disconnectGroupDescription": "该分组成员之间的所有连接都会被删除，包括备注。分组本身保留。"
+  "disconnectGroupDescription": "该分组成员之间的所有连接都会被删除，包括备注。分组本身保留。",
+  "talkingPointsToggle": "包括其认识的人",
+  "exportHint": "分组和连接合为一个 Markdown 文档。ZIP 另含 nodes.csv 和 edges.csv，可直接用 Gephi 等图工具打开。",
+  "exportOption": {
+    "me": "包括你自己，以及你的连接和分组",
+    "notes": "包括连接备注",
+    "skipIsolated": "省略没有连接或分组的人"
+  }
 }

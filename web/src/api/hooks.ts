@@ -231,10 +231,17 @@ export const useMarkEventAsked = () =>
     mutations.markEventAsked(personId, eventId),
   );
 
-export const useTalkingPoints = (personId: string) =>
+export const useTalkingPoints = (
+  personId: string,
+  connections?: ReadonlyMap<string, number>,
+  enabled = true,
+) =>
   useQuery({
-    queryKey: ['people', personId, 'talking-points'],
-    queryFn: () => repo.getTalkingPoints(personId),
+    // The weights are part of the key, so ticking "include connections" (or a closeness change)
+    // is a different answer, while the ['people', id, 'talking-points'] prefix still invalidates it.
+    queryKey: ['people', personId, 'talking-points', connections ? [...connections] : null],
+    queryFn: () => repo.getTalkingPoints(personId, connections),
+    enabled,
   });
 
 export const useMemories = (personId: string) =>

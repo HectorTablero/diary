@@ -244,6 +244,7 @@
     "matchMention": "Mentions them",
     "matchTag": "Shared tag",
     "matchBroadcast": "Shared with everyone",
+    "matchConnection": "Someone they know",
     "hiddenSubEntries": "+{{count}} hidden sub-entry",
     "hiddenSubEntries_other": "+{{count}} hidden sub-entries",
     "hideSubEntries": "Hide sub-entries",

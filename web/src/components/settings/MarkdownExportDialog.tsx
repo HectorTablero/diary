@@ -1,4 +1,4 @@
-import { Hash, Search } from 'lucide-react';
+import { BookOpen, Hash, Search, Users } from 'lucide-react';
 import { type ComponentType, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePeople, useTags } from '@/api/hooks';
@@ -170,9 +170,11 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
     setOwnPicker(null);
     void ownExportPlugin
       ?.load()
-      .then(({ default: module }) => {
+      .then(async ({ default: module }) => {
         const Picker = module.exportOwn?.Picker;
         if (!cancelled && Picker) setOwnPicker(() => Picker);
+        const defaults = await module.exportOwn?.defaultOptions?.();
+        if (!cancelled && defaults) setPluginOptions((prev) => ({ ...prev, ...defaults }));
       })
       .catch(() => {});
     return () => {
@@ -364,17 +366,24 @@ export function MarkdownExportDialog({ open, onOpenChange }: MarkdownExportDialo
                 <SelectTrigger className="w-full" aria-label={t('settings.markdownExport.type')}>
                   <SelectValue />
                 </SelectTrigger>
+                {/* Icons are the ones the sidebar uses for the same things, so each type reads as
+                    the place its data comes from. Inside the item text, so the trigger shows it too. */}
                 <SelectContent>
                   <SelectItem value="entries">
+                    <BookOpen className="text-muted-foreground" />
                     {t('settings.markdownExport.typeEntries')}
                   </SelectItem>
-                  <SelectItem value="people">{t('settings.markdownExport.typePeople')}</SelectItem>
+                  <SelectItem value="people">
+                    <Users className="text-muted-foreground" />
+                    {t('settings.markdownExport.typePeople')}
+                  </SelectItem>
                   {/* Only offered once a plugin is both enabled and declares `ownExport` — an
                       export type for data that doesn't exist would be a menu item that only ever
                       produces an empty file. The label is the same name the Plugins list already
                       shows it by, so there is exactly one place that string is ever written. */}
                   {ownExportPlugins.map((plugin) => (
                     <SelectItem key={plugin.id} value={plugin.id}>
+                      <plugin.icon className="text-muted-foreground" />
                       {pluginLabelsReady ? t(`plugins.${plugin.id}.name`) : '…'}
                     </SelectItem>
                   ))}

@@ -242,6 +242,7 @@
     "matchMention": "Le menciona",
     "matchTag": "Etiqueta compartida",
     "matchBroadcast": "Compartido con todos",
+    "matchConnection": "Alguien que conoce",
     "hiddenSubEntries": "+{{count}} sub-entrada oculta",
     "hiddenSubEntries_other": "+{{count}} sub-entradas ocultas",
     "hideSubEntries": "Ocultar sub-entradas",
